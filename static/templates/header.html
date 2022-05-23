@@ -1,0 +1,39 @@
+{{define "header"}}<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.js"></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@3.6.2/dist/chart.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/luxon@^2"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@^1"></script>
+        <!--
+        <script src="https://cdn.jsdelivr.net/npm/moment@^2"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@^1"></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-colorschemes"></script>
+        -->
+        <script src="/public/chartjs-plugin-colorschemes.js"></script>
+
+        <script src="https://unpkg.com/vue@next"></script>
+        <title>Mora</title>
+
+<style type="text/css">
+.main.menu {
+    margin-bottom: 10px;
+}
+</style>
+    </head>
+    <body>
+        <header style="margin-bottom: 10px" class="ui container">
+            <div class="ui inverted borderless main menu">
+                <div class="ui container">
+                    <a class="left item" href="/">Top</a>
+                    <a class="right floated item" href="/scms">Login/Logout</a>
+                </div>
+            </div>
+        </header>
+{{end}}
+

@@ -1,0 +1,13 @@
+{{template "header"}}
+<script src="/public/repos.js" type="module"></script>
+<main>
+<div class="ui container" id="app">
+        <h1 class="ui header">Repositories</h1>
+        <div class="ui bulleted list">
+            <div class="ui item" v-for="repo in repos">
+                <a :href="repo.path + '/coverages'">[[repo.link]]</a>
+            </div>
+        </div>
+    </div>
+</main>
+{{template "footer"}}

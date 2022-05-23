@@ -1,0 +1,195 @@
+package mora
+
+import (
+	"encoding/json"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func assertEqualCoverage(t *testing.T, expected Coverage, got SerializableCoverage) bool {
+	ok := assert.True(t, expected.Time().Equal(got.Time))
+	ok = ok && assert.Equal(t, expected.Revision(), got.Revision)
+
+	ok = ok && assert.Equal(t, len(expected.Entries()), len(got.Entries))
+	if len(expected.Entries()) != len(got.Entries) {
+		return false
+	}
+	for _, b := range got.Entries {
+		a, flag := expected.Entries()[b.Name]
+		ok = ok && assert.Equal(t, true, flag)
+		if ok {
+			ok = ok && assert.Equal(t, a.Name(), b.Name)
+			ok = ok && assert.Equal(t, a.Lines(), b.Lines)
+			ok = ok && assert.Equal(t, a.Hits(), b.Hits)
+		}
+	}
+
+	return ok
+}
+
+func assertEqualSerializableCoverageList(t *testing.T, expected []Coverage, got []SerializableCoverage) bool {
+	ok := assert.Equal(t, len(expected), len(got))
+	if !ok {
+		return false
+	}
+
+	for i := range expected {
+		ok = ok && assertEqualCoverage(t, expected[i], got[i])
+	}
+
+	return ok
+}
+
+func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Response) {
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	body, err := ioutil.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	var data []SerializableCoverage
+	err = json.Unmarshal(body, &data)
+	require.NoError(t, err)
+
+	assertEqualSerializableCoverageList(t, expected, data)
+}
+
+type MockCoverageEntry struct {
+	name  string
+	lines int
+	hits  int
+}
+
+func (e MockCoverageEntry) Name() string {
+	return e.name
+}
+
+func (e MockCoverageEntry) Lines() int {
+	return e.lines
+}
+
+func (e MockCoverageEntry) Hits() int {
+	return e.hits
+}
+
+type MockCoverage struct {
+	time     time.Time
+	revision string
+	entries  map[string]MockCoverageEntry
+}
+
+func NewMockCoverage() *MockCoverage {
+	return &MockCoverage{entries: map[string]MockCoverageEntry{}}
+}
+
+func (c MockCoverage) Time() time.Time {
+	return c.time
+}
+
+func (c MockCoverage) Revision() string {
+	return c.revision
+}
+
+func (c MockCoverage) Entries() map[string]CoverageEntry {
+	ret := map[string]CoverageEntry{}
+	for _, e := range c.entries {
+		ret[e.Name()] = e
+	}
+	return ret
+}
+
+type MockCoverageProvider struct {
+	coverages map[string][]Coverage
+}
+
+func NewMockCoverageProvider() *MockCoverageProvider {
+	p := &MockCoverageProvider{}
+	p.coverages = map[string][]Coverage{}
+	return p
+}
+
+func (p *MockCoverageProvider) AddCoverage(repo string, cov Coverage) {
+	p.coverages[repo] = append(p.coverages[repo], cov)
+}
+
+func (p *MockCoverageProvider) CoveragesFor(repo string) ([]Coverage, error) {
+	covs, ok := p.coverages[repo]
+	if !ok {
+		return nil, errors.New("unknown repo")
+	}
+	return covs, nil
+}
+
+func (p *MockCoverageProvider) Handler() http.Handler {
+	return nil
+}
+
+func (p *MockCoverageProvider) Repos() ([]string, error) {
+	repos := []string{}
+	for k := range p.coverages {
+		repos = append(repos, k)
+	}
+	return repos, nil
+}
+
+func createMockCoverage() MockCoverage {
+	cc := MockCoverageEntry{"cc", 100, 20}
+	py := MockCoverageEntry{"python", 300, 280}
+	cov := MockCoverage{time: time.Now(), revision: "abc123"}
+	cov.entries = map[string]MockCoverageEntry{}
+	cov.entries[cc.Name()] = cc
+	cov.entries[py.Name()] = py
+
+	return cov
+}
+
+func TestSerializeCoverage(t *testing.T) {
+	// repo := MockRepo{"scm", "owner", "repo"}
+	scm := NewMockSCMClient("scm")
+	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
+	cov := createMockCoverage()
+
+	data := serializableCoverageList(scm, repo, []Coverage{cov})
+
+	require.Equal(t, 1, len(data))
+	assertEqualCoverage(t, cov, data[0])
+}
+
+func getResultFromCovrageListHandler(handler http.Handler, repo *Repo) *http.Response {
+	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
+	scm := NewMockSCMClient("scm")
+	r = r.WithContext(WithRepo(WithSCM(r.Context(), scm), repo))
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	return w.Result()
+}
+
+func TestCoverageList(t *testing.T) {
+	//repo := MockRepo{"scm", "owner", "repo"}
+	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
+	p := NewMockCoverageProvider()
+	expected := createMockCoverage()
+	p.AddCoverage(repo.Link, expected)
+
+	handler := coverageListHandler(p)
+	res := getResultFromCovrageListHandler(handler, repo)
+
+	testCoverageListResponse(t, []Coverage{expected}, res)
+}
+
+func TestCoverageListWithHTMLCoverageProvider(t *testing.T) {
+	dir, repo, expected := createMockDataset(t)
+	p := NewHTMLCoverageProvider(dir)
+
+	handler := coverageListHandler(p)
+	res := getResultFromCovrageListHandler(handler, repo)
+
+	testCoverageListResponse(t, []Coverage{expected}, res)
+}

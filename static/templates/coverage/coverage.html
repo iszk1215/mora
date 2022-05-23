@@ -1,0 +1,42 @@
+{{template "header"}}
+<script src="/public/coverage.js" type="module"></script>
+<main>
+    <div class="ui container" id="app">
+        <div class="ui breadcrumb">
+            <span v-for="(e, i) in breadcrumbs">
+                <i class="right angle icon divider" v-if="i > 0"></i>
+                <a class="section" :href="e.href" v-if="'href' in e">[[e.name]]</a>
+                <span class="section" v-else>[[e.name]]</a>
+                </span>
+            </span>
+        </div>
+
+        <h2 class="ui header">Coverages</h2>
+
+        <canvas id="chart1" width="400" height="100"></canvas>
+
+        <div class="ui list">
+            <div class="item" v-for="cov in coverages">
+                <div class="ui segment">
+                    #[[cov.index]]
+                    Total [[formattedRatio(cov.hits, cov.lines)]]%
+                    ([[cov.hits]]/[[cov.lines]]) :
+                    <div class="right floated content">
+                        [[formattedTime(cov.time)]]
+                        <a :href="cov.revision_url">[[cov.revision.substring(0, 10)]]</a>
+                    </div>
+                    <span v-for="(e, i) in cov.entries">
+                        <span v-if="i > 0"> / </span>
+                        <a :href="'coverages/'+cov.index+'/'+e.name">
+                            [[e.name]]
+                            [[formattedRatio(e.hits, e.lines)]]%
+                            ([[e.hits]]/[[e.lines]])
+                        </a>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</main>
+{{template "footer"}}
