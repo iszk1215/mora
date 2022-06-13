@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/iszk1215/mora"
+	"github.com/iszk1215/mora/mora"
 	"github.com/rs/zerolog"
 
 	"github.com/rs/zerolog/log"
