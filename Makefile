@@ -1,9 +1,11 @@
-all: coverage.html check mora
+EXE = bin/mora
+
+all: coverage.html check $(EXE)
 
 SOURCES = $(shell find . -name '*.go')
 
-mora: $(SOURCES)
-	go build -o bin/mora ./cmd/mora
+$(EXE): $(SOURCES)
+	go build -o $@ ./cmd/mora
 
 check: $(SOURCES)
 	staticcheck ./...
@@ -11,8 +13,8 @@ check: $(SOURCES)
 test: $(SOURCES)
 	go test -v ./...
 
-run: mora
-	bin/mora -debug
+run: $(EXE)
+	$(EXE) -debug
 
 coverage.out: $(SOURCES)
 	go test -coverprofile=$@ ./...

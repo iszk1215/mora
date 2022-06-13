@@ -50,7 +50,6 @@ func RepoFrom(ctx context.Context) (*Repo, bool) {
 	return repo, ok
 }
 
-//type Repo scm.Repository
 type Repo = scm.Repository
 
 // scm client
@@ -71,7 +70,6 @@ type SerializableRepo struct {
 	Link string `json:"link"`
 }
 
-// urls: all repos which are tracked by mora
 func HandleRepoList(clients []Client, provider CoverageProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Print("HandleRepoList")
@@ -87,7 +85,7 @@ func HandleRepoList(clients []Client, provider CoverageProvider) http.HandlerFun
 		for _, client := range clients {
 			repos, err := getReposWithCache(client, sess)
 			if err == errorTokenNotFound {
-				log.Print("hoge")
+				// ignore
 			} else if err != nil {
 				render.NotFound(w, render.ErrNotFound)
 				return
@@ -96,7 +94,7 @@ func HandleRepoList(clients []Client, provider CoverageProvider) http.HandlerFun
 			for _, repo := range repos {
 				for _, link := range urls {
 					if repo.Link == link {
-						path := client.Name() + "/" + repo.Namespace + "/" + repo.Name // FIXME: add scm
+						path := client.Name() + "/" + repo.Namespace + "/" + repo.Name
 						srepos = append(srepos, SerializableRepo{path, repo.Link})
 					}
 				}
@@ -296,7 +294,7 @@ func createClients(config MoraConfig) []Client {
 				scmConfig.Name,
 				scmConfig.SecretFilename)
 		} else {
-			err = fmt.Errorf("scm is not supported: %s", scmConfig.Type)
+			err = fmt.Errorf("unknown scm: %s", scmConfig.Type)
 		}
 
 		if err != nil {
@@ -344,7 +342,7 @@ func (s *MoraServer) Handler() (http.Handler, error) {
 	})
 
 	r.Get("/public/*", func(w http.ResponseWriter, r *http.Request) {
-		fs := http.StripPrefix("/public/", http.FileServer(http.FS(s.publicFS)))
+		fs := http.StripPrefix("/public/", s.publicFileServer)
 		fs.ServeHTTP(w, r)
 	})
 
@@ -352,23 +350,24 @@ func (s *MoraServer) Handler() (http.Handler, error) {
 }
 
 type MoraServer struct {
-	sessionManager *MoraSessionManager
-	clients        []Client
-	provider       CoverageProvider
-	publicFS       fs.FS
-	debug          bool
+	clients  []Client
+	provider CoverageProvider
+	debug    bool
+
+	sessionManager   *MoraSessionManager
+	publicFileServer http.Handler
 }
 
 // static includes public and templates
 //go:embed static
-var static embed.FS
+var embedded embed.FS
 
-func getStaticFS(path string, debug bool) (fs.FS, error) {
+func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
 	if debug {
-		return os.DirFS(filepath.Join("static", path)), nil
+		return os.DirFS(filepath.Join(staticDir, path)), nil
 	}
 
-	return fs.Sub(static, filepath.Join("static", path))
+	return fs.Sub(embedded, filepath.Join("static", path))
 }
 
 func NewMoraServer(clients []Client, provider CoverageProvider, debug bool) (*MoraServer, error) {
@@ -379,13 +378,14 @@ func NewMoraServer(clients []Client, provider CoverageProvider, debug bool) (*Mo
 		return nil, err
 	}
 
-	fsys, err := getStaticFS("templates", debug)
+	staticDir := "mora/static" // FIXME
+	fsys, err := getStaticFS(staticDir, "templates", s.debug)
 	if err != nil {
 		return nil, err
 	}
 	templateLoader = NewTemplateLoader(fsys)
 
-	publicFS, err := getStaticFS("public", s.debug)
+	publicFS, err := getStaticFS(staticDir, "public", s.debug)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +393,7 @@ func NewMoraServer(clients []Client, provider CoverageProvider, debug bool) (*Mo
 	s.sessionManager = sessionManager
 	s.clients = clients
 	s.provider = provider
-	s.publicFS = publicFS
+	s.publicFileServer = http.FileServer(http.FS(publicFS))
 	s.debug = debug
 
 	return s, nil
