@@ -3,7 +3,6 @@ package mora
 import (
 	"context"
 	"net/http"
-	"sort"
 	"strconv"
 	"time"
 
@@ -21,7 +20,6 @@ type CoverageEntry interface {
 type Coverage interface {
 	Time() time.Time
 	Revision() string
-	// Entries() map[string]CoverageEntry // TODO: use slice
 	Entries() []CoverageEntry // TODO: use slice
 }
 
@@ -92,7 +90,7 @@ func injectCoverage(provider CoverageProvider) func(next http.Handler) http.Hand
 	}
 }
 
-func serializeCoverage(revisionURL string, cov Coverage, index int) CoverageResponse {
+func convertCoverage(revisionURL string, cov Coverage, index int) CoverageResponse {
 	ret := CoverageResponse{
 		Index:       index,
 		Time:        cov.Time(),
@@ -109,21 +107,17 @@ func serializeCoverage(revisionURL string, cov Coverage, index int) CoverageResp
 		ret.Entries = append(ret.Entries, d)
 	}
 
-	sort.Slice(ret.Entries, func(i, j int) bool {
-		return ret.Entries[i].Name < ret.Entries[j].Name
-	})
-
 	return ret
 }
 
-func serializableCoverageList(scm Client, repo *Repo, coverages []Coverage) []CoverageResponse {
-	var data []CoverageResponse
+func convertCoverages(scm Client, repo *Repo, coverages []Coverage) []CoverageResponse {
+	var ret []CoverageResponse
 	for i, cov := range coverages {
 		revURL := scm.RevisionURL(repo, cov.Revision())
-		data = append(data, serializeCoverage(revURL, cov, i))
+		ret = append(ret, convertCoverage(revURL, cov, i))
 	}
 
-	return data
+	return ret
 }
 
 func handleCoverageList(provider CoverageProvider) http.HandlerFunc {
@@ -149,7 +143,7 @@ func handleCoverageList(provider CoverageProvider) http.HandlerFunc {
 			return
 		}
 
-		covs := serializableCoverageList(scm, repo, coverages)
+		covs := convertCoverages(scm, repo, coverages)
 		render.JSON(w, covs, http.StatusOK)
 	}
 }

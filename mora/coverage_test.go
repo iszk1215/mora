@@ -22,8 +22,8 @@ func assertEqualCoverage(t *testing.T, expected Coverage, got CoverageResponse) 
 	if len(expected.Entries()) != len(got.Entries) {
 		return false
 	}
-	for i, b := range got.Entries {
-		a := expected.Entries()[i]
+	for i, a := range expected.Entries() {
+		b := got.Entries[i]
 		ok = ok && assert.Equal(t, a.Name(), b.Name)
 		ok = ok && assert.Equal(t, a.Lines(), b.Lines)
 		ok = ok && assert.Equal(t, a.Hits(), b.Hits)
@@ -79,11 +79,11 @@ func (e MockCoverageEntry) Hits() int {
 type MockCoverage struct {
 	time     time.Time
 	revision string
-	entries  map[string]MockCoverageEntry
+	entries  []MockCoverageEntry
 }
 
 func NewMockCoverage() *MockCoverage {
-	return &MockCoverage{entries: map[string]MockCoverageEntry{}}
+	return &MockCoverage{entries: []MockCoverageEntry{}}
 }
 
 func (c MockCoverage) Time() time.Time {
@@ -144,9 +144,7 @@ func createMockCoverage() MockCoverage {
 	cc := MockCoverageEntry{"cc", 100, 20}
 	py := MockCoverageEntry{"python", 300, 280}
 	cov := MockCoverage{time: time.Now(), revision: "abc123"}
-	cov.entries = map[string]MockCoverageEntry{}
-	cov.entries[cc.Name()] = cc
-	cov.entries[py.Name()] = py
+	cov.entries = []MockCoverageEntry{cc, py}
 
 	return cov
 }
@@ -157,7 +155,7 @@ func TestSerializeCoverage(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
 	cov := createMockCoverage()
 
-	data := serializableCoverageList(scm, repo, []Coverage{cov})
+	data := convertCoverages(scm, repo, []Coverage{cov})
 
 	require.Equal(t, 1, len(data))
 	assertEqualCoverage(t, cov, data[0])
