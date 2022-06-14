@@ -189,8 +189,6 @@ func requireLogin(t *testing.T, handler http.Handler, scm string) *http.Cookie {
 func setupServer(t *testing.T) (http.Handler, Client, Repo) {
 	scm := NewMockSCMClient("scm")
 	scm.loginHandler = MockLoginMiddleware{"/login/" + scm.Name()}.Handler
-	// FIXME
-	// repo := MockRepo{scm.Name(), "owner", "repo"}
 	repo := Repo{Namespace: "owner", Name: "repo"}
 	scm.AddRepo(&repo)
 

@@ -32,7 +32,7 @@ func assertEqualCoverage(t *testing.T, expected Coverage, got CoverageResponse) 
 	return ok
 }
 
-func assertEqualSerializableCoverageList(t *testing.T, expected []Coverage, got []CoverageResponse) bool {
+func assertEqualCoverageList(t *testing.T, expected []Coverage, got []CoverageResponse) bool {
 	ok := assert.Equal(t, len(expected), len(got))
 	if !ok {
 		return false
@@ -55,7 +55,7 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 	err = json.Unmarshal(body, &data)
 	require.NoError(t, err)
 
-	assertEqualSerializableCoverageList(t, expected, data)
+	assertEqualCoverageList(t, expected, data)
 }
 
 type MockCoverageEntry struct {
