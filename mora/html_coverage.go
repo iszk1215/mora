@@ -52,10 +52,10 @@ func (c htmlCoverage) Revision() string {
 	return c.Revision_
 }
 
-func (c htmlCoverage) Entries() map[string]CoverageEntry {
-	ret := map[string]CoverageEntry{}
+func (c htmlCoverage) Entries() []CoverageEntry {
+	ret := []CoverageEntry{}
 	for _, e := range c.Entries_ {
-		ret[e.Name()] = e
+		ret = append(ret, e)
 	}
 	return ret
 }

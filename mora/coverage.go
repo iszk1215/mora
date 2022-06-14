@@ -21,7 +21,8 @@ type CoverageEntry interface {
 type Coverage interface {
 	Time() time.Time
 	Revision() string
-	Entries() map[string]CoverageEntry // TODO: use slice
+	// Entries() map[string]CoverageEntry // TODO: use slice
+	Entries() []CoverageEntry // TODO: use slice
 }
 
 type CoverageProvider interface {

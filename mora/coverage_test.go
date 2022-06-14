@@ -22,14 +22,11 @@ func assertEqualCoverage(t *testing.T, expected Coverage, got CoverageResponse) 
 	if len(expected.Entries()) != len(got.Entries) {
 		return false
 	}
-	for _, b := range got.Entries {
-		a, flag := expected.Entries()[b.Name]
-		ok = ok && assert.Equal(t, true, flag)
-		if ok {
-			ok = ok && assert.Equal(t, a.Name(), b.Name)
-			ok = ok && assert.Equal(t, a.Lines(), b.Lines)
-			ok = ok && assert.Equal(t, a.Hits(), b.Hits)
-		}
+	for i, b := range got.Entries {
+		a := expected.Entries()[i]
+		ok = ok && assert.Equal(t, a.Name(), b.Name)
+		ok = ok && assert.Equal(t, a.Lines(), b.Lines)
+		ok = ok && assert.Equal(t, a.Hits(), b.Hits)
 	}
 
 	return ok
@@ -97,10 +94,10 @@ func (c MockCoverage) Revision() string {
 	return c.revision
 }
 
-func (c MockCoverage) Entries() map[string]CoverageEntry {
-	ret := map[string]CoverageEntry{}
+func (c MockCoverage) Entries() []CoverageEntry {
+	ret := []CoverageEntry{}
 	for _, e := range c.entries {
-		ret[e.Name()] = e
+		ret = append(ret, e)
 	}
 	return ret
 }
