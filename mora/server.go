@@ -22,8 +22,18 @@ import (
 
 var (
 	errorTokenNotFound = errors.New("token not found in a session")
-	templateLoader     *TemplateLoader
 )
+
+type Repo = scm.Repository
+
+// scm client
+type Client interface {
+	Name() string // unique name in mora
+	URL() *url.URL
+	RevisionURL(repo *Repo, revision string) string
+	LoginHandler(next http.Handler) http.Handler
+	ListRepos(token *scm.Token) ([]*Repo, error)
+}
 
 type contextKey int
 
@@ -50,24 +60,13 @@ func RepoFrom(ctx context.Context) (*Repo, bool) {
 	return repo, ok
 }
 
-type Repo = scm.Repository
+// API Handler
 
-// scm client
-type Client interface {
-	Name() string // unique name in mora
-	URL() *url.URL
-	RevisionURL(repo *Repo, revision string) string
-	LoginHandler(next http.Handler) http.Handler
-	GetRepos(token *scm.Token) ([]*Repo, error)
-}
-
-// ----------------------------------------------------------------------
-// API
-// ----------------------------------------------------------------------
-
-type SerializableRepo struct {
-	Path string `json:"path"`
-	Link string `json:"link"`
+type RepoResponse struct {
+	SCM       string `json:"scm"`
+	Namespace string `json:"namespace"`
+	Name      string `json:"name"`
+	Link      string `json:"link"`
 }
 
 func HandleRepoList(clients []Client, provider CoverageProvider) http.HandlerFunc {
@@ -80,10 +79,10 @@ func HandleRepoList(clients []Client, provider CoverageProvider) http.HandlerFun
 			return
 		}
 
-		srepos := []SerializableRepo{}
+		repos := []RepoResponse{}
 		sess, _ := MoraSessionFrom(r.Context())
 		for _, client := range clients {
-			repos, err := getReposWithCache(client, sess)
+			tmp, err := getReposWithCache(client, sess)
 			if err == errorTokenNotFound {
 				// ignore
 			} else if err != nil {
@@ -91,17 +90,17 @@ func HandleRepoList(clients []Client, provider CoverageProvider) http.HandlerFun
 				return
 			}
 
-			for _, repo := range repos {
+			for _, repo := range tmp {
 				for _, link := range urls {
 					if repo.Link == link {
-						path := client.Name() + "/" + repo.Namespace + "/" + repo.Name
-						srepos = append(srepos, SerializableRepo{path, repo.Link})
+						repos = append(repos, RepoResponse{
+							client.Name(), repo.Namespace, repo.Name, repo.Link})
 					}
 				}
 			}
 		}
 
-		render.JSON(w, srepos, 200)
+		render.JSON(w, repos, http.StatusOK)
 	}
 }
 
@@ -111,36 +110,31 @@ type SCMResponse struct {
 	Logined bool   `json:"logined"`
 }
 
-func makeSCMResponse(ctx context.Context, clients []Client) []SCMResponse {
-	scms := []SCMResponse{}
-	sess, _ := MoraSessionFrom(ctx)
-
-	for _, client := range clients {
-		_, ok := sess.getToken(client.Name())
-		scms = append(scms, SCMResponse{
-			URL:     client.URL().String(),
-			Name:    client.Name(),
-			Logined: ok,
-		})
-	}
-
-	return scms
-}
-
 func HandleSCMList(clients []Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		scms := makeSCMResponse(r.Context(), clients)
+		scms := []SCMResponse{}
+		sess, _ := MoraSessionFrom(r.Context())
+
+		for _, client := range clients {
+			_, ok := sess.getToken(client.Name())
+			scms = append(scms, SCMResponse{
+				URL:     client.URL().String(),
+				Name:    client.Name(),
+				Logined: ok,
+			})
+		}
+
 		render.JSON(w, scms, 200)
 	}
 }
 
-// ----------------------------------------------------------------------
-// Web
-// ----------------------------------------------------------------------
+// Web Handler
 
 type TemplateLoader struct {
 	fsys fs.FS
 }
+
+var templateLoader *TemplateLoader
 
 func NewTemplateLoader(fsys fs.FS) *TemplateLoader {
 	return &TemplateLoader{fsys}
@@ -153,6 +147,10 @@ func (l *TemplateLoader) load(filename string) (*template.Template, error) {
 		return nil, err
 	}
 	return t, nil
+}
+
+func initTemplateLoader(fsys fs.FS) {
+	templateLoader = NewTemplateLoader(fsys)
 }
 
 func loadTemplate(filename string) (*template.Template, error) {
@@ -194,7 +192,7 @@ func getReposWithCache(client Client, session *MoraSession) ([]*Repo, error) {
 		return nil, errorTokenNotFound
 	}
 
-	repos, err := client.GetRepos(&token)
+	repos, err := client.ListRepos(&token)
 	if err == nil {
 		log.Print("Store repos to cache")
 		session.setReposCache(client.Name(), repos)
@@ -263,6 +261,95 @@ func injectRepo(clients []Client) func(next http.Handler) http.Handler {
 	}
 }
 
+func (s *MoraServer) Handler() http.Handler {
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Use(s.sessionManager.SessionMiddleware)
+
+	// api
+
+	r.Get("/api/scms", HandleSCMList(s.clients))
+	r.Get("/api/repos", HandleRepoList(s.clients, s.provider))
+
+	r.Route("/api/{scm}/{owner}/{repo}", func(r chi.Router) {
+		r.Use(injectRepo(s.clients))
+		r.Mount("/coverages", HandleCoverage(s.provider))
+	})
+
+	// web
+
+	redirectHandler := http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/scms", http.StatusSeeOther)
+		})
+
+	r.Get("/", templateRenderingHandler("index.html"))
+	r.Get("/scms", templateRenderingHandler("login.html"))
+
+	r.Mount("/login", LoginHandler(s.clients, redirectHandler))
+	r.Mount("/logout", LogoutHandler(s.clients, redirectHandler))
+
+	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
+		r.Use(injectRepo(s.clients))
+		r.Mount("/coverages", CoverageWebHandler(s.provider))
+	})
+
+	r.Get("/public/*", func(w http.ResponseWriter, r *http.Request) {
+		fs := http.StripPrefix("/public/", s.publicFileServer)
+		fs.ServeHTTP(w, r)
+	})
+
+	return r
+}
+
+type MoraServer struct {
+	clients  []Client
+	provider CoverageProvider
+
+	sessionManager   *MoraSessionManager
+	publicFileServer http.Handler
+}
+
+// static includes public and templates
+//go:embed static
+var embedded embed.FS
+
+func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
+	if debug {
+		return os.DirFS(filepath.Join(staticDir, path)), nil
+	}
+
+	return fs.Sub(embedded, filepath.Join("static", path))
+}
+
+func NewMoraServer(clients []Client, provider CoverageProvider, debug bool) (*MoraServer, error) {
+	s := &MoraServer{}
+
+	sessionManager, err := NewMoraSessionManager()
+	if err != nil {
+		return nil, err
+	}
+
+	staticDir := "mora/static" // FIXME
+	fsys, err := getStaticFS(staticDir, "templates", debug)
+	if err != nil {
+		return nil, err
+	}
+	initTemplateLoader(fsys)
+
+	publicFS, err := getStaticFS(staticDir, "public", debug)
+	if err != nil {
+		return nil, err
+	}
+
+	s.sessionManager = sessionManager
+	s.clients = clients
+	s.provider = provider
+	s.publicFileServer = http.FileServer(http.FS(publicFS))
+
+	return s, nil
+}
+
 type ScmConfig struct {
 	Type           string `yaml:"type"`
 	Name           string `yaml:"name"`
@@ -308,97 +395,6 @@ func createClients(config MoraConfig) []Client {
 	return clients
 }
 
-func (s *MoraServer) Handler() (http.Handler, error) {
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(s.sessionManager.SessionMiddleware)
-
-	// api
-
-	r.Get("/api/scms", HandleSCMList(s.clients))
-	r.Get("/api/repos", HandleRepoList(s.clients, s.provider))
-
-	r.Route("/api/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(injectRepo(s.clients))
-		r.Mount("/coverages", CoverageAPIHandler(s.provider))
-	})
-
-	// web
-
-	r.Get("/", templateRenderingHandler("index.html"))
-
-	redirectHandler := http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/scms", http.StatusSeeOther)
-		})
-
-	r.Get("/scms", templateRenderingHandler("login.html"))
-	r.Mount("/login", LoginHandler(s.clients, redirectHandler))
-	r.Mount("/logout", LogoutHandler(s.clients, redirectHandler))
-
-	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(injectRepo(s.clients))
-		r.Mount("/coverages", CoverageWebHandler(s.provider))
-	})
-
-	r.Get("/public/*", func(w http.ResponseWriter, r *http.Request) {
-		fs := http.StripPrefix("/public/", s.publicFileServer)
-		fs.ServeHTTP(w, r)
-	})
-
-	return r, nil
-}
-
-type MoraServer struct {
-	clients  []Client
-	provider CoverageProvider
-	debug    bool
-
-	sessionManager   *MoraSessionManager
-	publicFileServer http.Handler
-}
-
-// static includes public and templates
-//go:embed static
-var embedded embed.FS
-
-func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
-	if debug {
-		return os.DirFS(filepath.Join(staticDir, path)), nil
-	}
-
-	return fs.Sub(embedded, filepath.Join("static", path))
-}
-
-func NewMoraServer(clients []Client, provider CoverageProvider, debug bool) (*MoraServer, error) {
-	s := &MoraServer{}
-
-	sessionManager, err := NewMoraSessionManager()
-	if err != nil {
-		return nil, err
-	}
-
-	staticDir := "mora/static" // FIXME
-	fsys, err := getStaticFS(staticDir, "templates", s.debug)
-	if err != nil {
-		return nil, err
-	}
-	templateLoader = NewTemplateLoader(fsys)
-
-	publicFS, err := getStaticFS(staticDir, "public", s.debug)
-	if err != nil {
-		return nil, err
-	}
-
-	s.sessionManager = sessionManager
-	s.clients = clients
-	s.provider = provider
-	s.publicFileServer = http.FileServer(http.FS(publicFS))
-	s.debug = debug
-
-	return s, nil
-}
-
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	clients := createClients(config)
 	if len(clients) == 0 {
@@ -408,6 +404,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	dir := os.DirFS("data") // TODO
 	provider := NewHTMLCoverageProvider(dir)
 
+	log.Print("config.Debug=", config.Debug)
 	return NewMoraServer(clients, provider, config.Debug)
 }
 

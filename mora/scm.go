@@ -6,21 +6,26 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/drone/go-login/login"
 	"github.com/drone/go-scm/scm"
 	"github.com/drone/go-scm/scm/transport/oauth2"
 	"gopkg.in/yaml.v3"
 )
 
 type BaseSCM struct {
-	name   string
-	client *scm.Client
-	url    *url.URL
+	name            string
+	client          *scm.Client
+	url             *url.URL
+	loginMiddleware login.Middleware
 }
 
-func (s *BaseSCM) Init(name string, client *scm.Client, url *url.URL) {
+func (s *BaseSCM) Init(name string, url *url.URL, client *scm.Client,
+	loginMiddleware login.Middleware) {
 	s.name = name
 	s.url = url
 	s.client = client
+	s.loginMiddleware = loginMiddleware
+
 	s.client.Client = &http.Client{
 		Transport: &oauth2.Transport{
 			Scheme: "token",
@@ -37,7 +42,11 @@ func (s *BaseSCM) URL() *url.URL {
 	return s.url
 }
 
-func (s *BaseSCM) GetRepos(token *scm.Token) ([]*Repo, error) {
+func (s *BaseSCM) LoginHandler(next http.Handler) http.Handler {
+	return s.loginMiddleware.Handler(next)
+}
+
+func (s *BaseSCM) ListRepos(token *scm.Token) ([]*Repo, error) {
 	ctx := scm.WithContext(context.Background(), token)
 
 	ret := []*Repo{}

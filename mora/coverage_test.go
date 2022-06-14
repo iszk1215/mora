@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func assertEqualCoverage(t *testing.T, expected Coverage, got SerializableCoverage) bool {
+func assertEqualCoverage(t *testing.T, expected Coverage, got CoverageResponse) bool {
 	ok := assert.True(t, expected.Time().Equal(got.Time))
 	ok = ok && assert.Equal(t, expected.Revision(), got.Revision)
 
@@ -35,7 +35,7 @@ func assertEqualCoverage(t *testing.T, expected Coverage, got SerializableCovera
 	return ok
 }
 
-func assertEqualSerializableCoverageList(t *testing.T, expected []Coverage, got []SerializableCoverage) bool {
+func assertEqualSerializableCoverageList(t *testing.T, expected []Coverage, got []CoverageResponse) bool {
 	ok := assert.Equal(t, len(expected), len(got))
 	if !ok {
 		return false
@@ -54,7 +54,7 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 	body, err := ioutil.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var data []SerializableCoverage
+	var data []CoverageResponse
 	err = json.Unmarshal(body, &data)
 	require.NoError(t, err)
 
@@ -128,7 +128,11 @@ func (p *MockCoverageProvider) CoveragesFor(repo string) ([]Coverage, error) {
 }
 
 func (p *MockCoverageProvider) Handler() http.Handler {
-	return nil
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
+}
+
+func (p *MockCoverageProvider) HandleCoverage() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 }
 
 func (p *MockCoverageProvider) Repos() ([]string, error) {
@@ -178,7 +182,7 @@ func TestCoverageList(t *testing.T) {
 	expected := createMockCoverage()
 	p.AddCoverage(repo.Link, expected)
 
-	handler := coverageListHandler(p)
+	handler := handleCoverageList(p)
 	res := getResultFromCovrageListHandler(handler, repo)
 
 	testCoverageListResponse(t, []Coverage{expected}, res)
@@ -188,7 +192,7 @@ func TestCoverageListWithHTMLCoverageProvider(t *testing.T) {
 	dir, repo, expected := createMockDataset(t)
 	p := NewHTMLCoverageProvider(dir)
 
-	handler := coverageListHandler(p)
+	handler := handleCoverageList(p)
 	res := getResultFromCovrageListHandler(handler, repo)
 
 	testCoverageListResponse(t, []Coverage{expected}, res)

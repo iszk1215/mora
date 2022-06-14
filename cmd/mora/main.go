@@ -37,12 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// handler, err := mora.ServerHandlerFromConfig(config)
-	handler, err := server.Handler()
-	if err != nil {
-		log.Err(err).Msg("")
-		os.Exit(1)
-	}
+	handler := server.Handler()
 
 	log.Info().Msg("Started")
 	err = http.ListenAndServe(":"+config.Port, handler)

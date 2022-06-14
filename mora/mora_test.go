@@ -39,7 +39,7 @@ func (m MockSCMClient) LoginHandler(next http.Handler) http.Handler {
 	return m.loginHandler(next)
 }
 
-func (m MockSCMClient) GetRepos(token *scm.Token) ([]*Repo, error) {
+func (m MockSCMClient) ListRepos(token *scm.Token) ([]*Repo, error) {
 	return m.repos, nil
 }
 

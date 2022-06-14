@@ -93,6 +93,7 @@
                 return (hits * 100.0 / lines).toFixed(1)
             },
             formattedTime(time) {
+                console.log(time)
                 //console.log(luxon)
                 return luxon.DateTime.fromISO(time).toLocaleString(
                     luxon.DateTime.DATETIME_FULL)

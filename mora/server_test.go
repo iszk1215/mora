@@ -19,9 +19,11 @@ func requireLocation(t *testing.T, expected string, r *http.Response) {
 	require.Equal(t, expected, loc.String())
 }
 
-func assertEqualSerializableRepo(t *testing.T, expected Repo, got SerializableRepo) bool {
-	// ok := assert.Equal(t, expected.Path(), got.Path)
-	ok := assert.Equal(t, expected.Link, got.Link) // FIXME
+func assertEqualRepoResponse(t *testing.T, expected Repo, got RepoResponse) bool {
+	// FIXME: check SCM
+	ok := assert.Equal(t, expected.Namespace, got.Namespace)
+	ok = ok && assert.Equal(t, expected.Name, got.Name)
+	ok = ok && assert.Equal(t, expected.Link, got.Link)
 	return ok
 }
 
@@ -29,13 +31,13 @@ func requireEqualRepoList(t *testing.T, expected []Repo, res *http.Response) {
 	body, err := ioutil.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var data []SerializableRepo
+	var data []RepoResponse
 	err = json.Unmarshal(body, &data)
 	require.NoError(t, err)
 
 	require.Equal(t, len(expected), len(data))
 	for i, exp := range expected {
-		assertEqualSerializableRepo(t, exp, data[i])
+		assertEqualRepoResponse(t, exp, data[i])
 	}
 }
 
@@ -198,8 +200,7 @@ func setupServer(t *testing.T) (http.Handler, Client, Repo) {
 
 	server, err := NewMoraServer([]Client{scm}, provider, false)
 	require.NoError(t, err)
-	handler, err := server.Handler()
-	require.NoError(t, err)
+	handler := server.Handler()
 
 	return handler, scm, repo
 }

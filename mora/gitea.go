@@ -1,15 +1,12 @@
 package mora
 
 import (
-	"net/http"
-
 	login "github.com/drone/go-login/login/gitea"
 	driver "github.com/drone/go-scm/scm/driver/gitea"
 )
 
 type Gitea struct {
 	BaseSCM
-	config login.Config
 }
 
 func NewGitea(name string, url string, config login.Config) (*Gitea, error) {
@@ -19,18 +16,13 @@ func NewGitea(name string, url string, config login.Config) (*Gitea, error) {
 	}
 
 	gitea := new(Gitea)
-	gitea.Init(name, client, client.BaseURL)
-	gitea.config = config
+	gitea.Init(name, client.BaseURL, client, &config)
 
 	return gitea, nil
 }
 
 func (g *Gitea) RevisionURL(repo *Repo, revision string) string {
 	return repo.Link + "/src/commit/" + revision
-}
-
-func (g *Gitea) LoginHandler(next http.Handler) http.Handler {
-	return g.config.Handler(next)
 }
 
 func NewGiteaFromFile(name string, filename string, url string, redirect_url string) (*Gitea, error) {
