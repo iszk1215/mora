@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/drone/go-scm/scm"
 	"github.com/rs/zerolog/log"
@@ -19,12 +21,13 @@ const (
 )
 
 type MoraSession struct {
-	reposMap map[string][]*Repo
-	tokenMap map[string]scm.Token
+	reposMap  map[string][]*Repo
+	tokenMap  map[string]scm.Token
+	timestamp time.Time
 }
 
 func NewMoraSession() *MoraSession {
-	return &MoraSession{map[string][]*Repo{}, map[string]scm.Token{}}
+	return &MoraSession{map[string][]*Repo{}, map[string]scm.Token{}, time.Now()}
 }
 
 func (s *MoraSession) getReposCache(scm string) ([]*Repo, bool) {
@@ -50,30 +53,21 @@ func (s *MoraSession) Remove(scm string) {
 	delete(s.reposMap, scm)
 }
 
+// Session Manager
+
 type MoraSessionManager struct {
 	cookiename string
 	store      map[string]*MoraSession
+	lifetime   time.Duration
+	lock       sync.Mutex
 }
 
-func NewMoraSessionManager() (*MoraSessionManager, error) {
-	s := &MoraSessionManager{}
-	s.store = map[string]*MoraSession{}
-	s.cookiename = "morasessionid"
-	/*
-		conf := &session.ManagerConfig{
-			CookieName:      "morasessionid",
-			Gclifetime:      3600 * 24 * 7,
-			EnableSetCookie: true,
-		}
-		m, err := session.NewManager("memory", conf)
-		if err != nil {
-			return nil, err
-		}
-		go m.GC()
-		s.sessionManager = m
-	*/
-
-	return s, nil
+func NewMoraSessionManager() *MoraSessionManager {
+	return &MoraSessionManager{
+		cookiename: "morasessionid",
+		store:      map[string]*MoraSession{},
+		lifetime:   3600 * 24 * time.Hour,
+	}
 }
 
 func WithMoraSession(ctx context.Context, sess *MoraSession) context.Context {
@@ -93,8 +87,37 @@ func sessionID() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
+func (m *MoraSessionManager) GC() {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	now := time.Now()
+	for sid, sess := range m.store {
+		if now.Sub(sess.timestamp) > m.lifetime {
+			delete(m.store, sid)
+		}
+	}
+}
+
+func (m *MoraSessionManager) get(sid string) (*MoraSession, bool) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	sess, ok := m.store[sid]
+	return sess, ok
+}
+
+func (m *MoraSessionManager) put(sid string, session *MoraSession) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.store[sid] = session
+}
+
 func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m.GC()
+
 		cookie, err := r.Cookie(m.cookiename)
 
 		var sid string
@@ -104,12 +127,13 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 			sid = cookie.Value
 		}
 
-		sess, ok := m.store[sid]
+		sess, ok := m.get(sid)
 		if !ok {
-			log.Info().Msg("SessionMiddleware: create new MoraSession")
-			sess := NewMoraSession()
-			m.store[sid] = sess
+			log.Info().Msgf("SessionMiddleware: create new MoraSession")
+			sess = NewMoraSession()
+			m.put(sid, sess)
 		}
+		sess.timestamp = time.Now()
 
 		cookie = &http.Cookie{
 			Name:     m.cookiename,

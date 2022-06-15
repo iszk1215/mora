@@ -14,6 +14,7 @@ test: $(SOURCES)
 	go test -v ./...
 
 run: $(EXE)
+	go test ./...
 	$(EXE) -debug
 
 coverage.out: $(SOURCES)

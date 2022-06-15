@@ -10,8 +10,7 @@ import (
 )
 
 func TestSessionManager(t *testing.T) {
-	m, err := NewMoraSessionManager()
-	require.NoError(t, err)
+	m := NewMoraSessionManager()
 	next := func(w http.ResponseWriter, r *http.Request) {
 		_, ok := MoraSessionFrom(r.Context())
 		require.True(t, ok)
