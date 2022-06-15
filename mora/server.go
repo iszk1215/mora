@@ -325,10 +325,7 @@ func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
 func NewMoraServer(clients []Client, provider CoverageProvider, debug bool) (*MoraServer, error) {
 	s := &MoraServer{}
 
-	sessionManager, err := NewMoraSessionManager()
-	if err != nil {
-		return nil, err
-	}
+	sessionManager := NewMoraSessionManager()
 
 	staticDir := "mora/static" // FIXME
 	fsys, err := getStaticFS(staticDir, "templates", debug)
