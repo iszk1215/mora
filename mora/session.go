@@ -2,10 +2,11 @@ package mora
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"io"
 	"net/http"
 
-	"github.com/beego/beego/v2/server/web/session"
-	"github.com/drone/drone/handler/api/render"
 	"github.com/drone/go-scm/scm"
 	"github.com/rs/zerolog/log"
 )
@@ -50,22 +51,27 @@ func (s *MoraSession) Remove(scm string) {
 }
 
 type MoraSessionManager struct {
-	sessionManager *session.Manager
+	cookiename string
+	store      map[string]*MoraSession
 }
 
 func NewMoraSessionManager() (*MoraSessionManager, error) {
 	s := &MoraSessionManager{}
-	conf := &session.ManagerConfig{
-		CookieName:      "morasessionid",
-		Gclifetime:      3600 * 24 * 7,
-		EnableSetCookie: true,
-	}
-	m, err := session.NewManager("memory", conf)
-	if err != nil {
-		return nil, err
-	}
-	go m.GC()
-	s.sessionManager = m
+	s.store = map[string]*MoraSession{}
+	s.cookiename = "morasessionid"
+	/*
+		conf := &session.ManagerConfig{
+			CookieName:      "morasessionid",
+			Gclifetime:      3600 * 24 * 7,
+			EnableSetCookie: true,
+		}
+		m, err := session.NewManager("memory", conf)
+		if err != nil {
+			return nil, err
+		}
+		go m.GC()
+		s.sessionManager = m
+	*/
 
 	return s, nil
 }
@@ -79,27 +85,42 @@ func MoraSessionFrom(ctx context.Context) (*MoraSession, bool) {
 	return sess, ok
 }
 
-func (s *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
+func sessionID() string {
+	b := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return ""
+	}
+	return base64.URLEncoding.EncodeToString(b)
+}
+
+func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tmp, err := s.sessionManager.SessionStart(w, r)
-		if err != nil {
-			panic("SessionStart returns error: " + err.Error())
+		cookie, err := r.Cookie(m.cookiename)
+
+		var sid string
+		if err != nil || cookie.Value == "" {
+			sid = sessionID()
+		} else {
+			sid = cookie.Value
 		}
 
-		sess, ok := tmp.Get(r.Context(), sessionMoraSessionKey).(*MoraSession)
+		sess, ok := m.store[sid]
 		if !ok {
 			log.Info().Msg("SessionMiddleware: create new MoraSession")
-			sess = NewMoraSession()
-			err := tmp.Set(r.Context(), sessionMoraSessionKey, sess)
-			if err != nil {
-				log.Err(err).Msg("")
-				render.NotFound(w, render.ErrNotFound)
-			}
+			sess := NewMoraSession()
+			m.store[sid] = sess
 		}
+
+		cookie = &http.Cookie{
+			Name:     m.cookiename,
+			Value:    sid,
+			Path:     "/",
+			HttpOnly: true,
+		}
+
+		http.SetCookie(w, cookie)
 
 		r = r.WithContext(WithMoraSession(r.Context(), sess))
 		next.ServeHTTP(w, r)
-
-		tmp.SessionRelease(r.Context(), w)
 	})
 }
