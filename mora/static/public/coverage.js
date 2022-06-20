@@ -1,5 +1,20 @@
+import { Breadcrumb } from '/public/mora.js'
+
 (function() {
     let chart
+
+    const breadcrumb = function() {
+        let [_, scm, owner, repo, cov, covIndex, entry, ...rest]
+            = window.location.pathname.split('/')
+        let path = ["", scm, owner, repo, "coverages"].join("/")
+
+        return [
+            { href: "/", name: "Top" },
+            { name: [scm, owner, repo].join("/") },
+            { href: path, name: "Coverages" },
+        ]
+    }()
+
 
     let chartData = {
         "type": "line",
@@ -81,6 +96,7 @@
     }
 
     const app = {
+        components: { breadcrumb: Breadcrumb(breadcrumb) },
         delimiters: ['[[', ']]'],
         data() {
             return {
