@@ -2,7 +2,6 @@ package mora
 
 import (
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -116,12 +115,12 @@ func (p *MockCoverageProvider) AddCoverage(repo string, cov Coverage) {
 	p.coverages[repo] = append(p.coverages[repo], cov)
 }
 
-func (p *MockCoverageProvider) CoveragesFor(repo string) ([]Coverage, error) {
+func (p *MockCoverageProvider) CoveragesFor(repo string) []Coverage {
 	covs, ok := p.coverages[repo]
 	if !ok {
-		return nil, errors.New("unknown repo")
+		return []Coverage{}
 	}
-	return covs, nil
+	return covs
 }
 
 func (p *MockCoverageProvider) Handler() http.Handler {
