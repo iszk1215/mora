@@ -118,6 +118,7 @@ func loadDirectory(dir fs.FS, path, configFilename string) ([]*htmlCoverage, err
 }
 
 func load(dir fs.FS, configFilename string) (map[string][]*htmlCoverage, error) {
+	log.Info().Msg("htmlCoverage::load")
 	covs, err := loadDirectory(dir, "", configFilename)
 	if err != nil {
 		return nil, err
@@ -145,43 +146,44 @@ const (
 	coverageEntryKey htmlCoverageContextKey = iota
 )
 
-func withEntry(ctx context.Context, entry htmlCoverageEntry) context.Context {
+func withEntry(ctx context.Context, entry *htmlCoverageEntry) context.Context {
 	return context.WithValue(ctx, coverageEntryKey, entry)
 }
 
-func htmlCoverageFrom(ctx context.Context) (htmlCoverage, bool) {
+func htmlCoverageFrom(ctx context.Context) (*htmlCoverage, bool) {
 	tmp, ok := coverageFrom(ctx)
 	if !ok {
-		return htmlCoverage{}, false
+		//return htmlCoverage{}, false
+		return nil, false
 	}
-	cov, ok := tmp.(htmlCoverage)
+	cov, ok := tmp.(*htmlCoverage)
 	return cov, ok
 }
 
-func entryFrom(ctx context.Context) (Client, *Repo, htmlCoverage, htmlCoverageEntry, bool) {
+func entryFrom(ctx context.Context) (Client, *Repo, *htmlCoverage, *htmlCoverageEntry, bool) {
 	scm, ok := SCMFrom(ctx)
 	if !ok {
-		return nil, nil, htmlCoverage{}, htmlCoverageEntry{}, false
+		return nil, nil, nil, nil, false
 	}
 
 	repo, ok := RepoFrom(ctx)
 	if !ok {
-		return nil, nil, htmlCoverage{}, htmlCoverageEntry{}, false
+		return nil, nil, nil, nil, false
 	}
 
 	cov, ok := htmlCoverageFrom(ctx)
 	if !ok {
-		return nil, nil, htmlCoverage{}, htmlCoverageEntry{}, false
+		return nil, nil, nil, nil, false
 	}
 
-	entry, ok := ctx.Value(coverageEntryKey).(htmlCoverageEntry)
+	entry, ok := ctx.Value(coverageEntryKey).(*htmlCoverageEntry)
 	return scm, repo, cov, entry, ok
 }
 
 type HTMLCoverageProvider struct {
 	dataDirectory  fs.FS
 	configFilename string
-	covmap         map[string][]*htmlCoverage
+	covmap         map[string][]Coverage
 	repos          []string
 	sync.Mutex
 }
@@ -204,40 +206,36 @@ func (m *HTMLCoverageProvider) reload() error {
 		repos = append(repos, repo)
 	}
 
+	coverageMap := map[string][]Coverage{}
+	for k, v := range covmap {
+		coverageMap[k] = []Coverage{}
+		for _, cov := range v {
+			coverageMap[k] = append(coverageMap[k], cov)
+		}
+	}
+
 	m.Lock()
 	defer m.Unlock()
-	m.covmap = covmap
+	m.covmap = coverageMap
 	m.repos = repos
 
 	return nil
 }
 
-func (m *HTMLCoverageProvider) Repos() ([]string, error) {
-	if len(m.covmap) == 0 {
-		err := m.reload()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return m.repos, nil
+func (m *HTMLCoverageProvider) Sync() error {
+	return m.reload()
 }
 
-func (m *HTMLCoverageProvider) CoveragesFor(repoURL string) ([]Coverage, error) {
-	if err := m.reload(); err != nil {
-		return nil, err
-	}
+func (m *HTMLCoverageProvider) Repos() []string {
+	return m.repos
+}
 
+func (m *HTMLCoverageProvider) CoveragesFor(repoURL string) []Coverage {
 	covs, ok := m.covmap[repoURL]
 	if !ok {
-		return nil, errors.New("unknow repo")
+		return []Coverage{}
 	}
-
-	ret := []Coverage{}
-	for _, c := range covs {
-		ret = append(ret, *c)
-	}
-	return ret, nil
+	return covs
 }
 
 func CoverageEntryChecker(next http.Handler) http.Handler {
@@ -265,7 +263,7 @@ func CoverageEntryChecker(next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r.WithContext(withEntry(r.Context(), *entry)))
+		next.ServeHTTP(w, r.WithContext(withEntry(r.Context(), entry)))
 	})
 }
 

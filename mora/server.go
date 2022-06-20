@@ -73,11 +73,7 @@ func HandleRepoList(clients []Client, provider CoverageProvider) http.HandlerFun
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Print("HandleRepoList")
 
-		urls, err := provider.Repos()
-		if err != nil {
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
+		urls := provider.Repos()
 
 		repos := []RepoResponse{}
 		sess, _ := MoraSessionFrom(r.Context())
@@ -125,6 +121,12 @@ func HandleSCMList(clients []Client) http.HandlerFunc {
 		}
 
 		render.JSON(w, scms, 200)
+	}
+}
+
+func HandleSync(provider CoverageProvider) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		provider.Sync()
 	}
 }
 
@@ -268,6 +270,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	// api
 
+	r.Post("/api/sync", HandleSync(s.provider))
 	r.Get("/api/scms", HandleSCMList(s.clients))
 	r.Get("/api/repos", HandleRepoList(s.clients, s.provider))
 
@@ -400,6 +403,10 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 
 	dir := os.DirFS("data") // TODO
 	provider := NewHTMLCoverageProvider(dir)
+	err := provider.Sync()
+	if err != nil {
+		return nil, err
+	}
 
 	log.Print("config.Debug=", config.Debug)
 	return NewMoraServer(clients, provider, config.Debug)

@@ -20,14 +20,15 @@ type CoverageEntry interface {
 type Coverage interface {
 	Time() time.Time
 	Revision() string
-	Entries() []CoverageEntry // TODO: use slice
+	Entries() []CoverageEntry
 }
 
 type CoverageProvider interface {
-	CoveragesFor(repoURL string) ([]Coverage, error)
+	CoveragesFor(repoURL string) []Coverage
 	Handler() http.Handler
 	HandleCoverage() http.Handler
-	Repos() ([]string, error)
+	Repos() []string
+	Sync() error
 }
 
 type CoverageEntryResponse struct {
@@ -76,8 +77,8 @@ func injectCoverage(provider CoverageProvider) func(next http.Handler) http.Hand
 				return
 			}
 
-			coverages, err := provider.CoveragesFor(repo.Link)
-			if err != nil || index < 0 || index >= len(coverages) {
+			coverages := provider.CoveragesFor(repo.Link)
+			if index < 0 || index >= len(coverages) {
 				log.Error().Msgf("coverage index is out of range: index=%d", index)
 				render.NotFound(w, render.ErrNotFound)
 				return
@@ -136,18 +137,14 @@ func handleCoverageList(provider CoverageProvider) http.HandlerFunc {
 			return
 		}
 
-		coverages, err := provider.CoveragesFor(repo.Link)
-		if err != nil {
-			log.Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
+		coverages := provider.CoveragesFor(repo.Link)
 
 		covs := convertCoverages(scm, repo, coverages)
 		render.JSON(w, covs, http.StatusOK)
 	}
 }
 
+// API
 func HandleCoverage(provider CoverageProvider) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", handleCoverageList(provider))

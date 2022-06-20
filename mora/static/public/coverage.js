@@ -1,4 +1,40 @@
 (function() {
+    let chart
+
+    let chartData = {
+        "type": "line",
+        "data": {
+            "datasets": [],
+            "labels": null
+        },
+        "options": {
+            "scales": {
+                "x": {
+                    "type": "time",
+                    "position": "bottom",
+                    "title": {}
+                },
+                "y": {
+                    "type": "linear",
+                    "position": "left",
+                    "title": {
+                        "display": true,
+                        "text": "Coverage %"
+                    }
+                }
+            },
+            "animation": {
+                "duration": 0
+            },
+            "plugins": {
+                "colorschemes": {
+                    "scheme": "tableau.Classic10"
+                }
+            }
+        }
+
+    }
+
     function preprocess(coverages) {
         coverages.reverse() // to yonger first
         for (const cov of coverages) {
@@ -12,72 +48,36 @@
         }
     }
 
-    function update(coverages) {
+    function update_chart(coverages) {
         let map = { "total": [] }
 
         for (const cov of coverages) {
             for (const e of cov.entries) {
-                if (!(e.name in map)) {
+                if (!(e.name in map))
                     map[e.name] = []
-                }
-                map[e.name].push(
-                    { "x": cov.time, "y": e.hits * 100.0 / e.lines })
+                map[e.name].push({ "x": cov.time, "y": e.hits * 100.0 / e.lines })
             }
             map["total"].push({ "x": cov.time, "y": cov.hits * 100.0 / cov.lines })
         }
         let datasets = []
         for (const k in map) {
-            // console.log(map[k])
-            datasets.push({
-                "borderWidth": 1,
-                "label": k,
-                /*
-                "pointBorderWidth": 0,
-                "pointRadius": 5,
-                "pointHitRadius": 0,
-                "pointHoverRadius": 0,
-                "pointHoverBorderWidth": 0,
-                */
-                "data": map[k],
-            })
+            datasets.push({ "borderWidth": 1, "label": k, "data": map[k] })
         }
 
-        let chart = {
-            "type": "line",
-            "data": {
-                "datasets": datasets,
-                "labels": null
-            },
-            "options": {
-                "scales": {
-                    "x": {
-                        "type": "time",
-                        "position": "bottom",
-                        "title": {}
-                    },
-                    "y": {
-                        "type": "linear",
-                        "position": "left",
-                        "title": {
-                            "display": true,
-                            "text": "Coverage %"
-                        }
-                    }
-                },
-                "animation": {
-                    "duration": 0
-                },
-                "plugins": {
-                    "colorschemes": {
-                        "scheme": "tableau.Classic10"
-                    }
-                }
-            }
+        chart.data.datasets = datasets
+        chart.update()
+    }
 
-        }
+    function update(proxy, json) {
+        preprocess(json)
+        proxy.coverages = json
+        update_chart(json)
+    }
 
-        const ctx = document.getElementById("chart1").getContext("2d")
-        new Chart(ctx, chart)
+    async function load_and_update(proxy) {
+        const data = await fetch("/api" + window.location.pathname)
+        const json = await data.json()
+        update(proxy, json)
     }
 
     const app = {
@@ -93,26 +93,23 @@
                 return (hits * 100.0 / lines).toFixed(1)
             },
             formattedTime(time) {
-                console.log(time)
-                //console.log(luxon)
                 return luxon.DateTime.fromISO(time).toLocaleString(
                     luxon.DateTime.DATETIME_FULL)
             },
+            async reload(e) {
+                load_and_update(this)
+            }
         },
-        async mounted() {
-            const data = await fetch("/api" + window.location.pathname)
-            const json = await data.json()
-            preprocess(json)
-            this.coverages = json
+        mounted() {
+            const ctx = document.getElementById("chart1").getContext("2d")
+            chart = new Chart(ctx, chartData)
+            const json = load_and_update(this)
 
             let [_, scm, owner, repo, ...rest] = window.location.pathname.split('/')
-            console.log(scm, owner, repo)
-
-            this.breadcrumbs = [{ href: "/", name: "Top" },
-            { name: [scm, owner, repo].join("/") },
-            { name: "coverages" }]
-
-            update(json)
+            this.breadcrumbs = [
+                { href: "/", name: "Top" },
+                { name: [scm, owner, repo].join("/") },
+                { name: "coverages" }]
         }
     };
 
