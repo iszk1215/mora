@@ -118,6 +118,7 @@ func loadDirectory(dir fs.FS, path, configFilename string) ([]*htmlCoverage, err
 }
 
 func load(dir fs.FS, configFilename string) (map[string][]*htmlCoverage, error) {
+	log.Info().Msg("htmlCoverage::load")
 	covs, err := loadDirectory(dir, "", configFilename)
 	if err != nil {
 		return nil, err
@@ -212,22 +213,15 @@ func (m *HTMLCoverageProvider) reload() error {
 	return nil
 }
 
-func (m *HTMLCoverageProvider) Repos() ([]string, error) {
-	if len(m.covmap) == 0 {
-		err := m.reload()
-		if err != nil {
-			return nil, err
-		}
-	}
+func (m *HTMLCoverageProvider) Sync() error {
+	return m.reload()
+}
 
-	return m.repos, nil
+func (m *HTMLCoverageProvider) Repos() []string {
+	return m.repos
 }
 
 func (m *HTMLCoverageProvider) CoveragesFor(repoURL string) ([]Coverage, error) {
-	if err := m.reload(); err != nil {
-		return nil, err
-	}
-
 	covs, ok := m.covmap[repoURL]
 	if !ok {
 		return nil, errors.New("unknow repo")

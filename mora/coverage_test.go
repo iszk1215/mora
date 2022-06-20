@@ -132,12 +132,14 @@ func (p *MockCoverageProvider) HandleCoverage() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 }
 
-func (p *MockCoverageProvider) Repos() ([]string, error) {
+func (p *MockCoverageProvider) Sync() error { return nil }
+
+func (p *MockCoverageProvider) Repos() []string {
 	repos := []string{}
 	for k := range p.coverages {
 		repos = append(repos, k)
 	}
-	return repos, nil
+	return repos
 }
 
 func createMockCoverage() MockCoverage {
@@ -171,8 +173,7 @@ func getResultFromCovrageListHandler(handler http.Handler, repo *Repo) *http.Res
 }
 
 func TestCoverageList(t *testing.T) {
-	//repo := MockRepo{"scm", "owner", "repo"}
-	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
+	repo := &Repo{Namespace: "owner", Name: "repo"}
 	p := NewMockCoverageProvider()
 	expected := createMockCoverage()
 	p.AddCoverage(repo.Link, expected)
@@ -186,6 +187,8 @@ func TestCoverageList(t *testing.T) {
 func TestCoverageListWithHTMLCoverageProvider(t *testing.T) {
 	dir, repo, expected := createMockDataset(t)
 	p := NewHTMLCoverageProvider(dir)
+	err := p.Sync()
+	require.NoError(t, err)
 
 	handler := handleCoverageList(p)
 	res := getResultFromCovrageListHandler(handler, repo)
