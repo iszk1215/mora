@@ -14,6 +14,7 @@ DA:5,1
 DA:6,1
 DA:10,0
 end_of_record
+TN:
 SF:/home/mora/repo/test2.cc
 DA:3,1
 DA:4,0
@@ -27,10 +28,22 @@ end_of_record
 	require.NoError(t, err)
 	require.Equal(t, 2, len(profiles))
 
-	require.Equal(t, "test1.cc", profiles[0].FileName)
+	expected := []*Profile{
+		{
+			FileName: "test1.cc",
+			Hits:     2,
+			Lines:    3,
+			Blocks:   [][]int{{5, 6, 1}, {10, 10, 0}},
+		},
+		{
+			FileName: "test2.cc",
+			Hits:     1,
+			Lines:    2,
+			Blocks:   [][]int{{3, 3, 1}, {4, 4, 0}},
+		},
+	}
 
-	blocks := [][]int{{5, 6, 1}, {10, 10, 0}}
-	require.Equal(t, blocks, profiles[0].Blocks)
+	require.Equal(t, expected, profiles)
 }
 
 func TestParseToolCoverageGo(t *testing.T) {

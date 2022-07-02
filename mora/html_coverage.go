@@ -6,12 +6,12 @@ import (
 	"io/fs"
 	"net/http"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/drone/drone/handler/api/render"
+	"github.com/elliotchance/pie/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
@@ -53,11 +53,8 @@ func (c htmlCoverage) Revision() string {
 }
 
 func (c htmlCoverage) Entries() []CoverageEntry {
-	ret := []CoverageEntry{}
-	for _, e := range c.Entries_ {
-		ret = append(ret, e)
-	}
-	return ret
+	return pie.Map(c.Entries_,
+		func(e *htmlCoverageEntry) CoverageEntry { return e })
 }
 
 // Loader
@@ -118,27 +115,6 @@ func loadDirectory(dir fs.FS, path, configFilename string) ([]*htmlCoverage, err
 	return ret, nil
 }
 
-func load(dir fs.FS, configFilename string) (map[string][]*htmlCoverage, error) {
-	log.Info().Msg("htmlCoverage::load")
-	covs, err := loadDirectory(dir, "", configFilename)
-	if err != nil {
-		return nil, err
-	}
-
-	covmap := map[string][]*htmlCoverage{}
-	for _, cov := range covs {
-		covmap[cov.RepoURL] = append(covmap[cov.RepoURL], cov)
-	}
-
-	for _, lst := range covmap {
-		sort.Slice(lst, func(i, j int) bool {
-			return lst[i].Time().Before(lst[j].Time())
-		})
-	}
-
-	return covmap, nil
-}
-
 // HTML Coverage Handlers
 
 func htmlCoverageFrom(ctx context.Context) (*htmlCoverage, bool) {
@@ -151,13 +127,15 @@ func htmlCoverageFrom(ctx context.Context) (*htmlCoverage, bool) {
 }
 
 func htmlCoverageEntryFrom(ctx context.Context) (*htmlCoverage, *htmlCoverageEntry, bool) {
-	tmp0, _ := CoverageFrom(ctx)
-	cov, ok0 := tmp0.(*htmlCoverage)
+	cov, ok := htmlCoverageFrom(ctx)
+	if !ok {
+		return nil, nil, false
+	}
 
-	tmp1, _ := CoverageEntryFrom(ctx)
-	entry, ok1 := tmp1.(*htmlCoverageEntry)
+	tmp, _ := CoverageEntryFrom(ctx)
+	entry, ok := tmp.(*htmlCoverageEntry)
 
-	return cov, entry, ok0 && ok1
+	return cov, entry, ok
 }
 
 type HTMLCoverageProvider struct {
@@ -175,25 +153,18 @@ func NewHTMLCoverageProvider(dataDirectory fs.FS) *HTMLCoverageProvider {
 	return m
 }
 
-func (m *HTMLCoverageProvider) reload() error {
-	covmap, err := load(m.dataDirectory, m.configFilename)
+func (m *HTMLCoverageProvider) Sync() error {
+	list, err := loadDirectory(m.dataDirectory, "", m.configFilename)
 	if err != nil {
 		return err
 	}
 
-	repos := []string{}
-	for repo := range covmap {
-		repos = append(repos, repo)
+	coverageMap := map[string][]Coverage{}
+	for _, cov := range list {
+		coverageMap[cov.RepoURL] = append(coverageMap[cov.RepoURL], cov)
 	}
 
-	coverageMap := map[string][]Coverage{}
-	for k, v := range covmap {
-		log.Print("reload: repo=", k)
-		coverageMap[k] = []Coverage{}
-		for _, cov := range v {
-			coverageMap[k] = append(coverageMap[k], cov)
-		}
-	}
+	repos := pie.Keys(coverageMap)
 
 	m.Lock()
 	defer m.Unlock()
@@ -203,20 +174,12 @@ func (m *HTMLCoverageProvider) reload() error {
 	return nil
 }
 
-func (m *HTMLCoverageProvider) Sync() error {
-	return m.reload()
-}
-
 func (m *HTMLCoverageProvider) Repos() []string {
 	return m.repos
 }
 
 func (m *HTMLCoverageProvider) CoveragesFor(repoURL string) []Coverage {
-	covs, ok := m.covmap[repoURL]
-	if !ok {
-		return []Coverage{}
-	}
-	return covs
+	return m.covmap[repoURL]
 }
 
 func (m *HTMLCoverageProvider) handleCoverageEntryData(w http.ResponseWriter, r *http.Request) {
@@ -277,19 +240,13 @@ func handleCoverageEntryJSON(w http.ResponseWriter, r *http.Request) {
 
 func (m *HTMLCoverageProvider) Handler() http.Handler {
 	r := chi.NewRouter()
-	r.Route("/{entry}", func(r chi.Router) {
-		r.Use(InjectCoverageEntry)
-		r.Get("/", handleCoverageEntryJSON)
-	})
+	r.Get("/", handleCoverageEntryJSON)
 	return r
 }
 
 func (m *HTMLCoverageProvider) WebHandler() http.Handler {
 	r := chi.NewRouter()
-	r.Route("/{entry}", func(r chi.Router) {
-		r.Use(InjectCoverageEntry)
-		r.Get("/", templateRenderingHandler("coverage/html_coverage.html"))
-		r.Get("/data/*", m.handleCoverageEntryData)
-	})
+	r.Get("/", templateRenderingHandler("coverage/html_coverage.html"))
+	r.Get("/data/*", m.handleCoverageEntryData)
 	return r
 }

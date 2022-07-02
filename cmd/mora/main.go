@@ -4,6 +4,7 @@ import (
 	"flag"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/iszk1215/mora/mora"
 	"github.com/rs/zerolog"
@@ -12,13 +13,8 @@ import (
 )
 
 func main() {
-	/*
-		log.Logger = log.Output(
-			zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
-	*/
-
-	//log.Logger = log.With().Caller().Logger()
-	log.Logger = zerolog.New(os.Stderr).With().Caller().Logger()
+	log.Logger = log.Output(
+		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
 
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	config_file := flag.String("config", "mora.yaml", "sets log level to debug")
