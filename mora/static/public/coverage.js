@@ -51,6 +51,7 @@ import { Breadcrumb } from '/public/mora.js'
     }
 
     function preprocess(coverages) {
+        console.log(coverages)
         coverages.reverse() // to yonger first
         for (const cov of coverages) {
             let hits = 0, lines = 0

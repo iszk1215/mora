@@ -38,6 +38,10 @@ func (s *BaseSCM) Name() string {
 	return s.name
 }
 
+func (s *BaseSCM) Client() *scm.Client {
+	return s.client
+}
+
 func (s *BaseSCM) URL() *url.URL {
 	return s.url
 }

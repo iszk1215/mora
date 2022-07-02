@@ -9,6 +9,8 @@ import (
 	"github.com/drone/drone/handler/api/render"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
+
+	mapset "github.com/deckarep/golang-set/v2"
 )
 
 type CoverageEntry interface {
@@ -26,7 +28,7 @@ type Coverage interface {
 type CoverageProvider interface {
 	CoveragesFor(repoURL string) []Coverage
 	Handler() http.Handler
-	HandleCoverage() http.Handler
+	WebHandler() http.Handler
 	Repos() []string
 	Sync() error
 }
@@ -45,50 +47,153 @@ type CoverageResponse struct {
 	Entries     []CoverageEntryResponse `json:"entries"`
 }
 
+type ProvidedCoverage struct {
+	coverage Coverage
+	provider CoverageProvider
+}
+
+type CoverageService struct {
+	providers []CoverageProvider
+	repos     []string
+	provided  map[string][]*ProvidedCoverage
+}
+
+func NewCoverageService() *CoverageService {
+	return &CoverageService{}
+}
+
+func (m *CoverageService) AddProvider(provider CoverageProvider) {
+	m.providers = append(m.providers, provider)
+}
+
+func (m *CoverageService) Sync() {
+	for _, p := range m.providers {
+		p.Sync()
+	}
+
+	repos := mapset.NewSet[string]()
+	for _, provider := range m.providers {
+		tmp := provider.Repos()
+		for _, v := range tmp {
+			repos.Add(v)
+		}
+	}
+
+	m.repos = repos.ToSlice()
+
+	provided := map[string][]*ProvidedCoverage{}
+	for _, repo := range m.repos {
+		e := []*ProvidedCoverage{}
+		for _, p := range m.providers {
+			tmp := p.CoveragesFor(repo)
+			for _, cov := range tmp {
+				e = append(e, &ProvidedCoverage{coverage: cov, provider: p})
+			}
+		}
+		provided[repo] = e
+	}
+
+	m.provided = provided
+}
+
+func (m *CoverageService) Repos() []string {
+	return m.repos
+}
+
 type coverageContextKey int
 
 const (
-	coverageKey coverageContextKey = iota
+	coverageKey      coverageContextKey = iota
+	coverageEntryKey coverageContextKey = iota
 )
 
-func withCoverage(ctx context.Context, cov Coverage) context.Context {
-	ctx = context.WithValue(ctx, coverageKey, cov)
-	return ctx
+func withCoverage(ctx context.Context, cov *ProvidedCoverage) context.Context {
+	return context.WithValue(ctx, coverageKey, cov)
 }
 
-func coverageFrom(ctx context.Context) (Coverage, bool) {
-	cov, ok := ctx.Value(coverageKey).(Coverage)
+func providedCoverageFrom(ctx context.Context) (*ProvidedCoverage, bool) {
+	cov, ok := ctx.Value(coverageKey).(*ProvidedCoverage)
+	if !ok {
+		log.Error().Msg("not ProvidedCoverage")
+		return nil, false
+	}
 	return cov, ok
 }
 
-func injectCoverage(provider CoverageProvider) func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			index, err := strconv.Atoi(chi.URLParam(r, "index"))
-			if err != nil {
-				log.Error().Err(err).Msg("")
-				render.NotFound(w, render.ErrNotFound)
-				return
-			}
+func CoverageFrom(ctx context.Context) (Coverage, bool) {
+	cov, ok := providedCoverageFrom(ctx)
+	return cov.coverage, ok
+}
 
-			repo, ok := RepoFrom(r.Context())
-			if !ok {
-				render.NotFound(w, render.ErrNotFound)
-				return
-			}
+func providerFrom(ctx context.Context) (CoverageProvider, bool) {
+	cov, ok := providedCoverageFrom(ctx)
+	return cov.provider, ok
+}
 
-			coverages := provider.CoveragesFor(repo.Link)
-			if index < 0 || index >= len(coverages) {
-				log.Error().Msgf("coverage index is out of range: index=%d", index)
-				render.NotFound(w, render.ErrNotFound)
-				return
-			}
-			cov := coverages[index]
+func WithCoverageEntry(ctx context.Context, entry CoverageEntry) context.Context {
+	return context.WithValue(ctx, coverageEntryKey, entry)
+}
 
-			r = r.WithContext(withCoverage(r.Context(), cov))
-			next.ServeHTTP(w, r)
-		})
-	}
+func CoverageEntryFrom(ctx context.Context) (CoverageEntry, bool) {
+	entry, ok := ctx.Value(coverageEntryKey).(CoverageEntry)
+	return entry, ok
+}
+
+func InjectCoverageEntry(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Print("InjectCoverageEntry")
+		entryName := chi.URLParam(r, "entry")
+
+		cov, ok := CoverageFrom(r.Context())
+		if !ok {
+			log.Error().Msg("unknown coverage")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
+		var entry CoverageEntry = nil
+		for _, e := range cov.Entries() {
+			if e.Name() == entryName {
+				entry = e
+			}
+		}
+
+		if entry == nil {
+			log.Error().Msg("can not find entry")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
+		next.ServeHTTP(w, r.WithContext(WithCoverageEntry(r.Context(), entry)))
+	})
+}
+
+func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		index, err := strconv.Atoi(chi.URLParam(r, "index"))
+		if err != nil {
+			log.Error().Err(err).Msg("")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
+		repo, ok := RepoFrom(r.Context())
+		if !ok {
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
+		coverages := m.provided[repo.Link]
+		if index < 0 || index >= len(coverages) {
+			log.Error().Msgf("coverage index is out of range: index=%d", index)
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+		cov := coverages[index]
+
+		r = r.WithContext(withCoverage(r.Context(), cov))
+		next.ServeHTTP(w, r)
+	})
 }
 
 func convertCoverage(revisionURL string, cov Coverage, index int) CoverageResponse {
@@ -97,6 +202,7 @@ func convertCoverage(revisionURL string, cov Coverage, index int) CoverageRespon
 		Time:        cov.Time(),
 		Revision:    cov.Revision(),
 		RevisionURL: revisionURL,
+		Entries:     []CoverageEntryResponse{},
 	}
 
 	for _, e := range cov.Entries() {
@@ -121,46 +227,63 @@ func convertCoverages(scm Client, repo *Repo, coverages []Coverage) []CoverageRe
 	return ret
 }
 
-func handleCoverageList(provider CoverageProvider) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		scm, ok := SCMFrom(r.Context())
-		if !ok {
-			log.Error().Msg("handleCoverageList: scm not found in a context")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
-		repo, ok := RepoFrom(r.Context())
-		if !ok {
-			log.Error().Msg("handleCoverageList: repo not found in a context")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
-		coverages := provider.CoveragesFor(repo.Link)
-
-		covs := convertCoverages(scm, repo, coverages)
-		render.JSON(w, covs, http.StatusOK)
+func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Request) {
+	scm, ok := SCMFrom(r.Context())
+	if !ok {
+		log.Error().Msg("handleCoverageList: scm not found in a context")
+		render.NotFound(w, render.ErrNotFound)
+		return
 	}
+
+	repo, ok := RepoFrom(r.Context())
+	if !ok {
+		log.Error().Msg("handleCoverageList: repo not found in a context")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
+
+	log.Print("handleCoverageList: making list...")
+	coverages := []Coverage{}
+	for _, provider := range s.providers {
+		log.Print("handleCoverageList: call CoverageFor")
+		tmp := provider.CoveragesFor(repo.Link)
+		coverages = append(coverages, tmp...)
+	}
+
+	covs := convertCoverages(scm, repo, coverages)
+	render.JSON(w, covs, http.StatusOK)
 }
 
 // API
-func HandleCoverage(provider CoverageProvider) http.Handler {
+func (s *CoverageService) handleCoverage(w http.ResponseWriter, r *http.Request) {
+	provider, _ := providerFrom(r.Context())
+	provider.Handler().ServeHTTP(w, r)
+}
+
+func (s *CoverageService) APIHandler() http.Handler {
 	r := chi.NewRouter()
-	r.Get("/", handleCoverageList(provider))
+	r.Get("/", s.handleCoverageList)
+
 	r.Route("/{index}", func(r chi.Router) {
-		r.Use(injectCoverage(provider))
-		r.Mount("/", provider.HandleCoverage())
+		r.Use(s.injectCoverage)
+		r.Mount("/", http.HandlerFunc(s.handleCoverage))
 	})
 	return r
 }
 
-func CoverageWebHandler(provider CoverageProvider) http.Handler {
+// Web
+func (s *CoverageService) handleCoveragePage(w http.ResponseWriter, r *http.Request) {
+	provider, _ := providerFrom(r.Context())
+	provider.WebHandler().ServeHTTP(w, r)
+}
+
+func (s *CoverageService) WebHandler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", templateRenderingHandler("coverage/coverage.html"))
+
 	r.Route("/{index}", func(r chi.Router) {
-		r.Use(injectCoverage(provider))
-		r.Mount("/", provider.Handler())
+		r.Use(s.injectCoverage)
+		r.Mount("/", http.HandlerFunc(s.handleCoveragePage))
 	})
 	return r
 }

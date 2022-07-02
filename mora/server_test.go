@@ -196,7 +196,11 @@ func setupServer(t *testing.T) (http.Handler, Client, Repo) {
 	cov := NewMockCoverage()
 	provider.AddCoverage(repo.Link, cov)
 
-	server, err := NewMoraServer([]Client{scm}, provider, false)
+	coverage := NewCoverageService()
+	coverage.AddProvider(provider)
+	coverage.Sync()
+
+	server, err := NewMoraServer([]Client{scm}, coverage, false)
 	require.NoError(t, err)
 	handler := server.Handler()
 

@@ -1,0 +1,46 @@
+{{template "header"}}
+<script src="/public/tool_coverage.js" type="module"></script>
+<main>
+    <div id="app">
+        <div class="ui container">
+            <breadcrumb></breadcrumb>
+
+            <h1>Coverage</h1>
+
+            <div class="ui right floated segment">
+                <a :href="meta.revision_url">[[meta.revision.substring(0, 10)]]</a>
+                [[formattedTime(meta.time)]]
+            </div>
+
+            <div>
+            Lines: [[meta.hits]]/[[meta.lines]] Coverage: [[(meta.hits*100/meta.lines).toFixed(1)]]%
+            </div>
+
+            <table class="ui very compact selectable celled striped table" style="line-height: 1.0;">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Hit</th>
+                        <th>Total</th>
+                        <th>Coverage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="file in files" :class="file.clazz">
+                        <td><a href="javascript:void(0)" v-on:click="selectFile(file)">[[file.filename]]</a></td>
+                        <td class="right aligned">[[file.hits]]</td>
+                        <td class="right aligned">[[file.lines]]</td>
+                        <td class="right aligned">[[file.ratio.toFixed(1)]] %</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ui container">
+            <pre><code v-if="show_code"
+                       v-html="src"
+                       style="padding: 0px; border:solid 1px darkgray;"></code></pre>
+        </div>
+    </div>
+</main>
+{{template "footer"}}

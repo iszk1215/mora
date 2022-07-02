@@ -30,6 +30,7 @@ type Repo = scm.Repository
 type Client interface {
 	Name() string // unique name in mora
 	URL() *url.URL
+	Client() *scm.Client
 	RevisionURL(repo *Repo, revision string) string
 	LoginHandler(next http.Handler) http.Handler
 	ListRepos(token *scm.Token) ([]*Repo, error)
@@ -69,35 +70,32 @@ type RepoResponse struct {
 	Link      string `json:"link"`
 }
 
-func HandleRepoList(clients []Client, provider CoverageProvider) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Print("HandleRepoList")
+func (s *MoraServer) HandleRepoList(w http.ResponseWriter, r *http.Request) {
+	log.Print("HandleRepoList")
 
-		urls := provider.Repos()
+	repos := []RepoResponse{}
+	sess, _ := MoraSessionFrom(r.Context())
+	for _, client := range s.clients {
+		tmp, err := getReposWithCache(client, sess)
+		if err == errorTokenNotFound {
+			// ignore
+		} else if err != nil {
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 
-		repos := []RepoResponse{}
-		sess, _ := MoraSessionFrom(r.Context())
-		for _, client := range clients {
-			tmp, err := getReposWithCache(client, sess)
-			if err == errorTokenNotFound {
-				// ignore
-			} else if err != nil {
-				render.NotFound(w, render.ErrNotFound)
-				return
-			}
-
-			for _, repo := range tmp {
-				for _, link := range urls {
-					if repo.Link == link {
-						repos = append(repos, RepoResponse{
-							client.Name(), repo.Namespace, repo.Name, repo.Link})
-					}
+		for _, repo := range tmp {
+			for _, link := range s.coverage.Repos() {
+				// log.Print(link)
+				if repo.Link == link {
+					repos = append(repos, RepoResponse{
+						client.Name(), repo.Namespace, repo.Name, repo.Link})
 				}
 			}
 		}
-
-		render.JSON(w, repos, http.StatusOK)
 	}
+
+	render.JSON(w, repos, http.StatusOK)
 }
 
 type SCMResponse struct {
@@ -124,10 +122,8 @@ func HandleSCMList(clients []Client) http.HandlerFunc {
 	}
 }
 
-func HandleSync(provider CoverageProvider) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		provider.Sync()
-	}
+func (s *MoraServer) HandleSync(w http.ResponseWriter, r *http.Request) {
+	s.coverage.Sync()
 }
 
 // Web Handler
@@ -212,7 +208,8 @@ func findClient(clients []Client, name string) (Client, bool) {
 	return nil, false
 }
 
-func findRepo(sess *MoraSession, client Client, owner, name string) (*Repo, error) {
+// checkRepoAccess checks if token in session can access a repo 'owner/name'
+func checkRepoAccess(sess *MoraSession, client Client, owner, name string) (*Repo, error) {
 	repos, err := getReposWithCache(client, sess)
 	if err != nil {
 		return nil, err
@@ -245,7 +242,7 @@ func injectRepo(clients []Client) func(next http.Handler) http.Handler {
 			}
 
 			sess, _ := MoraSessionFrom(r.Context())
-			repo, err := findRepo(sess, client, owner, repoName)
+			repo, err := checkRepoAccess(sess, client, owner, repoName)
 			if err == errorTokenNotFound {
 				http.Redirect(w, r, "/scms", http.StatusSeeOther)
 				return
@@ -263,6 +260,13 @@ func injectRepo(clients []Client) func(next http.Handler) http.Handler {
 	}
 }
 
+func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
+	if s.tool != nil {
+		s.tool.HandleUpload(w, r)
+		s.coverage.Sync() // TODO
+	}
+}
+
 func (s *MoraServer) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -270,13 +274,14 @@ func (s *MoraServer) Handler() http.Handler {
 
 	// api
 
-	r.Post("/api/sync", HandleSync(s.provider))
+	r.Post("/api/sync", s.HandleSync)
 	r.Get("/api/scms", HandleSCMList(s.clients))
-	r.Get("/api/repos", HandleRepoList(s.clients, s.provider))
+	r.Get("/api/repos", s.HandleRepoList)
+	r.Post("/api/upload", s.HandleUpload)
 
 	r.Route("/api/{scm}/{owner}/{repo}", func(r chi.Router) {
 		r.Use(injectRepo(s.clients))
-		r.Mount("/coverages", HandleCoverage(s.provider))
+		r.Mount("/coverages", s.coverage.APIHandler())
 	})
 
 	// web
@@ -294,7 +299,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
 		r.Use(injectRepo(s.clients))
-		r.Mount("/coverages", CoverageWebHandler(s.provider))
+		r.Mount("/coverages", s.coverage.WebHandler())
 	})
 
 	r.Get("/public/*", func(w http.ResponseWriter, r *http.Request) {
@@ -307,10 +312,12 @@ func (s *MoraServer) Handler() http.Handler {
 
 type MoraServer struct {
 	clients  []Client
-	provider CoverageProvider
+	coverage *CoverageService
 
 	sessionManager   *MoraSessionManager
 	publicFileServer http.Handler
+
+	tool *ToolCoverageProvider
 }
 
 // static includes public and templates
@@ -325,7 +332,7 @@ func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
 	return fs.Sub(embedded, filepath.Join("static", path))
 }
 
-func NewMoraServer(clients []Client, provider CoverageProvider, debug bool) (*MoraServer, error) {
+func NewMoraServer(clients []Client, coverage *CoverageService, debug bool) (*MoraServer, error) {
 	s := &MoraServer{}
 
 	sessionManager := NewMoraSessionManager()
@@ -344,8 +351,12 @@ func NewMoraServer(clients []Client, provider CoverageProvider, debug bool) (*Mo
 
 	s.sessionManager = sessionManager
 	s.clients = clients
-	s.provider = provider
+	s.coverage = coverage
 	s.publicFileServer = http.FileServer(http.FS(publicFS))
+
+	if len(coverage.providers) > 1 {
+		s.tool = coverage.providers[1].(*ToolCoverageProvider)
+	}
 
 	return s, nil
 }
@@ -401,15 +412,18 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, errors.New("no client is configured")
 	}
 
-	dir := os.DirFS("data") // TODO
-	provider := NewHTMLCoverageProvider(dir)
-	err := provider.Sync()
-	if err != nil {
-		return nil, err
+	coverage := NewCoverageService()
+	{
+		dir := os.DirFS("data") // TODO
+		provider0 := NewHTMLCoverageProvider(dir)
+		provider1 := NewToolCoverageProvider()
+		coverage.AddProvider(provider0)
+		coverage.AddProvider(provider1)
 	}
+	coverage.Sync()
 
 	log.Print("config.Debug=", config.Debug)
-	return NewMoraServer(clients, provider, config.Debug)
+	return NewMoraServer(clients, coverage, config.Debug)
 }
 
 func ReadMoraConfig(filename string) (MoraConfig, error) {

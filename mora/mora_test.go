@@ -27,6 +27,10 @@ func (m MockSCMClient) Name() string {
 	return m.name
 }
 
+func (m MockSCMClient) Client() *scm.Client {
+	return nil
+}
+
 func (m MockSCMClient) URL() *url.URL {
 	return m.url
 }

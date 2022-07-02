@@ -63,6 +63,7 @@ func (c htmlCoverage) Entries() []CoverageEntry {
 // Loader
 
 func loadFile(data []byte, path string) (*htmlCoverage, error) {
+	log.Print("loadFile: path=", path)
 	var cov htmlCoverage
 	err := yaml.Unmarshal(data, &cov)
 	if err != nil {
@@ -140,44 +141,23 @@ func load(dir fs.FS, configFilename string) (map[string][]*htmlCoverage, error) 
 
 // HTML Coverage Handlers
 
-type htmlCoverageContextKey int
-
-const (
-	coverageEntryKey htmlCoverageContextKey = iota
-)
-
-func withEntry(ctx context.Context, entry *htmlCoverageEntry) context.Context {
-	return context.WithValue(ctx, coverageEntryKey, entry)
-}
-
 func htmlCoverageFrom(ctx context.Context) (*htmlCoverage, bool) {
-	tmp, ok := coverageFrom(ctx)
+	tmp, ok := CoverageFrom(ctx)
 	if !ok {
-		//return htmlCoverage{}, false
 		return nil, false
 	}
 	cov, ok := tmp.(*htmlCoverage)
 	return cov, ok
 }
 
-func entryFrom(ctx context.Context) (Client, *Repo, *htmlCoverage, *htmlCoverageEntry, bool) {
-	scm, ok := SCMFrom(ctx)
-	if !ok {
-		return nil, nil, nil, nil, false
-	}
+func htmlCoverageEntryFrom(ctx context.Context) (*htmlCoverage, *htmlCoverageEntry, bool) {
+	tmp0, _ := CoverageFrom(ctx)
+	cov, ok0 := tmp0.(*htmlCoverage)
 
-	repo, ok := RepoFrom(ctx)
-	if !ok {
-		return nil, nil, nil, nil, false
-	}
+	tmp1, _ := CoverageEntryFrom(ctx)
+	entry, ok1 := tmp1.(*htmlCoverageEntry)
 
-	cov, ok := htmlCoverageFrom(ctx)
-	if !ok {
-		return nil, nil, nil, nil, false
-	}
-
-	entry, ok := ctx.Value(coverageEntryKey).(*htmlCoverageEntry)
-	return scm, repo, cov, entry, ok
+	return cov, entry, ok0 && ok1
 }
 
 type HTMLCoverageProvider struct {
@@ -208,6 +188,7 @@ func (m *HTMLCoverageProvider) reload() error {
 
 	coverageMap := map[string][]Coverage{}
 	for k, v := range covmap {
+		log.Print("reload: repo=", k)
 		coverageMap[k] = []Coverage{}
 		for _, cov := range v {
 			coverageMap[k] = append(coverageMap[k], cov)
@@ -238,35 +219,6 @@ func (m *HTMLCoverageProvider) CoveragesFor(repoURL string) []Coverage {
 	return covs
 }
 
-func CoverageEntryChecker(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Print("CoverageEntryChecker")
-		entryName := chi.URLParam(r, "entry")
-
-		cov, ok := htmlCoverageFrom(r.Context())
-		if !ok {
-			log.Error().Msg("unknown coverage")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
-		var entry *htmlCoverageEntry = nil
-		for _, e := range cov.Entries_ {
-			if e.Name_ == entryName {
-				entry = e
-			}
-		}
-
-		if entry == nil {
-			log.Error().Msg("can not find entry")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
-		next.ServeHTTP(w, r.WithContext(withEntry(r.Context(), entry)))
-	})
-}
-
 func (m *HTMLCoverageProvider) handleCoverageEntryData(w http.ResponseWriter, r *http.Request) {
 	cov, ok := htmlCoverageFrom(r.Context())
 	if !ok {
@@ -290,7 +242,10 @@ func (m *HTMLCoverageProvider) handleCoverageEntryData(w http.ResponseWriter, r 
 }
 
 func handleCoverageEntryJSON(w http.ResponseWriter, r *http.Request) {
-	scm, repo, cov, entry, ok := entryFrom(r.Context())
+	scm, _ := SCMFrom(r.Context())
+	repo, _ := RepoFrom(r.Context())
+
+	cov, entry, ok := htmlCoverageEntryFrom(r.Context())
 	if !ok {
 		log.Error().Msg("can not find coverage entry")
 		render.NotFound(w, render.ErrNotFound)
@@ -323,18 +278,18 @@ func handleCoverageEntryJSON(w http.ResponseWriter, r *http.Request) {
 func (m *HTMLCoverageProvider) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Route("/{entry}", func(r chi.Router) {
-		r.Use(CoverageEntryChecker)
-		r.Get("/", templateRenderingHandler("coverage/html_coverage.html"))
-		r.Get("/data/*", m.handleCoverageEntryData)
+		r.Use(InjectCoverageEntry)
+		r.Get("/", handleCoverageEntryJSON)
 	})
 	return r
 }
 
-func (m *HTMLCoverageProvider) HandleCoverage() http.Handler {
+func (m *HTMLCoverageProvider) WebHandler() http.Handler {
 	r := chi.NewRouter()
 	r.Route("/{entry}", func(r chi.Router) {
-		r.Use(CoverageEntryChecker)
-		r.Get("/", handleCoverageEntryJSON)
+		r.Use(InjectCoverageEntry)
+		r.Get("/", templateRenderingHandler("coverage/html_coverage.html"))
+		r.Get("/data/*", m.handleCoverageEntryData)
 	})
 	return r
 }
