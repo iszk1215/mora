@@ -95,7 +95,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
             // console.log(url)
             const data = await fetch(url)
             const json = await data.json()
-            console.log(json)
+            // console.log(json)
 
             for (let file of json.files) {
                 file.ratio = file.hits * 100.0 / file.lines

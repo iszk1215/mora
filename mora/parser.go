@@ -14,39 +14,57 @@ type Profile struct {
 	FileName string  `json:"filename"`
 	Hits     int     `json:"hits"`
 	Lines    int     `json:"lines"`
-	Blocks   [][]int `json:"blocks"`
+	Blocks   [][]int `json:"blocks"` // StartLine, EndLine, Count
 }
+
+const (
+	START int = iota
+	END   int = iota
+	COUNT int = iota
+)
 
 func split(text string, sep byte) (string, string) {
 	idx := strings.IndexByte(text, sep)
 	if idx < 0 {
-		return "", text
+		return text, ""
 	}
 	return text[:idx], text[idx+1:]
 }
 
-func ParseLcov(reader io.Reader, prefix string) ([]*Profile, error) {
+func adjust(profiles []*Profile, prefix string) {
+	for _, p := range profiles {
+		p.FileName = strings.Replace(p.FileName, prefix, "", -1)
+
+		p.Hits = 0
+		p.Lines = 0
+		for _, b := range p.Blocks {
+			l := b[END] - b[START] + 1
+			if b[COUNT] > 0 {
+				p.Hits += l
+			}
+			p.Lines += l
+		}
+	}
+}
+
+func convertLcovToGcov(reader io.Reader, prefix string) ([]*Profile, error) {
 	scanner := bufio.NewScanner(reader)
 
-	var prof *cover.Profile = nil
-	profiles := []*cover.Profile{}
+	profiles := []*Profile{}
 
-	var block *cover.ProfileBlock = nil
+	filename := ""
+	var block []int = nil
+	var blocks [][]int = nil
 
 	for scanner.Scan() {
 		line := scanner.Text()
 		typ, value := split(line, ':')
 		switch typ {
+		case "TN":
+			blocks = [][]int{}
 		case "SF":
-			// log.Print("text=", value)
-			if block != nil {
-				prof.Blocks = append(prof.Blocks, *block)
-			}
-			prof = &cover.Profile{FileName: value, Blocks: []cover.ProfileBlock{}}
-			profiles = append(profiles, prof)
-			block = nil
+			filename = value
 		case "DA":
-			// log.Print("DA=", value)
 			a, b := split(value, ',')
 			start, err := strconv.Atoi(a)
 			if err != nil {
@@ -56,25 +74,35 @@ func ParseLcov(reader io.Reader, prefix string) ([]*Profile, error) {
 			if err != nil {
 				return nil, err
 			}
-			if block != nil && block.EndLine+1 == start && block.Count == count {
-				block.EndLine = start
-				block.NumStmt += 1
+			if block != nil && block[END]+1 == start && block[COUNT] == count {
+				block[END] = start
 			} else {
-				if block != nil {
-					prof.Blocks = append(prof.Blocks, *block)
-				}
-				block = &cover.ProfileBlock{}
-				block.StartLine = start
-				block.StartCol = 0
-				block.EndLine = start
-				block.EndCol = 0
-				block.NumStmt = 1
-				block.Count = count
+				block = []int{start, start, count}
+				blocks = append(blocks, block)
 			}
+		case "end_of_record":
+			if filename == "" {
+				return nil, errors.New("no SF found for this TN")
+			}
+			prof := &Profile{FileName: filename, Blocks: blocks}
+			profiles = append(profiles, prof)
+
+			filename = ""
+			block = nil
+			blocks = nil
 		}
 	}
 
-	return convertGoProfiles(profiles, prefix)
+	return profiles, nil
+}
+
+func ParseLcov(reader io.Reader, prefix string) ([]*Profile, error) {
+	profiles, err := convertLcovToGcov(reader, prefix)
+	if err != nil {
+		return nil, err
+	}
+	adjust(profiles, prefix)
+	return profiles, nil
 }
 
 func convertGoProfile(profile *cover.Profile, moduleName string) *Profile {
@@ -92,16 +120,6 @@ func convertGoProfile(profile *cover.Profile, moduleName string) *Profile {
 	}
 
 	return pr
-}
-
-func convertGoProfiles(goProfiles []*cover.Profile, moduleName string) ([]*Profile, error) {
-	profiles := []*Profile{}
-	for _, profile := range goProfiles {
-		pr := convertGoProfile(profile, moduleName)
-		profiles = append(profiles, pr)
-	}
-
-	return profiles, nil
 }
 
 func ParseGoCover(reader io.Reader, moduleName string) ([]*Profile, error) {

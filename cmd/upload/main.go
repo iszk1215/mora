@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -15,12 +16,43 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ParseToolCoverageFile(filename, format, prefix string) ([]*mora.Profile, error) {
+func ParseToolCoverageFromFile(filename, format, prefix string) ([]*mora.Profile, error) {
 	reader, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	return mora.ParseToolCoverage(reader, format, prefix)
+}
+
+func upload(serverURL string, profiles []*mora.Profile, req mora.CoverageUploadRequest) error {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+
+	url := serverURL + "/api/upload"
+	r, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	client := http.Client{}
+	resp, err := client.Do(r)
+	if err != nil {
+		return err
+	}
+
+	msg, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		log.Print(msg)
+		return errors.New("returned status is not StatusOK")
+	}
+
+	return nil
 }
 
 func main() {
@@ -34,7 +66,6 @@ func main() {
 		"remove prefix from filename to get relative path from repository root")
 	timestampString := flag.String("time", "", "timestamp in RFC3339 format")
 
-	//filename := flag.String("filename", "", "coverage file")
 	flag.Parse()
 	args := flag.Args()
 
@@ -47,21 +78,15 @@ func main() {
 
 	timestamp, err := time.Parse(time.RFC3339, *timestampString)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+		log.Err(err).Msg("")
 		os.Exit(1)
 	}
 
-	profiles, err := ParseToolCoverageFile(filename, *format, *prefix)
+	profiles, err := ParseToolCoverageFromFile(filename, *format, *prefix)
 	if err != nil {
 		log.Err(err).Msg("parse error: ")
 		os.Exit(1)
 	}
-
-	encoded, err := json.Marshal(profiles)
-	if err != nil {
-		log.Err(err).Msg("json.Marshal")
-	}
-	fmt.Print(string(encoded))
 
 	req := mora.CoverageUploadRequest{
 		Format:     *format,
@@ -73,37 +98,9 @@ func main() {
 		Profiles:   profiles,
 	}
 
-	body, err := json.Marshal(req)
+	err = upload(moraServerURL, profiles, req)
 	if err != nil {
-		log.Err(err).Msg("")
+		log.Err(err).Msg("upload")
 		os.Exit(1)
-	}
-
-	url := moraServerURL + "/api/upload"
-	r, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
-	if err != nil {
-		log.Err(err).Msg("")
-		os.Exit(1)
-	}
-
-	client := http.Client{}
-	resp, err := client.Do(r)
-	if err != nil {
-		log.Err(err).Msg("")
-		os.Exit(1)
-	}
-
-	log.Print(resp)
-
-	msg, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Err(err).Msg("")
-		os.Exit(1)
-	}
-
-	fmt.Fprintf(os.Stderr, "%s", string(msg))
-
-	if resp.StatusCode != http.StatusOK {
-		log.Print("failed")
 	}
 }

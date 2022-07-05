@@ -26,14 +26,13 @@ var (
 
 type Repo = scm.Repository
 
-// scm client
-type Client interface {
+// Source Code Management System
+type SCM interface {
 	Name() string // unique name in mora
 	URL() *url.URL
 	Client() *scm.Client
 	RevisionURL(repo *Repo, revision string) string
 	LoginHandler(next http.Handler) http.Handler
-	ListRepos(token *scm.Token) ([]*Repo, error)
 }
 
 type contextKey int
@@ -43,12 +42,12 @@ const (
 	contextSCMKey  contextKey = iota
 )
 
-func WithSCM(ctx context.Context, scm Client) context.Context {
+func WithSCM(ctx context.Context, scm SCM) context.Context {
 	return context.WithValue(ctx, contextSCMKey, scm)
 }
 
-func SCMFrom(ctx context.Context) (Client, bool) {
-	scm, ok := ctx.Value(contextSCMKey).(Client)
+func SCMFrom(ctx context.Context) (SCM, bool) {
+	scm, ok := ctx.Value(contextSCMKey).(SCM)
 	return scm, ok
 }
 
@@ -75,8 +74,8 @@ func (s *MoraServer) HandleRepoList(w http.ResponseWriter, r *http.Request) {
 
 	repos := []RepoResponse{}
 	sess, _ := MoraSessionFrom(r.Context())
-	for _, client := range s.clients {
-		tmp, err := getReposWithCache(client, sess)
+	for _, scm := range s.smcs {
+		tmp, err := getReposWithCache(scm, sess)
 		if err == errorTokenNotFound {
 			// ignore
 		} else if err != nil {
@@ -89,7 +88,7 @@ func (s *MoraServer) HandleRepoList(w http.ResponseWriter, r *http.Request) {
 				// log.Print(link)
 				if repo.Link == link {
 					repos = append(repos, RepoResponse{
-						client.Name(), repo.Namespace, repo.Name, repo.Link})
+						scm.Name(), repo.Namespace, repo.Name, repo.Link})
 				}
 			}
 		}
@@ -104,21 +103,21 @@ type SCMResponse struct {
 	Logined bool   `json:"logined"`
 }
 
-func HandleSCMList(clients []Client) http.HandlerFunc {
+func HandleSCMList(scms []SCM) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		scms := []SCMResponse{}
+		resp := []SCMResponse{}
 		sess, _ := MoraSessionFrom(r.Context())
 
-		for _, client := range clients {
-			_, ok := sess.getToken(client.Name())
-			scms = append(scms, SCMResponse{
-				URL:     client.URL().String(),
-				Name:    client.Name(),
+		for _, scm := range scms {
+			_, ok := sess.getToken(scm.Name())
+			resp = append(resp, SCMResponse{
+				URL:     scm.URL().String(),
+				Name:    scm.Name(),
 				Logined: ok,
 			})
 		}
 
-		render.JSON(w, scms, 200)
+		render.JSON(w, resp, 200)
 	}
 }
 
@@ -132,8 +131,6 @@ type TemplateLoader struct {
 	fsys fs.FS
 }
 
-var templateLoader *TemplateLoader
-
 func NewTemplateLoader(fsys fs.FS) *TemplateLoader {
 	return &TemplateLoader{fsys}
 }
@@ -146,6 +143,8 @@ func (l *TemplateLoader) load(filename string) (*template.Template, error) {
 	}
 	return t, nil
 }
+
+var templateLoader *TemplateLoader
 
 func initTemplateLoader(fsys fs.FS) {
 	templateLoader = NewTemplateLoader(fsys)
@@ -175,42 +174,60 @@ func templateRenderingHandler(filename string) http.HandlerFunc {
 
 // ----------------------------------------------------------------------
 
-func getReposWithCache(client Client, session *MoraSession) ([]*Repo, error) {
-	repos, ok := session.getReposCache(client.Name())
+func listRepos(ctx context.Context, client *scm.Client) ([]*Repo, error) {
+	ret := []*Repo{}
+	opts := scm.ListOptions{Size: 100}
+	for {
+		result, meta, err := client.Repositories.List(ctx, opts)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, result...)
+
+		opts.Page = meta.Page.Next
+		opts.URL = meta.Page.NextURL
+
+		if opts.Page == 0 && opts.URL == "" {
+			break
+		}
+	}
+	return ret, nil
+}
+
+func getReposWithCache(scm SCM, session *MoraSession) ([]*Repo, error) {
+	repos, ok := session.getReposCache(scm.Name())
 	if ok {
-		log.Print("Load repos from session for ", client.Name())
+		log.Print("Load repos from session for ", scm.Name())
 		return repos, nil
 	}
 
-	log.Print("try to load repos from scm: ", client.Name())
-
-	token, ok := session.getToken(client.Name())
-	if !ok {
-		log.Print("token for scm was not found in session: ", client.Name())
-		return nil, errorTokenNotFound
+	ctx, err := session.WithToken(context.Background(), scm.Name())
+	if err != nil {
+		return nil, err
 	}
 
-	repos, err := client.ListRepos(&token)
+	log.Print("try to load repos from scm: ", scm.Name())
+	repos, err = listRepos(ctx, scm.Client())
 	if err == nil {
 		log.Print("Store repos to cache")
-		session.setReposCache(client.Name(), repos)
+		session.setReposCache(scm.Name(), repos)
 	}
 
 	return repos, err
 }
 
-func findClient(clients []Client, name string) (Client, bool) {
-	for _, client := range clients {
-		if client.Name() == name {
-			return client, true
+func findSCM(scms []SCM, name string) (SCM, bool) {
+	for _, scm := range scms {
+		if scm.Name() == name {
+			return scm, true
 		}
 	}
 	return nil, false
 }
 
 // checkRepoAccess checks if token in session can access a repo 'owner/name'
-func checkRepoAccess(sess *MoraSession, client Client, owner, name string) (*Repo, error) {
-	repos, err := getReposWithCache(client, sess)
+func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (*Repo, error) {
+	repos, err := getReposWithCache(scm, sess)
 	if err != nil {
 		return nil, err
 	}
@@ -225,24 +242,24 @@ func checkRepoAccess(sess *MoraSession, client Client, owner, name string) (*Rep
 		owner, name)
 }
 
-func injectRepo(clients []Client) func(next http.Handler) http.Handler {
+func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			scm := chi.URLParam(r, "scm")
+			scmName := chi.URLParam(r, "scm")
 			owner := chi.URLParam(r, "owner")
 			repoName := chi.URLParam(r, "repo")
 
-			log.Print("injectRepo: scm=", scm)
+			log.Print("injectRepo: scmName=", scmName)
 
-			client, ok := findClient(clients, scm)
+			scm, ok := findSCM(scms, scmName)
 			if !ok {
-				log.Error().Msgf("repoChecker: unknown scm: %s", scm)
+				log.Error().Msgf("repoChecker: unknown scm: %s", scmName)
 				render.NotFound(w, render.ErrNotFound)
 				return
 			}
 
 			sess, _ := MoraSessionFrom(r.Context())
-			repo, err := checkRepoAccess(sess, client, owner, repoName)
+			repo, err := checkRepoAccess(sess, scm, owner, repoName)
 			if err == errorTokenNotFound {
 				http.Redirect(w, r, "/scms", http.StatusSeeOther)
 				return
@@ -253,7 +270,7 @@ func injectRepo(clients []Client) func(next http.Handler) http.Handler {
 			}
 
 			ctx := r.Context()
-			ctx = WithSCM(ctx, client)
+			ctx = WithSCM(ctx, scm)
 			ctx = WithRepo(ctx, repo)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -263,7 +280,7 @@ func injectRepo(clients []Client) func(next http.Handler) http.Handler {
 func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	if s.tool != nil {
 		s.tool.HandleUpload(w, r)
-		s.coverage.Sync() // TODO
+		s.coverage.Sync()
 	}
 }
 
@@ -275,12 +292,12 @@ func (s *MoraServer) Handler() http.Handler {
 	// api
 
 	r.Post("/api/sync", s.HandleSync)
-	r.Get("/api/scms", HandleSCMList(s.clients))
+	r.Get("/api/scms", HandleSCMList(s.smcs))
 	r.Get("/api/repos", s.HandleRepoList)
 	r.Post("/api/upload", s.HandleUpload)
 
 	r.Route("/api/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(injectRepo(s.clients))
+		r.Use(injectRepo(s.smcs))
 		r.Mount("/coverages", s.coverage.APIHandler())
 	})
 
@@ -294,11 +311,11 @@ func (s *MoraServer) Handler() http.Handler {
 	r.Get("/", templateRenderingHandler("index.html"))
 	r.Get("/scms", templateRenderingHandler("login.html"))
 
-	r.Mount("/login", LoginHandler(s.clients, redirectHandler))
-	r.Mount("/logout", LogoutHandler(s.clients, redirectHandler))
+	r.Mount("/login", LoginHandler(s.smcs, redirectHandler))
+	r.Mount("/logout", LogoutHandler(s.smcs, redirectHandler))
 
 	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(injectRepo(s.clients))
+		r.Use(injectRepo(s.smcs))
 		r.Mount("/coverages", s.coverage.WebHandler())
 	})
 
@@ -311,13 +328,14 @@ func (s *MoraServer) Handler() http.Handler {
 }
 
 type MoraServer struct {
-	clients  []Client
+	smcs     []SCM
 	coverage *CoverageService
 
 	sessionManager   *MoraSessionManager
 	publicFileServer http.Handler
 
 	tool *ToolCoverageProvider
+	html *HTMLCoverageProvider
 }
 
 // static includes public and templates
@@ -332,7 +350,7 @@ func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
 	return fs.Sub(embedded, filepath.Join("static", path))
 }
 
-func NewMoraServer(clients []Client, coverage *CoverageService, debug bool) (*MoraServer, error) {
+func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 	s := &MoraServer{}
 
 	sessionManager := NewMoraSessionManager()
@@ -350,13 +368,8 @@ func NewMoraServer(clients []Client, coverage *CoverageService, debug bool) (*Mo
 	}
 
 	s.sessionManager = sessionManager
-	s.clients = clients
-	s.coverage = coverage
+	s.smcs = scms
 	s.publicFileServer = http.FileServer(http.FS(publicFS))
-
-	if len(coverage.providers) > 1 {
-		s.tool = coverage.providers[1].(*ToolCoverageProvider)
-	}
 
 	return s, nil
 }
@@ -375,20 +388,20 @@ type MoraConfig struct {
 	Debug      bool
 }
 
-func createClients(config MoraConfig) []Client {
-	clients := []Client{}
+func createSMCs(config MoraConfig) []SCM {
+	scms := []SCM{}
 	for _, scmConfig := range config.ScmConfigs {
 		log.Print(scmConfig.Type)
-		var client Client
+		var scm SCM
 		var err error
 		if scmConfig.Type == "gitea" {
-			client, err = NewGiteaFromFile(
+			scm, err = NewGiteaFromFile(
 				scmConfig.Name,
 				scmConfig.SecretFilename,
 				scmConfig.URL,
 				config.URL+"/login/"+scmConfig.Name)
 		} else if scmConfig.Type == "github" {
-			client, err = NewGithubFromFile(
+			scm, err = NewGithubFromFile(
 				scmConfig.Name,
 				scmConfig.SecretFilename)
 		} else {
@@ -399,31 +412,40 @@ func createClients(config MoraConfig) []Client {
 			log.Warn().Err(err).Msgf(
 				"ignore error during %s initialization", scmConfig.Name)
 		} else {
-			clients = append(clients, client)
+			scms = append(scms, scm)
 		}
 	}
 
-	return clients
+	return scms
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
-	clients := createClients(config)
-	if len(clients) == 0 {
-		return nil, errors.New("no client is configured")
+	scms := createSMCs(config)
+	if len(scms) == 0 {
+		return nil, errors.New("no SCM is configured")
 	}
-
-	coverage := NewCoverageService()
-	{
-		dir := os.DirFS("data") // TODO
-		provider0 := NewHTMLCoverageProvider(dir)
-		provider1 := NewToolCoverageProvider()
-		coverage.AddProvider(provider0)
-		coverage.AddProvider(provider1)
-	}
-	coverage.Sync()
 
 	log.Print("config.Debug=", config.Debug)
-	return NewMoraServer(clients, coverage, config.Debug)
+	s, err := NewMoraServer(scms, config.Debug)
+	if err != nil {
+		return nil, err
+	}
+
+	dir := os.DirFS("data") // TODO
+	html := NewHTMLCoverageProvider(dir)
+	tool := NewToolCoverageProvider()
+
+	coverage := NewCoverageService()
+	coverage.AddProvider(tool)
+	coverage.AddProvider(html)
+	coverage.SyncProviders()
+	coverage.Sync()
+
+	s.coverage = coverage
+	s.html = html
+	s.tool = tool
+
+	return s, nil
 }
 
 func ReadMoraConfig(filename string) (MoraConfig, error) {

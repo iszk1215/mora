@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,6 +54,8 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 	var data []CoverageResponse
 	err = json.Unmarshal(body, &data)
 	require.NoError(t, err)
+
+	log.Print(data)
 
 	assertEqualCoverageList(t, expected, data)
 }
@@ -152,7 +155,7 @@ func createMockCoverage() MockCoverage {
 
 func TestSerializeCoverage(t *testing.T) {
 	// repo := MockRepo{"scm", "owner", "repo"}
-	scm := NewMockSCMClient("scm")
+	scm := NewMockSCM("scm")
 	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
 	cov := createMockCoverage()
 
@@ -164,7 +167,7 @@ func TestSerializeCoverage(t *testing.T) {
 
 func getResultFromCovrageListHandler(handler http.Handler, repo *Repo) *http.Response {
 	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
-	scm := NewMockSCMClient("scm")
+	scm := NewMockSCM("scm")
 	r = r.WithContext(WithRepo(WithSCM(r.Context(), scm), repo))
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -174,16 +177,25 @@ func getResultFromCovrageListHandler(handler http.Handler, repo *Repo) *http.Res
 func TestCoverageList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo"}
 	p := NewMockCoverageProvider()
-	expected := createMockCoverage()
-	p.AddCoverage(repo.Link, expected)
+	// expected := createMockCoverage()
+
+	time0 := time.Now()
+	time1 := time0.Add(-10 * time.Hour * 24)
+	log.Print("time0=", time0)
+	log.Print("time1=", time1)
+	cov0 := MockCoverage{time: time0, revision: "abc123"}
+	cov1 := MockCoverage{time: time1, revision: "abc123"}
+	p.AddCoverage(repo.Link, cov0)
+	p.AddCoverage(repo.Link, cov1)
 
 	s := NewCoverageService()
 	s.AddProvider(p)
+	s.Sync()
 
 	handler := http.HandlerFunc(s.handleCoverageList)
 	res := getResultFromCovrageListHandler(handler, repo)
 
-	testCoverageListResponse(t, []Coverage{expected}, res)
+	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
 }
 
 func TestCoverageListWithHTMLCoverageProvider(t *testing.T) {
@@ -194,6 +206,7 @@ func TestCoverageListWithHTMLCoverageProvider(t *testing.T) {
 
 	s := NewCoverageService()
 	s.AddProvider(p)
+	s.Sync()
 
 	handler := http.HandlerFunc(s.handleCoverageList)
 	res := getResultFromCovrageListHandler(handler, repo)

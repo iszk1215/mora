@@ -3,7 +3,9 @@ package mora
 import (
 	"context"
 	"net/http"
+	"sort"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/drone/drone/handler/api/render"
@@ -47,7 +49,7 @@ type CoverageResponse struct {
 	Entries     []CoverageEntryResponse `json:"entries"`
 }
 
-type ProvidedCoverage struct {
+type providedCoverage struct {
 	coverage Coverage
 	provider CoverageProvider
 }
@@ -55,7 +57,8 @@ type ProvidedCoverage struct {
 type CoverageService struct {
 	providers []CoverageProvider
 	repos     []string
-	provided  map[string][]*ProvidedCoverage
+	provided  map[string][]*providedCoverage
+	sync.Mutex
 }
 
 func NewCoverageService() *CoverageService {
@@ -66,38 +69,46 @@ func (m *CoverageService) AddProvider(provider CoverageProvider) {
 	m.providers = append(m.providers, provider)
 }
 
-func (m *CoverageService) Sync() {
+func (m *CoverageService) SyncProviders() {
 	for _, p := range m.providers {
 		p.Sync()
 	}
+}
 
+func (s *CoverageService) Sync() {
 	repos := mapset.NewSet[string]()
-	for _, provider := range m.providers {
+	for _, provider := range s.providers {
 		tmp := provider.Repos()
 		for _, v := range tmp {
 			repos.Add(v)
 		}
 	}
 
-	m.repos = repos.ToSlice()
-
-	provided := map[string][]*ProvidedCoverage{}
-	for _, repo := range m.repos {
-		e := []*ProvidedCoverage{}
-		for _, p := range m.providers {
+	provided := map[string][]*providedCoverage{}
+	for _, repo := range repos.ToSlice() {
+		list := []*providedCoverage{}
+		for _, p := range s.providers {
 			tmp := p.CoveragesFor(repo)
 			for _, cov := range tmp {
-				e = append(e, &ProvidedCoverage{coverage: cov, provider: p})
+				list = append(list, &providedCoverage{coverage: cov, provider: p})
 			}
 		}
-		provided[repo] = e
+
+		sort.Slice(list, func(i, j int) bool {
+			return list[i].coverage.Time().Before(list[j].coverage.Time())
+		})
+
+		provided[repo] = list
 	}
 
-	m.provided = provided
+	s.Lock()
+	defer s.Unlock()
+	s.repos = repos.ToSlice()
+	s.provided = provided
 }
 
-func (m *CoverageService) Repos() []string {
-	return m.repos
+func (s *CoverageService) Repos() []string {
+	return s.repos
 }
 
 type coverageContextKey int
@@ -107,12 +118,12 @@ const (
 	coverageEntryKey coverageContextKey = iota
 )
 
-func withCoverage(ctx context.Context, cov *ProvidedCoverage) context.Context {
+func withCoverage(ctx context.Context, cov *providedCoverage) context.Context {
 	return context.WithValue(ctx, coverageKey, cov)
 }
 
-func providedCoverageFrom(ctx context.Context) (*ProvidedCoverage, bool) {
-	cov, ok := ctx.Value(coverageKey).(*ProvidedCoverage)
+func providedCoverageFrom(ctx context.Context) (*providedCoverage, bool) {
+	cov, ok := ctx.Value(coverageKey).(*providedCoverage)
 	if !ok {
 		log.Error().Msg("not ProvidedCoverage")
 		return nil, false
@@ -139,9 +150,9 @@ func CoverageEntryFrom(ctx context.Context) (CoverageEntry, bool) {
 	return entry, ok
 }
 
-func InjectCoverageEntry(next http.Handler) http.Handler {
+func injectCoverageEntry(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Print("InjectCoverageEntry")
+		log.Print("injectCoverageEntry")
 		entryName := chi.URLParam(r, "entry")
 
 		cov, ok := CoverageFrom(r.Context())
@@ -217,7 +228,7 @@ func convertCoverage(revisionURL string, cov Coverage, index int) CoverageRespon
 	return ret
 }
 
-func convertCoverages(scm Client, repo *Repo, coverages []Coverage) []CoverageResponse {
+func convertCoverages(scm SCM, repo *Repo, coverages []Coverage) []CoverageResponse {
 	var ret []CoverageResponse
 	for i, cov := range coverages {
 		revURL := scm.RevisionURL(repo, cov.Revision())
@@ -242,12 +253,17 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	log.Print("handleCoverageList: making list...")
+	_, ok = s.provided[repo.Link]
+	if !ok {
+		log.Error().Msg("handleCoverageList: no coverage for repo")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
+
+	// log.Print("handleCoverageList: making list...")
 	coverages := []Coverage{}
-	for _, provider := range s.providers {
-		log.Print("handleCoverageList: call CoverageFor")
-		tmp := provider.CoveragesFor(repo.Link)
-		coverages = append(coverages, tmp...)
+	for _, pcov := range s.provided[repo.Link] {
+		coverages = append(coverages, pcov.coverage)
 	}
 
 	covs := convertCoverages(scm, repo, coverages)
@@ -266,7 +282,10 @@ func (s *CoverageService) APIHandler() http.Handler {
 
 	r.Route("/{index}", func(r chi.Router) {
 		r.Use(s.injectCoverage)
-		r.Mount("/", http.HandlerFunc(s.handleCoverage))
+		r.Route("/{entry}", func(r chi.Router) {
+			r.Use(injectCoverageEntry)
+			r.Mount("/", http.HandlerFunc(s.handleCoverage))
+		})
 	})
 	return r
 }
@@ -283,7 +302,10 @@ func (s *CoverageService) WebHandler() http.Handler {
 
 	r.Route("/{index}", func(r chi.Router) {
 		r.Use(s.injectCoverage)
-		r.Mount("/", http.HandlerFunc(s.handleCoveragePage))
+		r.Route("/{entry}", func(r chi.Router) {
+			r.Use(injectCoverageEntry)
+			r.Mount("/", http.HandlerFunc(s.handleCoveragePage))
+		})
 	})
 	return r
 }

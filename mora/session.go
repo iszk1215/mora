@@ -53,6 +53,15 @@ func (s *MoraSession) Remove(scm string) {
 	delete(s.reposMap, scm)
 }
 
+func (s *MoraSession) WithToken(ctx context.Context, name string) (context.Context, error) {
+	token, ok := s.getToken(name)
+	if !ok {
+		return nil, errorTokenNotFound
+	}
+
+	return scm.WithContext(ctx, &token), nil
+}
+
 // Session Manager
 
 type MoraSessionManager struct {

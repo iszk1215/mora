@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/drone/drone/handler/api/render"
-	"github.com/drone/go-scm/scm"
+	"github.com/elliotchance/pie/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 )
@@ -74,34 +74,12 @@ func (p *ToolCoverageProvider) addCoverage(url string, cov Coverage) {
 	p.Lock()
 	defer p.Unlock()
 
-	list, ok := p.covmap[url]
-	if !ok {
-		//log.Print("addCoverage: first coverage")
-		list = []Coverage{}
-	}
-
-	//log.Print("addCoverage: len(list)=", len(list))
-	p.covmap[url] = append(list, cov)
-	//log.Print("addCoverage: len(p.covmap[url])=", len(p.covmap[url]))
-
-	repos := []string{}
-	for k := range p.covmap {
-		repos = append(repos, k)
-	}
-	p.repos = repos
+	p.covmap[url] = append(p.covmap[url], cov)
+	p.repos = pie.Keys(p.covmap)
 }
 
 func (p *ToolCoverageProvider) CoveragesFor(repoURL string) []Coverage {
-	ret, ok := p.covmap[repoURL]
-	for k := range p.covmap {
-		log.Print("CoveragesFor: repo=", k, " ", k == repoURL)
-	}
-	if !ok {
-		log.Print("CoveragesFor: no coverage for ", repoURL)
-		return []Coverage{}
-	}
-	log.Print("CoveragesFor: len=", len(ret))
-	return ret
+	return p.covmap[repoURL]
 }
 
 func (p *ToolCoverageProvider) Repos() []string {
@@ -183,15 +161,6 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func WithToken(session *MoraSession, name string) (context.Context, error) {
-	token, ok := session.getToken(name)
-	if !ok {
-		return nil, errorTokenNotFound
-	}
-
-	return scm.WithContext(context.Background(), &token), nil
-}
-
 func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 	repo, _ := RepoFrom(ctx)
 	repoPath := repo.Namespace + "/" + repo.Name
@@ -200,7 +169,7 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 	client := scm.Client()
 
 	sess, _ := MoraSessionFrom(ctx)
-	ctx, err := WithToken(sess, scm.Name())
+	ctx, err := sess.WithToken(context.Background(), scm.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -275,12 +244,7 @@ func parseToCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
 	hits := 0
 	profiles := map[string]*Profile{}
 	for _, p := range req.Profiles {
-		profiles[p.FileName] = &Profile{
-			FileName: p.FileName,
-			Hits:     p.Hits,
-			Lines:    p.Lines,
-			Blocks:   p.Blocks,
-		}
+		profiles[p.FileName] = p
 		lines += p.Lines
 		hits += p.Hits
 	}
@@ -323,17 +287,14 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 // API
 func (p *ToolCoverageProvider) Handler() http.Handler {
 	r := chi.NewRouter()
-	r.Route("/{entry}", func(r chi.Router) {
-		r.Use(InjectCoverageEntry)
-		r.Get("/files", handleFileList)
-		r.Get("/files/*", handleFile)
-	})
+	r.Get("/files", handleFileList)
+	r.Get("/files/*", handleFile)
 	return r
 }
 
 // Web
 func (p *ToolCoverageProvider) WebHandler() http.Handler {
 	r := chi.NewRouter()
-	r.Get("/{entry}", templateRenderingHandler("coverage/tool_coverage.html"))
+	r.Get("/", templateRenderingHandler("coverage/tool_coverage.html"))
 	return r
 }

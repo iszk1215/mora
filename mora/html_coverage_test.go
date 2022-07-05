@@ -50,14 +50,10 @@ func createMockDataset(t *testing.T) (fs.FS, *Repo, *htmlCoverage) {
 }
 
 func TestLoad(t *testing.T) {
-	fsys, repo, expected := createMockDataset(t)
+	fsys, _, expected := createMockDataset(t)
 
-	m, err := load(fsys, "mora.yaml")
+	covs, err := loadDirectory(fsys, "", "mora.yaml")
 	assert.NoError(t, err)
-	require.Equal(t, 1, len(m))
-
-	covs, ok := m[repo.Link]
-	require.Equal(t, true, ok)
 	require.Equal(t, 1, len(covs))
 
 	requireEqualHtmlCoverage(t, expected, covs[0])

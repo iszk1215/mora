@@ -10,7 +10,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func createLoginHandler(client Client, next http.Handler) http.Handler {
+func convertToken(token *login.Token) scm.Token {
+	return scm.Token{
+		Token:   token.Access,
+		Refresh: token.Refresh,
+		Expires: token.Expires,
+	}
+}
+
+func createLoginHandler(scm SCM, next http.Handler) http.Handler {
 	h := func(w http.ResponseWriter, r *http.Request) {
 		err := login.ErrorFrom(r.Context())
 		if err != nil {
@@ -19,30 +27,25 @@ func createLoginHandler(client Client, next http.Handler) http.Handler {
 			return
 		}
 
-		log.Print("Set token to session: ", client.Name())
-		token := login.TokenFrom(r.Context())
-
-		scmToken := scm.Token{
-			Token:   token.Access,
-			Refresh: token.Refresh,
-		}
+		log.Print("Set token to session: ", scm.Name())
+		token := convertToken(login.TokenFrom(r.Context()))
 
 		sess, _ := MoraSessionFrom(r.Context())
-		sess.setToken(client.Name(), scmToken)
+		sess.setToken(scm.Name(), token)
 
 		next.ServeHTTP(w, r)
 	}
 
-	return client.LoginHandler(http.HandlerFunc(h))
+	return scm.LoginHandler(http.HandlerFunc(h))
 }
 
-func LoginHandler(clients []Client, next http.Handler) http.Handler {
+func LoginHandler(scms []SCM, next http.Handler) http.Handler {
 	r := chi.NewRouter()
 
 	handlers := map[string]http.Handler{}
 
-	for _, client := range clients {
-		handlers[client.Name()] = createLoginHandler(client, next)
+	for _, scm := range scms {
+		handlers[scm.Name()] = createLoginHandler(scm, next)
 	}
 
 	r.Get("/{scm}", func(w http.ResponseWriter, r *http.Request) {
@@ -58,13 +61,13 @@ func LoginHandler(clients []Client, next http.Handler) http.Handler {
 	return r
 }
 
-func LogoutHandler(clients []Client, next http.Handler) http.Handler {
+func LogoutHandler(scms []SCM, next http.Handler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		s, _ := MoraSessionFrom(r.Context())
-		for _, c := range clients {
-			s.Remove(c.Name())
+		for _, scm := range scms {
+			s.Remove(scm.Name())
 		}
 		next.ServeHTTP(w, r)
 	})
