@@ -137,13 +137,12 @@ func ParseGoCover(reader io.Reader, moduleName string) ([]*Profile, error) {
 	return profiles, nil
 }
 
-func ParseToolCoverage(reader io.Reader, format, moduleName string) ([]*Profile, error) {
-
+func ParseToolCoverage(reader io.Reader, format, prefix string) ([]*Profile, error) {
 	switch format {
 	case "lcov":
-		return ParseLcov(reader, moduleName)
+		return ParseLcov(reader, prefix)
 	case "go":
-		return ParseGoCover(reader, moduleName)
+		return ParseGoCover(reader, prefix)
 	}
 
 	return nil, errors.New("unknown coverage format")

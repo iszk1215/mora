@@ -89,13 +89,13 @@ func main() {
 	}
 
 	req := mora.CoverageUploadRequest{
-		Format:     *format,
-		EntryName:  *entry,
-		RepoURL:    *repoURL,
-		Revision:   *revision,
-		ModuleName: *prefix,
-		Time:       timestamp,
-		Profiles:   profiles,
+		Format:    *format,
+		EntryName: *entry,
+		RepoURL:   *repoURL,
+		Revision:  *revision,
+		Prefix:    *prefix,
+		Time:      timestamp,
+		Profiles:  profiles,
 	}
 
 	err = upload(moraServerURL, profiles, req)

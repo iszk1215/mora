@@ -10,6 +10,8 @@ require (
 	github.com/elliotchance/pie/v2 v2.0.1
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/golang/mock v1.3.1
+	github.com/jmoiron/sqlx v0.0.0-20180614180643-0dae4fefe7c0
+	github.com/mattn/go-sqlite3 v1.14.14
 	github.com/rs/zerolog v1.26.1
 	github.com/stretchr/testify v1.7.1
 	golang.org/x/tools v0.1.11
