@@ -23,15 +23,7 @@ const (
 	COUNT int = iota
 )
 
-func split(text string, sep byte) (string, string) {
-	idx := strings.IndexByte(text, sep)
-	if idx < 0 {
-		return text, ""
-	}
-	return text[:idx], text[idx+1:]
-}
-
-func adjust(profiles []*Profile, prefix string) {
+func postprocess(profiles []*Profile, prefix string) {
 	for _, p := range profiles {
 		p.FileName = strings.Replace(p.FileName, prefix, "", -1)
 
@@ -58,19 +50,19 @@ func convertLcovToGcov(reader io.Reader, prefix string) ([]*Profile, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		typ, value := split(line, ':')
-		switch typ {
+		list := strings.Split(line, ":")
+		switch list[0] {
 		case "TN":
 			blocks = [][]int{}
 		case "SF":
-			filename = value
+			filename = list[1]
 		case "DA":
-			a, b := split(value, ',')
-			start, err := strconv.Atoi(a)
+			tmp := strings.Split(list[1], ",")
+			start, err := strconv.Atoi(tmp[0])
 			if err != nil {
 				return nil, err
 			}
-			count, err := strconv.Atoi(b)
+			count, err := strconv.Atoi(tmp[1])
 			if err != nil {
 				return nil, err
 			}
@@ -101,7 +93,7 @@ func ParseLcov(reader io.Reader, prefix string) ([]*Profile, error) {
 	if err != nil {
 		return nil, err
 	}
-	adjust(profiles, prefix)
+	postprocess(profiles, prefix)
 	return profiles, nil
 }
 

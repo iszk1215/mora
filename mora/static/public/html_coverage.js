@@ -10,7 +10,9 @@ import { Breadcrumb } from '/public/mora.js'
             { href: "/", name: "Top" },
             { name: [scm, owner, repo].join("/") },
             { href: path, name: "Coverages" },
-            { name: "#" + covIndex }]
+            { name: "#" + covIndex },
+            { name: entry },
+        ]
     }()
 
     const app = {

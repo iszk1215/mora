@@ -15,9 +15,9 @@ import (
 func TestHandleUpload(t *testing.T) {
 	profile0 := &Profile{
 		FileName: "test.go",
-		Hits:     12,
-		Lines:    15,
-		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 30, 1}},
+		Hits:     13,
+		Lines:    17,
+		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
 	}
 	profile1 := &Profile{
 		FileName: "test2.go",
@@ -27,14 +27,19 @@ func TestHandleUpload(t *testing.T) {
 	}
 	profiles := []*Profile{profile0, profile1}
 
-	req := CoverageUploadRequest{
-		Format:    "go",
+	e := &CoverageEntryUploadRequest{
 		EntryName: "go",
-		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
-		Revision:  "012345",
-		Prefix:    "mockscm.com/mockowner/mockrepo",
-		Time:      time.Now(),
 		Profiles:  profiles,
+		Hits:      13,
+		Lines:     20,
+	}
+	entries := []*CoverageEntryUploadRequest{e}
+
+	req := CoverageUploadRequest{
+		RepoURL:  "http://mockscm.com/mockowner/mockrepo",
+		Revision: "012345",
+		Time:     time.Now(),
+		Entries:  entries,
 	}
 
 	body, err := json.Marshal(req)
@@ -58,8 +63,8 @@ func TestHandleUpload(t *testing.T) {
 	require.Equal(t, 1, len(cov.entries))
 
 	entry := cov.entries[0]
-	assert.Equal(t, 12, entry.hits)
-	assert.Equal(t, 18, entry.lines)
+	assert.Equal(t, 13, entry.hits)
+	assert.Equal(t, 20, entry.lines)
 	assert.Equal(t, 2, len(entry.profiles))
 
 	require.Equal(t, http.StatusOK, res.StatusCode)
