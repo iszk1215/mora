@@ -26,6 +26,9 @@ const (
 func postprocess(profiles []*Profile, prefix string) {
 	for _, p := range profiles {
 		p.FileName = strings.Replace(p.FileName, prefix, "", -1)
+		if strings.HasPrefix(p.FileName, "/") {
+			p.FileName = p.FileName[1:len(p.FileName)]
+		}
 
 		p.Hits = 0
 		p.Lines = 0
@@ -39,7 +42,7 @@ func postprocess(profiles []*Profile, prefix string) {
 	}
 }
 
-func convertLcovToGcov(reader io.Reader, prefix string) ([]*Profile, error) {
+func parseLcov(reader io.Reader) ([]*Profile, error) {
 	scanner := bufio.NewScanner(reader)
 
 	profiles := []*Profile{}
@@ -88,33 +91,17 @@ func convertLcovToGcov(reader io.Reader, prefix string) ([]*Profile, error) {
 	return profiles, nil
 }
 
-func ParseLcov(reader io.Reader, prefix string) ([]*Profile, error) {
-	profiles, err := convertLcovToGcov(reader, prefix)
-	if err != nil {
-		return nil, err
-	}
-	postprocess(profiles, prefix)
-	return profiles, nil
-}
-
-func convertGoProfile(profile *cover.Profile, moduleName string) *Profile {
-	file := strings.Replace(profile.FileName, moduleName, "", -1)
-
-	pr := &Profile{
-		FileName: file, Hits: 0, Lines: 0, Blocks: [][]int{}}
+func convertGoProfile(profile *cover.Profile) *Profile {
+	pr := &Profile{FileName: profile.FileName}
 
 	for _, b := range profile.Blocks {
 		pr.Blocks = append(pr.Blocks, []int{b.StartLine, b.EndLine, b.Count})
-		pr.Lines += b.NumStmt
-		if b.Count > 0 {
-			pr.Hits += b.NumStmt
-		}
 	}
 
 	return pr
 }
 
-func ParseGoCover(reader io.Reader, moduleName string) ([]*Profile, error) {
+func parseGocov(reader io.Reader) ([]*Profile, error) {
 	goProfiles, err := cover.ParseProfilesFromReader(reader)
 	if err != nil {
 		return nil, err
@@ -122,20 +109,29 @@ func ParseGoCover(reader io.Reader, moduleName string) ([]*Profile, error) {
 
 	profiles := []*Profile{}
 	for _, profile := range goProfiles {
-		pr := convertGoProfile(profile, moduleName)
+		pr := convertGoProfile(profile)
 		profiles = append(profiles, pr)
 	}
 
 	return profiles, nil
 }
 
-func ParseToolCoverage(reader io.Reader, format, prefix string) ([]*Profile, error) {
+func ParseCoverage(reader io.Reader, format, prefix string) ([]*Profile, error) {
+	var profiles []*Profile
+	var err error
 	switch format {
 	case "lcov":
-		return ParseLcov(reader, prefix)
+		profiles, err = parseLcov(reader)
 	case "go":
-		return ParseGoCover(reader, prefix)
+		profiles, err = parseGocov(reader)
+	default:
+		return nil, errors.New("unknown coverage format")
 	}
 
-	return nil, errors.New("unknown coverage format")
+	if err != nil {
+		return nil, err
+	}
+
+	postprocess(profiles, prefix)
+	return profiles, nil
 }

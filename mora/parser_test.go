@@ -22,11 +22,10 @@ end_of_record
 `
 	buf := bytes.NewBufferString(text)
 
-	prefix := "/home/mora/repo/"
-	profiles, err := ParseToolCoverage(buf, "lcov", prefix)
+	prefix := "/home/mora/repo"
+	profiles, err := ParseCoverage(buf, "lcov", prefix)
 
 	require.NoError(t, err)
-	require.Equal(t, 2, len(profiles))
 
 	expected := []*Profile{
 		{
@@ -56,8 +55,24 @@ mockscm.com/mockowner/mockrepo/test2.go:1.2,3.4 3 0
 	buf := bytes.NewBufferString(text)
 
 	prefix := "mockscm.com/mockowner/mockrepo"
-	profiles, err := ParseToolCoverage(buf, "go", prefix)
+	profiles, err := ParseCoverage(buf, "go", prefix)
 
 	require.NoError(t, err)
-	require.Equal(t, 2, len(profiles))
+
+	expected := []*Profile{
+		{
+			FileName: "test.go",
+			Hits:     23,
+			Lines:    27,
+			Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 30, 1}},
+		},
+		{
+			FileName: "test2.go",
+			Hits:     0,
+			Lines:    3,
+			Blocks:   [][]int{{1, 3, 0}},
+		},
+	}
+
+	require.Equal(t, expected, profiles)
 }

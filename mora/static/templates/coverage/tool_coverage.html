@@ -1,7 +1,7 @@
 {{template "header"}}
 <script src="/public/tool_coverage.js" type="module"></script>
 <main>
-    <div id="app">
+    <div id="app" v-cloak>
         <div class="ui container">
             <breadcrumb></breadcrumb>
 
@@ -36,7 +36,19 @@
             </table>
 
             <div class="ui container" v-if="show_code">
-                <h3 class="ui header">[[selectedFile.filename]] (Hit [[selectedFile.hits]] / Total [[selectedFile.lines]] / Coverage [[(selectedFile.hits*100/selectedFile.lines).toFixed(1)]]%)</h3>
+                <h3 class="ui header">[[selectedFile.filename]]</h3>
+                <div class="ui blue label">
+                    Hit
+                    <div class="ui detail">[[selectedFile.hits]] Lines</div>
+                </div>
+                <div class="ui red label">
+                    Miss
+                    <div class="ui detail">[[selectedFile.lines-selectedFile.hits]] Lines</div>
+                </div>
+                <div class="ui label">
+                    Coverage
+                    <div class="ui detail">[[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%</div>
+                </div>
                 <pre><code v-html="src"
                            style="padding: 0px; border:solid 1px darkgray;"></code></pre>
             </div>

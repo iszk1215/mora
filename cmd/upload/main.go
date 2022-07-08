@@ -22,7 +22,7 @@ func ParseToolCoverageFromFile(filename, format, prefix string) ([]*mora.Profile
 	if err != nil {
 		return nil, err
 	}
-	return mora.ParseToolCoverage(reader, format, prefix)
+	return mora.ParseCoverage(reader, format, prefix)
 }
 
 func parseFromSpec(spec string) (*mora.CoverageEntryUploadRequest, error) {
@@ -109,6 +109,15 @@ func isDirty(repo *git.Repository) (bool, error) {
 	return false, nil
 }
 
+func checkRequest(req *mora.CoverageUploadRequest, repo *git.Repository) (bool, error) {
+	isDirty, err := isDirty(repo)
+	if err != nil {
+		return false, err
+	}
+
+	return !isDirty, nil
+}
+
 func makeRequest(repo *git.Repository, url string, specs ...string) (*mora.CoverageUploadRequest, error) {
 	ref, err := repo.Head()
 	if err != nil {
@@ -146,37 +155,42 @@ func main() {
 
 	server := flag.String("server", "", "server")
 	repoURL := flag.String("repo", "", "URL of repository")
-	repoPath := flag.String("repopath", "", "path of repository")
+	repoPath := flag.String("repo-path", "", "path of repository")
 	force := flag.Bool("f", false, "force upload even when working tree is dirty")
 
 	flag.Parse()
 	args := flag.Args()
 
+	if *server == "" {
+		fmt.Println("use -server=<server url>")
+		os.Exit(1)
+	}
+
 	repo, err := git.PlainOpen(*repoPath)
 	if err != nil {
-		log.Fatal().Err(err).Msg("git")
+		fmt.Println("Can not open repository. Use -repo-path=<repository>")
+		os.Exit(1)
 	}
-
-	isDirty, err := isDirty(repo)
-	if err != nil {
-		log.Fatal().Err(err).Msg("isDirty")
-	}
-	if (!*force) && isDirty {
-		log.Fatal().Msg("working tree is dirty")
-	}
-
-	moraServerURL := *server
 
 	req, err := makeRequest(repo, *repoURL, args...)
 	if err != nil {
 		log.Fatal().Msg("failed to make a request")
 	}
+
+	flag, err := checkRequest(req, repo)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	if (!*force) && !flag {
+		log.Fatal().Msg("working tree is dirty")
+		os.Exit(1)
+	}
+
 	fmt.Println("Revision:", req.Revision)
-	fmt.Println("Entries:", req.Entries)
+	fmt.Println("Time:", req.Time)
 
-	log.Print(req)
-
-	err = upload(moraServerURL, req)
+	err = upload(*server, req)
 	if err != nil {
 		log.Err(err).Msg("upload")
 		os.Exit(1)
