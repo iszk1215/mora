@@ -29,7 +29,7 @@ func createMockDataset(t *testing.T) (fs.FS, *Repo, *htmlCoverage) {
 	repo := &Repo{Namespace: "mockowner", Name: "mockrepo"} // FIXME
 	ts, _ := time.Parse(time.RFC3339, "2022-05-06T10:46:53+09:00")
 	cov := &htmlCoverage{
-		RepoURL:   repo.Link,
+		RepoURL_:  repo.Link,
 		Time_:     ts,
 		Revision_: "130351ab1f695620cb6db0c068e4a849812d0a48",
 		Directory: "",

@@ -15,7 +15,9 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
             { href: "/", name: "Top" },
             { name: [scm, owner, repo].join("/") },
             { href: path, name: "Coverages" },
-            { name: "#" + covIndex }]
+            { name: "#" + covIndex },
+            { name: entry },
+        ]
     }()
 
 
@@ -56,6 +58,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
             }
             lst.push('<span class="' + color + '" style="display: inline-block; width: 100%; padding-left: 10px">' + text + "</span>")
         }
+        proxy.selectedFile = file
         proxy.src = lst.join("\n")
     }
 
@@ -72,6 +75,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
                 },
                 files: [],
                 show_code: false,
+                selectedFile: {},
                 src: null,
             }
         },

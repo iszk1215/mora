@@ -13,19 +13,11 @@ import (
 )
 
 func TestHandleUpload(t *testing.T) {
-	/*
-			gocov := `mode: set
-		mockscm.com/mockowner/mockrepo/test.go:1.2,5.4 5 1
-		mockscm.com/mockowner/mockrepo/test.go:10.2,13.4 3 0
-		mockscm.com/mockowner/mockrepo/test.go:13.2,30.4 7 1
-		mockscm.com/mockowner/mockrepo/test2.go:1.2,3.4 3 0
-		`
-	*/
 	profile0 := &Profile{
 		FileName: "test.go",
-		Hits:     12,
-		Lines:    15,
-		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 30, 1}},
+		Hits:     13,
+		Lines:    17,
+		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
 	}
 	profile1 := &Profile{
 		FileName: "test2.go",
@@ -35,20 +27,25 @@ func TestHandleUpload(t *testing.T) {
 	}
 	profiles := []*Profile{profile0, profile1}
 
+	e := &CoverageEntryUploadRequest{
+		EntryName: "go",
+		Profiles:  profiles,
+		Hits:      13,
+		Lines:     20,
+	}
+	entries := []*CoverageEntryUploadRequest{e}
+
 	req := CoverageUploadRequest{
-		Format:     "go",
-		EntryName:  "go",
-		RepoURL:    "http://mockscm.com/mockowner/mockrepo",
-		Revision:   "012345",
-		ModuleName: "mockscm.com/mockowner/mockrepo",
-		Time:       time.Now(),
-		Profiles:   profiles,
+		RepoURL:  "http://mockscm.com/mockowner/mockrepo",
+		Revision: "012345",
+		Time:     time.Now(),
+		Entries:  entries,
 	}
 
 	body, err := json.Marshal(req)
 	require.NoError(t, err)
 
-	p := NewToolCoverageProvider()
+	p := NewToolCoverageProvider(nil)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
@@ -56,18 +53,17 @@ func TestHandleUpload(t *testing.T) {
 
 	res := w.Result()
 
-	covs, ok := p.covmap[req.RepoURL]
-	require.True(t, ok)
-	require.Equal(t, 1, len(covs))
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.Equal(t, 1, len(p.coverages))
 
-	cov, ok := covs[0].(*coverageImpl)
+	cov, ok := p.coverages[0].(*coverageImpl)
 	assert.True(t, ok)
 	assert.Equal(t, cov.Revision(), req.Revision)
 	require.Equal(t, 1, len(cov.entries))
 
 	entry := cov.entries[0]
-	assert.Equal(t, 12, entry.hits)
-	assert.Equal(t, 18, entry.lines)
+	assert.Equal(t, 13, entry.hits)
+	assert.Equal(t, 20, entry.lines)
 	assert.Equal(t, 2, len(entry.profiles))
 
 	require.Equal(t, http.StatusOK, res.StatusCode)

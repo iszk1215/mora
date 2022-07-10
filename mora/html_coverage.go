@@ -37,11 +37,15 @@ func (e htmlCoverageEntry) Hits() int {
 }
 
 type htmlCoverage struct {
-	RepoURL   string               `yaml:"repo"`
+	RepoURL_  string               `yaml:"repo"`
 	Time_     time.Time            `yaml:"time"`
 	Revision_ string               `yaml:"revision"`
 	Directory string               `yaml:"directory"` // where html files are stored
 	Entries_  []*htmlCoverageEntry `yaml:"entries"`
+}
+
+func (c htmlCoverage) RepoURL() string {
+	return c.RepoURL_
 }
 
 func (c htmlCoverage) Time() time.Time {
@@ -120,15 +124,17 @@ func loadDirectory(dir fs.FS, path, configFilename string) ([]*htmlCoverage, err
 func htmlCoverageFrom(ctx context.Context) (*htmlCoverage, bool) {
 	tmp, ok := CoverageFrom(ctx)
 	if !ok {
+		log.Error().Msg("no coverage found")
 		return nil, false
 	}
-	cov, ok := tmp.(*htmlCoverage)
-	return cov, ok
+	cov, ok := tmp.(htmlCoverage)
+	return &cov, ok
 }
 
 func htmlCoverageEntryFrom(ctx context.Context) (*htmlCoverage, *htmlCoverageEntry, bool) {
 	cov, ok := htmlCoverageFrom(ctx)
 	if !ok {
+		log.Error().Msg("no html_coverage found")
 		return nil, nil, false
 	}
 
@@ -139,10 +145,9 @@ func htmlCoverageEntryFrom(ctx context.Context) (*htmlCoverage, *htmlCoverageEnt
 }
 
 type HTMLCoverageProvider struct {
+	coverages      []Coverage
 	dataDirectory  fs.FS
 	configFilename string
-	covmap         map[string][]Coverage
-	repos          []string
 	sync.Mutex
 }
 
@@ -150,6 +155,7 @@ func NewHTMLCoverageProvider(dataDirectory fs.FS) *HTMLCoverageProvider {
 	m := new(HTMLCoverageProvider)
 	m.dataDirectory = dataDirectory
 	m.configFilename = "mora.yaml"
+	m.coverages = []Coverage{}
 	return m
 }
 
@@ -159,27 +165,18 @@ func (m *HTMLCoverageProvider) Sync() error {
 		return err
 	}
 
-	coverageMap := map[string][]Coverage{}
-	for _, cov := range list {
-		coverageMap[cov.RepoURL] = append(coverageMap[cov.RepoURL], cov)
-	}
-
-	repos := pie.Keys(coverageMap)
-
 	m.Lock()
 	defer m.Unlock()
-	m.covmap = coverageMap
-	m.repos = repos
+
+	m.coverages = pie.Map(list, func(cov *htmlCoverage) Coverage {
+		return *cov
+	})
 
 	return nil
 }
 
-func (m *HTMLCoverageProvider) Repos() []string {
-	return m.repos
-}
-
-func (m *HTMLCoverageProvider) CoveragesFor(repoURL string) []Coverage {
-	return m.covmap[repoURL]
+func (m *HTMLCoverageProvider) Coverages() []Coverage {
+	return m.coverages
 }
 
 func (m *HTMLCoverageProvider) handleCoverageEntryData(w http.ResponseWriter, r *http.Request) {

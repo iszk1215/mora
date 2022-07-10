@@ -1,11 +1,11 @@
 {{template "header"}}
 <script src="/public/tool_coverage.js" type="module"></script>
 <main>
-    <div id="app">
+    <div id="app" v-cloak>
         <div class="ui container">
             <breadcrumb></breadcrumb>
 
-            <h1>Coverage</h1>
+            <h1 class="ui header">Coverage</h1>
 
             <div class="ui right floated segment">
                 <a :href="meta.revision_url">[[meta.revision.substring(0, 10)]]</a>
@@ -13,7 +13,7 @@
             </div>
 
             <div>
-            Lines: [[meta.hits]]/[[meta.lines]] Coverage: [[(meta.hits*100/meta.lines).toFixed(1)]]%
+                Lines: [[meta.hits]]/[[meta.lines]] Coverage: [[(meta.hits*100/meta.lines).toFixed(1)]]%
             </div>
 
             <table class="ui very compact selectable celled striped table" style="line-height: 1.0;">
@@ -34,12 +34,24 @@
                     </tr>
                 </tbody>
             </table>
-        </div>
 
-        <div class="ui container">
-            <pre><code v-if="show_code"
-                       v-html="src"
-                       style="padding: 0px; border:solid 1px darkgray;"></code></pre>
+            <div class="ui container" v-if="show_code">
+                <h3 class="ui header">[[selectedFile.filename]]</h3>
+                <div class="ui blue label">
+                    Hit
+                    <div class="ui detail">[[selectedFile.hits]] Lines</div>
+                </div>
+                <div class="ui red label">
+                    Miss
+                    <div class="ui detail">[[selectedFile.lines-selectedFile.hits]] Lines</div>
+                </div>
+                <div class="ui label">
+                    Coverage
+                    <div class="ui detail">[[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%</div>
+                </div>
+                <pre><code v-html="src"
+                           style="padding: 0px; border:solid 1px darkgray;"></code></pre>
+            </div>
         </div>
     </div>
 </main>

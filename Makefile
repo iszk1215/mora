@@ -17,9 +17,9 @@ check: $(SOURCES)
 test: $(SOURCES)
 	go test -v ./...
 
-run: $(EXE)
+run: bin/mora
 	go test ./...
-	$(EXE) -debug
+	bin/mora -debug
 
 coverage.out: $(SOURCES)
 	go test -coverprofile=$@ ./...

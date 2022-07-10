@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/drone/drone/handler/api/render"
-	"github.com/elliotchance/pie/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 )
@@ -35,9 +35,14 @@ func (e *entryImpl) Hits() int {
 }
 
 type coverageImpl struct {
+	url      string
 	revision string
 	time     time.Time
 	entries  []*entryImpl
+}
+
+func (c *coverageImpl) RepoURL() string {
+	return c.url
 }
 
 func (c *coverageImpl) Time() time.Time {
@@ -57,36 +62,48 @@ func (c *coverageImpl) Entries() []CoverageEntry {
 }
 
 type ToolCoverageProvider struct {
-	covmap map[string][]Coverage
-	repos  []string
+	coverages []Coverage
+	store     *JSONStore
 	sync.Mutex
 }
 
-func NewToolCoverageProvider() *ToolCoverageProvider {
+func NewToolCoverageProvider(store *JSONStore) *ToolCoverageProvider {
 	p := &ToolCoverageProvider{}
-	p.covmap = map[string][]Coverage{}
-	p.repos = []string{}
+	p.store = store
+
+	p.coverages = []Coverage{}
 
 	return p
 }
 
 func (p *ToolCoverageProvider) addCoverage(url string, cov Coverage) {
+	log.Print("ToolCoverageProvider.addCoverage: cov=", cov)
 	p.Lock()
 	defer p.Unlock()
 
-	p.covmap[url] = append(p.covmap[url], cov)
-	p.repos = pie.Keys(p.covmap)
+	p.coverages = append(p.coverages, cov)
 }
 
-func (p *ToolCoverageProvider) CoveragesFor(repoURL string) []Coverage {
-	return p.covmap[repoURL]
-}
-
-func (p *ToolCoverageProvider) Repos() []string {
-	return p.repos
+func (p *ToolCoverageProvider) Coverages() []Coverage {
+	return p.coverages
 }
 
 func (p *ToolCoverageProvider) Sync() error {
+	return p.loadFromStore()
+}
+
+func (p *ToolCoverageProvider) loadFromStore() error {
+	rows, err := p.store.Scan()
+	if err != nil {
+		return err
+	}
+	for _, text := range rows {
+		err = p.processRequestBody([]byte(text))
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -105,7 +122,7 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
-	cov, _, ok := entryImplFrom(r.Context())
+	cov, entry, ok := entryImplFrom(r.Context())
 	if !ok {
 		log.Error().Msg("entry not found")
 		render.NotFound(w, render.ErrNotFound)
@@ -132,15 +149,9 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	files := []*FileResponse{}
-	hits := 0
-	lines := 0
-	for _, entry := range cov.entries {
-		for _, pr := range entry.profiles {
-			files = append(files, &FileResponse{
-				FileName: pr.FileName, Lines: pr.Lines, Hits: pr.Hits})
-			hits += pr.Hits
-			lines += pr.Lines
-		}
+	for _, pr := range entry.profiles {
+		files = append(files, &FileResponse{
+			FileName: pr.FileName, Lines: pr.Lines, Hits: pr.Hits})
 	}
 
 	sort.Slice(files, func(i, j int) bool {
@@ -153,8 +164,8 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 			Revision:    cov.Revision(),
 			RevisionURL: scm.RevisionURL(repo, cov.Revision()),
 			Time:        cov.Time(),
-			Hits:        hits,
-			Lines:       lines,
+			Hits:        entry.hits,
+			Lines:       entry.lines,
 		},
 	}
 
@@ -210,13 +221,13 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type Response struct {
+	type ProfileResponse struct {
 		FileName string  `json:"filename"`
 		Code     string  `json:"code"`
 		Blocks   [][]int `json:"blocks"`
 	}
 
-	resp := Response{
+	resp := ProfileResponse{
 		FileName: profile.FileName,
 		Code:     string(code),
 		Blocks:   profile.Blocks,
@@ -225,63 +236,102 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
-type CoverageUploadRequest struct {
-	Format     string     `json:"format"`
-	EntryName  string     `json:"entry"`
-	RepoURL    string     `json:"repo"`
-	Revision   string     `json:"revision"`
-	ModuleName string     `json:"module"`
-	Time       time.Time  `json:"time"`
-	Profiles   []*Profile `json:"profiles"`
+type CoverageEntryUploadRequest struct {
+	EntryName string     `json:"entry"`
+	Profiles  []*Profile `json:"profiles"`
+	Hits      int        `json:"hits"`
+	Lines     int        `json:"lines"`
 }
 
-func parseToCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
-	if req.EntryName == "" || req.RepoURL == "" || req.ModuleName == "" {
-		return nil, errors.New("illegal request")
+type CoverageUploadRequest struct {
+	RepoURL  string                        `json:"repo"`
+	Revision string                        `json:"revision"`
+	Time     time.Time                     `json:"time"`
+	Entries  []*CoverageEntryUploadRequest `json:"entries"`
+}
+
+func convertToEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
+	if req.EntryName == "" {
+		return nil, errors.New("entry name is empty")
 	}
 
-	lines := 0
-	hits := 0
 	profiles := map[string]*Profile{}
 	for _, p := range req.Profiles {
 		profiles[p.FileName] = p
-		lines += p.Lines
-		hits += p.Hits
 	}
 
 	entry := &entryImpl{}
 	entry.name = req.EntryName
 	entry.profiles = profiles
-	entry.lines = lines
-	entry.hits = hits
+	entry.hits = req.Hits
+	entry.lines = req.Lines
+
+	return entry, nil
+}
+
+func convertToCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
+	if req.RepoURL == "" {
+		return nil, errors.New("repo url is empty")
+	}
+
+	entries := []*entryImpl{}
+	for _, e := range req.Entries {
+		entry, err := convertToEntry(e)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
 
 	cov := &coverageImpl{}
+	cov.url = req.RepoURL
 	cov.revision = req.Revision
-	cov.entries = []*entryImpl{entry}
+	cov.entries = entries
 	cov.time = req.Time
 
 	return cov, nil
 }
 
+func (p *ToolCoverageProvider) processRequestBody(bytes []byte) error {
+	var req CoverageUploadRequest
+	err := json.Unmarshal(bytes, &req)
+	if err != nil {
+		return err
+	}
+
+	cov, err := convertToCoverage(&req)
+	if err != nil {
+		return err
+	}
+
+	p.addCoverage(req.RepoURL, cov)
+	return nil
+}
+
 func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleUpload")
-	var req CoverageUploadRequest
 
-	err := json.NewDecoder(r.Body).Decode(&req)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Err(err).Msg("HandleUpload")
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
-
-	cov, err := parseToCoverage(&req)
-	if err != nil {
-		log.Err(err).Msg("HandleUpload")
-		render.NotFound(w, err)
-		return
+	if p.store != nil {
+		err := p.store.Store(string(b))
+		if err != nil {
+			log.Err(err).Msg("HandleUpload")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 	}
 
-	p.addCoverage(req.RepoURL, cov)
+	err = p.processRequestBody(b)
+	if err != nil {
+		log.Err(err).Msg("HandleUpload")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
 }
 
 // API
