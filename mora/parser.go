@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -95,20 +96,48 @@ func parseLcov(reader io.Reader) ([]*Profile, error) {
 func convertGoProfile(profile *cover.Profile) *Profile {
 	pr := &Profile{FileName: profile.FileName}
 
-	miss := 0
-	block := []int{0, 0, 0}
+	blocks := [][]int{}
 	for _, b := range profile.Blocks {
-		if block[COUNT] < b.Count && block[END] >= b.StartLine {
-			block[END] = b.StartLine - 1
+		for l := b.StartLine; l <= b.EndLine; l++ {
+			blocks = append(blocks, []int{l, l, b.Count})
 		}
-		block = []int{b.StartLine, b.EndLine, b.Count}
-		pr.Blocks = append(pr.Blocks, block)
-		if b.Count == 0 {
-			miss += b.EndLine - b.StartLine + 1
-		}
-		fmt.Printf("%-20s %4d %4d %4d : %4d\n",
-			pr.FileName, b.StartLine, b.EndLine, b.Count, miss)
 	}
+
+	sort.Slice(blocks, func(i, j int) bool {
+		return blocks[i][START] < blocks[j][START]
+	})
+
+	var block []int = nil
+	list := [][]int{}
+	for _, b := range blocks {
+		fmt.Printf("%4d %4d %4d\n", b[START], b[END], b[COUNT])
+		if block == nil {
+			block = b
+			list = append(list, block)
+		} else if block[START] == b[START] {
+			block[COUNT] += b[COUNT]
+		} else {
+			block = b
+			list = append(list, block)
+		}
+	}
+
+	block = nil
+	list2 := [][]int{}
+	for _, b := range list {
+		if block == nil {
+			block = b
+			list2 = append(list2, block)
+		} else if block[END]+1 == b[START] && block[COUNT] == b[COUNT] {
+			block[END] = b[END]
+		} else {
+			block = b
+			list2 = append(list2, block)
+		}
+
+	}
+
+	pr.Blocks = list2
 
 	return pr
 }
