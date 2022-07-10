@@ -3,6 +3,7 @@ package mora
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -94,8 +95,19 @@ func parseLcov(reader io.Reader) ([]*Profile, error) {
 func convertGoProfile(profile *cover.Profile) *Profile {
 	pr := &Profile{FileName: profile.FileName}
 
+	miss := 0
+	block := []int{0, 0, 0}
 	for _, b := range profile.Blocks {
-		pr.Blocks = append(pr.Blocks, []int{b.StartLine, b.EndLine, b.Count})
+		if block[COUNT] < b.Count && block[END] >= b.StartLine {
+			block[END] = b.StartLine - 1
+		}
+		block = []int{b.StartLine, b.EndLine, b.Count}
+		pr.Blocks = append(pr.Blocks, block)
+		if b.Count == 0 {
+			miss += b.EndLine - b.StartLine + 1
+		}
+		fmt.Printf("%-20s %4d %4d %4d : %4d\n",
+			pr.FileName, b.StartLine, b.EndLine, b.Count, miss)
 	}
 
 	return pr

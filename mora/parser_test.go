@@ -63,8 +63,8 @@ mockscm.com/mockowner/mockrepo/test2.go:1.2,3.4 3 0
 		{
 			FileName: "test.go",
 			Hits:     23,
-			Lines:    27,
-			Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 30, 1}},
+			Lines:    26,
+			Blocks:   [][]int{{1, 5, 1}, {10, 12, 0}, {13, 30, 1}},
 		},
 		{
 			FileName: "test2.go",

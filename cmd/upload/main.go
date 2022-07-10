@@ -157,6 +157,7 @@ func main() {
 	repoURL := flag.String("repo", "", "URL of repository")
 	repoPath := flag.String("repo-path", "", "path of repository")
 	force := flag.Bool("f", false, "force upload even when working tree is dirty")
+	dryRun := flag.Bool("dry-run", false, "dry run")
 
 	flag.Parse()
 	args := flag.Args()
@@ -190,11 +191,13 @@ func main() {
 	fmt.Println("Revision:", req.Revision)
 	fmt.Println("Time:", req.Time)
 
-	err = upload(*server, req)
-	if err != nil {
-		log.Err(err).Msg("upload")
-		os.Exit(1)
-	}
+	if !*dryRun {
+		err = upload(*server, req)
+		if err != nil {
+			log.Err(err).Msg("upload")
+			os.Exit(1)
+		}
 
-	fmt.Println("Uploaded")
+		fmt.Println("Uploaded")
+	}
 }
