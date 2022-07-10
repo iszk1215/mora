@@ -9,10 +9,12 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/drone/go-login/login"
 	"github.com/drone/go-scm/scm"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type MockSCM struct {
@@ -70,6 +72,9 @@ func NewMoraSessionWithEmptyTokenFor(names ...string) *MoraSession {
 }
 
 func TestMain(m *testing.M) {
+	log.Logger = log.Output(
+		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
+
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	flag.Parse()
 	if *debug {

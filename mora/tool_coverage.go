@@ -36,9 +36,14 @@ func (e *entryImpl) Hits() int {
 }
 
 type coverageImpl struct {
+	url      string
 	revision string
 	time     time.Time
 	entries  []*entryImpl
+}
+
+func (c *coverageImpl) RepoURL() string {
+	return c.url
 }
 
 func (c *coverageImpl) Time() time.Time {
@@ -58,9 +63,10 @@ func (c *coverageImpl) Entries() []CoverageEntry {
 }
 
 type ToolCoverageProvider struct {
-	covmap map[string][]Coverage
-	repos  []string
-	store  *JSONStore
+	coverages []Coverage
+	covmap    map[string][]Coverage
+	repos     []string
+	store     *JSONStore
 	sync.Mutex
 }
 
@@ -69,6 +75,8 @@ func NewToolCoverageProvider(store *JSONStore) *ToolCoverageProvider {
 	p.covmap = map[string][]Coverage{}
 	p.repos = []string{}
 	p.store = store
+
+	p.coverages = []Coverage{}
 
 	return p
 }
@@ -80,6 +88,12 @@ func (p *ToolCoverageProvider) addCoverage(url string, cov Coverage) {
 
 	p.covmap[url] = append(p.covmap[url], cov)
 	p.repos = pie.Keys(p.covmap)
+
+	p.coverages = append(p.coverages, cov)
+}
+
+func (p *ToolCoverageProvider) Coverages() []Coverage {
+	return p.coverages
 }
 
 func (p *ToolCoverageProvider) CoveragesFor(repoURL string) []Coverage {
@@ -286,6 +300,7 @@ func convertToCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
 	}
 
 	cov := &coverageImpl{}
+	cov.url = req.RepoURL
 	cov.revision = req.Revision
 	cov.entries = entries
 	cov.time = req.Time

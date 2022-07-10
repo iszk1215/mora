@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -55,8 +54,6 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 	err = json.Unmarshal(body, &data)
 	require.NoError(t, err)
 
-	log.Print(data)
-
 	assertEqualCoverageList(t, expected, data)
 }
 
@@ -79,6 +76,7 @@ func (e MockCoverageEntry) Hits() int {
 }
 
 type MockCoverage struct {
+	url      string
 	time     time.Time
 	revision string
 	entries  []MockCoverageEntry
@@ -86,6 +84,10 @@ type MockCoverage struct {
 
 func NewMockCoverage() *MockCoverage {
 	return &MockCoverage{entries: []MockCoverageEntry{}}
+}
+
+func (c MockCoverage) RepoURL() string {
+	return c.url
 }
 
 func (c MockCoverage) Time() time.Time {
@@ -112,6 +114,14 @@ func NewMockCoverageProvider() *MockCoverageProvider {
 	p := &MockCoverageProvider{}
 	p.coverages = map[string][]Coverage{}
 	return p
+}
+
+func (p *MockCoverageProvider) Coverages() []Coverage {
+	list := []Coverage{}
+	for _, c := range p.coverages {
+		list = append(list, c...)
+	}
+	return list
 }
 
 func (p *MockCoverageProvider) AddCoverage(repo string, cov Coverage) {
@@ -177,14 +187,13 @@ func getResultFromCovrageListHandler(handler http.Handler, repo *Repo) *http.Res
 func TestCoverageList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo"}
 	p := NewMockCoverageProvider()
-	// expected := createMockCoverage()
 
 	time0 := time.Now()
 	time1 := time0.Add(-10 * time.Hour * 24)
-	log.Print("time0=", time0)
-	log.Print("time1=", time1)
 	cov0 := MockCoverage{time: time0, revision: "abc123"}
 	cov1 := MockCoverage{time: time1, revision: "abc123"}
+	cov0.url = repo.Link
+	cov1.url = repo.Link
 	p.AddCoverage(repo.Link, cov0)
 	p.AddCoverage(repo.Link, cov1)
 

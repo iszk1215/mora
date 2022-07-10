@@ -22,12 +22,14 @@ type CoverageEntry interface {
 }
 
 type Coverage interface {
-	Time() time.Time
+	RepoURL() string
 	Revision() string
+	Time() time.Time
 	Entries() []CoverageEntry
 }
 
 type CoverageProvider interface {
+	Coverages() []Coverage
 	CoveragesFor(repoURL string) []Coverage
 	Handler() http.Handler
 	WebHandler() http.Handler
@@ -76,6 +78,30 @@ func (m *CoverageService) SyncProviders() {
 }
 
 func (s *CoverageService) Sync() {
+	provided := map[string][]*providedCoverage{}
+	repos := mapset.NewSet[string]()
+	for _, p := range s.providers {
+		for _, cov := range p.Coverages() {
+			url := cov.RepoURL()
+			repos.Add(url)
+			pc := &providedCoverage{coverage: cov, provider: p}
+			provided[url] = append(provided[url], pc)
+		}
+	}
+
+	for _, list := range provided {
+		sort.Slice(list, func(i, j int) bool {
+			return list[i].coverage.Time().Before(list[j].coverage.Time())
+		})
+	}
+
+	s.Lock()
+	defer s.Unlock()
+	s.repos = repos.ToSlice()
+	s.provided = provided
+}
+
+func (s *CoverageService) Sync_() {
 	repos := mapset.NewSet[string]()
 	for _, provider := range s.providers {
 		tmp := provider.Repos()
