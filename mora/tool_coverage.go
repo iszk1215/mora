@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/drone/drone/handler/api/render"
-	"github.com/elliotchance/pie/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 )
@@ -64,16 +63,12 @@ func (c *coverageImpl) Entries() []CoverageEntry {
 
 type ToolCoverageProvider struct {
 	coverages []Coverage
-	covmap    map[string][]Coverage
-	repos     []string
 	store     *JSONStore
 	sync.Mutex
 }
 
 func NewToolCoverageProvider(store *JSONStore) *ToolCoverageProvider {
 	p := &ToolCoverageProvider{}
-	p.covmap = map[string][]Coverage{}
-	p.repos = []string{}
 	p.store = store
 
 	p.coverages = []Coverage{}
@@ -86,22 +81,11 @@ func (p *ToolCoverageProvider) addCoverage(url string, cov Coverage) {
 	p.Lock()
 	defer p.Unlock()
 
-	p.covmap[url] = append(p.covmap[url], cov)
-	p.repos = pie.Keys(p.covmap)
-
 	p.coverages = append(p.coverages, cov)
 }
 
 func (p *ToolCoverageProvider) Coverages() []Coverage {
 	return p.coverages
-}
-
-func (p *ToolCoverageProvider) CoveragesFor(repoURL string) []Coverage {
-	return p.covmap[repoURL]
-}
-
-func (p *ToolCoverageProvider) Repos() []string {
-	return p.repos
 }
 
 func (p *ToolCoverageProvider) Sync() error {

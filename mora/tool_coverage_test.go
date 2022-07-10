@@ -53,11 +53,10 @@ func TestHandleUpload(t *testing.T) {
 
 	res := w.Result()
 
-	covs, ok := p.covmap[req.RepoURL]
-	require.True(t, ok)
-	require.Equal(t, 1, len(covs))
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.Equal(t, 1, len(p.coverages))
 
-	cov, ok := covs[0].(*coverageImpl)
+	cov, ok := p.coverages[0].(*coverageImpl)
 	assert.True(t, ok)
 	assert.Equal(t, cov.Revision(), req.Revision)
 	require.Equal(t, 1, len(cov.entries))

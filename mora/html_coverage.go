@@ -148,8 +148,6 @@ type HTMLCoverageProvider struct {
 	coverages      []Coverage
 	dataDirectory  fs.FS
 	configFilename string
-	covmap         map[string][]Coverage
-	repos          []string
 	sync.Mutex
 }
 
@@ -167,17 +165,8 @@ func (m *HTMLCoverageProvider) Sync() error {
 		return err
 	}
 
-	coverageMap := map[string][]Coverage{}
-	for _, cov := range list {
-		coverageMap[cov.RepoURL_] = append(coverageMap[cov.RepoURL_], cov)
-	}
-
-	repos := pie.Keys(coverageMap)
-
 	m.Lock()
 	defer m.Unlock()
-	m.covmap = coverageMap
-	m.repos = repos
 
 	m.coverages = pie.Map(list, func(cov *htmlCoverage) Coverage {
 		return *cov
@@ -188,14 +177,6 @@ func (m *HTMLCoverageProvider) Sync() error {
 
 func (m *HTMLCoverageProvider) Coverages() []Coverage {
 	return m.coverages
-}
-
-func (m *HTMLCoverageProvider) Repos() []string {
-	return m.repos
-}
-
-func (m *HTMLCoverageProvider) CoveragesFor(repoURL string) []Coverage {
-	return m.covmap[repoURL]
 }
 
 func (m *HTMLCoverageProvider) handleCoverageEntryData(w http.ResponseWriter, r *http.Request) {

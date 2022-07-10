@@ -30,10 +30,8 @@ type Coverage interface {
 
 type CoverageProvider interface {
 	Coverages() []Coverage
-	CoveragesFor(repoURL string) []Coverage
 	Handler() http.Handler
 	WebHandler() http.Handler
-	Repos() []string
 	Sync() error
 }
 
@@ -93,38 +91,6 @@ func (s *CoverageService) Sync() {
 		sort.Slice(list, func(i, j int) bool {
 			return list[i].coverage.Time().Before(list[j].coverage.Time())
 		})
-	}
-
-	s.Lock()
-	defer s.Unlock()
-	s.repos = repos.ToSlice()
-	s.provided = provided
-}
-
-func (s *CoverageService) Sync_() {
-	repos := mapset.NewSet[string]()
-	for _, provider := range s.providers {
-		tmp := provider.Repos()
-		for _, v := range tmp {
-			repos.Add(v)
-		}
-	}
-
-	provided := map[string][]*providedCoverage{}
-	for _, repo := range repos.ToSlice() {
-		list := []*providedCoverage{}
-		for _, p := range s.providers {
-			tmp := p.CoveragesFor(repo)
-			for _, cov := range tmp {
-				list = append(list, &providedCoverage{coverage: cov, provider: p})
-			}
-		}
-
-		sort.Slice(list, func(i, j int) bool {
-			return list[i].coverage.Time().Before(list[j].coverage.Time())
-		})
-
-		provided[repo] = list
 	}
 
 	s.Lock()
