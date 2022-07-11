@@ -45,10 +45,7 @@
                     Miss
                     <div class="ui detail">[[selectedFile.lines-selectedFile.hits]] Lines</div>
                 </div>
-                <div class="ui label">
-                    Coverage
-                    <div class="ui detail">[[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%</div>
-                </div>
+                Coverage [[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%
                 <pre><code v-html="src"
                            style="padding: 0px; border:solid 1px darkgray;"></code></pre>
             </div>
