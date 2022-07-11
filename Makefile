@@ -1,5 +1,5 @@
 EXE = bin/mora
-EXE += bin/upload
+EXE += bin/mora-upload
 
 all: coverage.html check $(EXE)
 
@@ -8,7 +8,7 @@ SOURCES = $(shell find . -name '*.go')
 bin/mora: $(SOURCES)
 	go build -o $@ ./cmd/mora
 
-bin/upload: $(SOURCES)
+bin/mora-upload: $(SOURCES)
 	go build -o $@ ./cmd/upload
 
 check: $(SOURCES)

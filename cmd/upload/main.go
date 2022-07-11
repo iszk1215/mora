@@ -184,7 +184,7 @@ func main() {
 		os.Exit(1)
 	}
 	if (!*force) && !flag {
-		log.Fatal().Msg("working tree is dirty")
+		fmt.Println("working tree is dirty")
 		os.Exit(1)
 	}
 
