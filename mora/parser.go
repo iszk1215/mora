@@ -3,7 +3,6 @@ package mora
 import (
 	"bufio"
 	"errors"
-	"fmt"
 	"io"
 	"sort"
 	"strconv"
@@ -25,12 +24,32 @@ const (
 	COUNT int = iota
 )
 
+func mergeBlocks(blocks [][]int) [][]int {
+	if len(blocks) < 2 {
+		return blocks
+	}
+
+	block := blocks[0]
+	ret := [][]int{block}
+	for _, b := range blocks[1:] {
+		if block[END]+1 == b[START] && block[COUNT] == b[COUNT] {
+			block[END] = b[END]
+		} else {
+			block = b
+			ret = append(ret, block)
+		}
+	}
+	return ret
+}
+
 func postprocess(profiles []*Profile, prefix string) {
 	for _, p := range profiles {
 		p.FileName = strings.Replace(p.FileName, prefix, "", -1)
 		if strings.HasPrefix(p.FileName, "/") {
 			p.FileName = p.FileName[1:len(p.FileName)]
 		}
+
+		p.Blocks = mergeBlocks(p.Blocks)
 
 		p.Hits = 0
 		p.Lines = 0
@@ -50,7 +69,6 @@ func parseLcov(reader io.Reader) ([]*Profile, error) {
 	profiles := []*Profile{}
 
 	filename := ""
-	var block []int = nil
 	var blocks [][]int = nil
 
 	for scanner.Scan() {
@@ -71,12 +89,7 @@ func parseLcov(reader io.Reader) ([]*Profile, error) {
 			if err != nil {
 				return nil, err
 			}
-			if block != nil && block[END]+1 == start && block[COUNT] == count {
-				block[END] = start
-			} else {
-				block = []int{start, start, count}
-				blocks = append(blocks, block)
-			}
+			blocks = append(blocks, []int{start, start, count})
 		case "end_of_record":
 			if filename == "" {
 				return nil, errors.New("no SF found for this TN")
@@ -85,7 +98,6 @@ func parseLcov(reader io.Reader) ([]*Profile, error) {
 			profiles = append(profiles, prof)
 
 			filename = ""
-			block = nil
 			blocks = nil
 		}
 	}
@@ -110,7 +122,6 @@ func convertGoProfile(profile *cover.Profile) *Profile {
 	var block []int = nil
 	list := [][]int{}
 	for _, b := range blocks {
-		fmt.Printf("%4d %4d %4d\n", b[START], b[END], b[COUNT])
 		if block == nil {
 			block = b
 			list = append(list, block)
@@ -122,23 +133,7 @@ func convertGoProfile(profile *cover.Profile) *Profile {
 		}
 	}
 
-	block = nil
-	list2 := [][]int{}
-	for _, b := range list {
-		if block == nil {
-			block = b
-			list2 = append(list2, block)
-		} else if block[END]+1 == b[START] && block[COUNT] == b[COUNT] {
-			block[END] = b[END]
-		} else {
-			block = b
-			list2 = append(list2, block)
-		}
-
-	}
-
-	pr.Blocks = list2
-
+	pr.Blocks = list
 	return pr
 }
 
