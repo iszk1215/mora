@@ -2,9 +2,11 @@ import { Breadcrumb } from '/public/mora.js'
 import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.min.js';
 
 (function() {
-    hljs.highlightAll()
-
+    let darkMode = true
+    let cssElment = null
     let apiBaseURL = "/api" + window.location.pathname
+
+    hljs.highlightAll()
 
     const breadcrumb = function() {
         let [_, scm, owner, repo, cov, covIndex, entry, ...rest]
@@ -56,10 +58,73 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
                     color = "miss"
                 }
             }
-            lst.push('<span class="' + color + '" style="display: inline-block; width: 100%; padding-left: 10px">' + text + "</span>")
+            lst.push(`<span class="${color}" style="display: inline-block; width: 100%; padding-left: 10px">${text}</span>`)
         }
         proxy.selectedFile = file
         proxy.src = lst.join("\n")
+        proxy.$nextTick(() => { setStyle() })
+    }
+
+    function setStyle() {
+        console.log("setStyle")
+        const hrefDark = 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/styles/github-dark.min.css'
+        const hrefLight = 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/styles/github.min.css'
+
+        let href = hrefLight
+        let hit = "palegreen"
+        let miss = "pink"
+
+        if (darkMode) {
+            href = hrefDark
+            hit = "darkblue"
+            miss = "darkred"
+        }
+
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.type = 'text/css'
+        link.href = href
+
+        const head = document.getElementsByTagName('head')[0]
+
+        if (cssElment)
+            cssElment.remove()
+        head.appendChild(link)
+        cssElment = link
+
+        for (const e of document.querySelectorAll('.hit'))
+            e.style.background = hit
+        for (const e of document.querySelectorAll('.miss'))
+            e.style.background = miss
+
+        // toggle button
+        const button = document.getElementById('darkModeButton')
+        if (darkMode) {
+            button.classList.add('active')
+        } else {
+            button.classList.remove('active')
+        }
+
+        // hit/miss labels
+        const set_color = function(e, dark, light) {
+            let src = dark, dst = light
+            if (darkMode) {
+                src = light
+                dst = dark
+            }
+            if (!e.classList.replace(src, dst))
+                e.classList.add(dst)
+        }
+        const hitLabel = document.getElementById('hitLabel')
+        const missLabel = document.getElementById('missLabel')
+        set_color(hitLabel, 'blue', 'green')
+        set_color(missLabel, 'red', 'pink')
+    }
+
+    function _toggleDarkMode(button) {
+        darkMode = !darkMode
+        document.cookie = "darkMode=" + (darkMode ? "1" : "0")
+        setStyle()
     }
 
     const app = {
@@ -92,6 +157,15 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
                 print_code(this, file)
                 this.show_code = true
             },
+            toggleDarkMode(ev) {
+                console.log(ev)
+                console.log(ev.target)
+                console.log(ev.target.style)
+                // ev.target.style.background = "blue"
+                // ev.target.classList.toggle('active')
+                console.log(ev.target.state)
+                _toggleDarkMode(ev.target)
+            }
         },
         async mounted() {
             let baseURL = "/api" + window.location.pathname
@@ -111,6 +185,18 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
             }
             this.files = json.files
             this.meta = json.meta
+
+            darkMode = false
+            let cookies = document.cookie
+            console.log("cookie:", cookies)
+            if (cookies) {
+                for (let cookie of cookies.split(';')) {
+                    let [key, value] = cookie.split('=')
+                    if (key == "darkMode" && value == "1")
+                        darkMode = true
+                }
+            }
+            console.log("darkMode =", darkMode)
         }
     };
 
