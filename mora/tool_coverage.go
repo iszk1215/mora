@@ -76,11 +76,10 @@ func NewToolCoverageProvider(store *JSONStore) *ToolCoverageProvider {
 	return p
 }
 
-func (p *ToolCoverageProvider) addCoverage(url string, cov Coverage) {
+func (p *ToolCoverageProvider) addCoverage(cov Coverage) {
 	log.Print("ToolCoverageProvider.addCoverage: cov=", cov)
 	p.Lock()
 	defer p.Unlock()
-
 	p.coverages = append(p.coverages, cov)
 }
 
@@ -292,19 +291,40 @@ func convertToCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
 	return cov, nil
 }
 
-func (p *ToolCoverageProvider) processRequestBody(bytes []byte) error {
+func parseUploadRequest(bytes []byte) (*coverageImpl, error) {
 	var req CoverageUploadRequest
 	err := json.Unmarshal(bytes, &req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	cov, err := convertToCoverage(&req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	p.addCoverage(req.RepoURL, cov)
+	return cov, nil
+}
+
+func (p *ToolCoverageProvider) processRequestBody(bytes []byte) error {
+	/*
+		var req CoverageUploadRequest
+		err := json.Unmarshal(bytes, &req)
+		if err != nil {
+			return err
+		}
+
+		cov, err := convertToCoverage(&req)
+		if err != nil {
+			return err
+		}
+	*/
+	cov, err := parseUploadRequest(bytes)
+	if err != nil {
+		return nil
+	}
+
+	p.addCoverage(cov)
 	return nil
 }
 
@@ -317,8 +337,18 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
+
+	cov, err := parseUploadRequest(b)
+	if err != nil {
+		log.Err(err).Msg("HandleUpload")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
+
+	p.addCoverage(cov)
+
 	if p.store != nil {
-		err := p.store.Store(string(b))
+		err := p.store.Store(cov, string(b))
 		if err != nil {
 			log.Err(err).Msg("HandleUpload")
 			render.NotFound(w, render.ErrNotFound)
@@ -326,12 +356,14 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
-	err = p.processRequestBody(b)
-	if err != nil {
-		log.Err(err).Msg("HandleUpload")
-		render.NotFound(w, render.ErrNotFound)
-		return
-	}
+	/*
+		err = p.processRequestBody(b)
+		if err != nil {
+			log.Err(err).Msg("HandleUpload")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+	*/
 }
 
 // API

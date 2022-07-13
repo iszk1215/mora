@@ -10,8 +10,10 @@ import (
 
 var schema = `
 CREATE TABLE IF NOT EXISTS json (
-    owner text not null,
-    json text not null
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL,
+    revision TEXT NOT NULL,
+    json TEXT NOT NULL
 )`
 
 type JSONStore struct {
@@ -39,17 +41,17 @@ func NewJSONStore(db *sqlx.DB, name string) *JSONStore {
 	return &JSONStore{db: db, name: name}
 }
 
-func (s *JSONStore) Store(json string) error {
+func (s *JSONStore) Store(cov Coverage, json string) error {
 	s.Lock()
 	defer s.Unlock()
 
 	_, err := s.db.Exec(
-		"INSERT INTO json (owner, json) VALUES ($1, $2)", s.name, string(json))
+		"INSERT INTO json (url, revision, json) VALUES ($1, $2, $3)", cov.RepoURL(), cov.Revision(), json)
 	return err
 }
 
 func (s *JSONStore) Scan() ([]string, error) {
 	rows := []string{}
-	err := s.db.Select(&rows, "SELECT json FROM json WHERE owner=$1", s.name)
+	err := s.db.Select(&rows, "SELECT json FROM json")
 	return rows, err
 }
