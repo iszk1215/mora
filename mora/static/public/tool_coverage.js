@@ -66,32 +66,25 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
     }
 
     function setStyle() {
-        console.log("setStyle")
-        const hrefDark = 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/styles/github-dark.min.css'
-        const hrefLight = 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/styles/github.min.css'
-
-        let href = hrefLight
-        let hit = "palegreen"
-        let miss = "pink"
-
-        if (darkMode) {
-            href = hrefDark
-            hit = "darkblue"
-            miss = "darkred"
-        }
+        // source code highlight theme
+        const themeURL = 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/styles/'
+        const hrefDark = themeURL + 'github-dark.min.css'
+        const hrefLight = themeURL + 'github.min.css'
 
         const link = document.createElement('link')
         link.rel = 'stylesheet'
         link.type = 'text/css'
-        link.href = href
+        link.href = darkMode ? hrefDark : hrefLight
 
         const head = document.getElementsByTagName('head')[0]
-
         if (cssElment)
             cssElment.remove()
         head.appendChild(link)
         cssElment = link
 
+        // source code line background
+        let hit = darkMode ? "darkblue" : "palegreen"
+        let miss = darkMode ? "darkred" : "pink"
         for (const e of document.querySelectorAll('.hit'))
             e.style.background = hit
         for (const e of document.querySelectorAll('.miss'))
@@ -107,11 +100,8 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
 
         // hit/miss labels
         const set_color = function(e, dark, light) {
-            let src = dark, dst = light
-            if (darkMode) {
-                src = light
-                dst = dark
-            }
+            let src = darkMode ? light : dark
+            let dst = darkMode ? dark : light
             if (!e.classList.replace(src, dst))
                 e.classList.add(dst)
         }
@@ -158,12 +148,6 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
                 this.show_code = true
             },
             toggleDarkMode(ev) {
-                console.log(ev)
-                console.log(ev.target)
-                console.log(ev.target.style)
-                // ev.target.style.background = "blue"
-                // ev.target.classList.toggle('active')
-                console.log(ev.target.state)
                 _toggleDarkMode(ev.target)
             }
         },
@@ -188,7 +172,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
 
             darkMode = false
             let cookies = document.cookie
-            console.log("cookie:", cookies)
+            // console.log("cookie:", cookies)
             if (cookies) {
                 for (let cookie of cookies.split(';')) {
                     let [key, value] = cookie.split('=')
@@ -196,7 +180,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
                         darkMode = true
                 }
             }
-            console.log("darkMode =", darkMode)
+            // console.log("darkMode =", darkMode)
         }
     };
 

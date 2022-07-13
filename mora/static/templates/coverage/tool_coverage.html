@@ -37,6 +37,7 @@
 
             <div class="ui container" v-if="show_code">
                 <h4 class="ui header">[[selectedFile.filename]]</h4>
+                Coverage [[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%
                 <div id="hitLabel" class="ui label">
                     Hit
                     <div class="ui detail">[[selectedFile.hits]] Lines</div>
@@ -45,7 +46,6 @@
                     Miss
                     <div class="ui detail">[[selectedFile.lines-selectedFile.hits]] Lines</div>
                 </div>
-                Coverage [[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%
                 <button id="darkModeButton" class="ui right floated toggle button" v-on:click="toggleDarkMode($event)">
                     Dark
                 </button>
