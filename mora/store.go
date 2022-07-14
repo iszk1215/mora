@@ -1,7 +1,9 @@
 package mora
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -9,9 +11,12 @@ import (
 )
 
 var schema = `
-CREATE TABLE IF NOT EXISTS json (
-    owner text not null,
-    json text not null
+CREATE TABLE IF NOT EXISTS coverage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL,
+    revision TEXT NOT NULL,
+    time DATETIME NOT NULL,
+    raw TEXT NOT NULL
 )`
 
 type JSONStore struct {
@@ -39,17 +44,45 @@ func NewJSONStore(db *sqlx.DB, name string) *JSONStore {
 	return &JSONStore{db: db, name: name}
 }
 
-func (s *JSONStore) Store(json string) error {
+func (s *JSONStore) Store(cov Coverage, raw string) error {
 	s.Lock()
 	defer s.Unlock()
 
-	_, err := s.db.Exec(
-		"INSERT INTO json (owner, json) VALUES ($1, $2)", s.name, string(json))
+	rows := []int{}
+	err := s.db.Select(&rows, "SELECT id FROM coverage WHERE url = $1 and revision = $2", cov.RepoURL(), cov.Revision())
+	if err != nil {
+		return err
+	}
+
+	if len(rows) > 1 {
+		return fmt.Errorf(
+			"multiple records in store found for url=%s and revision=%s",
+			cov.RepoURL(), cov.Revision())
+	}
+
+	if len(rows) == 0 { // insert
+		log.Print("Insert")
+		_, err = s.db.Exec(
+			"INSERT INTO coverage (url, revision, time, raw) VALUES ($1, $2, $3, $4)",
+			cov.RepoURL(), cov.Revision(), cov.Time(), raw)
+	} else { // update
+		log.Print("Update")
+		_, err = s.db.Exec(
+			"UPDATE coverage SET raw = $1 WHERE url = $2 and revision = $3",
+			raw, cov.RepoURL(), cov.Revision())
+	}
 	return err
 }
 
-func (s *JSONStore) Scan() ([]string, error) {
-	rows := []string{}
-	err := s.db.Select(&rows, "SELECT json FROM json WHERE owner=$1", s.name)
+type ScanedCoverage struct {
+	RepoURL  string    `db:"url"`
+	Revision string    `db:"revision"`
+	Time     time.Time `db:"time"`
+	Raw      string    `db:"raw"`
+}
+
+func (s *JSONStore) Scan() ([]ScanedCoverage, error) {
+	rows := []ScanedCoverage{}
+	err := s.db.Select(&rows, "SELECT url, revision, time, raw FROM coverage")
 	return rows, err
 }

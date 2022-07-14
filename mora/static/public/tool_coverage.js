@@ -28,6 +28,9 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
         const data = await fetch(url)
         const json = await data.json()
         // console.log(json)
+        if (json.message) { // error
+            return
+        }
         const tmp = hljs.highlightAuto(json.code)
         const lines = tmp.value.split("\n")
 
@@ -62,7 +65,12 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
         }
         proxy.selectedFile = file
         proxy.src = lst.join("\n")
-        proxy.$nextTick(() => { setStyle() })
+        proxy.$nextTick(() => {
+            proxy.show_code = true
+            proxy.$nextTick(() => {
+                setStyle()
+            })
+        })
     }
 
     function setStyle() {
@@ -145,7 +153,6 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
             selectFile(file) {
                 // console.log(file)
                 print_code(this, file)
-                this.show_code = true
             },
             toggleDarkMode(ev) {
                 _toggleDarkMode(ev.target)
