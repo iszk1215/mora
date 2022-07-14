@@ -273,7 +273,7 @@ type CoverageUploadRequest struct {
 	Entries  []*CoverageEntryUploadRequest `json:"entries"`
 }
 
-func convertToEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
+func parseEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
 	if req.EntryName == "" {
 		return nil, errors.New("entry name is empty")
 	}
@@ -295,7 +295,7 @@ func convertToEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
 func parseEntries(req []*CoverageEntryUploadRequest) ([]*entryImpl, error) {
 	entries := []*entryImpl{}
 	for _, e := range req {
-		entry, err := convertToEntry(e)
+		entry, err := parseEntry(e)
 		if err != nil {
 			return nil, err
 		}
