@@ -97,10 +97,11 @@ func (p *ToolCoverageProvider) loadFromStore() error {
 		return err
 	}
 	for _, text := range rows {
-		err = p.processRequestBody([]byte(text))
+		cov, err := parseUploadRequest([]byte(text))
 		if err != nil {
 			return err
 		}
+		p.addCoverage(cov)
 	}
 
 	return nil
@@ -306,28 +307,6 @@ func parseUploadRequest(bytes []byte) (*coverageImpl, error) {
 	return cov, nil
 }
 
-func (p *ToolCoverageProvider) processRequestBody(bytes []byte) error {
-	/*
-		var req CoverageUploadRequest
-		err := json.Unmarshal(bytes, &req)
-		if err != nil {
-			return err
-		}
-
-		cov, err := convertToCoverage(&req)
-		if err != nil {
-			return err
-		}
-	*/
-	cov, err := parseUploadRequest(bytes)
-	if err != nil {
-		return nil
-	}
-
-	p.addCoverage(cov)
-	return nil
-}
-
 func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleUpload")
 
@@ -355,15 +334,6 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 			return
 		}
 	}
-
-	/*
-		err = p.processRequestBody(b)
-		if err != nil {
-			log.Err(err).Msg("HandleUpload")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-	*/
 }
 
 // API
