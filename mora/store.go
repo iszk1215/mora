@@ -3,6 +3,7 @@ package mora
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -73,8 +74,15 @@ func (s *JSONStore) Store(cov Coverage, raw string) error {
 	return err
 }
 
-func (s *JSONStore) Scan() ([]string, error) {
-	rows := []string{}
-	err := s.db.Select(&rows, "SELECT raw FROM coverage")
+type ScanedCoverage struct {
+	RepoURL  string    `db:"url"`
+	Revision string    `db:"revision"`
+	Time     time.Time `db:"time"`
+	Raw      string    `db:"raw"`
+}
+
+func (s *JSONStore) Scan() ([]ScanedCoverage, error) {
+	rows := []ScanedCoverage{}
+	err := s.db.Select(&rows, "SELECT url, revision, time, raw FROM coverage")
 	return rows, err
 }

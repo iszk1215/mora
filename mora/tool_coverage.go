@@ -91,16 +91,39 @@ func (p *ToolCoverageProvider) Sync() error {
 	return p.loadFromStore()
 }
 
+func parseScandCoverage(record ScanedCoverage) (*coverageImpl, error) {
+	var req []*CoverageEntryUploadRequest
+	err := json.Unmarshal([]byte(record.Raw), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := parseEntries(req)
+	if err != nil {
+		return nil, err
+	}
+
+	cov := &coverageImpl{}
+	cov.url = record.RepoURL
+	cov.revision = record.Revision
+	cov.entries = entries
+	cov.time = record.Time
+
+	return cov, nil
+}
+
 func (p *ToolCoverageProvider) loadFromStore() error {
-	rows, err := p.store.Scan()
+	records, err := p.store.Scan()
 	if err != nil {
 		return err
 	}
-	for _, text := range rows {
-		cov, err := parseUploadRequest([]byte(text))
+
+	for _, record := range records {
+		cov, err := parseScandCoverage(record)
 		if err != nil {
 			return err
 		}
+
 		p.addCoverage(cov)
 	}
 
@@ -269,18 +292,27 @@ func convertToEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
 	return entry, nil
 }
 
-func convertToCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
-	if req.RepoURL == "" {
-		return nil, errors.New("repo url is empty")
-	}
-
+func parseEntries(req []*CoverageEntryUploadRequest) ([]*entryImpl, error) {
 	entries := []*entryImpl{}
-	for _, e := range req.Entries {
+	for _, e := range req {
 		entry, err := convertToEntry(e)
 		if err != nil {
 			return nil, err
 		}
 		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
+func parseCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
+	if req.RepoURL == "" {
+		return nil, errors.New("repo url is empty")
+	}
+
+	entries, err := parseEntries(req.Entries)
+	if err != nil {
+		return nil, err
 	}
 
 	cov := &coverageImpl{}
@@ -292,32 +324,30 @@ func convertToCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
 	return cov, nil
 }
 
-func parseUploadRequest(bytes []byte) (*coverageImpl, error) {
-	var req CoverageUploadRequest
-	err := json.Unmarshal(bytes, &req)
+func parseFromReader(reader io.Reader) (*CoverageUploadRequest, Coverage, error) {
+	b, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	cov, err := convertToCoverage(&req)
+	var req *CoverageUploadRequest
+	err = json.Unmarshal(b, &req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return cov, nil
+	cov, err := parseCoverage(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return req, cov, nil
 }
 
 func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleUpload")
 
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Err(err).Msg("HandleUpload")
-		render.NotFound(w, render.ErrNotFound)
-		return
-	}
-
-	cov, err := parseUploadRequest(b)
+	req, cov, err := parseFromReader(r.Body)
 	if err != nil {
 		log.Err(err).Msg("HandleUpload")
 		render.NotFound(w, render.ErrNotFound)
@@ -327,7 +357,14 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 	p.addCoverage(cov)
 
 	if p.store != nil {
-		err := p.store.Store(cov, string(b))
+		raw, err := json.Marshal(req.Entries)
+		if err != nil {
+			log.Err(err).Msg("HandleUpload")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
+		err = p.store.Store(cov, string(raw))
 		if err != nil {
 			log.Err(err).Msg("HandleUpload")
 			render.NotFound(w, render.ErrNotFound)
