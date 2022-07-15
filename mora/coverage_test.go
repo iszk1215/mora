@@ -128,6 +128,7 @@ func (p *MockCoverageProvider) AddCoverage(repo string, cov Coverage) {
 	p.coverages[repo] = append(p.coverages[repo], cov)
 }
 
+/*
 func (p *MockCoverageProvider) CoveragesFor(repo string) []Coverage {
 	covs, ok := p.coverages[repo]
 	if !ok {
@@ -135,6 +136,7 @@ func (p *MockCoverageProvider) CoveragesFor(repo string) []Coverage {
 	}
 	return covs
 }
+*/
 
 func (p *MockCoverageProvider) WebHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
