@@ -1,0 +1,58 @@
+{{template "header"}}
+<script src="/public/tool_coverage.js" type="module"></script>
+<main>
+    <div id="app" v-cloak>
+        <div class="ui container">
+            <breadcrumb></breadcrumb>
+
+            <h1 class="ui header">Coverage</h1>
+
+            <div class="ui right floated segment">
+                <a :href="meta.revision_url">[[meta.revision.substring(0, 10)]]</a>
+                [[formattedTime(meta.time)]]
+            </div>
+
+            <div>
+                Lines: [[meta.hits]]/[[meta.lines]] Coverage: [[(meta.hits*100/meta.lines).toFixed(1)]]%
+            </div>
+
+            <table class="ui very compact selectable celled striped table" style="line-height: 1.0;">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Hit</th>
+                        <th>Total</th>
+                        <th>Coverage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="file in files" :class="file.clazz">
+                        <td><a href="javascript:void(0)" v-on:click="selectFile(file)">[[file.filename]]</a></td>
+                        <td class="right aligned">[[file.hits]]</td>
+                        <td class="right aligned">[[file.lines]]</td>
+                        <td class="right aligned">[[file.ratio.toFixed(1)]] %</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="ui container" v-if="show_code">
+                <h4 class="ui header">[[selectedFile.filename]]</h4>
+                Coverage [[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%
+                <div id="hitLabel" class="ui label">
+                    Hit
+                    <div class="ui detail">[[selectedFile.hits]] Lines</div>
+                </div>
+                <div id="missLabel" class="ui label">
+                    Miss
+                    <div class="ui detail">[[selectedFile.lines-selectedFile.hits]] Lines</div>
+                </div>
+                <button id="darkModeButton" class="ui right floated toggle button" v-on:click="toggleDarkMode($event)">
+                    Dark
+                </button>
+                <pre><code v-html="src"
+                           style="padding: 0px; border:solid 1px darkgray;"></code></pre>
+            </div>
+        </div>
+    </div>
+</main>
+{{template "footer"}}

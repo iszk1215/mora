@@ -34,10 +34,9 @@ func (m MockLoginMiddleware) Handler(next http.Handler) http.Handler {
 	})
 }
 
-func createTestLoginHandler(client Client) http.Handler {
-	clients := []Client{client}
+func createTestLoginHandler(scm SCM) http.Handler {
 	next := func(w http.ResponseWriter, r *http.Request) {}
-	return LoginHandler(clients, http.HandlerFunc(next))
+	return LoginHandler([]SCM{scm}, http.HandlerFunc(next))
 }
 
 func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request {
@@ -46,7 +45,7 @@ func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request 
 }
 
 func TestLoginSuccess(t *testing.T) {
-	mock := NewMockSCMClient("scm")
+	mock := NewMockSCM("scm")
 	path := "/" + mock.Name()
 	mock.loginHandler = MockLoginMiddleware{path}.Handler
 	r := createTestLoginHandler(mock)
@@ -79,7 +78,7 @@ func TestLoginSuccess(t *testing.T) {
 }
 
 func TestLoginError(t *testing.T) {
-	mock := NewMockSCMClient("scm")
+	mock := NewMockSCM("scm")
 	r := createTestLoginHandler(mock)
 
 	req := NewGetRequestWithMoraSession("/"+mock.Name(), NewMoraSession())
@@ -91,7 +90,7 @@ func TestLoginError(t *testing.T) {
 }
 
 func TestLoginErrorOnUnknownSCM(t *testing.T) {
-	mock := NewMockSCMClient("scm")
+	mock := NewMockSCM("scm")
 	r := createTestLoginHandler(mock)
 
 	req := NewGetRequestWithMoraSession("/unknown_scm", NewMoraSession())
@@ -103,28 +102,28 @@ func TestLoginErrorOnUnknownSCM(t *testing.T) {
 }
 
 func testLogout(t *testing.T, logoutAll bool) {
-	client0 := NewMockSCMClient("client0")
-	client1 := NewMockSCMClient("client1")
+	scm0 := NewMockSCM("scm0")
+	scm1 := NewMockSCM("scm1")
 
 	path := "/"
 	if !logoutAll {
-		path = "/" + client0.Name()
+		path = "/" + scm0.Name()
 	}
 	got := httptest.NewRecorder()
 
 	sess := NewMoraSession()
-	sess.setToken(client0.Name(), scm.Token{})
-	sess.setToken(client1.Name(), scm.Token{})
+	sess.setToken(scm0.Name(), scm.Token{})
+	sess.setToken(scm1.Name(), scm.Token{})
 	req := NewGetRequestWithMoraSession(path, sess)
 
 	next := func(w http.ResponseWriter, r *http.Request) {}
-	clients := []Client{client0, client1}
-	r := LogoutHandler(clients, http.HandlerFunc(next))
+	scms := []SCM{scm0, scm1}
+	r := LogoutHandler(scms, http.HandlerFunc(next))
 
 	r.ServeHTTP(got, req)
 
-	_, hasToken0 := sess.getToken(client0.Name())
-	_, hasToken1 := sess.getToken(client1.Name())
+	_, hasToken0 := sess.getToken(scm0.Name())
+	_, hasToken1 := sess.getToken(scm1.Name())
 
 	if logoutAll {
 		assert.False(t, hasToken0)

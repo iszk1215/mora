@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/iszk1215/mora"
+	"github.com/iszk1215/mora/mora"
 	"github.com/rs/zerolog"
 
 	"github.com/rs/zerolog/log"
@@ -14,7 +14,7 @@ import (
 
 func main() {
 	log.Logger = log.Output(
-		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
 
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	config_file := flag.String("config", "mora.yaml", "sets log level to debug")
@@ -37,12 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// handler, err := mora.ServerHandlerFromConfig(config)
-	handler, err := server.Handler()
-	if err != nil {
-		log.Err(err).Msg("")
-		os.Exit(1)
-	}
+	handler := server.Handler()
 
 	log.Info().Msg("Started")
 	err = http.ListenAndServe(":"+config.Port, handler)

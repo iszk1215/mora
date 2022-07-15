@@ -29,7 +29,7 @@ func createMockDataset(t *testing.T) (fs.FS, *Repo, *htmlCoverage) {
 	repo := &Repo{Namespace: "mockowner", Name: "mockrepo"} // FIXME
 	ts, _ := time.Parse(time.RFC3339, "2022-05-06T10:46:53+09:00")
 	cov := &htmlCoverage{
-		RepoURL:   repo.Link,
+		RepoURL_:  repo.Link,
 		Time_:     ts,
 		Revision_: "130351ab1f695620cb6db0c068e4a849812d0a48",
 		Directory: "",
@@ -50,14 +50,10 @@ func createMockDataset(t *testing.T) (fs.FS, *Repo, *htmlCoverage) {
 }
 
 func TestLoad(t *testing.T) {
-	fsys, repo, expected := createMockDataset(t)
+	fsys, _, expected := createMockDataset(t)
 
-	m, err := load(fsys, "mora.yaml")
+	covs, err := loadDirectory(fsys, "", "mora.yaml")
 	assert.NoError(t, err)
-	require.Equal(t, 1, len(m))
-
-	covs, ok := m[repo.Link]
-	require.Equal(t, true, ok)
 	require.Equal(t, 1, len(covs))
 
 	requireEqualHtmlCoverage(t, expected, covs[0])

@@ -18,13 +18,29 @@
         <script src="/public/chartjs-plugin-colorschemes.js"></script>
 
         <script src="https://unpkg.com/vue@next"></script>
+
+        <!--
+        <link rel="stylesheet" href="https://unpkg.com/@highlightjs/cdn-assets@11.5.1/styles/github.min.css">
+        -->
+
         <title>Mora</title>
 
-<style type="text/css">
-.main.menu {
-    margin-bottom: 10px;
-}
-</style>
+        <style type="text/css">
+            .main.menu {
+                margin-bottom: 10px;
+            }
+            /*
+            .hit {
+                background: palegreen;
+            }
+            .miss {
+                background: pink;
+            }
+            */
+            [v-cloak] {
+                display: none;
+            }
+        </style>
     </head>
     <body>
         <header style="margin-bottom: 10px" class="ui container">
@@ -35,5 +51,5 @@
                 </div>
             </div>
         </header>
-{{end}}
+        {{end}}
 

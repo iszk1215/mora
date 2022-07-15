@@ -2,13 +2,17 @@ package mora
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/drone/drone/mock/mockscm"
+	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,53 +23,60 @@ func requireLocation(t *testing.T, expected string, r *http.Response) {
 	require.Equal(t, expected, loc.String())
 }
 
-func assertEqualSerializableRepo(t *testing.T, expected Repo, got SerializableRepo) bool {
-	// ok := assert.Equal(t, expected.Path(), got.Path)
-	ok := assert.Equal(t, expected.Link, got.Link) // FIXME
+func assertEqualRepoResponse(t *testing.T, expected *Repo, got RepoResponse) bool {
+	// FIXME: check SCM
+	ok := assert.Equal(t, expected.Namespace, got.Namespace)
+	ok = ok && assert.Equal(t, expected.Name, got.Name)
+	ok = ok && assert.Equal(t, expected.Link, got.Link)
 	return ok
 }
 
-func requireEqualRepoList(t *testing.T, expected []Repo, res *http.Response) {
+func requireEqualRepoList(t *testing.T, expected []*Repo, res *http.Response) {
 	body, err := ioutil.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var data []SerializableRepo
+	var data []RepoResponse
 	err = json.Unmarshal(body, &data)
 	require.NoError(t, err)
 
 	require.Equal(t, len(expected), len(data))
 	for i, exp := range expected {
-		assertEqualSerializableRepo(t, exp, data[i])
+		assertEqualRepoResponse(t, exp, data[i])
 	}
 }
 
-func TestRepos(t *testing.T) {
-	client := NewMockSCMClient("mock")
-	// FIXME
-	// repo0 := MockRepo{"mock", "owner", "repo0"}
-	// repo1 := MockRepo{"mock", "owner", "repo1"}
+func Test_checkRepoAccess(t *testing.T) {
+	scm := NewMockSCM("mock")
+
 	repo0 := &Repo{Namespace: "owner", Name: "repo0"}
-	repo1 := &Repo{Namespace: "owner", Name: "repo1"}
-	client.AddRepo(repo0, repo1)
+	mockRepos := []*Repo{repo0}
 
-	sess := NewMoraSessionWithEmptyTokenFor(client.Name())
-	repos, err := getReposWithCache(client, sess)
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	enableRepoService(controller, scm, mockRepos)
 
+	sess := NewMoraSessionWithEmptyTokenFor(scm.Name())
+
+	cache, ok := sess.getReposCache(scm.Name())
+	require.False(t, ok)
+	require.Equal(t, 0, len(cache))
+
+	repo, err := checkRepoAccess(sess, scm, "owner", "repo1")
 	require.NoError(t, err)
-	require.Equal(t, client.repos, repos)
+	require.Equal(t, repo0, repo)
 
 	// from cache
-	repos, ok := sess.getReposCache(client.Name())
+	cache, ok = sess.getReposCache(scm.Name())
 	require.True(t, ok)
-	require.Equal(t, client.repos, repos)
+	require.Equal(t, []*Repo{repo0}, cache)
 }
 
-func getResultWithHandler(sess *MoraSession, clients []Client, path string, handler http.Handler) *http.Response {
+func getResultWithHandler(sess *MoraSession, scms []SCM, path string, handler http.Handler) *http.Response {
 
 	got := httptest.NewRecorder()
 	r := chi.NewRouter()
 	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(injectRepo(clients))
+		r.Use(injectRepo(scms))
 		r.Get("/", handler.ServeHTTP)
 	})
 
@@ -76,27 +87,34 @@ func getResultWithHandler(sess *MoraSession, clients []Client, path string, hand
 	return got.Result()
 }
 
-func getResult(sess *MoraSession, clients []Client, path string) *http.Response {
+func getResult(sess *MoraSession, scms []SCM, path string) *http.Response {
 	null := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	return getResultWithHandler(sess, clients, path, null)
+	return getResultWithHandler(sess, scms, path, null)
 }
 
 func newRepo(scm, namespace, name string) *Repo {
 	return &Repo{Namespace: namespace, Name: name,
 		Link: scm + "/" + namespace + "/" + name}
-
 }
 
-func createMockSCMClient(name string) (Client, *Repo) {
-	client := NewMockSCMClient(name)
-	repo := newRepo("https://"+name+".com", "owner", "repo")
-	client.AddRepo(repo)
-	return client, repo
+func enableRepoService(controller *gomock.Controller, mock *MockSCM, repos []*Repo) {
+	mockRepoService := mockscm.NewMockRepositoryService(controller)
+	// mockRepoService.EXPECT().List(gomock.Any(), gomock.Any()).Return(repos, &scm.Response{}, nil)
+	if len(repos) == 0 {
+		mockRepoService.EXPECT().Find(gomock.Any(), gomock.Any()).Return(nil, &scm.Response{}, fmt.Errorf("no repository found"))
+	} else if len(repos) == 1 {
+		mockRepoService.EXPECT().Find(gomock.Any(), gomock.Any()).Return(repos[0], &scm.Response{}, nil)
+	}
+	mock.client.Repositories = mockRepoService
 }
 
-func TestRepoCheckerSuccess(t *testing.T) {
-	client, repo := createMockSCMClient("mock")
-	sess := NewMoraSessionWithEmptyTokenFor(client.Name())
+func Test_injectRepo(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	scm := NewMockSCM("mock")
+	repo := newRepo("http://mock.com", "owner", "repo")
+	enableRepoService(controller, scm, []*Repo{repo})
+	sess := NewMoraSessionWithEmptyTokenFor(scm.Name())
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got, ok := RepoFrom(r.Context())
@@ -104,49 +122,58 @@ func TestRepoCheckerSuccess(t *testing.T) {
 		require.Equal(t, repo, got)
 	})
 
-	res := getResultWithHandler(sess, []Client{client}, "/mock/owner/repo", handler)
+	res := getResultWithHandler(sess, []SCM{scm}, "/mock/owner/repo", handler)
 	require.Equal(t, http.StatusOK, res.StatusCode)
 }
 
-func TestRepoCheckerNoLogin(t *testing.T) {
-	client, _ := createMockSCMClient("mock")
+func Test_injectRepo_NoLogin(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	scm := NewMockSCM("mock")
 
 	sess := NewMoraSession() // without token
-	res := getResult(sess, []Client{client}, "/mock/owner/repo")
+	res := getResult(sess, []SCM{scm}, "/mock/owner/repo")
 
 	require.Equal(t, http.StatusSeeOther, res.StatusCode)
 	requireLocation(t, "/scms", res)
 }
 
-func testRepoCheckerError(t *testing.T, path string, expectedCode int) {
-	client, _ := createMockSCMClient("mock")
-	sess := NewMoraSessionWithEmptyTokenFor(client.Name())
+func test_injectRepo_Error(t *testing.T, path string, useRepo bool, expectedCode int) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	scm := NewMockSCM("mock")
+	if useRepo {
+		enableRepoService(controller, scm, []*Repo{})
+	}
+	sess := NewMoraSessionWithEmptyTokenFor(scm.Name())
 
-	res := getResult(sess, []Client{client}, path)
+	res := getResult(sess, []SCM{scm}, path)
 	require.Equal(t, expectedCode, res.StatusCode)
 }
 
-func TestRepoCheckerUnknownSCM(t *testing.T) {
-	testRepoCheckerError(t, "/err/owner/repo", http.StatusNotFound)
+func Test_injectRepo_UnknownSCM(t *testing.T) {
+	test_injectRepo_Error(t, "/err/owner/repo", false, http.StatusNotFound)
 }
 
 func TestRepoCheckerUnknownOwner(t *testing.T) {
-	testRepoCheckerError(t, "/mock/error/repo", http.StatusNotFound)
+	test_injectRepo_Error(t, "/mock/error/repo", true, http.StatusNotFound)
 }
 
 func TestRepoCheckerUnknownRepo(t *testing.T) {
-	testRepoCheckerError(t, "/mock/owner/unknown", http.StatusNotFound)
+	test_injectRepo_Error(t, "/mock/owner/unknown", true, http.StatusNotFound)
 }
 
 func TestSCMList(t *testing.T) {
-	client0, _ := createMockSCMClient("mock0")
-	client1, _ := createMockSCMClient("mock1")
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	scm0 := NewMockSCM("mock0")
+	scm1 := NewMockSCM("mock1")
 	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
-	sess := NewMoraSessionWithEmptyTokenFor(client0.Name())
+	sess := NewMoraSessionWithEmptyTokenFor(scm0.Name())
 
 	r = r.WithContext(WithMoraSession(r.Context(), sess))
 	got := httptest.NewRecorder()
-	handler := HandleSCMList([]Client{client0, client1})
+	handler := HandleSCMList([]SCM{scm0, scm1})
 	handler.ServeHTTP(got, r)
 	res := got.Result()
 	t.Log(res)
@@ -184,28 +211,37 @@ func requireLogin(t *testing.T, handler http.Handler, scm string) *http.Cookie {
 	return cookie
 }
 
-func setupServer(t *testing.T) (http.Handler, Client, Repo) {
-	scm := NewMockSCMClient("scm")
+func setupServer(t *testing.T, controller *gomock.Controller, useRepo bool) (http.Handler, SCM, *Repo) {
+	scm := NewMockSCM("scm")
 	scm.loginHandler = MockLoginMiddleware{"/login/" + scm.Name()}.Handler
-	// FIXME
-	// repo := MockRepo{scm.Name(), "owner", "repo"}
-	repo := Repo{Namespace: "owner", Name: "repo"}
-	scm.AddRepo(&repo)
+
+	repo := &Repo{Namespace: "owner", Name: "repo",
+		Link: "https://scm.com/owner/repo"}
+	if useRepo {
+		enableRepoService(controller, scm, []*Repo{repo})
+	}
 
 	provider := NewMockCoverageProvider()
 	cov := NewMockCoverage()
+	cov.url = repo.Link
 	provider.AddCoverage(repo.Link, cov)
 
-	server, err := NewMoraServer([]Client{scm}, provider, false)
+	coverage := NewCoverageService()
+	coverage.AddProvider(provider)
+	coverage.Sync()
+
+	server, err := NewMoraServer([]SCM{scm}, false)
+	server.coverage = coverage
 	require.NoError(t, err)
-	handler, err := server.Handler()
-	require.NoError(t, err)
+	handler := server.Handler()
 
 	return handler, scm, repo
 }
 
 func TestServerSCMList(t *testing.T) {
-	handler, scm, _ := setupServer(t)
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	handler, scm, _ := setupServer(t, controller, false)
 	cookie := requireLogin(t, handler, scm.Name())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/scms", strings.NewReader(""))
@@ -229,7 +265,9 @@ func TestServerSCMList(t *testing.T) {
 }
 
 func TestServerRepoList(t *testing.T) {
-	handler, scm, repo := setupServer(t)
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	handler, scm, repo := setupServer(t, controller, true)
 	cookie := requireLogin(t, handler, scm.Name())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/repos", strings.NewReader(""))
@@ -239,5 +277,5 @@ func TestServerRepoList(t *testing.T) {
 	res := w.Result()
 
 	require.Equal(t, http.StatusOK, res.StatusCode)
-	requireEqualRepoList(t, []Repo{repo}, res)
+	requireEqualRepoList(t, []*Repo{repo}, res)
 }

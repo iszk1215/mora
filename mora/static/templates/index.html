@@ -5,7 +5,7 @@
         <h1 class="ui header">Repositories</h1>
         <div class="ui bulleted list">
             <div class="ui item" v-for="repo in repos">
-                <a :href="repo.path + '/coverages'">[[repo.link]]</a>
+                <a :href="repo.scm + '/' + repo.namespace + '/' + repo.name + '/coverages'">[[repo.link]]</a>
             </div>
         </div>
     </div>
