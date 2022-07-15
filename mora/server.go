@@ -97,16 +97,6 @@ func (s *MoraServer) HandleRepoList(w http.ResponseWriter, r *http.Request) {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-		/*
-			var scm SCM = nil
-			for _, s := range s.scms {
-				tmp := s.URL().String()
-				tmp = strings.TrimSuffix(tmp, "/")
-				if tmp == scmURL {
-					scm = s
-				}
-			}
-		*/
 		scm, ok := findSCMFromURL(s.scms, scmURL)
 		if !ok {
 			log.Print("scm not found")
