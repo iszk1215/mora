@@ -105,7 +105,6 @@ func (s *MoraServer) HandleRepoList(w http.ResponseWriter, r *http.Request) {
 		}
 
 		repo, err := checkRepoAccess(sess, scm, owner, name)
-		// repo, err := findRepoFromSCM(sess, scm, owner, name)
 		if err == errorTokenNotFound {
 			// ignore
 			continue
