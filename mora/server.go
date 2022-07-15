@@ -10,10 +10,12 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	"github.com/drone/drone/handler/api/render"
 	"github.com/drone/go-scm/scm"
+	"github.com/elliotchance/pie/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog/log"
@@ -69,29 +71,51 @@ type RepoResponse struct {
 	Link      string `json:"link"`
 }
 
+func parseRepoURL(str string) (string, string, string, error) {
+	tmp := strings.Split(str, "/")
+	if len(tmp) != 5 {
+		return "", "", "", fmt.Errorf("invalid repo url: %s", str)
+	}
+
+	scm := tmp[0] + "//" + tmp[2]
+	owner := tmp[3]
+	name := tmp[4]
+
+	return scm, owner, name, nil
+}
+
 func (s *MoraServer) HandleRepoList(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleRepoList")
 
 	repos := []RepoResponse{}
 	sess, _ := MoraSessionFrom(r.Context())
-	for _, scm := range s.smcs {
-		tmp, err := getReposWithCache(scm, sess)
-		if err == errorTokenNotFound {
-			// ignore
-		} else if err != nil {
+
+	for _, link := range s.coverage.Repos() {
+		scmURL, owner, name, err := parseRepoURL(link)
+		if err != nil {
+			log.Err(err).Msg("")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+		scm, ok := findSCMFromURL(s.scms, scmURL)
+		if !ok {
+			log.Print("scm not found")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
-		for _, repo := range tmp {
-			for _, link := range s.coverage.Repos() {
-				// log.Print(link)
-				if repo.Link == link {
-					repos = append(repos, RepoResponse{
-						scm.Name(), repo.Namespace, repo.Name, repo.Link})
-				}
-			}
+		repo, err := checkRepoAccess(sess, scm, owner, name)
+		if err == errorTokenNotFound {
+			// ignore
+			continue
+		} else if err != nil {
+			log.Err(err).Msg("Repo not found")
+			render.NotFound(w, render.ErrNotFound)
+			return
 		}
+
+		repos = append(repos, RepoResponse{
+			scm.Name(), repo.Namespace, repo.Name, repo.Link})
 	}
 
 	render.JSON(w, repos, http.StatusOK)
@@ -174,48 +198,6 @@ func templateRenderingHandler(filename string) http.HandlerFunc {
 
 // ----------------------------------------------------------------------
 
-func listRepos(ctx context.Context, client *scm.Client) ([]*Repo, error) {
-	ret := []*Repo{}
-	opts := scm.ListOptions{Size: 100}
-	for {
-		result, meta, err := client.Repositories.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, result...)
-
-		opts.Page = meta.Page.Next
-		opts.URL = meta.Page.NextURL
-
-		if opts.Page == 0 && opts.URL == "" {
-			break
-		}
-	}
-	return ret, nil
-}
-
-func getReposWithCache(scm SCM, session *MoraSession) ([]*Repo, error) {
-	repos, ok := session.getReposCache(scm.Name())
-	if ok {
-		log.Print("Load repos from session for ", scm.Name())
-		return repos, nil
-	}
-
-	ctx, err := session.WithToken(context.Background(), scm.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	log.Print("try to load repos from scm: ", scm.Name())
-	repos, err = listRepos(ctx, scm.Client())
-	if err == nil {
-		log.Print("Store repos to cache")
-		session.setReposCache(scm.Name(), repos)
-	}
-
-	return repos, err
-}
-
 func findSCM(scms []SCM, name string) (SCM, bool) {
 	for _, scm := range scms {
 		if scm.Name() == name {
@@ -225,21 +207,64 @@ func findSCM(scms []SCM, name string) (SCM, bool) {
 	return nil, false
 }
 
-// checkRepoAccess checks if token in session can access a repo 'owner/name'
-func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (*Repo, error) {
-	repos, err := getReposWithCache(scm, sess)
+func findSCMFromURL(scms []SCM, url string) (SCM, bool) {
+	for _, s := range scms {
+		tmp := s.URL().String()
+		tmp = strings.TrimSuffix(tmp, "/")
+		if tmp == url {
+			return s, true
+		}
+	}
+
+	return nil, false
+}
+
+func findRepoFromCache(cache []*Repo, scm, owner, name string) *Repo {
+	index := pie.FindFirstUsing(cache, func(repo *Repo) bool {
+		return repo.Namespace == owner && repo.Name == name
+	})
+
+	if index < 0 {
+		return nil
+	}
+	return cache[index]
+}
+
+func findRepoFromSCM(session *MoraSession, scm SCM, owner, name string) (*Repo, error) {
+	ctx, err := session.WithToken(context.Background(), scm.Name())
 	if err != nil {
 		return nil, err
 	}
 
-	for _, repo := range repos {
-		if repo.Namespace == owner && repo.Name == name {
+	repo, meta, err := scm.Client().Repositories.Find(ctx, owner+"/"+name)
+	if err != nil {
+		log.Print(meta)
+		return nil, err
+	}
+
+	return repo, nil
+}
+
+// checkRepoAccess checks if token in session can access a repo 'owner/name'
+func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (*Repo, error) {
+	cache, ok := sess.getReposCache(scm.Name())
+	if ok {
+		repo := findRepoFromCache(cache, scm.Name(), owner, name)
+		if repo != nil {
+			log.Print("checkRepoAccess: found in cache")
 			return repo, nil
 		}
 	}
 
-	return nil, fmt.Errorf("requested repo not exist or not visible: %s/%s",
-		owner, name)
+	repo, err := findRepoFromSCM(sess, scm, owner, name)
+	if err != nil {
+		return nil, err
+	}
+
+	cache = append(cache, repo)
+	sess.setReposCache(scm.Name(), cache)
+
+	return repo, nil
 }
 
 func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
@@ -292,12 +317,12 @@ func (s *MoraServer) Handler() http.Handler {
 	// api
 
 	r.Post("/api/sync", s.HandleSync)
-	r.Get("/api/scms", HandleSCMList(s.smcs))
+	r.Get("/api/scms", HandleSCMList(s.scms))
 	r.Get("/api/repos", s.HandleRepoList)
 	r.Post("/api/upload", s.HandleUpload)
 
 	r.Route("/api/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(injectRepo(s.smcs))
+		r.Use(injectRepo(s.scms))
 		r.Mount("/coverages", s.coverage.APIHandler())
 	})
 
@@ -311,11 +336,11 @@ func (s *MoraServer) Handler() http.Handler {
 	r.Get("/", templateRenderingHandler("index.html"))
 	r.Get("/scms", templateRenderingHandler("login.html"))
 
-	r.Mount("/login", LoginHandler(s.smcs, redirectHandler))
-	r.Mount("/logout", LogoutHandler(s.smcs, redirectHandler))
+	r.Mount("/login", LoginHandler(s.scms, redirectHandler))
+	r.Mount("/logout", LogoutHandler(s.scms, redirectHandler))
 
 	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(injectRepo(s.smcs))
+		r.Use(injectRepo(s.scms))
 		r.Mount("/coverages", s.coverage.WebHandler())
 	})
 
@@ -328,7 +353,7 @@ func (s *MoraServer) Handler() http.Handler {
 }
 
 type MoraServer struct {
-	smcs     []SCM
+	scms     []SCM
 	coverage *CoverageService
 
 	sessionManager   *MoraSessionManager
@@ -368,7 +393,7 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 	}
 
 	s.sessionManager = sessionManager
-	s.smcs = scms
+	s.scms = scms
 	s.publicFileServer = http.FileServer(http.FS(publicFS))
 
 	return s, nil
