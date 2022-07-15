@@ -45,9 +45,7 @@ func mergeBlocks(blocks [][]int) [][]int {
 func postprocess(profiles []*Profile, prefix string) {
 	for _, p := range profiles {
 		p.FileName = strings.Replace(p.FileName, prefix, "", -1)
-		if strings.HasPrefix(p.FileName, "/") {
-			p.FileName = p.FileName[1:len(p.FileName)]
-		}
+		p.FileName = strings.TrimPrefix(p.FileName, "/")
 
 		p.Blocks = mergeBlocks(p.Blocks)
 
@@ -108,6 +106,17 @@ func parseLcov(reader io.Reader) ([]*Profile, error) {
 func convertGoProfile(profile *cover.Profile) *Profile {
 	pr := &Profile{FileName: profile.FileName}
 
+	// Change block to lines.
+	//
+	// NOTE: We do not use NumStmt because it is difficult to use without
+	// source code.
+	//
+	// Example:
+	//   10  if (condition) {
+	//   11    // do something
+	//   12  }
+	// For this code block, we have a cover.ProfileBlock with StartLine = 10,
+	// EndLine = 12, NumStmt = 1. Three lines are created here from this block.
 	blocks := [][]int{}
 	for _, b := range profile.Blocks {
 		for l := b.StartLine; l <= b.EndLine; l++ {

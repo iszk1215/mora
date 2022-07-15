@@ -20,8 +20,7 @@ CREATE TABLE IF NOT EXISTS coverage (
 )`
 
 type JSONStore struct {
-	db   *sqlx.DB
-	name string
+	db *sqlx.DB
 	sync.Mutex
 }
 
@@ -40,8 +39,8 @@ func Connect(filename string) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func NewJSONStore(db *sqlx.DB, name string) *JSONStore {
-	return &JSONStore{db: db, name: name}
+func NewJSONStore(db *sqlx.DB) *JSONStore {
+	return &JSONStore{db: db}
 }
 
 func (s *JSONStore) Store(cov Coverage, raw string) error {

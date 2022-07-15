@@ -82,10 +82,6 @@ type MockCoverage struct {
 	entries  []MockCoverageEntry
 }
 
-func NewMockCoverage() *MockCoverage {
-	return &MockCoverage{entries: []MockCoverageEntry{}}
-}
-
 func (c MockCoverage) RepoURL() string {
 	return c.url
 }
@@ -128,16 +124,6 @@ func (p *MockCoverageProvider) AddCoverage(repo string, cov Coverage) {
 	p.coverages[repo] = append(p.coverages[repo], cov)
 }
 
-/*
-func (p *MockCoverageProvider) CoveragesFor(repo string) []Coverage {
-	covs, ok := p.coverages[repo]
-	if !ok {
-		return []Coverage{}
-	}
-	return covs
-}
-*/
-
 func (p *MockCoverageProvider) WebHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 }
@@ -166,12 +152,11 @@ func createMockCoverage() MockCoverage {
 }
 
 func TestSerializeCoverage(t *testing.T) {
-	// repo := MockRepo{"scm", "owner", "repo"}
 	scm := NewMockSCM("scm")
 	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
 	cov := createMockCoverage()
 
-	data := convertCoverages(scm, repo, []Coverage{cov})
+	data := makeCoverageResponseList(scm, repo, []Coverage{cov})
 
 	require.Equal(t, 1, len(data))
 	assertEqualCoverage(t, cov, data[0])

@@ -91,7 +91,7 @@ func (p *ToolCoverageProvider) Sync() error {
 	return p.loadFromStore()
 }
 
-func parseScandCoverage(record ScanedCoverage) (*coverageImpl, error) {
+func parseScanedCoverage(record ScanedCoverage) (*coverageImpl, error) {
 	var req []*CoverageEntryUploadRequest
 	err := json.Unmarshal([]byte(record.Raw), &req)
 	if err != nil {
@@ -119,7 +119,7 @@ func (p *ToolCoverageProvider) loadFromStore() error {
 	}
 
 	for _, record := range records {
-		cov, err := parseScandCoverage(record)
+		cov, err := parseScanedCoverage(record)
 		if err != nil {
 			return err
 		}
@@ -372,6 +372,8 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 		}
 	}
 }
+
+// Entry Handler
 
 // API
 func (p *ToolCoverageProvider) Handler() http.Handler {

@@ -14,8 +14,11 @@ type Gitea struct {
 	BaseSCM
 }
 
-// defaultTransport provides a default http.Transport. If
-// skipverify is true, the transport will skip ssl verification.
+func (g *Gitea) RevisionURL(repo *Repo, revision string) string {
+	return repo.Link + "/src/commit/" + revision
+}
+
+// from drone
 func defaultTransport(skipverify bool) http.RoundTripper {
 	return &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -47,10 +50,6 @@ func NewGitea(name string, url string, config login.Config) (*Gitea, error) {
 		},
 	}
 	return gitea, nil
-}
-
-func (g *Gitea) RevisionURL(repo *Repo, revision string) string {
-	return repo.Link + "/src/commit/" + revision
 }
 
 func NewGiteaFromFile(name string, filename string, url string, redirect_url string) (*Gitea, error) {
