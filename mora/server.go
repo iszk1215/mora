@@ -97,16 +97,18 @@ func (s *MoraServer) HandleRepoList(w http.ResponseWriter, r *http.Request) {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-		var scm SCM = nil
-		for _, s := range s.scms {
-			tmp := s.URL().String()
-			tmp = strings.TrimSuffix(tmp, "/")
-			if tmp == scmURL {
-				scm = s
+		/*
+			var scm SCM = nil
+			for _, s := range s.scms {
+				tmp := s.URL().String()
+				tmp = strings.TrimSuffix(tmp, "/")
+				if tmp == scmURL {
+					scm = s
+				}
 			}
-		}
-
-		if scm == nil {
+		*/
+		scm, ok := findSCMFromURL(s.scms, scmURL)
+		if !ok {
 			log.Print("scm not found")
 			render.NotFound(w, render.ErrNotFound)
 			return
@@ -207,56 +209,24 @@ func templateRenderingHandler(filename string) http.HandlerFunc {
 
 // ----------------------------------------------------------------------
 
-/*
-func listRepos(ctx context.Context, client *scm.Client) ([]*Repo, error) {
-	ret := []*Repo{}
-	opts := scm.ListOptions{Size: 100}
-	for {
-		result, meta, err := client.Repositories.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, result...)
-
-		opts.Page = meta.Page.Next
-		opts.URL = meta.Page.NextURL
-
-		if opts.Page == 0 && opts.URL == "" {
-			break
-		}
-	}
-	return ret, nil
-}
-
-func getReposWithCache(scm SCM, session *MoraSession) ([]*Repo, error) {
-	repos, ok := session.getReposCache(scm.Name())
-	if ok {
-		log.Print("Load repos from session for ", scm.Name())
-		return repos, nil
-	}
-
-	ctx, err := session.WithToken(context.Background(), scm.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	log.Print("try to load repos from scm: ", scm.Name())
-	repos, err = listRepos(ctx, scm.Client())
-	if err == nil {
-		log.Print("Store repos to cache")
-		// session.setReposCache(scm.Name(), repos)
-	}
-
-	return repos, err
-}
-*/
-
 func findSCM(scms []SCM, name string) (SCM, bool) {
 	for _, scm := range scms {
 		if scm.Name() == name {
 			return scm, true
 		}
 	}
+	return nil, false
+}
+
+func findSCMFromURL(scms []SCM, url string) (SCM, bool) {
+	for _, s := range scms {
+		tmp := s.URL().String()
+		tmp = strings.TrimSuffix(tmp, "/")
+		if tmp == url {
+			return s, true
+		}
+	}
+
 	return nil, false
 }
 
@@ -268,7 +238,6 @@ func findRepoFromCache(cache []*Repo, scm, owner, name string) *Repo {
 	if index < 0 {
 		return nil
 	}
-
 	return cache[index]
 }
 
@@ -289,11 +258,9 @@ func findRepoFromSCM(session *MoraSession, scm SCM, owner, name string) (*Repo, 
 
 // checkRepoAccess checks if token in session can access a repo 'owner/name'
 func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (*Repo, error) {
-	var repo *Repo = nil
-
 	cache, ok := sess.getReposCache(scm.Name())
 	if ok {
-		repo = findRepoFromCache(cache, scm.Name(), owner, name)
+		repo := findRepoFromCache(cache, scm.Name(), owner, name)
 		if repo != nil {
 			log.Print("checkRepoAccess: found in cache")
 			return repo, nil
