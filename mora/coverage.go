@@ -192,14 +192,13 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-		cov := coverages[index]
 
-		r = r.WithContext(withCoverage(r.Context(), cov))
+		r = r.WithContext(withCoverage(r.Context(), coverages[index]))
 		next.ServeHTTP(w, r)
 	})
 }
 
-func convertCoverage(revisionURL string, cov Coverage, index int) CoverageResponse {
+func makeCoverageResponse(revisionURL string, cov Coverage, index int) CoverageResponse {
 	ret := CoverageResponse{
 		Index:       index,
 		Time:        cov.Time(),
@@ -220,50 +219,38 @@ func convertCoverage(revisionURL string, cov Coverage, index int) CoverageRespon
 	return ret
 }
 
-func convertCoverages(scm SCM, repo *Repo, coverages []Coverage) []CoverageResponse {
+func makeCoverageResponseList(scm SCM, repo *Repo, coverages []Coverage) []CoverageResponse {
 	var ret []CoverageResponse
 	for i, cov := range coverages {
 		revURL := scm.RevisionURL(repo, cov.Revision())
-		ret = append(ret, convertCoverage(revURL, cov, i))
+		ret = append(ret, makeCoverageResponse(revURL, cov, i))
 	}
 
 	return ret
 }
 
 func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Request) {
-	scm, ok := SCMFrom(r.Context())
-	if !ok {
-		log.Error().Msg("handleCoverageList: scm not found in a context")
-		render.NotFound(w, render.ErrNotFound)
-		return
-	}
+	scm, _ := SCMFrom(r.Context())
+	repo, _ := RepoFrom(r.Context())
 
-	repo, ok := RepoFrom(r.Context())
-	if !ok {
-		log.Error().Msg("handleCoverageList: repo not found in a context")
-		render.NotFound(w, render.ErrNotFound)
-		return
-	}
-
-	_, ok = s.provided[repo.Link]
+	_, ok := s.provided[repo.Link]
 	if !ok {
 		log.Error().Msg("handleCoverageList: no coverage for repo")
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
 
-	// log.Print("handleCoverageList: making list...")
 	coverages := []Coverage{}
 	for _, pcov := range s.provided[repo.Link] {
 		coverages = append(coverages, pcov.coverage)
 	}
 
-	covs := convertCoverages(scm, repo, coverages)
-	render.JSON(w, covs, http.StatusOK)
+	resp := makeCoverageResponseList(scm, repo, coverages)
+	render.JSON(w, resp, http.StatusOK)
 }
 
 // API
-func (s *CoverageService) handleCoverage(w http.ResponseWriter, r *http.Request) {
+func (s *CoverageService) handleCoverageEntry(w http.ResponseWriter, r *http.Request) {
 	provider, _ := providerFrom(r.Context())
 	provider.Handler().ServeHTTP(w, r)
 }
@@ -276,14 +263,14 @@ func (s *CoverageService) APIHandler() http.Handler {
 		r.Use(s.injectCoverage)
 		r.Route("/{entry}", func(r chi.Router) {
 			r.Use(injectCoverageEntry)
-			r.Mount("/", http.HandlerFunc(s.handleCoverage))
+			r.Mount("/", http.HandlerFunc(s.handleCoverageEntry))
 		})
 	})
 	return r
 }
 
 // Web
-func (s *CoverageService) handleCoveragePage(w http.ResponseWriter, r *http.Request) {
+func (s *CoverageService) handleCoverageEntryPage(w http.ResponseWriter, r *http.Request) {
 	provider, _ := providerFrom(r.Context())
 	provider.WebHandler().ServeHTTP(w, r)
 }
@@ -296,7 +283,7 @@ func (s *CoverageService) WebHandler() http.Handler {
 		r.Use(s.injectCoverage)
 		r.Route("/{entry}", func(r chi.Router) {
 			r.Use(injectCoverageEntry)
-			r.Mount("/", http.HandlerFunc(s.handleCoveragePage))
+			r.Mount("/", http.HandlerFunc(s.handleCoverageEntryPage))
 		})
 	})
 	return r

@@ -30,9 +30,8 @@ func NewMoraSession() *MoraSession {
 	return &MoraSession{map[string][]*Repo{}, map[string]scm.Token{}, time.Now()}
 }
 
-func (s *MoraSession) getReposCache(scm string) ([]*Repo, bool) {
-	repos, ok := s.reposMap[scm]
-	return repos, ok
+func (s *MoraSession) getReposCache(scm string) []*Repo {
+	return s.reposMap[scm]
 }
 
 func (s *MoraSession) setReposCache(scm string, repos []*Repo) {

@@ -1,7 +1,6 @@
 package mora
 
 import (
-	"context"
 	"net/http"
 	"net/url"
 	"os"
@@ -48,28 +47,6 @@ func (s *BaseSCM) URL() *url.URL {
 
 func (s *BaseSCM) LoginHandler(next http.Handler) http.Handler {
 	return s.loginMiddleware.Handler(next)
-}
-
-func (s *BaseSCM) ListRepos(token *scm.Token) ([]*Repo, error) {
-	ctx := scm.WithContext(context.Background(), token)
-
-	ret := []*Repo{}
-	opts := scm.ListOptions{Size: 100}
-	for {
-		result, meta, err := s.client.Repositories.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, result...)
-
-		opts.Page = meta.Page.Next
-		opts.URL = meta.Page.NextURL
-
-		if opts.Page == 0 && opts.URL == "" {
-			break
-		}
-	}
-	return ret, nil
 }
 
 type secret struct {

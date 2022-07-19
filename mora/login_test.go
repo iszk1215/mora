@@ -45,16 +45,16 @@ func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request 
 }
 
 func TestLoginSuccess(t *testing.T) {
-	mock := NewMockSCM("scm")
-	path := "/" + mock.Name()
-	mock.loginHandler = MockLoginMiddleware{path}.Handler
-	r := createTestLoginHandler(mock)
+	scm := NewMockSCM("scm")
+	path := "/" + scm.Name()
+	scm.loginHandler = MockLoginMiddleware{path}.Handler
+	handler := createTestLoginHandler(scm)
 
 	// First request
 
 	req := httptest.NewRequest(http.MethodGet, path, strings.NewReader(""))
 	got := httptest.NewRecorder()
-	r.ServeHTTP(got, req)
+	handler.ServeHTTP(got, req)
 	res := got.Result()
 
 	require.Equal(t, http.StatusFound, res.StatusCode)
@@ -67,21 +67,21 @@ func TestLoginSuccess(t *testing.T) {
 	sess := NewMoraSession()
 	req = NewGetRequestWithMoraSession(loc.String(), sess)
 	got = httptest.NewRecorder()
-	r.ServeHTTP(got, req)
+	handler.ServeHTTP(got, req)
 	res = got.Result()
 
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
-	token, ok := sess.getToken(mock.Name())
+	token, ok := sess.getToken(scm.Name())
 	require.True(t, ok)
 	assert.Equal(t, "MockAccessToken", token.Token)
 }
 
 func TestLoginError(t *testing.T) {
-	mock := NewMockSCM("scm")
-	r := createTestLoginHandler(mock)
+	scm := NewMockSCM("scm")
+	r := createTestLoginHandler(scm)
 
-	req := NewGetRequestWithMoraSession("/"+mock.Name(), NewMoraSession())
+	req := NewGetRequestWithMoraSession("/"+scm.Name(), NewMoraSession())
 	got := httptest.NewRecorder()
 	r.ServeHTTP(got, req)
 	res := got.Result()
@@ -90,8 +90,8 @@ func TestLoginError(t *testing.T) {
 }
 
 func TestLoginErrorOnUnknownSCM(t *testing.T) {
-	mock := NewMockSCM("scm")
-	r := createTestLoginHandler(mock)
+	scm := NewMockSCM("scm")
+	r := createTestLoginHandler(scm)
 
 	req := NewGetRequestWithMoraSession("/unknown_scm", NewMoraSession())
 	got := httptest.NewRecorder()

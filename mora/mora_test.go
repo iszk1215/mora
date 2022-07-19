@@ -63,7 +63,7 @@ func NewMockSCM(name string) *MockSCM {
 	return m
 }
 
-func NewMoraSessionWithEmptyTokenFor(names ...string) *MoraSession {
+func NewMoraSessionWithTokenFor(names ...string) *MoraSession {
 	s := NewMoraSession()
 	for _, name := range names {
 		s.setToken(name, scm.Token{})

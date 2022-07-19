@@ -25,7 +25,6 @@ func requireEqualHtmlCoverage(t *testing.T, e, g *htmlCoverage) {
 }
 
 func createMockDataset(t *testing.T) (fs.FS, *Repo, *htmlCoverage) {
-	// repo := MockRepo{"mockscm", "mockowner", "mockrepo"}
 	repo := &Repo{Namespace: "mockowner", Name: "mockrepo"} // FIXME
 	ts, _ := time.Parse(time.RFC3339, "2022-05-06T10:46:53+09:00")
 	cov := &htmlCoverage{
