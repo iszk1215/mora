@@ -435,12 +435,12 @@ func createSMCs(config MoraConfig) []SCM {
 	return scms
 }
 
-func initJSONStoreForToolCoverageProvider() (*JSONStore, error) {
-	db, err := Connect("test.db")
+func initStoreForCoverageProvider() (*CoverageStore, error) {
+	db, err := Connect("mora.db")
 	if err != nil {
 		return nil, err
 	}
-	return NewJSONStore(db), nil
+	return NewCoverageStore(db), nil
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
@@ -458,7 +458,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	dir := os.DirFS("data") // TODO
 	html := NewHTMLCoverageProvider(dir)
 
-	store, err := initJSONStoreForToolCoverageProvider()
+	store, err := initStoreForCoverageProvider()
 	if err != nil {
 		return nil, err
 	}

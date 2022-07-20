@@ -63,11 +63,11 @@ func (c *coverageImpl) Entries() []CoverageEntry {
 
 type ToolCoverageProvider struct {
 	coverages []Coverage
-	store     *JSONStore
+	store     *CoverageStore
 	sync.Mutex
 }
 
-func NewToolCoverageProvider(store *JSONStore) *ToolCoverageProvider {
+func NewToolCoverageProvider(store *CoverageStore) *ToolCoverageProvider {
 	p := &ToolCoverageProvider{}
 	p.store = store
 
@@ -114,7 +114,7 @@ func (p *ToolCoverageProvider) Sync() error {
 
 func parseScanedCoverage(record ScanedCoverage) (*coverageImpl, error) {
 	var req []*CoverageEntryUploadRequest
-	err := json.Unmarshal([]byte(record.Raw), &req)
+	err := json.Unmarshal([]byte(record.Contents), &req)
 	if err != nil {
 		return nil, err
 	}
@@ -375,18 +375,17 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// p.addCoverage(cov)
 	p.addOrReplaceCoverage(cov)
 
 	if p.store != nil {
-		raw, err := json.Marshal(req.Entries)
+		contents, err := json.Marshal(req.Entries)
 		if err != nil {
 			log.Err(err).Msg("HandleUpload")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
-		err = p.store.Store(cov, string(raw))
+		err = p.store.Put(cov, string(contents))
 		if err != nil {
 			log.Err(err).Msg("HandleUpload")
 			render.NotFound(w, render.ErrNotFound)
