@@ -19,12 +19,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ParseCoverageFromFile(filename, format, prefix string) ([]*mora.Profile, error) {
+func ParseCoverageFromFile(filename string) ([]*mora.Profile, error) {
 	reader, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
-	return mora.ParseCoverage(reader, format, prefix)
+	return mora.ParseCoverage(reader)
 }
 
 func relativePathFromRoot(path string, root string) string {
@@ -38,8 +38,6 @@ func relativePathFromRoot(path string, root string) string {
 			return relativePath
 		}
 		path = filepath.Dir(path)
-		//dir = filepath.Dir(dir)
-		//file = filepath.Join(filepath.Base(dir), file)
 	}
 	return ""
 }
@@ -57,7 +55,7 @@ func replaceFileName(profiles []*mora.Profile, root string) error {
 }
 
 func parseFile(filename string, root string) (*mora.CoverageEntryUploadRequest, error) {
-	profiles, err := ParseCoverageFromFile(filename, "go", "")
+	profiles, err := ParseCoverageFromFile(filename)
 	if err != nil {
 		return nil, err
 	}

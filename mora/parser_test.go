@@ -22,8 +22,7 @@ end_of_record
 `
 	buf := bytes.NewBufferString(text)
 
-	prefix := "/home/mora/repo"
-	profiles, err := ParseCoverage(buf, "lcov", prefix)
+	profiles, err := ParseCoverage(buf)
 
 	require.NoError(t, err)
 
@@ -54,8 +53,7 @@ mockscm.com/mockowner/mockrepo/test2.go:1.2,3.4 3 0
 `
 	buf := bytes.NewBufferString(text)
 
-	prefix := "mockscm.com/mockowner/mockrepo"
-	profiles, err := ParseCoverage(buf, "go", prefix)
+	profiles, err := ParseCoverage(buf)
 
 	require.NoError(t, err)
 

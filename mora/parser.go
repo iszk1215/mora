@@ -44,11 +44,8 @@ func mergeBlocks(blocks [][]int) [][]int {
 	return ret
 }
 
-func postprocess(profiles []*Profile, prefix string) {
+func postprocess(profiles []*Profile) {
 	for _, p := range profiles {
-		// p.FileName = strings.Replace(p.FileName, prefix, "", -1)
-		// p.FileName = strings.TrimPrefix(p.FileName, "/")
-
 		p.Blocks = mergeBlocks(p.Blocks)
 
 		p.Hits = 0
@@ -168,7 +165,7 @@ func parseGocov(reader io.Reader) ([]*Profile, error) {
 	return profiles, nil
 }
 
-func ParseCoverage(reader io.Reader, format, prefix string) ([]*Profile, error) {
+func ParseCoverage(reader io.Reader) ([]*Profile, error) {
 	b, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -183,28 +180,6 @@ func ParseCoverage(reader io.Reader, format, prefix string) ([]*Profile, error) 
 		return nil, err
 	}
 
-	postprocess(profiles, prefix)
+	postprocess(profiles)
 	return profiles, nil
 }
-
-/*
-func ParseCoverage(reader io.Reader, format, prefix string) ([]*Profile, error) {
-	var profiles []*Profile
-	var err error
-	switch format {
-	case "lcov":
-		profiles, err = parseLcov(reader)
-	case "go":
-		profiles, err = parseGocov(reader)
-	default:
-		return nil, errors.New("unknown coverage format")
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	postprocess(profiles, prefix)
-	return profiles, nil
-}
-*/
