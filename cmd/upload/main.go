@@ -9,7 +9,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/iszk1215/mora/mora"
@@ -17,7 +19,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ParseToolCoverageFromFile(filename, format, prefix string) ([]*mora.Profile, error) {
+func ParseCoverageFromFile(filename, format, prefix string) ([]*mora.Profile, error) {
 	reader, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -25,21 +27,44 @@ func ParseToolCoverageFromFile(filename, format, prefix string) ([]*mora.Profile
 	return mora.ParseCoverage(reader, format, prefix)
 }
 
-func parseFromSpec(spec string) (*mora.CoverageEntryUploadRequest, error) {
-	tmp := strings.Split(spec, ",")
-	if len(tmp) != 4 {
-		err := errors.New("format error")
+func relativePathFromRoot(path string, root string) string {
+	relativePath := ""
+	for path != "." && path != "/" {
+		relativePath = filepath.Join(filepath.Base(path), relativePath)
+
+		f := filepath.Join(root, relativePath)
+		_, err := os.Stat(f)
+		if !os.IsNotExist(err) {
+			return relativePath
+		}
+		path = filepath.Dir(path)
+		//dir = filepath.Dir(dir)
+		//file = filepath.Join(filepath.Base(dir), file)
+	}
+	return ""
+}
+
+func replaceFileName(profiles []*mora.Profile, root string) error {
+	for _, p := range profiles {
+		file := relativePathFromRoot(p.FileName, root)
+		if file == "" {
+			return fmt.Errorf("file not found: %s", p.FileName)
+		}
+		log.Print("file=", file)
+		p.FileName = file
+	}
+	return nil
+}
+
+func parseFile(filename string, root string) (*mora.CoverageEntryUploadRequest, error) {
+	profiles, err := ParseCoverageFromFile(filename, "go", "")
+	if err != nil {
 		return nil, err
 	}
-	format := tmp[0]
-	entry := tmp[1]
-	prefix := tmp[2]
-	filename := tmp[3]
 
-	profiles, err := ParseToolCoverageFromFile(filename, format, prefix)
+	err = replaceFileName(profiles, root)
 	if err != nil {
-		log.Err(err).Msg("parse error: ")
-		os.Exit(1)
+		return nil, err
 	}
 
 	hits := 0
@@ -48,6 +73,8 @@ func parseFromSpec(spec string) (*mora.CoverageEntryUploadRequest, error) {
 		hits += p.Hits
 		lines += p.Lines
 	}
+
+	entry := "_default"
 
 	e := &mora.CoverageEntryUploadRequest{
 		EntryName: entry,
@@ -129,15 +156,30 @@ func makeRequest(repo *git.Repository, url string, specs ...string) (*mora.Cover
 		return nil, err
 	}
 
+	wt, err := repo.Worktree()
+	if err != nil {
+		return nil, err
+	}
+	root := wt.Filesystem.Root()
+
 	entries := []*mora.CoverageEntryUploadRequest{}
 	for _, spec := range specs {
-		e, err := parseFromSpec(spec)
+		e, err := parseFile(spec, root)
 		if err != nil {
-			log.Err(err).Msg("")
-			os.Exit(1)
+			return nil, err
 		}
 
 		entries = append(entries, e)
+	}
+
+	if url == "" {
+		remote, err := repo.Remote("origin")
+		if err != nil {
+			return nil, err
+		}
+		log.Print(remote.Config().URLs)
+		url = remote.Config().URLs[0]
+		url = strings.TrimSuffix(url, ".git")
 	}
 
 	req := &mora.CoverageUploadRequest{
@@ -151,21 +193,25 @@ func makeRequest(repo *git.Repository, url string, specs ...string) (*mora.Cover
 }
 
 func main() {
-	log.Logger = zerolog.New(os.Stderr).With().Caller().Logger()
+	// log.Logger = zerolog.New(os.Stderr).With().Caller().Logger()
+
+	noColor := false
+	o, _ := os.Stderr.Stat()
+	if (o.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
+		noColor = true
+	}
+
+	log.Logger = log.Output(
+		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
 
 	server := flag.String("server", "", "server")
 	repoURL := flag.String("repo", "", "URL of repository")
-	repoPath := flag.String("repo-path", "", "path of repository")
+	repoPath := flag.String("repo-path", ".", "path of repository")
 	force := flag.Bool("f", false, "force upload even when working tree is dirty")
 	dryRun := flag.Bool("dry-run", false, "dry run")
 
 	flag.Parse()
 	args := flag.Args()
-
-	if *server == "" {
-		fmt.Println("use -server=<server url>")
-		os.Exit(1)
-	}
 
 	repo, err := git.PlainOpen(*repoPath)
 	if err != nil {
@@ -175,7 +221,7 @@ func main() {
 
 	req, err := makeRequest(repo, *repoURL, args...)
 	if err != nil {
-		log.Fatal().Msg("failed to make a request")
+		log.Fatal().Err(err).Msg("failed to make a request")
 	}
 
 	flag, err := checkRequest(req, repo)
@@ -192,6 +238,11 @@ func main() {
 	fmt.Println("Time:", req.Time)
 
 	if !*dryRun {
+		if *server == "" {
+			fmt.Println("use -server=<server url>")
+			os.Exit(1)
+		}
+
 		err = upload(*server, req)
 		if err != nil {
 			log.Err(err).Msg("upload")

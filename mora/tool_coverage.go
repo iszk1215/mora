@@ -76,6 +76,27 @@ func NewToolCoverageProvider(store *JSONStore) *ToolCoverageProvider {
 	return p
 }
 
+func (p *ToolCoverageProvider) addOrReplaceCoverage(cov Coverage) {
+	p.Lock()
+	defer p.Unlock()
+
+	list := []Coverage{}
+	found := false
+	for _, c := range p.coverages {
+		if c.RepoURL() == cov.RepoURL() && c.Revision() == cov.Revision() {
+			list = append(list, cov)
+			found = true
+		} else {
+			list = append(list, c)
+		}
+	}
+	if !found {
+		list = append(list, cov)
+	}
+
+	p.coverages = list
+}
+
 func (p *ToolCoverageProvider) addCoverage(cov Coverage) {
 	log.Print("ToolCoverageProvider.addCoverage: cov=", cov)
 	p.Lock()
@@ -354,7 +375,8 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	p.addCoverage(cov)
+	// p.addCoverage(cov)
+	p.addOrReplaceCoverage(cov)
 
 	if p.store != nil {
 		raw, err := json.Marshal(req.Entries)
