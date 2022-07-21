@@ -45,7 +45,7 @@ func TestHandleUpload(t *testing.T) {
 	body, err := json.Marshal(req)
 	require.NoError(t, err)
 
-	p := NewToolCoverageProvider(nil)
+	p := NewMoraCoverageProvider(nil)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))

@@ -63,14 +63,14 @@ func (c *coverageImpl) Entries() []CoverageEntry {
 	return ret
 }
 
-type ToolCoverageProvider struct {
+type MoraCoverageProvider struct {
 	coverages []Coverage
 	store     *CoverageStore
 	sync.Mutex
 }
 
-func NewToolCoverageProvider(store *CoverageStore) *ToolCoverageProvider {
-	p := &ToolCoverageProvider{}
+func NewMoraCoverageProvider(store *CoverageStore) *MoraCoverageProvider {
+	p := &MoraCoverageProvider{}
 	p.store = store
 
 	p.coverages = []Coverage{}
@@ -78,7 +78,7 @@ func NewToolCoverageProvider(store *CoverageStore) *ToolCoverageProvider {
 	return p
 }
 
-func (p *ToolCoverageProvider) findCoverage(cov Coverage) int {
+func (p *MoraCoverageProvider) findCoverage(cov Coverage) int {
 	for i, c := range p.coverages {
 		if c.RepoURL() == cov.RepoURL() && c.Revision() == cov.Revision() {
 			return i
@@ -137,7 +137,7 @@ func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
 	return c, nil
 }
 
-func (p *ToolCoverageProvider) addOrMergeCoverage(cov *coverageImpl) *coverageImpl {
+func (p *MoraCoverageProvider) addOrMergeCoverage(cov *coverageImpl) *coverageImpl {
 	p.Lock()
 	defer p.Unlock()
 
@@ -152,11 +152,11 @@ func (p *ToolCoverageProvider) addOrMergeCoverage(cov *coverageImpl) *coverageIm
 	}
 }
 
-func (p *ToolCoverageProvider) Coverages() []Coverage {
+func (p *MoraCoverageProvider) Coverages() []Coverage {
 	return p.coverages
 }
 
-func (p *ToolCoverageProvider) Sync() error {
+func (p *MoraCoverageProvider) Sync() error {
 	return p.loadFromStore()
 }
 
@@ -181,7 +181,7 @@ func parseScanedCoverage(record ScanedCoverage) (*coverageImpl, error) {
 	return cov, nil
 }
 
-func (p *ToolCoverageProvider) loadFromStore() error {
+func (p *MoraCoverageProvider) loadFromStore() error {
 	records, err := p.store.Scan()
 	if err != nil {
 		return err
@@ -413,7 +413,7 @@ func parseFromReader(reader io.Reader) (*CoverageUploadRequest, *coverageImpl, e
 	return req, cov, nil
 }
 
-func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
+func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleUpload")
 
 	req, cov, err := parseFromReader(r.Body)
@@ -460,7 +460,7 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 // Entry Handler
 
 // API
-func (p *ToolCoverageProvider) Handler() http.Handler {
+func (p *MoraCoverageProvider) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/files", handleFileList)
 	r.Get("/files/*", handleFile)
@@ -468,8 +468,8 @@ func (p *ToolCoverageProvider) Handler() http.Handler {
 }
 
 // Web
-func (p *ToolCoverageProvider) WebHandler() http.Handler {
+func (p *MoraCoverageProvider) WebHandler() http.Handler {
 	r := chi.NewRouter()
-	r.Get("/", templateRenderingHandler("coverage/tool_coverage.html"))
+	r.Get("/", templateRenderingHandler("coverage/mora_coverage.html"))
 	return r
 }
