@@ -100,7 +100,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 
 			scm := findSCMFromURL(s.scms, scmURL)
 			if scm == nil {
-				log.Print("scm not found")
+				log.Print("scm not found for ", scmURL)
 				render.NotFound(w, render.ErrNotFound)
 				return
 			}
@@ -293,8 +293,8 @@ func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
 }
 
 func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	if s.tool != nil {
-		s.tool.HandleUpload(w, r)
+	if s.moraCoverageProvider != nil {
+		s.moraCoverageProvider.HandleUpload(w, r)
 		s.coverage.Sync()
 	}
 }
@@ -350,8 +350,8 @@ type MoraServer struct {
 	sessionManager   *MoraSessionManager
 	publicFileServer http.Handler
 
-	tool *ToolCoverageProvider
-	html *HTMLCoverageProvider
+	moraCoverageProvider *MoraCoverageProvider
+	htmlCoverageProvider *HTMLCoverageProvider
 }
 
 // static includes public and templates
@@ -435,12 +435,12 @@ func createSMCs(config MoraConfig) []SCM {
 	return scms
 }
 
-func initJSONStoreForToolCoverageProvider() (*JSONStore, error) {
-	db, err := Connect("test.db")
+func initStoreForCoverageProvider() (*CoverageStore, error) {
+	db, err := Connect("mora.db")
 	if err != nil {
 		return nil, err
 	}
-	return NewJSONStore(db), nil
+	return NewCoverageStore(db), nil
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
@@ -456,23 +456,23 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	}
 
 	dir := os.DirFS("data") // TODO
-	html := NewHTMLCoverageProvider(dir)
+	htmlCoverageProvider := NewHTMLCoverageProvider(dir)
 
-	store, err := initJSONStoreForToolCoverageProvider()
+	store, err := initStoreForCoverageProvider()
 	if err != nil {
 		return nil, err
 	}
-	tool := NewToolCoverageProvider(store)
+	moraCoverageProvider := NewMoraCoverageProvider(store)
 
 	coverage := NewCoverageService()
-	coverage.AddProvider(tool)
-	coverage.AddProvider(html)
+	coverage.AddProvider(moraCoverageProvider)
+	coverage.AddProvider(htmlCoverageProvider)
 	coverage.SyncProviders()
 	coverage.Sync()
 
 	s.coverage = coverage
-	s.html = html
-	s.tool = tool
+	s.htmlCoverageProvider = htmlCoverageProvider
+	s.moraCoverageProvider = moraCoverageProvider
 
 	if err != nil {
 		log.Err(err).Msg("init_store")

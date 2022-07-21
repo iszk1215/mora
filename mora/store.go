@@ -16,10 +16,10 @@ CREATE TABLE IF NOT EXISTS coverage (
     url TEXT NOT NULL,
     revision TEXT NOT NULL,
     time DATETIME NOT NULL,
-    raw TEXT NOT NULL
+    contents TEXT NOT NULL
 )`
 
-type JSONStore struct {
+type CoverageStore struct {
 	db *sqlx.DB
 	sync.Mutex
 }
@@ -39,11 +39,11 @@ func Connect(filename string) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func NewJSONStore(db *sqlx.DB) *JSONStore {
-	return &JSONStore{db: db}
+func NewCoverageStore(db *sqlx.DB) *CoverageStore {
+	return &CoverageStore{db: db}
 }
 
-func (s *JSONStore) Store(cov Coverage, raw string) error {
+func (s *CoverageStore) Put(cov Coverage, contents string) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -62,13 +62,13 @@ func (s *JSONStore) Store(cov Coverage, raw string) error {
 	if len(rows) == 0 { // insert
 		log.Print("Insert")
 		_, err = s.db.Exec(
-			"INSERT INTO coverage (url, revision, time, raw) VALUES ($1, $2, $3, $4)",
-			cov.RepoURL(), cov.Revision(), cov.Time(), raw)
+			"INSERT INTO coverage (url, revision, time, contents) VALUES ($1, $2, $3, $4)",
+			cov.RepoURL(), cov.Revision(), cov.Time(), contents)
 	} else { // update
 		log.Print("Update")
 		_, err = s.db.Exec(
-			"UPDATE coverage SET raw = $1 WHERE url = $2 and revision = $3",
-			raw, cov.RepoURL(), cov.Revision())
+			"UPDATE coverage SET contents = $1 WHERE url = $2 and revision = $3",
+			contents, cov.RepoURL(), cov.Revision())
 	}
 	return err
 }
@@ -77,11 +77,11 @@ type ScanedCoverage struct {
 	RepoURL  string    `db:"url"`
 	Revision string    `db:"revision"`
 	Time     time.Time `db:"time"`
-	Raw      string    `db:"raw"`
+	Contents string    `db:"contents"`
 }
 
-func (s *JSONStore) Scan() ([]ScanedCoverage, error) {
+func (s *CoverageStore) Scan() ([]ScanedCoverage, error) {
 	rows := []ScanedCoverage{}
-	err := s.db.Select(&rows, "SELECT url, revision, time, raw FROM coverage")
+	err := s.db.Select(&rows, "SELECT url, revision, time, contents FROM coverage")
 	return rows, err
 }

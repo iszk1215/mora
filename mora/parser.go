@@ -2,7 +2,9 @@ package mora
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"sort"
 	"strconv"
@@ -42,11 +44,8 @@ func mergeBlocks(blocks [][]int) [][]int {
 	return ret
 }
 
-func postprocess(profiles []*Profile, prefix string) {
+func postprocess(profiles []*Profile) {
 	for _, p := range profiles {
-		p.FileName = strings.Replace(p.FileName, prefix, "", -1)
-		p.FileName = strings.TrimPrefix(p.FileName, "/")
-
 		p.Blocks = mergeBlocks(p.Blocks)
 
 		p.Hits = 0
@@ -100,6 +99,10 @@ func parseLcov(reader io.Reader) ([]*Profile, error) {
 		}
 	}
 
+	if len(profiles) == 0 {
+		return nil, fmt.Errorf("no profile found")
+	}
+
 	return profiles, nil
 }
 
@@ -115,8 +118,9 @@ func convertGoProfile(profile *cover.Profile) *Profile {
 	//   10  if (condition) {
 	//   11    // do something
 	//   12  }
-	// For this code block, we have a cover.ProfileBlock with StartLine = 10,
-	// EndLine = 12, NumStmt = 1. Three lines are created here from this block.
+	// For this code block, we have a cover.ProfileBlock with StartLine=10,
+	// EndLine=12, NumStmt=1. Three lines, 10, 11 and 12 are created here from
+	// this block regardless of NumStmt=3
 	blocks := [][]int{}
 	for _, b := range profile.Blocks {
 		for l := b.StartLine; l <= b.EndLine; l++ {
@@ -161,22 +165,21 @@ func parseGocov(reader io.Reader) ([]*Profile, error) {
 	return profiles, nil
 }
 
-func ParseCoverage(reader io.Reader, format, prefix string) ([]*Profile, error) {
-	var profiles []*Profile
-	var err error
-	switch format {
-	case "lcov":
-		profiles, err = parseLcov(reader)
-	case "go":
-		profiles, err = parseGocov(reader)
-	default:
-		return nil, errors.New("unknown coverage format")
+func ParseCoverage(reader io.Reader) ([]*Profile, error) {
+	b, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	profiles, err := parseLcov(bytes.NewReader(b))
+	if err != nil {
+		profiles, err = parseGocov(bytes.NewReader(b))
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	postprocess(profiles, prefix)
+	postprocess(profiles)
 	return profiles, nil
 }
