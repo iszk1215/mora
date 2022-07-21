@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/drone/drone/handler/api/render"
+	"github.com/elliotchance/pie/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 )
@@ -76,32 +78,78 @@ func NewToolCoverageProvider(store *CoverageStore) *ToolCoverageProvider {
 	return p
 }
 
-func (p *ToolCoverageProvider) addOrReplaceCoverage(cov Coverage) {
-	p.Lock()
-	defer p.Unlock()
-
-	list := []Coverage{}
-	found := false
-	for _, c := range p.coverages {
+func (p *ToolCoverageProvider) findCoverage(cov Coverage) int {
+	for i, c := range p.coverages {
 		if c.RepoURL() == cov.RepoURL() && c.Revision() == cov.Revision() {
-			list = append(list, cov)
-			found = true
-		} else {
-			list = append(list, c)
+			return i
 		}
 	}
-	if !found {
-		list = append(list, cov)
-	}
 
-	p.coverages = list
+	return -1
 }
 
-func (p *ToolCoverageProvider) addCoverage(cov Coverage) {
-	log.Print("ToolCoverageProvider.addCoverage: cov=", cov)
+// Profile is not deep-copied because it is read-only
+func mergeEntry(a, b *entryImpl) *entryImpl {
+	c := &entryImpl{name: a.name, profiles: map[string]*Profile{}}
+
+	for file, p := range a.profiles {
+		c.profiles[file] = p
+	}
+
+	for file, p := range b.profiles {
+		c.profiles[file] = p
+	}
+
+	c.hits = 0
+	c.lines = 0
+	for _, p := range c.profiles {
+		c.hits += p.Hits
+		c.lines += p.Lines
+	}
+
+	return c
+}
+
+func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
+	if a.url != b.url || a.revision != b.revision {
+		return nil, fmt.Errorf("can not merge two coverages those have different urls and/or revisions")
+	}
+
+	// c = merge(a, b)
+
+	entries := map[string]*entryImpl{}
+
+	for _, e := range a.entries {
+		entries[e.name] = e
+	}
+
+	for _, e := range b.entries {
+		entries[e.name] = mergeEntry(entries[e.name], e)
+	}
+
+	c := &coverageImpl{
+		url:      a.url,
+		revision: a.revision,
+		time:     a.time,
+		entries:  pie.Values(entries),
+	}
+
+	return c, nil
+}
+
+func (p *ToolCoverageProvider) addOrMergeCoverage(cov *coverageImpl) *coverageImpl {
 	p.Lock()
 	defer p.Unlock()
-	p.coverages = append(p.coverages, cov)
+
+	idx := p.findCoverage(cov)
+	if idx < 0 {
+		p.coverages = append(p.coverages, cov)
+		return nil
+	} else {
+		merged, _ := mergeCoverage(p.coverages[idx].(*coverageImpl), cov)
+		p.coverages[idx] = merged
+		return merged
+	}
 }
 
 func (p *ToolCoverageProvider) Coverages() []Coverage {
@@ -145,7 +193,7 @@ func (p *ToolCoverageProvider) loadFromStore() error {
 			return err
 		}
 
-		p.addCoverage(cov)
+		p.coverages = append(p.coverages, cov)
 	}
 
 	return nil
@@ -345,7 +393,7 @@ func parseCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
 	return cov, nil
 }
 
-func parseFromReader(reader io.Reader) (*CoverageUploadRequest, Coverage, error) {
+func parseFromReader(reader io.Reader) (*CoverageUploadRequest, *coverageImpl, error) {
 	b, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, nil, err
@@ -375,10 +423,25 @@ func (p *ToolCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	p.addOrReplaceCoverage(cov)
+	merged := p.addOrMergeCoverage(cov)
 
 	if p.store != nil {
-		contents, err := json.Marshal(req.Entries)
+		var entries []*CoverageEntryUploadRequest
+		if merged == nil {
+			entries = req.Entries
+		} else {
+			// rebuild entries
+			for _, e := range merged.entries {
+				entries = append(entries,
+					&CoverageEntryUploadRequest{
+						EntryName: e.name,
+						Hits:      e.hits,
+						Lines:     e.lines,
+						Profiles:  pie.Values(e.profiles),
+					})
+			}
+		}
+		contents, err := json.Marshal(entries)
 		if err != nil {
 			log.Err(err).Msg("HandleUpload")
 			render.NotFound(w, render.ErrNotFound)

@@ -100,7 +100,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 
 			scm := findSCMFromURL(s.scms, scmURL)
 			if scm == nil {
-				log.Print("scm not found")
+				log.Print("scm not found for ", scmURL)
 				render.NotFound(w, render.ErrNotFound)
 				return
 			}
