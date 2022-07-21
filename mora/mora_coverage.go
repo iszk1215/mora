@@ -111,6 +111,7 @@ func mergeEntry(a, b *entryImpl) *entryImpl {
 }
 
 func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
+	log.Print("a=", a)
 	if a.url != b.url || a.revision != b.revision {
 		return nil, fmt.Errorf("can not merge two coverages those have different urls and/or revisions")
 	}
@@ -124,7 +125,12 @@ func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
 	}
 
 	for _, e := range b.entries {
-		entries[e.name] = mergeEntry(entries[e.name], e)
+		ea, ok := entries[e.name]
+		if ok {
+			entries[e.name] = mergeEntry(ea, e)
+		} else {
+			entries[e.name] = e
+		}
 	}
 
 	c := &coverageImpl{
@@ -142,10 +148,12 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *coverageImpl) *coverageIm
 	defer p.Unlock()
 
 	idx := p.findCoverage(cov)
+	log.Print("idx=", idx)
 	if idx < 0 {
 		p.coverages = append(p.coverages, cov)
 		return nil
 	} else {
+		log.Print("p.coverages[idx]=", p.coverages[idx])
 		merged, _ := mergeCoverage(p.coverages[idx].(*coverageImpl), cov)
 		p.coverages[idx] = merged
 		return merged

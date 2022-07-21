@@ -54,7 +54,7 @@ func replaceFileName(profiles []*mora.Profile, root string) error {
 	return nil
 }
 
-func parseFile(filename string, root string) (*mora.CoverageEntryUploadRequest, error) {
+func parseFile(filename, root, entryName string) (*mora.CoverageEntryUploadRequest, error) {
 	profiles, err := ParseCoverageFromFile(filename)
 	if err != nil {
 		return nil, err
@@ -72,10 +72,8 @@ func parseFile(filename string, root string) (*mora.CoverageEntryUploadRequest, 
 		lines += p.Lines
 	}
 
-	entry := "_default"
-
 	e := &mora.CoverageEntryUploadRequest{
-		EntryName: entry,
+		EntryName: entryName,
 		Profiles:  profiles,
 		Hits:      hits,
 		Lines:     lines,
@@ -143,7 +141,7 @@ func checkRequest(req *mora.CoverageUploadRequest, repo *git.Repository) (bool, 
 	return !isDirty, nil
 }
 
-func makeRequest(repo *git.Repository, url string, specs ...string) (*mora.CoverageUploadRequest, error) {
+func makeRequest(repo *git.Repository, url, entryName string, files ...string) (*mora.CoverageUploadRequest, error) {
 	ref, err := repo.Head()
 	if err != nil {
 		return nil, err
@@ -161,8 +159,8 @@ func makeRequest(repo *git.Repository, url string, specs ...string) (*mora.Cover
 	root := wt.Filesystem.Root()
 
 	entries := []*mora.CoverageEntryUploadRequest{}
-	for _, spec := range specs {
-		e, err := parseFile(spec, root)
+	for _, file := range files {
+		e, err := parseFile(file, root, entryName)
 		if err != nil {
 			return nil, err
 		}
@@ -206,6 +204,7 @@ func main() {
 	repoURL := flag.String("repo", "", "URL of repository")
 	repoPath := flag.String("repo-path", ".", "path of repository")
 	force := flag.Bool("f", false, "force upload even when working tree is dirty")
+	entryName := flag.String("entry", "_default", "entry name")
 	dryRun := flag.Bool("dry-run", false, "dry run")
 
 	flag.Parse()
@@ -217,7 +216,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	req, err := makeRequest(repo, *repoURL, args...)
+	req, err := makeRequest(repo, *repoURL, *entryName, args...)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to make a request")
 	}
