@@ -8,7 +8,7 @@ import (
 	"github.com/drone/go-login/login"
 	"github.com/drone/go-scm/scm"
 	"github.com/drone/go-scm/scm/transport/oauth2"
-	"gopkg.in/yaml.v3"
+	"github.com/pelletier/go-toml/v2"
 )
 
 type BaseSCM struct {
@@ -61,7 +61,7 @@ func readSecret(filename string) (secret, error) {
 	}
 
 	s := secret{}
-	err = yaml.Unmarshal(b, &s)
+	err = toml.Unmarshal(b, &s)
 	if err != nil {
 		return secret{}, err
 	}

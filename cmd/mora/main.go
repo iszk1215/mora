@@ -18,7 +18,7 @@ func main() {
 		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
 
 	debug := flag.Bool("debug", false, "sets log level to debug")
-	config_file := flag.String("config", "mora.conf", "sets log level to debug")
+	config_file := flag.String("config", "mora.conf", "sets config file")
 	flag.Parse()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if *debug {
