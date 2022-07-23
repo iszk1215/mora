@@ -17,7 +17,6 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -390,24 +389,6 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 	return s, nil
 }
 
-type ServerConfig struct {
-	URL  string
-	Port int
-}
-
-type SCMConfig struct {
-	Type           string `toml:"scm"`
-	Name           string
-	URL            string
-	SecretFilename string `toml:"secret_file"`
-}
-
-type MoraConfig struct {
-	Server ServerConfig
-	SCMs   []SCMConfig `toml:"scm"`
-	Debug  bool
-}
-
 func createSCMs(config MoraConfig) []SCM {
 	scms := []SCM{}
 	for _, scmConfig := range config.SCMs {
@@ -489,18 +470,4 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	}
 
 	return s, nil
-}
-
-func ReadMoraConfig(filename string) (MoraConfig, error) {
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return MoraConfig{}, err
-	}
-
-	var config MoraConfig
-	if err := toml.Unmarshal(b, &config); err != nil {
-		return MoraConfig{}, err
-	}
-
-	return config, nil
 }
