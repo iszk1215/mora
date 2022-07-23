@@ -13,8 +13,9 @@ require (
 	github.com/golang/mock v1.3.1
 	github.com/jmoiron/sqlx v0.0.0-20180614180643-0dae4fefe7c0
 	github.com/mattn/go-sqlite3 v1.14.14
+	github.com/pelletier/go-toml/v2 v2.0.2
 	github.com/rs/zerolog v1.26.1
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.7.2
 	golang.org/x/tools v0.1.11
 	gopkg.in/yaml.v3 v3.0.1
 )
