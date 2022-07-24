@@ -4,6 +4,7 @@ import (
 	"flag"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/iszk1215/mora/mora"
@@ -17,7 +18,7 @@ func main() {
 		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
 
 	debug := flag.Bool("debug", false, "sets log level to debug")
-	config_file := flag.String("config", "mora.yaml", "sets log level to debug")
+	config_file := flag.String("config", "mora.conf", "sets config file")
 	flag.Parse()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	if *debug {
@@ -40,7 +41,7 @@ func main() {
 	handler := server.Handler()
 
 	log.Info().Msg("Started")
-	err = http.ListenAndServe(":"+config.Port, handler)
+	err = http.ListenAndServe(":"+strconv.Itoa(config.Server.Port), handler)
 	if err != nil {
 		log.Err(err).Msg("")
 	}

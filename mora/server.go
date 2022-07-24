@@ -18,7 +18,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -390,33 +389,25 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 	return s, nil
 }
 
-type ScmConfig struct {
-	Type           string `yaml:"type"`
-	Name           string `yaml:"name"`
-	SecretFilename string `yaml:"secret_filename"`
-	URL            string `yaml:"url"`
-}
-
-type MoraConfig struct {
-	URL        string      `yaml:"url"`
-	Port       string      `yaml:"port"`
-	ScmConfigs []ScmConfig `yaml:"scms"`
-	Debug      bool
-}
-
-func createSMCs(config MoraConfig) []SCM {
+func createSCMs(config MoraConfig) []SCM {
 	scms := []SCM{}
-	for _, scmConfig := range config.ScmConfigs {
+	for _, scmConfig := range config.SCMs {
 		log.Print(scmConfig.Type)
 		var scm SCM
 		var err error
 		if scmConfig.Type == "gitea" {
+			if scmConfig.Name == "" {
+				scmConfig.Name = "gitea"
+			}
 			scm, err = NewGiteaFromFile(
 				scmConfig.Name,
 				scmConfig.SecretFilename,
 				scmConfig.URL,
-				config.URL+"/login/"+scmConfig.Name)
+				config.Server.URL+"/login/"+scmConfig.Name)
 		} else if scmConfig.Type == "github" {
+			if scmConfig.Name == "" {
+				scmConfig.Name = "github"
+			}
 			scm, err = NewGithubFromFile(
 				scmConfig.Name,
 				scmConfig.SecretFilename)
@@ -444,7 +435,7 @@ func initStoreForCoverageProvider() (*CoverageStore, error) {
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
-	scms := createSMCs(config)
+	scms := createSCMs(config)
 	if len(scms) == 0 {
 		return nil, errors.New("no SCM is configured")
 	}
@@ -479,17 +470,4 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	}
 
 	return s, nil
-}
-
-func ReadMoraConfig(filename string) (MoraConfig, error) {
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return MoraConfig{}, err
-	}
-	config := MoraConfig{}
-	if err := yaml.Unmarshal(b, &config); err != nil {
-		return MoraConfig{}, err
-	}
-
-	return config, nil
 }
