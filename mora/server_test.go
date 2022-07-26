@@ -80,9 +80,35 @@ func Test_checkRepoAccess(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, repo0, repo)
 
-	// from cache
+	// cache has repo0
 	cache = sess.getReposCache(scm.Name())
-	require.Equal(t, []*Repo{repo0}, cache)
+	require.NotNil(t, cache)
+	require.Equal(t, map[string]*Repo{"owner/repo0": repo0}, cache)
+}
+
+func Test_checkRepoAccess_NoAccess(t *testing.T) {
+	scm := NewMockSCM("mock")
+
+	repo0 := &Repo{Namespace: "owner", Name: "repo0"}
+	mockRepos := []*Repo{repo0}
+
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+	scm.client.Repositories = createMockRepoService(controller, mockRepos)
+
+	sess := NewMoraSessionWithTokenFor(scm.Name())
+
+	cache := sess.getReposCache(scm.Name())
+	require.Equal(t, 0, len(cache))
+
+	repo, err := checkRepoAccess(sess, scm, "owner", "repo1")
+	require.Error(t, err)
+	require.Nil(t, repo)
+
+	// cache has nil
+	cache = sess.getReposCache(scm.Name())
+	require.NotNil(t, cache)
+	require.Equal(t, map[string]*Repo{"owner/repo1": nil}, cache)
 }
 
 func doInjectRepo(sess *MoraSession, scms []SCM, path string, handler http.HandlerFunc) *http.Response {
