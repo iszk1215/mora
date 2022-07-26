@@ -15,7 +15,7 @@ test: $(SOURCES)
 
 run: bin/mora
 	go test ./...
-	bin/mora web -debug
+	bin/mora web --debug
 
 coverage.out: $(SOURCES)
 	go test -coverprofile=$@ ./...

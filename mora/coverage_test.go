@@ -23,9 +23,9 @@ func assertEqualCoverage(t *testing.T, expected Coverage, got CoverageResponse) 
 	}
 	for i, a := range expected.Entries() {
 		b := got.Entries[i]
-		ok = ok && assert.Equal(t, a.Name(), b.Name)
-		ok = ok && assert.Equal(t, a.Lines(), b.Lines)
-		ok = ok && assert.Equal(t, a.Hits(), b.Hits)
+		ok = ok && assert.Equal(t, a.Name, b.Name)
+		ok = ok && assert.Equal(t, a.Lines, b.Lines)
+		ok = ok && assert.Equal(t, a.Hits, b.Hits)
 	}
 
 	return ok
@@ -57,29 +57,11 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 	assertEqualCoverageList(t, expected, data)
 }
 
-type MockCoverageEntry struct {
-	name  string
-	lines int
-	hits  int
-}
-
-func (e MockCoverageEntry) Name() string {
-	return e.name
-}
-
-func (e MockCoverageEntry) Lines() int {
-	return e.lines
-}
-
-func (e MockCoverageEntry) Hits() int {
-	return e.hits
-}
-
 type MockCoverage struct {
 	url      string
 	time     time.Time
 	revision string
-	entries  []MockCoverageEntry
+	entries  []CoverageEntry
 }
 
 func (c MockCoverage) RepoURL() string {
@@ -95,11 +77,7 @@ func (c MockCoverage) Revision() string {
 }
 
 func (c MockCoverage) Entries() []CoverageEntry {
-	ret := []CoverageEntry{}
-	for _, e := range c.entries {
-		ret = append(ret, e)
-	}
-	return ret
+	return c.entries
 }
 
 type MockCoverageProvider struct {
@@ -143,10 +121,10 @@ func (p *MockCoverageProvider) Repos() []string {
 }
 
 func createMockCoverage() MockCoverage {
-	cc := MockCoverageEntry{"cc", 100, 20}
-	py := MockCoverageEntry{"python", 300, 280}
+	cc := CoverageEntry{"cc", 100, 20}
+	py := CoverageEntry{"python", 300, 280}
 	cov := MockCoverage{time: time.Now(), revision: "abc123"}
-	cov.entries = []MockCoverageEntry{cc, py}
+	cov.entries = []CoverageEntry{cc, py}
 
 	return cov
 }

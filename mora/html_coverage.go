@@ -18,22 +18,10 @@ import (
 )
 
 type htmlCoverageEntry struct {
-	Name_  string `yaml:"name"`
-	Lines_ int    `yaml:"lines"`
-	Hits_  int    `yaml:"hits"`
-	File   string `yaml:"file"`
-}
-
-func (e htmlCoverageEntry) Name() string {
-	return e.Name_
-}
-
-func (e htmlCoverageEntry) Lines() int {
-	return e.Lines_
-}
-
-func (e htmlCoverageEntry) Hits() int {
-	return e.Hits_
+	Name  string `yaml:"name"`
+	Lines int    `yaml:"lines"`
+	Hits  int    `yaml:"hits"`
+	File  string `yaml:"file"`
 }
 
 type htmlCoverage struct {
@@ -58,7 +46,19 @@ func (c htmlCoverage) Revision() string {
 
 func (c htmlCoverage) Entries() []CoverageEntry {
 	return pie.Map(c.Entries_,
-		func(e *htmlCoverageEntry) CoverageEntry { return e })
+		func(e *htmlCoverageEntry) CoverageEntry {
+			return CoverageEntry{Name: e.Name, Hits: e.Hits, Lines: e.Lines}
+		})
+}
+
+func (c htmlCoverage) findEntry(name string) *htmlCoverageEntry {
+	var entry *htmlCoverageEntry
+	for _, e := range c.Entries_ {
+		if e.Name == name {
+			entry = e
+		}
+	}
+	return entry
 }
 
 // Loader
@@ -138,10 +138,10 @@ func htmlCoverageEntryFrom(ctx context.Context) (*htmlCoverage, *htmlCoverageEnt
 		return nil, nil, false
 	}
 
-	tmp, _ := CoverageEntryFrom(ctx)
-	entry, ok := tmp.(*htmlCoverageEntry)
+	name, _ := CoverageEntryFrom(ctx)
+	entry := cov.findEntry(name)
 
-	return cov, entry, ok
+	return cov, entry, entry != nil
 }
 
 type HTMLCoverageProvider struct {
@@ -214,9 +214,9 @@ func handleCoverageEntryJSON(w http.ResponseWriter, r *http.Request) {
 
 	file := ""
 	if entry.File != "" {
-		file = entry.Name() + "/data/" + entry.File
+		file = entry.Name + "/data/" + entry.File
 	}
-	log.Print("entry.Name=", entry.Name(), " file=", file)
+	log.Print("entry.Name=", entry.Name, " file=", file)
 
 	type htmlCoverageEntryResponse struct {
 		File        string    `json:"file"`

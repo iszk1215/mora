@@ -15,10 +15,10 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
-type CoverageEntry interface {
-	Name() string
-	Lines() int
-	Hits() int
+type CoverageEntry struct {
+	Name  string `json:"name"`
+	Lines int    `json:"lines"`
+	Hits  int    `json:"hits"`
 }
 
 type Coverage interface {
@@ -35,18 +35,12 @@ type CoverageProvider interface {
 	Sync() error
 }
 
-type CoverageEntryResponse struct {
-	Name  string `json:"name"`
-	Lines int    `json:"lines"`
-	Hits  int    `json:"hits"`
-}
-
 type CoverageResponse struct {
-	Index       int                     `json:"index"`
-	Time        time.Time               `json:"time"`
-	Revision    string                  `json:"revision"`
-	RevisionURL string                  `json:"revision_url"`
-	Entries     []CoverageEntryResponse `json:"entries"`
+	Index       int             `json:"index"`
+	Time        time.Time       `json:"time"`
+	Revision    string          `json:"revision"`
+	RevisionURL string          `json:"revision_url"`
+	Entries     []CoverageEntry `json:"entries"`
 }
 
 type providedCoverage struct {
@@ -133,12 +127,12 @@ func providerFrom(ctx context.Context) (CoverageProvider, bool) {
 	return cov.provider, ok
 }
 
-func WithCoverageEntry(ctx context.Context, entry CoverageEntry) context.Context {
+func WithCoverageEntry(ctx context.Context, entry string) context.Context {
 	return context.WithValue(ctx, coverageEntryKey, entry)
 }
 
-func CoverageEntryFrom(ctx context.Context) (CoverageEntry, bool) {
-	entry, ok := ctx.Value(coverageEntryKey).(CoverageEntry)
+func CoverageEntryFrom(ctx context.Context) (string, bool) {
+	entry, ok := ctx.Value(coverageEntryKey).(string)
 	return entry, ok
 }
 
@@ -154,20 +148,20 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 			return
 		}
 
-		var entry CoverageEntry = nil
+		found := false
 		for _, e := range cov.Entries() {
-			if e.Name() == entryName {
-				entry = e
+			if e.Name == entryName {
+				found = true
 			}
 		}
 
-		if entry == nil {
+		if !found {
 			log.Error().Msg("can not find entry")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
-		next.ServeHTTP(w, r.WithContext(WithCoverageEntry(r.Context(), entry)))
+		next.ServeHTTP(w, r.WithContext(WithCoverageEntry(r.Context(), entryName)))
 	})
 }
 
@@ -204,16 +198,7 @@ func makeCoverageResponse(revisionURL string, cov Coverage, index int) CoverageR
 		Time:        cov.Time(),
 		Revision:    cov.Revision(),
 		RevisionURL: revisionURL,
-		Entries:     []CoverageEntryResponse{},
-	}
-
-	for _, e := range cov.Entries() {
-		d := CoverageEntryResponse{
-			Name:  e.Name(),
-			Hits:  e.Hits(),
-			Lines: e.Lines(),
-		}
-		ret.Entries = append(ret.Entries, d)
+		Entries:     cov.Entries(),
 	}
 
 	return ret

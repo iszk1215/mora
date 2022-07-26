@@ -18,22 +18,10 @@ import (
 )
 
 type entryImpl struct {
-	name     string
-	hits     int
-	lines    int
+	Name     string
+	Hits     int
+	Lines    int
 	profiles map[string]*Profile
-}
-
-func (e *entryImpl) Name() string {
-	return e.name
-}
-
-func (e *entryImpl) Lines() int {
-	return e.lines
-}
-
-func (e *entryImpl) Hits() int {
-	return e.hits
 }
 
 type coverageImpl struct {
@@ -58,7 +46,8 @@ func (c *coverageImpl) Revision() string {
 func (c *coverageImpl) Entries() []CoverageEntry {
 	ret := []CoverageEntry{}
 	for _, e := range c.entries {
-		ret = append(ret, e)
+		ret = append(ret,
+			CoverageEntry{Name: e.Name, Hits: e.Hits, Lines: e.Lines})
 	}
 	return ret
 }
@@ -90,7 +79,7 @@ func (p *MoraCoverageProvider) findCoverage(cov Coverage) int {
 
 // Profile is not deep-copied because it is read-only
 func mergeEntry(a, b *entryImpl) *entryImpl {
-	c := &entryImpl{name: a.name, profiles: map[string]*Profile{}}
+	c := &entryImpl{Name: a.Name, profiles: map[string]*Profile{}}
 
 	for file, p := range a.profiles {
 		c.profiles[file] = p
@@ -100,11 +89,11 @@ func mergeEntry(a, b *entryImpl) *entryImpl {
 		c.profiles[file] = p
 	}
 
-	c.hits = 0
-	c.lines = 0
+	c.Hits = 0
+	c.Lines = 0
 	for _, p := range c.profiles {
-		c.hits += p.Hits
-		c.lines += p.Lines
+		c.Hits += p.Hits
+		c.Lines += p.Lines
 	}
 
 	return c
@@ -121,15 +110,15 @@ func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
 	entries := map[string]*entryImpl{}
 
 	for _, e := range a.entries {
-		entries[e.name] = e
+		entries[e.Name] = e
 	}
 
 	for _, e := range b.entries {
-		ea, ok := entries[e.name]
+		ea, ok := entries[e.Name]
 		if ok {
-			entries[e.name] = mergeEntry(ea, e)
+			entries[e.Name] = mergeEntry(ea, e)
 		} else {
-			entries[e.name] = e
+			entries[e.Name] = e
 		}
 	}
 
@@ -211,8 +200,16 @@ func entryImplFrom(ctx context.Context) (*coverageImpl, *entryImpl, bool) {
 	tmp0, _ := CoverageFrom(ctx)
 	cov, ok0 := tmp0.(*coverageImpl)
 
-	tmp1, _ := CoverageEntryFrom(ctx)
-	entry, ok1 := tmp1.(*entryImpl)
+	name, _ := CoverageEntryFrom(ctx)
+
+	var entry *entryImpl
+	ok1 := false
+	for _, e := range cov.entries {
+		if e.Name == name {
+			entry = e
+			ok1 = true
+		}
+	}
 
 	return cov, entry, ok0 && ok1
 }
@@ -264,8 +261,8 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 			Revision:    cov.Revision(),
 			RevisionURL: scm.RevisionURL(repo, cov.Revision()),
 			Time:        cov.Time(),
-			Hits:        entry.hits,
-			Lines:       entry.lines,
+			Hits:        entry.Hits,
+			Lines:       entry.Lines,
 		},
 	}
 
@@ -361,10 +358,10 @@ func parseEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
 	}
 
 	entry := &entryImpl{}
-	entry.name = req.EntryName
+	entry.Name = req.EntryName
 	entry.profiles = profiles
-	entry.hits = req.Hits
-	entry.lines = req.Lines
+	entry.Hits = req.Hits
+	entry.Lines = req.Lines
 
 	return entry, nil
 }
@@ -442,9 +439,9 @@ func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 			for _, e := range merged.entries {
 				entries = append(entries,
 					&CoverageEntryUploadRequest{
-						EntryName: e.name,
-						Hits:      e.hits,
-						Lines:     e.lines,
+						EntryName: e.Name,
+						Hits:      e.Hits,
+						Lines:     e.Lines,
 						Profiles:  pie.Values(e.profiles),
 					})
 			}
