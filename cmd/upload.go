@@ -1,10 +1,13 @@
-package main
+/*
+Copyright © 2022 NAME HERE <EMAIL ADDRESS>
+
+*/
+package cmd
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -17,6 +20,7 @@ import (
 	"github.com/iszk1215/mora/mora"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 )
 
 func ParseCoverageFromFile(filename string) ([]*mora.Profile, error) {
@@ -188,64 +192,92 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 	return req, nil
 }
 
-func main() {
-	// log.Logger = zerolog.New(os.Stderr).With().Caller().Logger()
+// uploadCmd represents the upload command
+var uploadCmd = &cobra.Command{
+	Use:   "upload",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
 
-	noColor := false
-	o, _ := os.Stderr.Stat()
-	if (o.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
-		noColor = true
-	}
-
-	log.Logger = log.Output(
-		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
-
-	server := flag.String("server", "", "server")
-	repoURL := flag.String("repo", "", "URL of repository")
-	repoPath := flag.String("repo-path", ".", "path of repository")
-	force := flag.Bool("f", false, "force upload even when working tree is dirty")
-	entryName := flag.String("entry", "_default", "entry name")
-	dryRun := flag.Bool("dry-run", false, "dry run")
-
-	flag.Parse()
-	args := flag.Args()
-
-	repo, err := git.PlainOpen(*repoPath)
-	if err != nil {
-		fmt.Println("Can not open repository. Use -repo-path=<repository>")
-		os.Exit(1)
-	}
-
-	req, err := makeRequest(repo, *repoURL, *entryName, args...)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to make a request")
-	}
-
-	flag, err := checkRequest(req, repo)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	if (!*force) && !flag {
-		fmt.Println("working tree is dirty")
-		os.Exit(1)
-	}
-
-	fmt.Println("Revision:", req.Revision)
-	fmt.Println("Time:", req.Time)
-
-	if !*dryRun {
-		if *server == "" {
-			fmt.Println("use -server=<server url>")
-			os.Exit(1)
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		noColor := false
+		o, _ := os.Stderr.Stat()
+		if (o.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
+			noColor = true
 		}
 
-		err = upload(*server, req)
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
+
+		server, _ := cmd.Flags().GetString("server")
+		repoURL, _ := cmd.Flags().GetString("repo")
+		repoPath, _ := cmd.Flags().GetString("repo-path")
+		force, _ := cmd.Flags().GetBool("force")
+		entryName, _ := cmd.Flags().GetString("entry")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		log.Print("force=", force)
+		repo, err := git.PlainOpen(repoPath)
 		if err != nil {
-			log.Err(err).Msg("upload")
-			os.Exit(1)
+			return errors.New("can not open repository. Use -repo-path=<repository>")
 		}
 
-		fmt.Println("Uploaded")
-	}
+		req, err := makeRequest(repo, repoURL, entryName, args...)
+		if err != nil {
+			// log.Fatal().Err(err).Msg("failed to make a request")
+			return err
+		}
+
+		flag, err := checkRequest(req, repo)
+		if err != nil {
+			return err
+		}
+		log.Print(flag)
+		if (!force) && !flag {
+			fmt.Println("working tree is dirty")
+			return err
+		}
+
+		fmt.Println("Revision:", req.Revision)
+		fmt.Println("Time:", req.Time)
+
+		if !dryRun {
+			if server == "" {
+				fmt.Println("use -server=<server url>")
+				os.Exit(1)
+			}
+
+			err = upload(server, req)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println("Uploaded")
+		}
+
+		return nil
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(uploadCmd)
+
+	// Here you will define your flags and configuration settings.
+
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// uploadCmd.PersistentFlags().String("foo", "", "A help for foo")
+
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// uploadCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	uploadCmd.Flags().String("server", "", "server url")
+	uploadCmd.Flags().String("repo-path", "", "path of repositry")
+	uploadCmd.Flags().String("repo", "", "URL")
+	uploadCmd.Flags().String("entry", "_default", "entry name")
+	uploadCmd.Flags().BoolP("force", "f", false, "force upload even when working tree is dirty")
+	uploadCmd.Flags().Bool("dry-run", false, "test")
 }
