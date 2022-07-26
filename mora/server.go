@@ -209,15 +209,6 @@ func findSCMFromURL(scms []SCM, url string) SCM {
 	})
 }
 
-func findRepoFromCache(cache []*Repo, owner, name string) *Repo {
-	for _, repo := range cache {
-		if repo.Namespace == owner && repo.Name == name {
-			return repo
-		}
-	}
-	return nil
-}
-
 func findRepoFromSCM(session *MoraSession, scm SCM, owner, name string) (*Repo, error) {
 	ctx, err := session.WithToken(context.Background(), scm.Name())
 	if err != nil {
@@ -236,23 +227,28 @@ func findRepoFromSCM(session *MoraSession, scm SCM, owner, name string) (*Repo, 
 // checkRepoAccess checks if token in session can access a repo 'owner/name'
 func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (*Repo, error) {
 	cache := sess.getReposCache(scm.Name())
-	repo := findRepoFromCache(cache, owner, name)
+	key := owner + "/" + name
+	repo := cache[key]
 	if repo != nil {
 		log.Print("checkRepoAccess: found in cache")
 		return repo, nil
 	}
 
 	repo, err := findRepoFromSCM(sess, scm, owner, name)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		log.Print("checkRepoAccess: found in SCM")
+	} else {
+		log.Print("checkRepoAccess: no repo or no access")
 	}
-	log.Print("checkRepoAccess: found in SCM")
 
 	// store cache
-	cache = append(cache, repo)
+	if cache == nil {
+		cache = map[string]*Repo{}
+	}
+	cache[key] = repo
 	sess.setReposCache(scm.Name(), cache)
 
-	return repo, nil
+	return repo, err
 }
 
 func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
