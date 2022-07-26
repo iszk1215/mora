@@ -62,8 +62,8 @@ func TestHandleUpload(t *testing.T) {
 	require.Equal(t, 1, len(cov.entries))
 
 	entry := cov.entries[0]
-	assert.Equal(t, 13, entry.hits)
-	assert.Equal(t, 20, entry.lines)
+	assert.Equal(t, 13, entry.Hits)
+	assert.Equal(t, 20, entry.Lines)
 	assert.Equal(t, 2, len(entry.profiles))
 
 	require.Equal(t, http.StatusOK, res.StatusCode)
