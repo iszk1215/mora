@@ -1,4 +1,4 @@
-import { Breadcrumb } from '/public/mora.js'
+import { Breadcrumb, Browser } from '/public/mora.js'
 import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.min.js';
 
 (function() {
@@ -24,7 +24,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
 
 
     async function print_code(proxy, file) {
-        const url = apiBaseURL + "/files/" + file.filename
+        const url = apiBaseURL + "/files/" + file.path
         const data = await fetch(url)
         const json = await data.json()
         // console.log(json)
@@ -137,6 +137,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
                     revision: ""
                 },
                 files: [],
+                //root: [],
                 show_code: false,
                 selectedFile: {},
                 src: null,
@@ -144,6 +145,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
         },
         components: {
             breadcrumb: Breadcrumb(breadcrumb),
+            browser: Browser(),
         },
         methods: {
             formattedTime(time) {
@@ -151,12 +153,13 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
                     luxon.DateTime.DATETIME_FULL)
             },
             selectFile(file) {
+                console.log("selectFile")
                 // console.log(file)
                 print_code(this, file)
             },
             toggleDarkMode(ev) {
                 _toggleDarkMode(ev.target)
-            }
+            },
         },
         async mounted() {
             let baseURL = "/api" + window.location.pathname
@@ -176,6 +179,7 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
             }
             this.files = json.files
             this.meta = json.meta
+
 
             darkMode = false
             let cookies = document.cookie

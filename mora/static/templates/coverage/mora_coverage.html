@@ -16,6 +16,8 @@
                 Lines: [[meta.hits]]/[[meta.lines]] Coverage: [[(meta.hits*100/meta.lines).toFixed(1)]]%
             </div>
 
+            <browser :files="files" @select-file="selectFile"></browser>
+            <!--
             <table class="ui very compact selectable celled striped table" style="line-height: 1.0;">
                 <thead>
                     <tr>
@@ -34,9 +36,11 @@
                     </tr>
                 </tbody>
             </table>
+            -->
 
+            <p>
             <div class="ui container" v-if="show_code">
-                <h4 class="ui header">[[selectedFile.filename]]</h4>
+                <h4 class="ui header">[[selectedFile.path]]</h4>
                 Coverage [[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%
                 <div id="hitLabel" class="ui label">
                     Hit
@@ -52,6 +56,7 @@
                 <pre><code v-html="src"
                            style="padding: 0px; border:solid 1px darkgray;"></code></pre>
             </div>
+            </p>
         </div>
     </div>
 </main>
