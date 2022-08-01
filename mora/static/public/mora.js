@@ -160,8 +160,7 @@ function Browser() {
         <tbody>
         <tr v-for="item in items" :class="item.clazz">
             <td>
-            <i class="angle right icon" v-if="item.depth > 0"></i>
-            <i class="angle right icon" v-if="item.depth > 1"></i>
+            <i class="icon" v-for="n in item.depth"></i>
             <i class="folder open outline icon" v-if="item.type == 'dir' && item.state == 1"></i>
             <i class="folder outline icon" v-if="item.type == 'dir' && item.state == 0"></i>
             <!--
