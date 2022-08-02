@@ -22,7 +22,6 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
         ]
     }()
 
-
     async function print_code(proxy, file) {
         const url = apiBaseURL + "/files/" + file.path
         const data = await fetch(url)
@@ -31,8 +30,10 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
         if (json.message) { // error
             return
         }
+        json.code = json.code.replace(/\s+$/g,'') // remove trailing '\n'
         const tmp = hljs.highlightAuto(json.code)
         const lines = tmp.value.split("\n")
+        //console.log(tmp.value)
 
         const blockIter = {
             curr: 0,
@@ -46,8 +47,28 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
 
         let lst = []
         let block = blockIter.next()
+        let lastSpan = ""
         for (let i = 0; i < lines.length; ++i) {
             let lineno = i + 1
+            // console.log(lines[i])
+            if (lines[i].length > 0) {
+                let tmp = lines[i].trim()
+                let hasClosingSpan = tmp.endsWith(">")
+                if (tmp.startsWith("<")) {
+                    const pos = tmp.indexOf(">")
+                    lastSpan = tmp.slice(0, pos + 1)
+                } else {
+                    // console.log("add opening spane")
+                    lines[i] = lastSpan + lines[i]
+                }
+
+                if (!hasClosingSpan) {
+                    // console.log("add closing spane")
+                    lines[i] += "</span>"
+                }
+            }
+
+
             let prefix = ('    ' + lineno).slice(-4)
             let text = prefix + "  " + lines[i];
 
