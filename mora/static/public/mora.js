@@ -69,6 +69,7 @@ function Browser() {
             parentDir.children[f.filename] = item
         }
 
+        // directory first
         const cmpItem = (a, b) => {
             const cmp = (c, d) => {
                 return c == d ? 0 : (c < d ? -1 : 1)
@@ -76,13 +77,10 @@ function Browser() {
             return a.type != b.type ? cmp(a.type, b.type) : cmp(a.name, b.name)
         }
 
-        const sortChildren = (item, cmp) => {
-            item.children = Object.values(item.children).sort(cmp)
-            for (let child of item.children) {
-                sortChildren(child, cmp)
-            }
-        }
-        sortChildren(root, cmpItem)
+        forEachItem(root, (item) => {
+            item.children = Object.values(item.children).sort(cmpItem)
+            return true
+        })
 
         const calcDirCoverage = (item) => {
             if (item.type != "dir")
@@ -90,7 +88,7 @@ function Browser() {
             item.hits = 0
             item.lines = 0
             for (const child of item.children) {
-                calcDirCoverage(child)
+                calcDirCoverage(child) // depth first
                 item.hits += child.hits
                 item.lines += child.lines
             }
@@ -98,8 +96,14 @@ function Browser() {
         }
         calcDirCoverage(root)
 
-        if (root.children.length == 1)
-            root.children[0].state = 1
+        forEachItem(root, (item) => {
+            //console.log(item.name, item.children.length)
+            if (item.type == "dir" && item.children.length == 1) {
+                item.state = 1
+                item.children[0].state = 1
+            }
+            return true
+        })
 
         return root
     }
