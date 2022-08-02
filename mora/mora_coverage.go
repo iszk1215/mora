@@ -100,12 +100,9 @@ func mergeEntry(a, b *entryImpl) *entryImpl {
 }
 
 func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
-	log.Print("a=", a)
 	if a.url != b.url || a.revision != b.revision {
-		return nil, fmt.Errorf("can not merge two coverages those have different urls and/or revisions")
+		return nil, fmt.Errorf("can not merge two coverages with different urls and/or revisions")
 	}
-
-	// c = merge(a, b)
 
 	entries := map[string]*entryImpl{}
 
@@ -122,14 +119,14 @@ func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
 		}
 	}
 
-	c := &coverageImpl{
+	merged := &coverageImpl{
 		url:      a.url,
 		revision: a.revision,
 		time:     a.time,
 		entries:  pie.Values(entries),
 	}
 
-	return c, nil
+	return merged, nil
 }
 
 func (p *MoraCoverageProvider) addOrMergeCoverage(cov *coverageImpl) *coverageImpl {
@@ -137,12 +134,10 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *coverageImpl) *coverageIm
 	defer p.Unlock()
 
 	idx := p.findCoverage(cov)
-	log.Print("idx=", idx)
 	if idx < 0 {
 		p.coverages = append(p.coverages, cov)
 		return nil
 	} else {
-		log.Print("p.coverages[idx]=", p.coverages[idx])
 		merged, _ := mergeCoverage(p.coverages[idx].(*coverageImpl), cov)
 		p.coverages[idx] = merged
 		return merged
@@ -431,13 +426,13 @@ func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 	merged := p.addOrMergeCoverage(cov)
 
 	if p.store != nil {
-		var entries []*CoverageEntryUploadRequest
+		var requests []*CoverageEntryUploadRequest
 		if merged == nil {
-			entries = req.Entries
+			requests = req.Entries
 		} else {
-			// rebuild entries
+			// rebuild upload request
 			for _, e := range merged.entries {
-				entries = append(entries,
+				requests = append(requests,
 					&CoverageEntryUploadRequest{
 						EntryName: e.Name,
 						Hits:      e.Hits,
@@ -446,7 +441,7 @@ func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 					})
 			}
 		}
-		contents, err := json.Marshal(entries)
+		contents, err := json.Marshal(requests)
 		if err != nil {
 			log.Err(err).Msg("HandleUpload")
 			render.NotFound(w, render.ErrNotFound)
