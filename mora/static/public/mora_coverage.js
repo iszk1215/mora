@@ -190,14 +190,6 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
             const json = await data.json()
             // console.log(json)
 
-            for (let file of json.files) {
-                file.ratio = file.hits * 100.0 / file.lines
-                if (file.ratio < 50) {
-                    file.clazz = "negative"
-                } else if (file.ratio > 80) {
-                    file.clazz = "positive"
-                }
-            }
             this.files = json.files
             this.meta = json.meta
 

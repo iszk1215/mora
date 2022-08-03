@@ -83,8 +83,10 @@ function Browser() {
         })
 
         const calcDirCoverage = (item) => {
-            if (item.type != "dir")
+            if (item.type != "dir") {
+                item.ratio = item.hits * 100.0 / item.lines
                 return
+            }
             item.hits = 0
             item.lines = 0
             for (const child of item.children) {

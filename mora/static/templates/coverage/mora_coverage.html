@@ -17,26 +17,6 @@
             </div>
 
             <browser :files="files" @select-file="selectFile"></browser>
-            <!--
-            <table class="ui very compact selectable celled striped table" style="line-height: 1.0;">
-                <thead>
-                    <tr>
-                        <th>Filename</th>
-                        <th>Hit</th>
-                        <th>Total</th>
-                        <th>Coverage</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="file in files" :class="file.clazz">
-                        <td><a href="javascript:void(0)" v-on:click="selectFile(file)">[[file.filename]]</a></td>
-                        <td class="right aligned">[[file.hits]]</td>
-                        <td class="right aligned">[[file.lines]]</td>
-                        <td class="right aligned">[[file.ratio.toFixed(1)]] %</td>
-                    </tr>
-                </tbody>
-            </table>
-            -->
 
             <p>
             <div class="ui container" v-if="show_code">
