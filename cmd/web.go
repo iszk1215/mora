@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/iszk1215/mora/mora"
+	"github.com/iszk1215/mora/mora/server"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -39,14 +39,14 @@ to quickly create a Cobra application.`,
 			zerolog.SetGlobalLevel(zerolog.DebugLevel)
 		}
 
-		config, err := mora.ReadMoraConfig(config_file)
+		config, err := server.ReadMoraConfig(config_file)
 		if err != nil {
 			return err
 		}
 		config.Debug = debug
 		config.Server.Port = port
 
-		server, err := mora.NewMoraServerFromConfig(config)
+		server, err := server.NewMoraServerFromConfig(config)
 		if err != nil {
 			return err
 		}

@@ -1,4 +1,4 @@
-package mora
+package server
 
 import (
 	"context"
@@ -365,7 +365,7 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 
 	sessionManager := NewMoraSessionManager()
 
-	staticDir := "mora/static" // FIXME
+	staticDir := "mora/server/static" // FIXME
 	fsys, err := getStaticFS(staticDir, "templates", debug)
 	if err != nil {
 		return nil, err

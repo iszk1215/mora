@@ -1,4 +1,4 @@
-package mora
+package server
 
 import (
 	"net/http"

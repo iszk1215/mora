@@ -1,4 +1,4 @@
-package mora
+package server
 
 import (
 	"bytes"
@@ -8,24 +8,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iszk1215/mora/mora"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestHandleUpload(t *testing.T) {
-	profile0 := &Profile{
+	profile0 := &mora.Profile{
 		FileName: "test.go",
 		Hits:     13,
 		Lines:    17,
 		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
 	}
-	profile1 := &Profile{
+	profile1 := &mora.Profile{
 		FileName: "test2.go",
 		Hits:     0,
 		Lines:    3,
 		Blocks:   [][]int{{1, 3, 0}},
 	}
-	profiles := []*Profile{profile0, profile1}
+	profiles := []*mora.Profile{profile0, profile1}
 
 	e := &CoverageEntryUploadRequest{
 		EntryName: "go",
