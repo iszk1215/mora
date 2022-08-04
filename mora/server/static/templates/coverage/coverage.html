@@ -18,8 +18,10 @@
             <div class="item" v-for="cov in coverages">
                 <div class="ui segment">
                     #[[cov.index]]
+                    <span v-if="cov.entries.length > 1">
                     Total [[formattedRatio(cov.hits, cov.lines)]]%
                     ([[cov.hits]]/[[cov.lines]]) :
+                    </span>
                     <div class="right floated content">
                         [[formattedTime(cov.time)]]
                         <a :href="cov.revision_url">[[cov.revision.substring(0, 10)]]</a>
@@ -27,7 +29,7 @@
                     <span v-for="(e, i) in cov.entries">
                         <span v-if="i > 0"> / </span>
                         <a :href="'coverages/'+cov.index+'/'+e.name">
-                            [[e.name]]
+                            <span v-if="e.name != '_default'">[[e.name]]</span>
                             [[formattedRatio(e.hits, e.lines)]]%
                             ([[e.hits]]/[[e.lines]])
                         </a>

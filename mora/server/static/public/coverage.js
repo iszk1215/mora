@@ -65,7 +65,12 @@ import { Breadcrumb } from '/public/mora.js'
     }
 
     function update_chart(coverages) {
-        let map = { "total": [] }
+        let map = {}
+
+        let hasMultiEntries = coverages.reduce(
+            (flag, cov) => flag || cov.entries.length > 1, false)
+        if (hasMultiEntries)
+            map["total"] = []
 
         for (const cov of coverages) {
             for (const e of cov.entries) {
@@ -73,11 +78,13 @@ import { Breadcrumb } from '/public/mora.js'
                     map[e.name] = []
                 map[e.name].push({ "x": cov.time, "y": e.hits * 100.0 / e.lines })
             }
-            map["total"].push({ "x": cov.time, "y": cov.hits * 100.0 / cov.lines })
+            if (hasMultiEntries)
+                map["total"].push({ "x": cov.time, "y": cov.hits * 100.0 / cov.lines })
         }
         let datasets = []
         for (const k in map) {
-            datasets.push({ "borderWidth": 1, "label": k, "data": map[k] })
+            let label = k == "_default" ? "coverage" : k
+            datasets.push({ "borderWidth": 1, "label": label, "data": map[k] })
         }
 
         chart.data.datasets = datasets
