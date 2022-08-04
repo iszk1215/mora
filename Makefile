@@ -1,6 +1,6 @@
 EXE = bin/mora
 
-all: coverage.html check $(EXE)
+all: $(EXE) coverage.html check
 
 SOURCES = $(shell find . -name '*.go')
 

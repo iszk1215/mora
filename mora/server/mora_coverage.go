@@ -1,4 +1,4 @@
-package mora
+package server
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/drone/drone/handler/api/render"
 	"github.com/elliotchance/pie/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/iszk1215/mora/mora/profile"
 	"github.com/rs/zerolog/log"
 )
 
@@ -21,7 +22,7 @@ type entryImpl struct {
 	Name     string
 	Hits     int
 	Lines    int
-	profiles map[string]*Profile
+	profiles map[string]*profile.Profile
 }
 
 type coverageImpl struct {
@@ -79,7 +80,7 @@ func (p *MoraCoverageProvider) findCoverage(cov Coverage) int {
 
 // Profile is not deep-copied because it is read-only
 func mergeEntry(a, b *entryImpl) *entryImpl {
-	c := &entryImpl{Name: a.Name, profiles: map[string]*Profile{}}
+	c := &entryImpl{Name: a.Name, profiles: map[string]*profile.Profile{}}
 
 	for file, p := range a.profiles {
 		c.profiles[file] = p
@@ -329,10 +330,10 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 }
 
 type CoverageEntryUploadRequest struct {
-	EntryName string     `json:"entry"`
-	Profiles  []*Profile `json:"profiles"`
-	Hits      int        `json:"hits"`
-	Lines     int        `json:"lines"`
+	EntryName string             `json:"entry"`
+	Profiles  []*profile.Profile `json:"profiles"`
+	Hits      int                `json:"hits"`
+	Lines     int                `json:"lines"`
 }
 
 type CoverageUploadRequest struct {
@@ -347,7 +348,7 @@ func parseEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
 		return nil, errors.New("entry name is empty")
 	}
 
-	profiles := map[string]*Profile{}
+	profiles := map[string]*profile.Profile{}
 	for _, p := range req.Profiles {
 		profiles[p.FileName] = p
 	}

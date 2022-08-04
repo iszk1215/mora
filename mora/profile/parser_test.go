@@ -1,4 +1,4 @@
-package mora
+package profile
 
 import (
 	"bytes"
