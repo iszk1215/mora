@@ -13,16 +13,16 @@ import (
 	"strings"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/iszk1215/mora/mora"
+	"github.com/iszk1215/mora/mora/profile"
 	"github.com/iszk1215/mora/mora/server"
 )
 
-func ParseCoverageFromFile(filename string) ([]*mora.Profile, error) {
+func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 	reader, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
-	return mora.ParseCoverage(reader)
+	return profile.ParseCoverage(reader)
 }
 
 func relativePathFromRoot(path string, root string) string {
@@ -40,7 +40,7 @@ func relativePathFromRoot(path string, root string) string {
 	return ""
 }
 
-func replaceFileName(profiles []*mora.Profile, root string) error {
+func replaceFileName(profiles []*profile.Profile, root string) error {
 	for _, p := range profiles {
 		file := relativePathFromRoot(p.FileName, root)
 		if file == "" {
@@ -53,7 +53,7 @@ func replaceFileName(profiles []*mora.Profile, root string) error {
 }
 
 func parseFile(filename, root, entryName string) (*server.CoverageEntryUploadRequest, error) {
-	profiles, err := ParseCoverageFromFile(filename)
+	profiles, err := parseCoverageFromFile(filename)
 	if err != nil {
 		return nil, err
 	}
