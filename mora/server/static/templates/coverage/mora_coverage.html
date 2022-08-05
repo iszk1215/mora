@@ -16,27 +16,10 @@
                 Lines: [[meta.hits]]/[[meta.lines]] Coverage: [[(meta.hits*100/meta.lines).toFixed(1)]]%
             </div>
 
-            <browser :files="files" @select-file="selectFile"></browser>
-
             <p>
-            <div class="ui container" v-if="show_code">
-                <h4 class="ui header">[[selectedFile.path]]</h4>
-                Coverage [[(selectedFile.hits*100.0/selectedFile.lines).toFixed(1)]]%
-                <div id="hitLabel" class="ui label">
-                    Hit
-                    <div class="ui detail">[[selectedFile.hits]] Lines</div>
-                </div>
-                <div id="missLabel" class="ui label">
-                    Miss
-                    <div class="ui detail">[[selectedFile.lines-selectedFile.hits]] Lines</div>
-                </div>
-                <button id="darkModeButton" class="ui right floated toggle button" v-on:click="toggleDarkMode($event)">
-                    Dark
-                </button>
-                <pre><code v-html="src"
-                           style="padding: 0px; border:solid 1px darkgray;"></code></pre>
-            </div>
+                <browser :files="files" @select-file="selectFile"></browser>
             </p>
+            <codeview :file="source_file"></codeview>
         </div>
     </div>
 </main>
