@@ -6,12 +6,11 @@ import { Breadcrumb } from '/public/mora.js'
     const breadcrumb = function() {
         let [_, scm, owner, repo, cov, covIndex, entry, ...rest]
             = window.location.pathname.split('/')
-        let path = ["", scm, owner, repo, "coverages"].join("/")
 
         return [
             { href: "/", name: "Top" },
             { name: [scm, owner, repo].join("/") },
-            { href: path, name: "Coverages" },
+            { name: "Coverages" },
         ]
     }()
 
@@ -91,16 +90,12 @@ import { Breadcrumb } from '/public/mora.js'
         chart.update()
     }
 
-    function update(proxy, json) {
-        preprocess(json)
-        proxy.coverages = json
-        update_chart(json)
-    }
-
     async function load_and_update(proxy) {
         const data = await fetch("/api" + window.location.pathname)
         const json = await data.json()
-        update(proxy, json)
+        preprocess(json)
+        proxy.coverages = json
+        update_chart(json)
     }
 
     const app = {
@@ -109,7 +104,6 @@ import { Breadcrumb } from '/public/mora.js'
         data() {
             return {
                 coverages: [],
-                breadcrumbs: [],
             }
         },
         methods: {
@@ -127,13 +121,7 @@ import { Breadcrumb } from '/public/mora.js'
         mounted() {
             const ctx = document.getElementById("chart1").getContext("2d")
             chart = new Chart(ctx, chartData)
-            const json = load_and_update(this)
-
-            let [_, scm, owner, repo, ...rest] = window.location.pathname.split('/')
-            this.breadcrumbs = [
-                { href: "/", name: "Top" },
-                { name: [scm, owner, repo].join("/") },
-                { name: "coverages" }]
+            load_and_update(this)
         }
     };
 

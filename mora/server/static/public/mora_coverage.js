@@ -44,7 +44,7 @@ import { CodeView } from '/public/codeview.js'
                     luxon.DateTime.DATETIME_FULL)
             },
             async selectFile(file) {
-                console.log("selectFile")
+                // console.log("selectFile")
                 const url = apiBaseURL + "/files/" + file.path
                 const data = await fetch(url)
                 const json = await data.json()
