@@ -16,34 +16,56 @@ import { Breadcrumb } from '/public/mora.js'
 
 
     let chartData = {
-        "type": "line",
-        "data": {
-            "datasets": [],
-            "labels": null
+        type: "line",
+        data: {
+            datasets: [],
+            labels: null
         },
-        "options": {
-            "scales": {
-                "x": {
-                    "type": "time",
-                    "position": "bottom",
-                    "title": {}
-                },
-                "y": {
-                    "type": "linear",
-                    "position": "left",
-                    "title": {
-                        "display": true,
-                        "text": "Coverage %"
+        options: {
+            onClick: function(ev, elements, chart) {
+                // console.log(chart.data)
+                if (elements.length == 1) {
+                    const e = elements[0]
+                    const dataset = chart.data.datasets[e.datasetIndex]
+                    if (dataset.label != "total") {
+                        const d = dataset.data[e.index]
+                        const url = `${window.location}/${d.index}/${dataset.entry}`
+                        window.location = url
                     }
                 }
             },
-            "animation": {
-                "duration": 0
-            },
-            "plugins": {
-                "colorschemes": {
-                    "scheme": "tableau.Classic10"
+            scales: {
+                x: {
+                    type: "time",
+                    position: "bottom",
+                    title: {}
+                },
+                y: {
+                    type: "linear",
+                    position: "left",
+                    title: {
+                        display: true,
+                        text: "Coverage %"
+                    }
                 }
+            },
+            animation: {
+                duration: 0
+            },
+            plugins: {
+                colorschemes: {
+                    scheme: "tableau.Classic10"
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const data = context.dataset.data[context.dataIndex]
+                            const label = context.dataset.label
+                            const y = context.raw.y
+                            return `#${data.index}: ${label} ${y.toFixed(1)}%`
+                        },
+                    },
+                },
             }
         }
 
@@ -75,15 +97,17 @@ import { Breadcrumb } from '/public/mora.js'
             for (const e of cov.entries) {
                 if (!(e.name in map))
                     map[e.name] = []
-                map[e.name].push({ "x": cov.time, "y": e.hits * 100.0 / e.lines })
+                map[e.name].push(
+                    {x: cov.time, y: e.hits * 100.0 / e.lines, index: cov.index})
             }
             if (hasMultiEntries)
-                map["total"].push({ "x": cov.time, "y": cov.hits * 100.0 / cov.lines })
+                map["total"].push(
+                    {x: cov.time, y: cov.hits * 100.0 / cov.lines, index: cov.index})
         }
         let datasets = []
         for (const k in map) {
             let label = k == "_default" ? "coverage" : k
-            datasets.push({ "borderWidth": 1, "label": label, "data": map[k] })
+            datasets.push({borderWidth: 1, label: label, data: map[k], entry: k})
         }
 
         chart.data.datasets = datasets
