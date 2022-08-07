@@ -166,7 +166,7 @@ function CodeView() {
         props: ["file", "darkMode"],
         watch: {
             file: function(now, old) {
-                console.log(now)
+                //console.log(now)
                 const lst = make_code(now.json.code, now.json.blocks)
                 this.src = lst.join("\n")
                 this.selectedFile = now.file

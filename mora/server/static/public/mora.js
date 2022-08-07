@@ -98,14 +98,14 @@ function Browser() {
         }
         calcDirCoverage(root)
 
-        forEachItem(root, (item) => {
-            //console.log(item.name, item.children.length)
-            if (item.type == "dir" && item.children.length == 1) {
+        if (files.length < 10) {
+            forEachItem(root, (item) => {
                 item.state = 1
-                item.children[0].state = 1
-            }
-            return true
-        })
+                return true
+            })
+        }
+        if (root.children.length == 1)
+            root.children[0].state = 1
 
         return root
     }
