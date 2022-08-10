@@ -1,5 +1,6 @@
 import { Breadcrumb } from '/public/mora.js'
-
+//import {Chart} from 'https://cdn.jsdelivr.net/npm/chart.js@3.6.2/dist/chart.min.js'
+//import ChartDataLabels from 'https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0'
 (function() {
     let chart
 
@@ -55,6 +56,18 @@ import { Breadcrumb } from '/public/mora.js'
             plugins: {
                 colorschemes: {
                     scheme: "tableau.Classic10"
+                },
+                datalabels: {
+                    align: "top",
+                    /*
+                    backgroundColor: function(context) {
+                        return context.dataset.backgroundColor
+                    },
+                    borderRadius: 4,
+                    */
+                    formatter: function(value, context) {
+                        return `#${value.index}`
+                    },
                 },
                 tooltip: {
                     callbacks: {
@@ -144,6 +157,7 @@ import { Breadcrumb } from '/public/mora.js'
         },
         mounted() {
             const ctx = document.getElementById("chart1").getContext("2d")
+            Chart.register(ChartDataLabels)
             chart = new Chart(ctx, chartData)
             load_and_update(this)
         }

@@ -3,8 +3,6 @@ import hljs from 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/es/highlight.
 let darkMode = true
 let linkElement = null
 
-// hljs.highlightAll()
-
 function loadDarkModeFromCookie() {
     darkMode = false
     let cookies = document.cookie

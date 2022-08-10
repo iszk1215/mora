@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/iszk1215/mora/mora/profile"
@@ -186,6 +188,20 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 	return req, nil
 }
 
+func ask() (bool, error) {
+	fmt.Print("OK? [Y/n] ")
+	reader := bufio.NewReader(os.Stdin)
+	ru, _, err := reader.ReadRune()
+	if err != nil {
+		return false, err
+	}
+	lru := unicode.ToLower(ru)
+	if lru != rune('y') && lru != rune('\n') {
+		return false, nil
+	}
+	return true, nil
+}
+
 func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, args []string) error {
 
 	log.Print("force=", force)
@@ -212,6 +228,15 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, arg
 
 	fmt.Println("Revision:", req.Revision)
 	fmt.Println("Time:", req.Time)
+
+	ok, err := ask()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		fmt.Println("Canceled")
+		return nil
+	}
 
 	if !dryRun {
 		if server == "" {
