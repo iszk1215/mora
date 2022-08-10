@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -27,12 +28,11 @@ func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 	return profile.ParseCoverage(reader)
 }
 
-func relativePathFromRoot(path string, root string) string {
+func relativePathFromRoot(path string, root fs.FS) string {
 	lst := strings.Split(filepath.ToSlash(filepath.Clean(path)), "/")
 	for i := range lst {
 		relativePath := filepath.Join(lst[i:]...)
-		f := filepath.Join(root, relativePath)
-		_, err := os.Stat(f)
+		_, err := fs.Stat(root, relativePath)
 		if !os.IsNotExist(err) {
 			return relativePath
 		}
@@ -40,7 +40,7 @@ func relativePathFromRoot(path string, root string) string {
 	return ""
 }
 
-func replaceFileName(profiles []*profile.Profile, root string) error {
+func replaceFileName(profiles []*profile.Profile, root fs.FS) error {
 	for _, p := range profiles {
 		file := relativePathFromRoot(p.FileName, root)
 		if file == "" {
@@ -51,7 +51,7 @@ func replaceFileName(profiles []*profile.Profile, root string) error {
 	return nil
 }
 
-func parseFile(filename, root, entryName string) (*server.CoverageEntryUploadRequest, error) {
+func parseFile(filename, entryName string, root fs.FS) (*server.CoverageEntryUploadRequest, error) {
 	profiles, err := parseCoverageFromFile(filename)
 	if err != nil {
 		return nil, err
@@ -153,11 +153,11 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 	if err != nil {
 		return nil, err
 	}
-	root := wt.Filesystem.Root()
+	root := os.DirFS(wt.Filesystem.Root())
 
 	entries := []*server.CoverageEntryUploadRequest{}
 	for _, file := range files {
-		e, err := parseFile(file, root, entryName)
+		e, err := parseFile(file, entryName, root)
 		if err != nil {
 			return nil, err
 		}
