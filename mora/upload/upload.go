@@ -28,16 +28,15 @@ func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 }
 
 func relativePathFromRoot(path string, root string) string {
-	relativePath := ""
-	for path != "." && path != "/" {
-		relativePath = filepath.Join(filepath.Base(path), relativePath)
-
+	log.Print(path)
+	lst := strings.Split(filepath.ToSlash(filepath.Clean(path)), "/")
+	for i := range lst {
+		relativePath := filepath.Join(lst[i:]...)
 		f := filepath.Join(root, relativePath)
 		_, err := os.Stat(f)
 		if !os.IsNotExist(err) {
 			return relativePath
 		}
-		path = filepath.Dir(path)
 	}
 	return ""
 }
@@ -48,7 +47,6 @@ func replaceFileName(profiles []*profile.Profile, root string) error {
 		if file == "" {
 			return fmt.Errorf("file not found: %s", p.FileName)
 		}
-		log.Print("file=", file)
 		p.FileName = file
 	}
 	return nil
