@@ -28,7 +28,6 @@ func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 }
 
 func relativePathFromRoot(path string, root string) string {
-	log.Print(path)
 	lst := strings.Split(filepath.ToSlash(filepath.Clean(path)), "/")
 	for i := range lst {
 		relativePath := filepath.Join(lst[i:]...)
@@ -186,6 +185,36 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 	return req, nil
 }
 
+type stats struct {
+	Hits  int
+	Lines int
+}
+
+func NewStats() *stats {
+	return &stats{0, 0}
+}
+
+func (s *stats) Add(hits, lines int) {
+	s.Hits += hits
+	s.Lines += lines
+}
+
+func printRequest(req *server.CoverageUploadRequest) {
+	nfiles := 0
+	s := NewStats()
+	for _, e := range req.Entries {
+		s.Add(e.Hits, e.Lines)
+		nfiles += len(e.Profiles)
+	}
+
+	fmt.Printf("%-20s%s\n", "Repository", req.RepoURL)
+	fmt.Printf("%-20s%s\n", "Revision", req.Revision)
+	fmt.Printf("%-20s%s\n", "Time:", req.Time)
+	fmt.Printf("%-20s%.1f%% (%d Hit / %d Lines, %d Files)\n", "Coverage",
+		float64(s.Hits)*100.0/float64(s.Lines), s.Hits, s.Lines, nfiles)
+
+}
+
 func ask() (bool, error) {
 	fmt.Print("OK? [Y/n] ")
 	reader := bufio.NewReader(os.Stdin)
@@ -201,8 +230,6 @@ func ask() (bool, error) {
 }
 
 func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, args []string) error {
-
-	log.Print("force=", force)
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return errors.New("can not open repository. Use -repo-path=<repository>")
@@ -218,14 +245,13 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, arg
 	if err != nil {
 		return err
 	}
-	log.Print(flag)
-	if (!force) && !flag {
+
+	if !force && !flag {
 		fmt.Println("working tree is dirty")
 		return err
 	}
 
-	fmt.Println("Revision:", req.Revision)
-	fmt.Println("Time:", req.Time)
+	printRequest(req)
 
 	ok, err := ask()
 	if err != nil {
