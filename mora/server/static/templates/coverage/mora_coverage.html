@@ -8,12 +8,12 @@
             <h1 class="ui header">Coverage</h1>
 
             <div class="ui right floated segment">
-                <a :href="meta.revision_url">[[meta.revision.substring(0, 10)]]</a>
-                [[formattedTime(meta.time)]]
+                <a :href="meta.revision_url">[[FormattedRevision]]</a>
+                [[FormattedTime]]
             </div>
 
             <div>
-                Lines: [[meta.hits]]/[[meta.lines]] Coverage: [[(meta.hits*100/meta.lines).toFixed(1)]]%
+                Lines: [[meta.hits]]/[[meta.lines]] Coverage: [[FormattedRatio]]%
             </div>
 
             <p>

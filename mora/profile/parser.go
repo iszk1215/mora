@@ -120,7 +120,7 @@ func convertGoProfile(profile *cover.Profile) *Profile {
 	//   12  }
 	// For this code block, we have a cover.ProfileBlock with StartLine=10,
 	// EndLine=12, NumStmt=1. Three lines, 10, 11 and 12 are created here from
-	// this block regardless of NumStmt=3
+	// this block regardless of NumStmt=1
 	blocks := [][]int{}
 	for _, b := range profile.Blocks {
 		for l := b.StartLine; l <= b.EndLine; l++ {

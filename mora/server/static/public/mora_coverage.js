@@ -33,6 +33,18 @@ import { CodeView } from '/public/codeview.js'
                 source_file: {},
             }
         },
+        computed: {
+            FormattedRevision() {
+                return this.meta.revision.substring(0, 10)
+            },
+            FormattedRatio() {
+                return (this.meta.hits * 100 / this.meta.lines).toFixed(1)
+            },
+            FormattedTime() {
+                return luxon.DateTime.fromISO(this.meta.time).toLocaleString(
+                    luxon.DateTime.DATETIME_FULL)
+            },
+        },
         components: {
             breadcrumb: Breadcrumb(breadcrumb),
             browser: Browser(),
