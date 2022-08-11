@@ -69,6 +69,17 @@ type RepoResponse struct {
 	Link      string `json:"link"`
 }
 
+type MoraServer struct {
+	scms     []SCM
+	coverage *CoverageService
+
+	sessionManager   *MoraSessionManager
+	publicFileServer http.Handler
+
+	moraCoverageProvider *MoraCoverageProvider
+	htmlCoverageProvider *HTMLCoverageProvider
+}
+
 func parseRepoURL(str string) (string, string, string, error) {
 	tmp := strings.Split(str, "/")
 	if len(tmp) != 5 {
@@ -337,17 +348,6 @@ func (s *MoraServer) Handler() http.Handler {
 	return r
 }
 
-type MoraServer struct {
-	scms     []SCM
-	coverage *CoverageService
-
-	sessionManager   *MoraSessionManager
-	publicFileServer http.Handler
-
-	moraCoverageProvider *MoraCoverageProvider
-	htmlCoverageProvider *HTMLCoverageProvider
-}
-
 // static includes public and templates
 //go:embed static
 var embedded embed.FS
@@ -421,7 +421,7 @@ func createSCMs(config MoraConfig) []SCM {
 	return scms
 }
 
-func initStoreForCoverageProvider() (*CoverageStore, error) {
+func initCoverageStore() (*CoverageStore, error) {
 	db, err := Connect("mora.db")
 	if err != nil {
 		return nil, err
@@ -444,7 +444,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	dir := os.DirFS("data") // TODO
 	htmlCoverageProvider := NewHTMLCoverageProvider(dir)
 
-	store, err := initStoreForCoverageProvider()
+	store, err := initCoverageStore()
 	if err != nil {
 		return nil, err
 	}
