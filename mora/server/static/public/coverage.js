@@ -127,11 +127,11 @@ import { Breadcrumb } from '/public/mora.js'
         chart.update()
     }
 
-    async function load_and_update(proxy) {
+    async function load_and_update(vm) {
         const data = await fetch("/api" + window.location.pathname)
         const json = await data.json()
         preprocess(json)
-        proxy.coverages = json
+        vm.coverages = json
         update_chart(json)
     }
 
