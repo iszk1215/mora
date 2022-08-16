@@ -229,7 +229,7 @@ func ask() (bool, error) {
 	return true, nil
 }
 
-func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, args []string) error {
+func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes bool, args []string) error {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return errors.New("can not open repository. Use -repo-path=<repository>")
@@ -253,13 +253,15 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, arg
 
 	printRequest(req)
 
-	ok, err := ask()
-	if err != nil {
-		return err
-	}
-	if !ok {
-		fmt.Println("Canceled")
-		return nil
+	if !yes {
+		ok, err := ask()
+		if err != nil {
+			return err
+		}
+		if !ok {
+			fmt.Println("Canceled")
+			return nil
+		}
 	}
 
 	if !dryRun {

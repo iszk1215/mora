@@ -39,8 +39,9 @@ to quickly create a Cobra application.`,
 		force, _ := cmd.Flags().GetBool("force")
 		entryName, _ := cmd.Flags().GetString("entry")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		yes, _ := cmd.Flags().GetBool("yes")
 
-		return upload.Upload(server, repoURL, repoPath, entryName, dryRun, force, args)
+		return upload.Upload(server, repoURL, repoPath, entryName, dryRun, force, yes, args)
 	},
 }
 
@@ -63,4 +64,5 @@ func init() {
 	uploadCmd.Flags().String("entry", "_default", "entry name")
 	uploadCmd.Flags().BoolP("force", "f", false, "force upload even when working tree is dirty")
 	uploadCmd.Flags().Bool("dry-run", false, "test")
+	uploadCmd.Flags().BoolP("yes", "y", false, "yes")
 }
