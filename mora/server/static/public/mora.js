@@ -1,159 +1,160 @@
 function Breadcrumb(items) {
-    let delm = '<i class="right angle icon divider"></i>'
+  const delm = '<i class="right angle icon divider"></i>';
 
-    let tmp = []
-    for (const item of items) {
-        let b
-        if ("href" in item) {
-            b = '<a href="' + item.href + '">' + item.name + '</a>'
-        } else {
-            b = item.name
-        }
-        tmp.push('<span class="section">' + b + "</span>")
-
+  const tmp = [];
+  for (const item of items) {
+    let b;
+    if ("href" in item) {
+      b = '<a href="' + item.href + '">' + item.name + "</a>";
+    } else {
+      b = item.name;
     }
-    return {
-        template:
-            '<div class="ui breadcrumb">' + tmp.join(delm) + "</div>"
-    }
+    tmp.push('<span class="section">' + b + "</span>");
+  }
+  return {
+    template: '<div class="ui breadcrumb">' + tmp.join(delm) + "</div>",
+  };
 }
 
 function Browser() {
-    function forEachItem(item, func) {
-        let flag = func(item)
-        if (flag) {
-            for (const child of item.children) {
-                forEachItem(child, func)
-            }
+  function forEachItem(item, func) {
+    const flag = func(item);
+    if (flag) {
+      for (const child of item.children) {
+        forEachItem(child, func);
+      }
+    }
+  }
+
+  function collectItems(root) {
+    const items = [];
+    forEachItem(root, (item) => {
+      if (item.name != "") {
+        items.push(item);
+      }
+      return item.type == "dir" && item.state == 1;
+    });
+    return items;
+  }
+
+  function list2tree(files) {
+    const Item = (name, type, depth) => {
+      return {
+        name: name,
+        type: type,
+        hits: 0,
+        lines: 0,
+        state: 0,
+        children: {},
+        depth: depth,
+      };
+    };
+
+    const root = Item("", "dir", 0);
+    root.state = 1;
+
+    for (const f of files) {
+      const tmp = f.filename.split("/");
+      let parentDir = root;
+      let depth = 0;
+      for (const dirName of tmp.slice(0, -1)) {
+        if (dirName in parentDir.children) {
+          parentDir = parentDir.children[dirName];
+        } else {
+          const dir = Item(dirName, "dir", depth);
+          parentDir.children[dirName] = dir;
+          parentDir = dir;
         }
+        depth++;
+      }
+      const item = Item(tmp[tmp.length - 1], "file", depth);
+      item.hits = f.hits;
+      item.lines = f.lines;
+      item.ratio = f.ratio;
+      item.path = f.filename;
+      parentDir.children[f.filename] = item;
     }
 
-    function collectItems(root) {
-        let items = []
+    // directory first
+    const cmpItem = (a, b) => {
+      const cmp = (c, d) => {
+        return c == d ? 0 : (c < d ? -1 : 1);
+      };
+      return a.type != b.type ? cmp(a.type, b.type) : cmp(a.name, b.name);
+    };
+
+    forEachItem(root, (item) => {
+      item.children = Object.values(item.children).sort(cmpItem);
+      return true;
+    });
+
+    const calcDirCoverage = (item) => {
+      if (item.type != "dir") {
+        item.ratio = item.hits * 100.0 / item.lines;
+        return;
+      }
+      item.hits = 0;
+      item.lines = 0;
+      for (const child of item.children) {
+        calcDirCoverage(child); // depth first
+        item.hits += child.hits;
+        item.lines += child.lines;
+      }
+      item.ratio = item.hits * 100.0 / item.lines;
+    };
+    calcDirCoverage(root);
+
+    forEachItem(root, (item) => {
+      item.state = 1;
+      return true;
+    });
+
+    return root;
+  }
+
+  return {
+    data() {
+      return {
+        items: [],
+        root: {},
+      };
+    },
+    emits: ["selectFile"],
+    methods: {
+      selectItem(item) {
+        //console.log("selectItem")
+        //console.log(item)
+        if (item.type == "file") {
+          this.$emit("selectFile", item);
+        } else { // "dir"
+          item.state = item.state == 0 ? 1 : 0;
+          this.update();
+        }
+      },
+      update() {
+        this.items = collectItems(this.root);
+      },
+      setData(files) {
+        const root = list2tree(files);
         forEachItem(root, (item) => {
-            if (item.name != "")
-                items.push(item)
-            return item.type == "dir" && item.state == 1
-        })
-        return items
-    }
-
-    function list2tree(files) {
-        const Item = (name, type, depth) => {
-            return {name: name, type: type, hits: 0, lines: 0, state: 0,
-                children: {}, depth: depth}
-        }
-
-        let root = Item("", "dir", 0)
-        root.state = 1
-
-        for (const f of files) {
-            let tmp = f.filename.split("/")
-            let parentDir = root
-            let depth = 0
-            for (let dirName of tmp.slice(0, -1)) {
-                if (dirName in parentDir.children) {
-                    parentDir = parentDir.children[dirName]
-                } else {
-                    const dir = Item(dirName, "dir", depth)
-                    parentDir.children[dirName] = dir
-                    parentDir = dir
-                }
-                depth++
-            }
-            const item = Item(tmp[tmp.length-1], "file", depth)
-            item.hits = f.hits
-            item.lines = f.lines
-            item.ratio = f.ratio
-            item.path = f.filename
-            parentDir.children[f.filename] = item
-        }
-
-        // directory first
-        const cmpItem = (a, b) => {
-            const cmp = (c, d) => {
-                return c == d ? 0 : (c < d ? -1 : 1)
-            }
-            return a.type != b.type ? cmp(a.type, b.type) : cmp(a.name, b.name)
-        }
-
-        forEachItem(root, (item) => {
-            item.children = Object.values(item.children).sort(cmpItem)
-            return true
-        })
-
-        const calcDirCoverage = (item) => {
-            if (item.type != "dir") {
-                item.ratio = item.hits * 100.0 / item.lines
-                return
-            }
-            item.hits = 0
-            item.lines = 0
-            for (const child of item.children) {
-                calcDirCoverage(child) // depth first
-                item.hits += child.hits
-                item.lines += child.lines
-            }
-            item.ratio = item.hits * 100.0 / item.lines
-        }
-        calcDirCoverage(root)
-
-        if (files.length < 10) {
-            forEachItem(root, (item) => {
-                item.state = 1
-                return true
-            })
-        }
-        if (root.children.length == 1)
-            root.children[0].state = 1
-
-        return root
-    }
-
-
-    return {
-        data() {
-            return {
-                items: [],
-                root: {},
-            }
-        },
-        emits: ["selectFile"],
-        methods: {
-            selectItem(item) {
-                //console.log("selectItem")
-                //console.log(item)
-                if (item.type == "file") {
-                    this.$emit("selectFile", item)
-                } else { // "dir"
-                    item.state = item.state == 0 ? 1 : 0
-                    this.update()
-                }
-            },
-            update() {
-                this.items = collectItems(this.root)
-            },
-            setData(files) {
-                const root = list2tree(files)
-                forEachItem(root, (item) => {
-                    if (item.ratio < 50) 
-                        item.clazz = "negative"
-                    else if (item.ratio > 80)
-                        item.clazz = "positive"
-                    return true
-                })
-                this.root = root
-                this.update()
-            },
-        },
-        props: ["files"],
-        watch: {
-            files: function(now, old) {
-                this.setData(now)
-            },
-        },
-        template:
-        `<div>
+          if (item.ratio < 50) {
+            item.clazz = "negative";
+          } else if (item.ratio > 80) {
+            item.clazz = "positive";
+          }
+          return true;
+        });
+        this.root = root;
+        this.update();
+      },
+    },
+    props: ["files"],
+    watch: {
+      files: function (now, _old) {
+        this.setData(now);
+      },
+    },
+    template: `<div>
         <table class="ui fixed very compact selectable celled striped table" style="line-height: 1.0;">
         <thead>
                     <tr style="line-height: 0.0;">
@@ -179,8 +180,8 @@ function Browser() {
         </tr>
         </tbody>
         </table>
-        </div>`
-    }
+        </div>`,
+  };
 }
 
-export { Breadcrumb, Browser }
+export { Breadcrumb, Browser };
