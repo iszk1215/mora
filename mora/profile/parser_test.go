@@ -44,6 +44,37 @@ end_of_record
 	require.Equal(t, expected, profiles)
 }
 
+func TestParseCoverageLcovDuplicatedFile(t *testing.T) {
+	text := `TN:
+SF:/home/mora/repo/test1.cc
+DA:5,1
+DA:6,1
+DA:10,0
+end_of_record
+TN:
+SF:/home/mora/repo/test1.cc
+DA:3,1
+DA:4,0
+end_of_record
+`
+	buf := bytes.NewBufferString(text)
+
+	profiles, err := ParseCoverage(buf)
+
+	require.NoError(t, err)
+
+	expected := []*Profile{
+		{
+			FileName: "/home/mora/repo/test1.cc",
+			Hits:     3,
+			Lines:    5,
+			Blocks:   [][]int{{3, 3, 1}, {4, 4, 0}, {5, 6, 1}, {10, 10, 0}},
+		},
+	}
+
+	require.Equal(t, expected, profiles)
+}
+
 func TestParseCoverageGo(t *testing.T) {
 	text := `mode: set
 mockscm.com/mockowner/mockrepo/test.go:1.2,5.4 5 1

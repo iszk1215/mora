@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,7 +34,7 @@ func assertEqualRepoResponse(t *testing.T, expected *Repo, got RepoResponse) boo
 }
 
 func requireEqualRepoList(t *testing.T, expected []*Repo, res *http.Response) {
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
 	var data []RepoResponse
@@ -253,7 +253,7 @@ func TestServerSCMList(t *testing.T) {
 	handler.ServeHTTP(w, req)
 	res := w.Result()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
 	var scms []SCMResponse
