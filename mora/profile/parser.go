@@ -44,7 +44,32 @@ func mergeBlocks(blocks [][]int) [][]int {
 	return ret
 }
 
-func postprocess(profiles []*Profile) {
+func mergeProfiles(profiles []*Profile) []*Profile {
+	ret := []*Profile{}
+
+	for _, p := range profiles {
+		merged := false
+		for _, q := range ret {
+			if p.FileName == q.FileName {
+				q.Blocks = append(q.Blocks, p.Blocks...)
+				sort.Slice(q.Blocks, func(i, j int) bool {
+					return q.Blocks[i][START] < q.Blocks[j][START]
+				})
+				merged = true
+			}
+		}
+
+		if !merged {
+			ret = append(ret, p)
+		}
+	}
+
+	return ret
+}
+
+func postprocess(profiles []*Profile) []*Profile {
+	profiles = mergeProfiles(profiles)
+
 	for _, p := range profiles {
 		p.Blocks = mergeBlocks(p.Blocks)
 
@@ -58,6 +83,8 @@ func postprocess(profiles []*Profile) {
 			p.Lines += l
 		}
 	}
+
+	return profiles
 }
 
 func parseLcov(reader io.Reader) ([]*Profile, error) {
@@ -180,6 +207,6 @@ func ParseCoverage(reader io.Reader) ([]*Profile, error) {
 		return nil, err
 	}
 
-	postprocess(profiles)
+	profiles = postprocess(profiles)
 	return profiles, nil
 }

@@ -2,7 +2,7 @@ package server
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,7 +47,7 @@ func assertEqualCoverageList(t *testing.T, expected []Coverage, got []CoverageRe
 func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Response) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
 	var data []CoverageResponse
