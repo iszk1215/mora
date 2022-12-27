@@ -73,8 +73,9 @@ type MoraServer struct {
 	scms     []SCM
 	coverage *CoverageService
 
-	sessionManager   *MoraSessionManager
-	publicFileServer http.Handler
+	sessionManager     *MoraSessionManager
+	publicFileServer   http.Handler
+	frontendFileServer http.Handler
 
 	moraCoverageProvider *MoraCoverageProvider
 	htmlCoverageProvider *HTMLCoverageProvider
@@ -326,14 +327,27 @@ func (s *MoraServer) Handler() http.Handler {
 
 	redirectHandler := http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/scms", http.StatusSeeOther)
-		})
+			sess, _ := MoraSessionFrom(r.Context())
+			path := sess.getLoginRedirectPath()
 
-	r.Get("/", templateRenderingHandler("index.html"))
-	r.Get("/scms", templateRenderingHandler("login.html"))
+			// http.Redirect(w, r, "/scms", http.StatusSeeOther)
+			http.Redirect(w, r, path, http.StatusSeeOther)
+		})
 
 	r.Mount("/login", LoginHandler(s.scms, redirectHandler))
 	r.Mount("/logout", LogoutHandler(s.scms, redirectHandler))
+
+	// frontend v1
+
+	// r.Get("/", templateRenderingHandler("index.html"))
+	topPageHandler := templateRenderingHandler("index.html")
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Print("setLoginRedirectPath to /scms")
+		sess, _ := MoraSessionFrom(r.Context())
+		sess.setLoginRedirectPath("/scms")
+		topPageHandler(w, r)
+	})
+	r.Get("/scms", templateRenderingHandler("login.html"))
 
 	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
 		r.Use(injectRepo(s.scms))
@@ -343,6 +357,29 @@ func (s *MoraServer) Handler() http.Handler {
 	r.Get("/public/*", func(w http.ResponseWriter, r *http.Request) {
 		fs := http.StripPrefix("/public/", s.publicFileServer)
 		fs.ServeHTTP(w, r)
+	})
+
+	// frontend v2
+
+	r.Route("/v2", func(r chi.Router) {
+		r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {
+			fs := http.StripPrefix("/v2/", s.frontendFileServer)
+			fs.ServeHTTP(w, r)
+		})
+
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			log.Print("setLoginRedirectPath to /v2/scms")
+			sess, _ := MoraSessionFrom(r.Context())
+			sess.setLoginRedirectPath("/v2/scms")
+			fs := http.StripPrefix("/v2/", s.frontendFileServer)
+			fs.ServeHTTP(w, r)
+		})
+
+		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+			r.URL.Path = "/v2/"
+			fs := http.StripPrefix("/v2/", s.frontendFileServer)
+			fs.ServeHTTP(w, r)
+		})
 	})
 
 	return r
@@ -377,9 +414,15 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 		return nil, err
 	}
 
+	frontendFS, err := getStaticFS(staticDir, "v2", debug)
+	if err != nil {
+		return nil, err
+	}
+
 	s.sessionManager = sessionManager
 	s.scms = scms
 	s.publicFileServer = http.FileServer(http.FS(publicFS))
+	s.frontendFileServer = http.FileServer(http.FS(frontendFS))
 
 	return s, nil
 }
