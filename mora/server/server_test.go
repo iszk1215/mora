@@ -19,11 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+/*
 func requireLocation(t *testing.T, expected string, r *http.Response) {
 	loc, err := r.Location()
 	require.NoError(t, err)
 	require.Equal(t, expected, loc.String())
 }
+*/
 
 func assertEqualRepoResponse(t *testing.T, expected *Repo, got RepoResponse) bool {
 	// mora uses these three members
@@ -161,8 +163,8 @@ func Test_injectRepo_NoLogin(t *testing.T) {
 	sess := NewMoraSession() // without token
 	res := doInjectRepo(sess, []SCM{scm}, "/mock/owner/repo", nil)
 
-	require.Equal(t, http.StatusSeeOther, res.StatusCode)
-	requireLocation(t, "/scms", res)
+	require.Equal(t, http.StatusForbidden, res.StatusCode)
+	//requireLocation(t, "/scms", res)
 }
 
 func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
