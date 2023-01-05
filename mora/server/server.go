@@ -78,7 +78,7 @@ type MoraServer struct {
 	frontendFileServer http.Handler
 
 	moraCoverageProvider *MoraCoverageProvider
-	htmlCoverageProvider *HTMLCoverageProvider
+	// htmlCoverageProvider *HTMLCoverageProvider
 }
 
 func parseRepoURL(str string) (string, string, string, error) {
@@ -279,10 +279,12 @@ func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
 				return
 			}
 
+			// FIXME: Do not render here. Set an error
 			sess, _ := MoraSessionFrom(r.Context())
 			repo, err := checkRepoAccess(sess, scm, owner, repoName)
 			if err == errorTokenNotFound {
-				http.Redirect(w, r, "/scms", http.StatusSeeOther)
+				// http.Redirect(w, r, "/scms", http.StatusSeeOther)
+				render.Forbidden(w, render.ErrForbidden)
 				return
 			} else if err != nil {
 				log.Err(err).Msg("injectRepo")
@@ -485,8 +487,8 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	dir := os.DirFS("data") // TODO
-	htmlCoverageProvider := NewHTMLCoverageProvider(dir)
+	// dir := os.DirFS("data") // TODO
+	// htmlCoverageProvider := NewHTMLCoverageProvider(dir)
 
 	store, err := initCoverageStore()
 	if err != nil {
@@ -496,12 +498,12 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 
 	coverage := NewCoverageService()
 	coverage.AddProvider(moraCoverageProvider)
-	coverage.AddProvider(htmlCoverageProvider)
+	// coverage.AddProvider(htmlCoverageProvider)
 	coverage.SyncProviders()
 	coverage.Sync()
 
 	s.coverage = coverage
-	s.htmlCoverageProvider = htmlCoverageProvider
+	// s.htmlCoverageProvider = htmlCoverageProvider
 	s.moraCoverageProvider = moraCoverageProvider
 
 	if err != nil {
