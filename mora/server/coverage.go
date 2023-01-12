@@ -30,7 +30,6 @@ type Coverage interface {
 
 type CoverageProvider interface {
 	Coverages() []Coverage
-	WebHandler() http.Handler
 	Sync() error
 }
 
@@ -44,7 +43,6 @@ type CoverageResponse struct {
 
 type providedCoverage struct {
 	coverage Coverage
-	provider CoverageProvider
 }
 
 type CoverageService struct {
@@ -75,7 +73,7 @@ func (s *CoverageService) Sync() {
 		for _, cov := range p.Coverages() {
 			url := cov.RepoURL()
 			repos.Add(url)
-			pc := &providedCoverage{coverage: cov, provider: p}
+			pc := &providedCoverage{coverage: cov}
 			provided[url] = append(provided[url], pc)
 		}
 	}
@@ -119,11 +117,6 @@ func providedCoverageFrom(ctx context.Context) (*providedCoverage, bool) {
 func CoverageFrom(ctx context.Context) (Coverage, bool) {
 	cov, ok := providedCoverageFrom(ctx)
 	return cov.coverage, ok
-}
-
-func providerFrom(ctx context.Context) (CoverageProvider, bool) {
-	cov, ok := providedCoverageFrom(ctx)
-	return cov.provider, ok
 }
 
 func WithCoverageEntry(ctx context.Context, entry string) context.Context {
@@ -235,6 +228,143 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 
 // API
 
+func entryImplFrom(ctx context.Context) (*coverageImpl, *entryImpl, bool) {
+	tmp0, _ := CoverageFrom(ctx)
+	cov, ok0 := tmp0.(*coverageImpl)
+
+	name, _ := CoverageEntryFrom(ctx)
+
+	var entry *entryImpl
+	ok1 := false
+	for _, e := range cov.entries {
+		if e.Name == name {
+			entry = e
+			ok1 = true
+		}
+	}
+
+	return cov, entry, ok0 && ok1
+}
+
+func handleFileList(w http.ResponseWriter, r *http.Request) {
+	log.Print("handleFileList")
+	scm, _ := SCMFrom(r.Context())
+	repo, _ := RepoFrom(r.Context())
+
+	cov, entry, ok := entryImplFrom(r.Context())
+	if !ok {
+		log.Error().Msg("entry not found")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
+
+	type FileResponse struct {
+		FileName string `json:"filename"`
+		Hits     int    `json:"hits"`
+		Lines    int    `json:"lines"`
+	}
+
+	type MetaResonse struct {
+		Revision    string    `json:"revision"`
+		RevisionURL string    `json:"revision_url"`
+		Time        time.Time `json:"time"`
+		Hits        int       `json:"hits"`
+		Lines       int       `json:"lines"`
+	}
+
+	type Response struct {
+		Files []*FileResponse `json:"files"`
+		Meta  MetaResonse     `json:"meta"`
+	}
+
+	files := []*FileResponse{}
+	for _, pr := range entry.profiles {
+		files = append(files, &FileResponse{
+			FileName: pr.FileName, Lines: pr.Lines, Hits: pr.Hits})
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].FileName < files[j].FileName
+	})
+
+	resp := Response{
+		Files: files,
+		Meta: MetaResonse{
+			Revision:    cov.Revision(),
+			RevisionURL: scm.RevisionURL(repo, cov.Revision()),
+			Time:        cov.Time(),
+			Hits:        entry.Hits,
+			Lines:       entry.Lines,
+		},
+	}
+
+	render.JSON(w, resp, http.StatusOK)
+}
+
+func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
+	repo, _ := RepoFrom(ctx)
+	repoPath := repo.Namespace + "/" + repo.Name
+
+	scm, _ := SCMFrom(ctx)
+	client := scm.Client()
+
+	sess, _ := MoraSessionFrom(ctx)
+	ctx, err := sess.WithToken(context.Background(), scm.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	content, meta, err := client.Contents.Find(ctx, repoPath, path, revision)
+	if err != nil {
+		log.Print(meta)
+		return nil, err
+	}
+
+	return content.Data, nil
+}
+
+func handleFile(w http.ResponseWriter, r *http.Request) {
+	log.Print("handleFile")
+
+	cov, entry, ok := entryImplFrom(r.Context())
+	if !ok {
+		log.Error().Msg("entryImplFrom returns false")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
+
+	file := chi.URLParam(r, "*")
+	log.Print("file=", file)
+
+	profile, ok := entry.profiles[file]
+	if !ok {
+		log.Error().Msg("handleEntry")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
+
+	code, err := getSourceCode(r.Context(), cov.Revision(), file)
+	if err != nil {
+		log.Err(err).Msg("handleFile")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
+
+	type ProfileResponse struct {
+		FileName string  `json:"filename"`
+		Code     string  `json:"code"`
+		Blocks   [][]int `json:"blocks"`
+	}
+
+	resp := ProfileResponse{
+		FileName: profile.FileName,
+		Code:     string(code),
+		Blocks:   profile.Blocks,
+	}
+
+	render.JSON(w, resp, http.StatusOK)
+}
+
 func (s *CoverageService) APIHandler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", s.handleCoverageList)
@@ -251,10 +381,6 @@ func (s *CoverageService) APIHandler() http.Handler {
 }
 
 // Web
-func (s *CoverageService) handleCoverageEntryPage(w http.ResponseWriter, r *http.Request) {
-	provider, _ := providerFrom(r.Context())
-	provider.WebHandler().ServeHTTP(w, r)
-}
 
 func (s *CoverageService) WebHandler() http.Handler {
 	r := chi.NewRouter()
@@ -264,7 +390,6 @@ func (s *CoverageService) WebHandler() http.Handler {
 		r.Use(s.injectCoverage)
 		r.Route("/{entry}", func(r chi.Router) {
 			r.Use(injectCoverageEntry)
-			r.Mount("/", http.HandlerFunc(s.handleCoverageEntryPage))
 		})
 	})
 	return r
