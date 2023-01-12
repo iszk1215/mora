@@ -41,14 +41,10 @@ type CoverageResponse struct {
 	Entries     []CoverageEntry `json:"entries"`
 }
 
-type providedCoverage struct {
-	coverage Coverage
-}
-
 type CoverageService struct {
 	providers []CoverageProvider
 	repos     []string
-	provided  map[string][]*providedCoverage
+	coverages map[string][]Coverage
 	sync.Mutex
 }
 
@@ -67,27 +63,26 @@ func (m *CoverageService) SyncProviders() {
 }
 
 func (s *CoverageService) Sync() {
-	provided := map[string][]*providedCoverage{}
+	coverages := map[string][]Coverage{}
 	repos := mapset.NewSet[string]()
 	for _, p := range s.providers {
 		for _, cov := range p.Coverages() {
 			url := cov.RepoURL()
 			repos.Add(url)
-			pc := &providedCoverage{coverage: cov}
-			provided[url] = append(provided[url], pc)
+			coverages[url] = append(coverages[url], cov)
 		}
 	}
 
-	for _, list := range provided {
+	for _, list := range coverages {
 		sort.Slice(list, func(i, j int) bool {
-			return list[i].coverage.Time().Before(list[j].coverage.Time())
+			return list[i].Time().Before(list[j].Time())
 		})
 	}
 
 	s.Lock()
 	defer s.Unlock()
 	s.repos = repos.ToSlice()
-	s.provided = provided
+	s.coverages = coverages
 }
 
 func (s *CoverageService) Repos() []string {
@@ -101,22 +96,13 @@ const (
 	coverageEntryKey coverageContextKey = iota
 )
 
-func withCoverage(ctx context.Context, cov *providedCoverage) context.Context {
+func withCoverage(ctx context.Context, cov Coverage) context.Context {
 	return context.WithValue(ctx, coverageKey, cov)
 }
 
-func providedCoverageFrom(ctx context.Context) (*providedCoverage, bool) {
-	cov, ok := ctx.Value(coverageKey).(*providedCoverage)
-	if !ok {
-		log.Error().Msg("not ProvidedCoverage")
-		return nil, false
-	}
-	return cov, ok
-}
-
 func CoverageFrom(ctx context.Context) (Coverage, bool) {
-	cov, ok := providedCoverageFrom(ctx)
-	return cov.coverage, ok
+	cov, ok := ctx.Value(coverageKey).(Coverage)
+	return cov, ok
 }
 
 func WithCoverageEntry(ctx context.Context, entry string) context.Context {
@@ -172,7 +158,7 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		coverages := m.provided[repo.Link]
+		coverages := m.coverages[repo.Link]
 		if index < 0 || index >= len(coverages) {
 			log.Error().Msgf("coverage index is out of range: index=%d", index)
 			render.NotFound(w, render.ErrNotFound)
@@ -210,19 +196,14 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
-	_, ok := s.provided[repo.Link]
+	_, ok := s.coverages[repo.Link]
 	if !ok {
 		log.Error().Msg("handleCoverageList: no coverage for repo")
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
 
-	coverages := []Coverage{}
-	for _, pcov := range s.provided[repo.Link] {
-		coverages = append(coverages, pcov.coverage)
-	}
-
-	resp := makeCoverageResponseList(scm, repo, coverages)
+	resp := makeCoverageResponseList(scm, repo, s.coverages[repo.Link])
 	render.JSON(w, resp, http.StatusOK)
 }
 
