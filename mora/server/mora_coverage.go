@@ -15,10 +15,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type entryImpl struct {
-	Name     string
-	Hits     int
-	Lines    int
+type CoverageEntry struct {
+	Name     string `json:"name"`
+	Hits     int    `json:"lines"`
+	Lines    int    `json:"hits"`
 	profiles map[string]*profile.Profile
 }
 
@@ -26,7 +26,7 @@ type coverageImpl struct {
 	url      string
 	revision string
 	time     time.Time
-	entries  []*entryImpl
+	entries  []*CoverageEntry
 }
 
 func (c *coverageImpl) RepoURL() string {
@@ -76,8 +76,8 @@ func (p *MoraCoverageProvider) findCoverage(cov Coverage) int {
 }
 
 // Profile is not deep-copied because it is read-only
-func mergeEntry(a, b *entryImpl) *entryImpl {
-	c := &entryImpl{Name: a.Name, profiles: map[string]*profile.Profile{}}
+func mergeEntry(a, b *CoverageEntry) *CoverageEntry {
+	c := &CoverageEntry{Name: a.Name, profiles: map[string]*profile.Profile{}}
 
 	for file, p := range a.profiles {
 		c.profiles[file] = p
@@ -102,7 +102,7 @@ func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
 		return nil, fmt.Errorf("can not merge two coverages with different urls and/or revisions")
 	}
 
-	entries := map[string]*entryImpl{}
+	entries := map[string]*CoverageEntry{}
 
 	for _, e := range a.entries {
 		entries[e.Name] = e
@@ -203,7 +203,7 @@ type CoverageUploadRequest struct {
 	Entries  []*CoverageEntryUploadRequest `json:"entries"`
 }
 
-func parseEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
+func parseEntry(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
 	if req.EntryName == "" {
 		return nil, errors.New("entry name is empty")
 	}
@@ -213,7 +213,7 @@ func parseEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
 		profiles[p.FileName] = p
 	}
 
-	entry := &entryImpl{}
+	entry := &CoverageEntry{}
 	entry.Name = req.EntryName
 	entry.profiles = profiles
 	entry.Hits = req.Hits
@@ -222,8 +222,8 @@ func parseEntry(req *CoverageEntryUploadRequest) (*entryImpl, error) {
 	return entry, nil
 }
 
-func parseEntries(req []*CoverageEntryUploadRequest) ([]*entryImpl, error) {
-	entries := []*entryImpl{}
+func parseEntries(req []*CoverageEntryUploadRequest) ([]*CoverageEntry, error) {
+	entries := []*CoverageEntry{}
 	for _, e := range req {
 		entry, err := parseEntry(e)
 		if err != nil {

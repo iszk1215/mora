@@ -121,8 +121,8 @@ func (p *MockCoverageProvider) Repos() []string {
 }
 
 func createMockCoverage() MockCoverage {
-	cc := CoverageEntry{"cc", 100, 20}
-	py := CoverageEntry{"python", 300, 280}
+	cc := CoverageEntry{"cc", 100, 20, nil}
+	py := CoverageEntry{"python", 300, 280, nil}
 	cov := MockCoverage{time: time.Now(), revision: "abc123"}
 	cov.entries = []CoverageEntry{cc, py}
 

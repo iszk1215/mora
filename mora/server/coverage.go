@@ -15,12 +15,6 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
-type CoverageEntry struct {
-	Name  string `json:"name"`
-	Lines int    `json:"lines"`
-	Hits  int    `json:"hits"`
-}
-
 type Coverage interface {
 	RepoURL() string
 	Revision() string
@@ -209,13 +203,13 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 
 // API
 
-func entryImplFrom(ctx context.Context) (*coverageImpl, *entryImpl, bool) {
+func entryImplFrom(ctx context.Context) (*coverageImpl, *CoverageEntry, bool) {
 	tmp0, _ := CoverageFrom(ctx)
 	cov, ok0 := tmp0.(*coverageImpl)
 
 	name, _ := CoverageEntryFrom(ctx)
 
-	var entry *entryImpl
+	var entry *CoverageEntry
 	ok1 := false
 	for _, e := range cov.entries {
 		if e.Name == name {
