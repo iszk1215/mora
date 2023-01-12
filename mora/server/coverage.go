@@ -360,18 +360,3 @@ func (s *CoverageService) APIHandler() http.Handler {
 	})
 	return r
 }
-
-// Web
-
-func (s *CoverageService) WebHandler() http.Handler {
-	r := chi.NewRouter()
-	r.Get("/", templateRenderingHandler("coverage/coverage.html"))
-
-	r.Route("/{index}", func(r chi.Router) {
-		r.Use(s.injectCoverage)
-		r.Route("/{entry}", func(r chi.Router) {
-			r.Use(injectCoverageEntry)
-		})
-	})
-	return r
-}

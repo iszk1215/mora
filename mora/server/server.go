@@ -353,7 +353,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 		r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
 			r.Use(injectRepo(s.scms))
-			r.Mount("/coverages", s.coverage.WebHandler())
+			// r.Mount("/coverages", s.coverage.WebHandler())
 		})
 
 		r.Get("/public/*", func(w http.ResponseWriter, r *http.Request) {
