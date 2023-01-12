@@ -171,19 +171,3 @@ func TestCoverageList(t *testing.T) {
 
 	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
 }
-
-func TestCoverageListWithHTMLCoverageProvider(t *testing.T) {
-	dir, repo, expected := createMockDataset(t)
-	p := NewHTMLCoverageProvider(dir)
-	err := p.Sync()
-	require.NoError(t, err)
-
-	s := NewCoverageService()
-	s.AddProvider(p)
-	s.Sync()
-
-	handler := http.HandlerFunc(s.handleCoverageList)
-	res := getResultFromCovrageListHandler(handler, repo)
-
-	testCoverageListResponse(t, []Coverage{expected}, res)
-}

@@ -487,9 +487,6 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	// dir := os.DirFS("data") // TODO
-	// htmlCoverageProvider := NewHTMLCoverageProvider(dir)
-
 	store, err := initCoverageStore()
 	if err != nil {
 		return nil, err
@@ -498,12 +495,10 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 
 	coverage := NewCoverageService()
 	coverage.AddProvider(moraCoverageProvider)
-	// coverage.AddProvider(htmlCoverageProvider)
 	coverage.SyncProviders()
 	coverage.Sync()
 
 	s.coverage = coverage
-	// s.htmlCoverageProvider = htmlCoverageProvider
 	s.moraCoverageProvider = moraCoverageProvider
 
 	if err != nil {
