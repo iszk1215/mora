@@ -458,16 +458,6 @@ func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// Entry Handler
-
-// API
-func (p *MoraCoverageProvider) Handler() http.Handler {
-	r := chi.NewRouter()
-	r.Get("/files", handleFileList)
-	r.Get("/files/*", handleFile)
-	return r
-}
-
 // Web
 func (p *MoraCoverageProvider) WebHandler() http.Handler {
 	r := chi.NewRouter()

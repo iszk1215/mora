@@ -30,7 +30,6 @@ type Coverage interface {
 
 type CoverageProvider interface {
 	Coverages() []Coverage
-	Handler() http.Handler
 	WebHandler() http.Handler
 	Sync() error
 }
@@ -235,10 +234,6 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 }
 
 // API
-func (s *CoverageService) handleCoverageEntry(w http.ResponseWriter, r *http.Request) {
-	provider, _ := providerFrom(r.Context())
-	provider.Handler().ServeHTTP(w, r)
-}
 
 func (s *CoverageService) APIHandler() http.Handler {
 	r := chi.NewRouter()
@@ -248,7 +243,8 @@ func (s *CoverageService) APIHandler() http.Handler {
 		r.Use(s.injectCoverage)
 		r.Route("/{entry}", func(r chi.Router) {
 			r.Use(injectCoverageEntry)
-			r.Mount("/", http.HandlerFunc(s.handleCoverageEntry))
+			r.Get("/files", handleFileList)
+			r.Get("/files/*", handleFile)
 		})
 	})
 	return r
