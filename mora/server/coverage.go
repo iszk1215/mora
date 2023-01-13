@@ -18,8 +18,8 @@ import (
 
 type CoverageEntry struct {
 	Name     string `json:"name"`
-	Hits     int    `json:"lines"`
-	Lines    int    `json:"hits"`
+	Hits     int    `json:"hits"`
+	Lines    int    `json:"lines"`
 	profiles map[string]*profile.Profile
 }
 
@@ -52,7 +52,7 @@ func (c *Coverage) Entries() []CoverageEntry {
 }
 
 type CoverageProvider interface {
-	Coverages() []Coverage
+	Coverages() []*Coverage
 	Sync() error
 }
 
@@ -92,7 +92,7 @@ func (s *CoverageService) Sync() {
 		for _, cov := range p.Coverages() {
 			url := cov.RepoURL()
 			repos.Add(url)
-			coverages[url] = append(coverages[url], cov)
+			coverages[url] = append(coverages[url], *cov)
 		}
 	}
 

@@ -81,24 +81,24 @@ func (c MockCoverage) Entries() []CoverageEntry {
 }
 
 type MockCoverageProvider struct {
-	coverages map[string][]Coverage
+	coverages map[string][]*Coverage
 }
 
 func NewMockCoverageProvider() *MockCoverageProvider {
 	p := &MockCoverageProvider{}
-	p.coverages = map[string][]Coverage{}
+	p.coverages = map[string][]*Coverage{}
 	return p
 }
 
-func (p *MockCoverageProvider) Coverages() []Coverage {
-	list := []Coverage{}
+func (p *MockCoverageProvider) Coverages() []*Coverage {
+	list := []*Coverage{}
 	for _, c := range p.coverages {
 		list = append(list, c...)
 	}
 	return list
 }
 
-func (p *MockCoverageProvider) AddCoverage(repo string, cov Coverage) {
+func (p *MockCoverageProvider) AddCoverage(repo string, cov *Coverage) {
 	p.coverages[repo] = append(p.coverages[repo], cov)
 }
 
@@ -159,8 +159,8 @@ func TestCoverageList(t *testing.T) {
 	cov1 := Coverage{time: time1, revision: "abc123"}
 	cov0.url = repo.Link
 	cov1.url = repo.Link
-	p.AddCoverage(repo.Link, cov0)
-	p.AddCoverage(repo.Link, cov1)
+	p.AddCoverage(repo.Link, &cov0)
+	p.AddCoverage(repo.Link, &cov1)
 
 	s := NewCoverageService()
 	s.AddProvider(p)

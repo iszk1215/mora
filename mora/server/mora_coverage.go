@@ -16,7 +16,7 @@ import (
 )
 
 type MoraCoverageProvider struct {
-	coverages []Coverage
+	coverages []*Coverage
 	store     *CoverageStore
 	sync.Mutex
 }
@@ -25,7 +25,7 @@ func NewMoraCoverageProvider(store *CoverageStore) *MoraCoverageProvider {
 	p := &MoraCoverageProvider{}
 	p.store = store
 
-	p.coverages = []Coverage{}
+	p.coverages = []*Coverage{}
 
 	return p
 }
@@ -98,16 +98,16 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 
 	idx := p.findCoverage(*cov)
 	if idx < 0 {
-		p.coverages = append(p.coverages, *cov)
+		p.coverages = append(p.coverages, cov)
 		return nil
 	} else {
-		merged, _ := mergeCoverage(&p.coverages[idx], cov)
-		p.coverages[idx] = *merged
+		merged, _ := mergeCoverage(p.coverages[idx], cov)
+		p.coverages[idx] = merged
 		return merged
 	}
 }
 
-func (p *MoraCoverageProvider) Coverages() []Coverage {
+func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
@@ -148,7 +148,7 @@ func (p *MoraCoverageProvider) loadFromStore() error {
 			return err
 		}
 
-		p.coverages = append(p.coverages, *cov)
+		p.coverages = append(p.coverages, cov)
 	}
 
 	return nil
