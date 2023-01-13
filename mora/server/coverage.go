@@ -10,19 +10,46 @@ import (
 
 	"github.com/drone/drone/handler/api/render"
 	"github.com/go-chi/chi/v5"
+	"github.com/iszk1215/mora/mora/profile"
 	"github.com/rs/zerolog/log"
 
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
-/*
-type Coverage interface {
-	RepoURL() string
-	Revision() string
-	Time() time.Time
-	Entries() []CoverageEntry
+type CoverageEntry struct {
+	Name     string `json:"name"`
+	Hits     int    `json:"lines"`
+	Lines    int    `json:"hits"`
+	profiles map[string]*profile.Profile
 }
-*/
+
+type Coverage struct {
+	url      string
+	revision string
+	time     time.Time
+	entries  []*CoverageEntry
+}
+
+func (c *Coverage) RepoURL() string {
+	return c.url
+}
+
+func (c *Coverage) Time() time.Time {
+	return c.time
+}
+
+func (c *Coverage) Revision() string {
+	return c.revision
+}
+
+func (c *Coverage) Entries() []CoverageEntry {
+	ret := []CoverageEntry{}
+	for _, e := range c.entries {
+		ret = append(ret,
+			CoverageEntry{Name: e.Name, Hits: e.Hits, Lines: e.Lines})
+	}
+	return ret
+}
 
 type CoverageProvider interface {
 	Coverages() []Coverage
@@ -340,7 +367,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func (s *CoverageService) APIHandler() http.Handler {
+func (s *CoverageService) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", s.handleCoverageList)
 

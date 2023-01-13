@@ -15,41 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type CoverageEntry struct {
-	Name     string `json:"name"`
-	Hits     int    `json:"lines"`
-	Lines    int    `json:"hits"`
-	profiles map[string]*profile.Profile
-}
-
-type Coverage struct {
-	url      string
-	revision string
-	time     time.Time
-	entries  []*CoverageEntry
-}
-
-func (c *Coverage) RepoURL() string {
-	return c.url
-}
-
-func (c *Coverage) Time() time.Time {
-	return c.time
-}
-
-func (c *Coverage) Revision() string {
-	return c.revision
-}
-
-func (c *Coverage) Entries() []CoverageEntry {
-	ret := []CoverageEntry{}
-	for _, e := range c.entries {
-		ret = append(ret,
-			CoverageEntry{Name: e.Name, Hits: e.Hits, Lines: e.Lines})
-	}
-	return ret
-}
-
 type MoraCoverageProvider struct {
 	coverages []Coverage
 	store     *CoverageStore
