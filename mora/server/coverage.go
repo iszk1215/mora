@@ -44,14 +44,6 @@ func (c *Coverage) Revision() string {
 
 func (c *Coverage) Entries() []*CoverageEntry {
 	return c.entries
-	/*
-		ret := []CoverageEntry{}
-		for _, e := range c.entries {
-			ret = append(ret,
-				CoverageEntry{Name: e.Name, Hits: e.Hits, Lines: e.Lines})
-		}
-		return ret
-	*/
 }
 
 type CoverageProvider interface {
