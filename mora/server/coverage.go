@@ -42,13 +42,16 @@ func (c *Coverage) Revision() string {
 	return c.revision
 }
 
-func (c *Coverage) Entries() []CoverageEntry {
-	ret := []CoverageEntry{}
-	for _, e := range c.entries {
-		ret = append(ret,
-			CoverageEntry{Name: e.Name, Hits: e.Hits, Lines: e.Lines})
-	}
-	return ret
+func (c *Coverage) Entries() []*CoverageEntry {
+	return c.entries
+	/*
+		ret := []CoverageEntry{}
+		for _, e := range c.entries {
+			ret = append(ret,
+				CoverageEntry{Name: e.Name, Hits: e.Hits, Lines: e.Lines})
+		}
+		return ret
+	*/
 }
 
 type CoverageProvider interface {
@@ -57,17 +60,17 @@ type CoverageProvider interface {
 }
 
 type CoverageResponse struct {
-	Index       int             `json:"index"`
-	Time        time.Time       `json:"time"`
-	Revision    string          `json:"revision"`
-	RevisionURL string          `json:"revision_url"`
-	Entries     []CoverageEntry `json:"entries"`
+	Index       int              `json:"index"`
+	Time        time.Time        `json:"time"`
+	Revision    string           `json:"revision"`
+	RevisionURL string           `json:"revision_url"`
+	Entries     []*CoverageEntry `json:"entries"`
 }
 
 type CoverageService struct {
 	providers []CoverageProvider
 	repos     []string
-	coverages map[string][]Coverage
+	coverages map[string][]*Coverage
 	sync.Mutex
 }
 
@@ -86,13 +89,13 @@ func (m *CoverageService) SyncProviders() {
 }
 
 func (s *CoverageService) Sync() {
-	coverages := map[string][]Coverage{}
+	coverages := map[string][]*Coverage{}
 	repos := mapset.NewSet[string]()
 	for _, p := range s.providers {
 		for _, cov := range p.Coverages() {
 			url := cov.RepoURL()
 			repos.Add(url)
-			coverages[url] = append(coverages[url], *cov)
+			coverages[url] = append(coverages[url], cov)
 		}
 	}
 
@@ -119,12 +122,12 @@ const (
 	coverageEntryKey coverageContextKey = iota
 )
 
-func withCoverage(ctx context.Context, cov Coverage) context.Context {
+func withCoverage(ctx context.Context, cov *Coverage) context.Context {
 	return context.WithValue(ctx, coverageKey, cov)
 }
 
-func CoverageFrom(ctx context.Context) (Coverage, bool) {
-	cov, ok := ctx.Value(coverageKey).(Coverage)
+func CoverageFrom(ctx context.Context) (*Coverage, bool) {
+	cov, ok := ctx.Value(coverageKey).(*Coverage)
 	return cov, ok
 }
 
@@ -193,7 +196,7 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 	})
 }
 
-func makeCoverageResponse(revisionURL string, cov Coverage, index int) CoverageResponse {
+func makeCoverageResponse(revisionURL string, cov *Coverage, index int) CoverageResponse {
 	ret := CoverageResponse{
 		Index:       index,
 		Time:        cov.Time(),
@@ -205,7 +208,7 @@ func makeCoverageResponse(revisionURL string, cov Coverage, index int) CoverageR
 	return ret
 }
 
-func makeCoverageResponseList(scm SCM, repo *Repo, coverages []Coverage) []CoverageResponse {
+func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
 	var ret []CoverageResponse
 	for i, cov := range coverages {
 		revURL := scm.RevisionURL(repo, cov.Revision())
@@ -232,7 +235,7 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 
 // API
 
-func entryImplFrom(ctx context.Context) (Coverage, *CoverageEntry, bool) {
+func entryImplFrom(ctx context.Context) (*Coverage, *CoverageEntry, bool) {
 	cov, ok0 := CoverageFrom(ctx)
 	name, _ := CoverageEntryFrom(ctx)
 

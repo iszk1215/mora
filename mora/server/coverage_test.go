@@ -134,7 +134,7 @@ func TestSerializeCoverage(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
 	cov := createMockCoverage()
 
-	data := makeCoverageResponseList(scm, repo, []Coverage{cov})
+	data := makeCoverageResponseList(scm, repo, []*Coverage{&cov})
 
 	require.Equal(t, 1, len(data))
 	assertEqualCoverage(t, cov, data[0])
