@@ -120,11 +120,11 @@ func (p *MockCoverageProvider) Repos() []string {
 	return repos
 }
 
-func createMockCoverage() MockCoverage {
+func createMockCoverage() Coverage {
 	cc := CoverageEntry{"cc", 100, 20, nil}
 	py := CoverageEntry{"python", 300, 280, nil}
-	cov := MockCoverage{time: time.Now(), revision: "abc123"}
-	cov.entries = []CoverageEntry{cc, py}
+	cov := Coverage{time: time.Now(), revision: "abc123"}
+	cov.entries = []*CoverageEntry{&cc, &py}
 
 	return cov
 }
@@ -155,8 +155,8 @@ func TestCoverageList(t *testing.T) {
 
 	time0 := time.Now()
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := MockCoverage{time: time0, revision: "abc123"}
-	cov1 := MockCoverage{time: time1, revision: "abc123"}
+	cov0 := Coverage{time: time0, revision: "abc123"}
+	cov1 := Coverage{time: time1, revision: "abc123"}
 	cov0.url = repo.Link
 	cov1.url = repo.Link
 	p.AddCoverage(repo.Link, cov0)

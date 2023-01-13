@@ -22,26 +22,26 @@ type CoverageEntry struct {
 	profiles map[string]*profile.Profile
 }
 
-type coverageImpl struct {
+type Coverage struct {
 	url      string
 	revision string
 	time     time.Time
 	entries  []*CoverageEntry
 }
 
-func (c *coverageImpl) RepoURL() string {
+func (c *Coverage) RepoURL() string {
 	return c.url
 }
 
-func (c *coverageImpl) Time() time.Time {
+func (c *Coverage) Time() time.Time {
 	return c.time
 }
 
-func (c *coverageImpl) Revision() string {
+func (c *Coverage) Revision() string {
 	return c.revision
 }
 
-func (c *coverageImpl) Entries() []CoverageEntry {
+func (c *Coverage) Entries() []CoverageEntry {
 	ret := []CoverageEntry{}
 	for _, e := range c.entries {
 		ret = append(ret,
@@ -97,7 +97,7 @@ func mergeEntry(a, b *CoverageEntry) *CoverageEntry {
 	return c
 }
 
-func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
+func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 	if a.url != b.url || a.revision != b.revision {
 		return nil, fmt.Errorf("can not merge two coverages with different urls and/or revisions")
 	}
@@ -117,7 +117,7 @@ func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
 		}
 	}
 
-	merged := &coverageImpl{
+	merged := &Coverage{
 		url:      a.url,
 		revision: a.revision,
 		time:     a.time,
@@ -127,17 +127,17 @@ func mergeCoverage(a, b *coverageImpl) (*coverageImpl, error) {
 	return merged, nil
 }
 
-func (p *MoraCoverageProvider) addOrMergeCoverage(cov *coverageImpl) *coverageImpl {
+func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 	p.Lock()
 	defer p.Unlock()
 
-	idx := p.findCoverage(cov)
+	idx := p.findCoverage(*cov)
 	if idx < 0 {
-		p.coverages = append(p.coverages, cov)
+		p.coverages = append(p.coverages, *cov)
 		return nil
 	} else {
-		merged, _ := mergeCoverage(p.coverages[idx].(*coverageImpl), cov)
-		p.coverages[idx] = merged
+		merged, _ := mergeCoverage(&p.coverages[idx], cov)
+		p.coverages[idx] = *merged
 		return merged
 	}
 }
@@ -150,7 +150,7 @@ func (p *MoraCoverageProvider) Sync() error {
 	return p.loadFromStore()
 }
 
-func parseScanedCoverage(record ScanedCoverage) (*coverageImpl, error) {
+func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 	var req []*CoverageEntryUploadRequest
 	err := json.Unmarshal([]byte(record.Contents), &req)
 	if err != nil {
@@ -162,7 +162,7 @@ func parseScanedCoverage(record ScanedCoverage) (*coverageImpl, error) {
 		return nil, err
 	}
 
-	cov := &coverageImpl{}
+	cov := &Coverage{}
 	cov.url = record.RepoURL
 	cov.revision = record.Revision
 	cov.entries = entries
@@ -183,7 +183,7 @@ func (p *MoraCoverageProvider) loadFromStore() error {
 			return err
 		}
 
-		p.coverages = append(p.coverages, cov)
+		p.coverages = append(p.coverages, *cov)
 	}
 
 	return nil
@@ -235,7 +235,7 @@ func parseEntries(req []*CoverageEntryUploadRequest) ([]*CoverageEntry, error) {
 	return entries, nil
 }
 
-func parseCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
+func parseCoverage(req *CoverageUploadRequest) (*Coverage, error) {
 	if req.RepoURL == "" {
 		return nil, errors.New("repo url is empty")
 	}
@@ -245,7 +245,7 @@ func parseCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
 		return nil, err
 	}
 
-	cov := &coverageImpl{}
+	cov := &Coverage{}
 	cov.url = req.RepoURL
 	cov.revision = req.Revision
 	cov.entries = entries
@@ -254,7 +254,7 @@ func parseCoverage(req *CoverageUploadRequest) (*coverageImpl, error) {
 	return cov, nil
 }
 
-func parseFromReader(reader io.Reader) (*CoverageUploadRequest, *coverageImpl, error) {
+func parseFromReader(reader io.Reader) (*CoverageUploadRequest, *Coverage, error) {
 	b, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, nil, err
@@ -309,7 +309,7 @@ func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 			return
 		}
 
-		err = p.store.Put(cov, string(contents))
+		err = p.store.Put(*cov, string(contents))
 		if err != nil {
 			log.Err(err).Msg("HandleUpload")
 			render.NotFound(w, render.ErrNotFound)

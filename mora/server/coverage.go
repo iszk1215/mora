@@ -15,12 +15,14 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
+/*
 type Coverage interface {
 	RepoURL() string
 	Revision() string
 	Time() time.Time
 	Entries() []CoverageEntry
 }
+*/
 
 type CoverageProvider interface {
 	Coverages() []Coverage
@@ -203,10 +205,8 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 
 // API
 
-func entryImplFrom(ctx context.Context) (*coverageImpl, *CoverageEntry, bool) {
-	tmp0, _ := CoverageFrom(ctx)
-	cov, ok0 := tmp0.(*coverageImpl)
-
+func entryImplFrom(ctx context.Context) (Coverage, *CoverageEntry, bool) {
+	cov, ok0 := CoverageFrom(ctx)
 	name, _ := CoverageEntryFrom(ctx)
 
 	var entry *CoverageEntry
