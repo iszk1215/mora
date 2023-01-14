@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -375,7 +377,23 @@ func (s *CoverageService) Handler() http.Handler {
 			r.Get("/files/*", handleFile)
 		})
 	})
+
 	return r
+}
+
+func parseFromReader(reader io.Reader) (*CoverageUploadRequest, error) {
+	b, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	var req *CoverageUploadRequest
+	err = json.Unmarshal(b, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 func (s *CoverageService) HandleUpload(w http.ResponseWriter, r *http.Request) {

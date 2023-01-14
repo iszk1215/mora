@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -216,21 +215,6 @@ func parseCoverage(req *CoverageUploadRequest) (*Coverage, error) {
 	return cov, nil
 }
 
-func parseFromReader(reader io.Reader) (*CoverageUploadRequest, error) {
-	b, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	var req *CoverageUploadRequest
-	err = json.Unmarshal(b, &req)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 func (p *MoraCoverageProvider) HandleUploadRequest(req *CoverageUploadRequest) error {
 	cov, err := parseCoverage(req)
 	if err != nil {
@@ -268,21 +252,3 @@ func (p *MoraCoverageProvider) HandleUploadRequest(req *CoverageUploadRequest) e
 
 	return nil
 }
-
-/*
-func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	log.Print("HandleUpload")
-
-	req, err := parseFromReader(r.Body)
-
-	if err == nil {
-		err = p.HandleUploadRequest(req)
-	}
-
-	if err != nil {
-		log.Err(err).Msg("HandleUpload")
-		render.NotFound(w, render.ErrNotFound)
-		return
-	}
-}
-*/
