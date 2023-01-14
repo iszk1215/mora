@@ -48,6 +48,7 @@ func (c *Coverage) Entries() []*CoverageEntry {
 
 type CoverageProvider interface {
 	Coverages() []*Coverage
+	HandleUploadRequest(*CoverageUploadRequest) error
 	Sync() error
 }
 
@@ -375,4 +376,18 @@ func (s *CoverageService) Handler() http.Handler {
 		})
 	})
 	return r
+}
+
+func (s *CoverageService) HandlerUpload(w http.ResponseWriter, r *http.Request) {
+	req, err := parseFromReader(r.Body)
+
+	if err == nil {
+		err = s.providers[0].HandleUploadRequest(req)
+	}
+
+	if err != nil {
+		log.Err(err).Msg("HandleUpload")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
 }
