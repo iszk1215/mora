@@ -219,34 +219,25 @@ func parseCoverage(req *CoverageUploadRequest) (*Coverage, error) {
 	return cov, nil
 }
 
-func parseFromReader(reader io.Reader) (*CoverageUploadRequest, *Coverage, error) {
+func parseFromReader(reader io.Reader) (*CoverageUploadRequest, error) {
 	b, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var req *CoverageUploadRequest
 	err = json.Unmarshal(b, &req)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	cov, err := parseCoverage(req)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return req, cov, nil
+	return req, nil
 }
 
-func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	log.Print("HandleUpload")
-
-	req, cov, err := parseFromReader(r.Body)
+func (p *MoraCoverageProvider) HandleUploadRequest(req *CoverageUploadRequest) error {
+	cov, err := parseCoverage(req)
 	if err != nil {
-		log.Err(err).Msg("HandleUpload")
-		render.NotFound(w, render.ErrNotFound)
-		return
+		return err
 	}
 
 	merged := p.addOrMergeCoverage(cov)
@@ -269,16 +260,30 @@ func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 		}
 		contents, err := json.Marshal(requests)
 		if err != nil {
-			log.Err(err).Msg("HandleUpload")
-			render.NotFound(w, render.ErrNotFound)
-			return
+			return err
 		}
 
 		err = p.store.Put(*cov, string(contents))
 		if err != nil {
-			log.Err(err).Msg("HandleUpload")
-			render.NotFound(w, render.ErrNotFound)
-			return
+			return err
 		}
+	}
+
+	return nil
+}
+
+func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
+	log.Print("HandleUpload")
+
+	req, err := parseFromReader(r.Body)
+
+	if err == nil {
+		err = p.HandleUploadRequest(req)
+	}
+
+	if err != nil {
+		log.Err(err).Msg("HandleUpload")
+		render.NotFound(w, render.ErrNotFound)
+		return
 	}
 }
