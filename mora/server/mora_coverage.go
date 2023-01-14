@@ -5,14 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"sync"
 	"time"
 
-	"github.com/drone/drone/handler/api/render"
 	"github.com/elliotchance/pie/v2"
 	"github.com/iszk1215/mora/mora/profile"
-	"github.com/rs/zerolog/log"
 )
 
 type MoraCoverageProvider struct {
@@ -272,6 +269,7 @@ func (p *MoraCoverageProvider) HandleUploadRequest(req *CoverageUploadRequest) e
 	return nil
 }
 
+/*
 func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleUpload")
 
@@ -287,3 +285,4 @@ func (p *MoraCoverageProvider) HandleUpload(w http.ResponseWriter, r *http.Reque
 		return
 	}
 }
+*/

@@ -90,6 +90,10 @@ func NewMockCoverageProvider() *MockCoverageProvider {
 	return p
 }
 
+func (p *MockCoverageProvider) HandleUploadRequest(req *CoverageUploadRequest) error {
+	return nil
+}
+
 func (p *MockCoverageProvider) Coverages() []*Coverage {
 	list := []*Coverage{}
 	for _, c := range p.coverages {

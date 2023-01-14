@@ -1,10 +1,6 @@
 package server
 
 import (
-	"bytes"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -43,19 +39,22 @@ func TestHandleUpload(t *testing.T) {
 		Entries:  entries,
 	}
 
-	body, err := json.Marshal(req)
-	require.NoError(t, err)
+	// body, err := json.Marshal(req)
+	// require.NoError(t, err)
 
 	p := NewMoraCoverageProvider(nil)
 
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
-	p.HandleUpload(w, r)
+	// w := httptest.NewRecorder()
+	// r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	err := p.HandleUploadRequest(&req)
+	require.NoError(t, err)
 
-	res := w.Result()
+	/*
+		res := w.Result()
 
-	require.Equal(t, http.StatusOK, res.StatusCode)
-	require.Equal(t, 1, len(p.coverages))
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.Equal(t, 1, len(p.coverages))
+	*/
 
 	cov := p.coverages[0]
 	assert.Equal(t, cov.Revision(), req.Revision)
@@ -66,5 +65,5 @@ func TestHandleUpload(t *testing.T) {
 	assert.Equal(t, 20, entry.Lines)
 	assert.Equal(t, 2, len(entry.profiles))
 
-	require.Equal(t, http.StatusOK, res.StatusCode)
+	// require.Equal(t, http.StatusOK, res.StatusCode)
 }

@@ -378,7 +378,7 @@ func (s *CoverageService) Handler() http.Handler {
 	return r
 }
 
-func (s *CoverageService) HandlerUpload(w http.ResponseWriter, r *http.Request) {
+func (s *CoverageService) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	req, err := parseFromReader(r.Body)
 
 	if err == nil {
