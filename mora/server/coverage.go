@@ -63,7 +63,7 @@ type CoverageResponse struct {
 }
 
 type CoverageService struct {
-	providers []CoverageProvider
+	provider  CoverageProvider
 	repos     []string
 	coverages map[string][]*Coverage
 	sync.Mutex
@@ -73,25 +73,21 @@ func NewCoverageService() *CoverageService {
 	return &CoverageService{}
 }
 
-func (m *CoverageService) AddProvider(provider CoverageProvider) {
-	m.providers = append(m.providers, provider)
+func (s *CoverageService) AddProvider(provider CoverageProvider) {
+	s.provider = provider
 }
 
-func (m *CoverageService) SyncProviders() {
-	for _, p := range m.providers {
-		p.Sync()
-	}
+func (s *CoverageService) SyncProviders() {
+	s.provider.Sync()
 }
 
 func (s *CoverageService) Sync() {
 	coverages := map[string][]*Coverage{}
 	repos := mapset.NewSet[string]()
-	for _, p := range s.providers {
-		for _, cov := range p.Coverages() {
-			url := cov.RepoURL()
-			repos.Add(url)
-			coverages[url] = append(coverages[url], cov)
-		}
+	for _, cov := range s.provider.Coverages() {
+		url := cov.RepoURL()
+		repos.Add(url)
+		coverages[url] = append(coverages[url], cov)
 	}
 
 	for _, list := range coverages {
@@ -400,7 +396,7 @@ func (s *CoverageService) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	req, err := parseFromReader(r.Body)
 
 	if err == nil {
-		err = s.providers[0].HandleUploadRequest(req)
+		err = s.provider.HandleUploadRequest(req)
 	}
 
 	if err != nil {
