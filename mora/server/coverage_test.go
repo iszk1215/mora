@@ -57,6 +57,7 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 	assertEqualCoverageList(t, expected, data)
 }
 
+/*
 type MockCoverage struct {
 	url      string
 	time     time.Time
@@ -79,6 +80,7 @@ func (c MockCoverage) Revision() string {
 func (c MockCoverage) Entries() []CoverageEntry {
 	return c.entries
 }
+*/
 
 type MockCoverageProvider struct {
 	coverages map[string][]*Coverage

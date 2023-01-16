@@ -202,7 +202,7 @@ func TestHandleUpload(t *testing.T) {
 	// require.Equal(t, http.StatusOK, res.StatusCode)
 }
 
-func TestAddOrMergeCoverage(t *testing.T) {
+func TestHandlerUploadMerge(t *testing.T) {
 	coverage0 := Coverage{
 		url:      "http://mockscm.com/mockowner/mockrepo",
 		revision: "012345",
@@ -224,17 +224,20 @@ func TestAddOrMergeCoverage(t *testing.T) {
 		},
 	}
 
-	coverage1 := Coverage{
-		url:      "http://mockscm.com/mockowner/mockrepo",
-		revision: "012345",
-		time:     time.Now(),
-		entries: []*CoverageEntry{
+	p := NewMoraCoverageProvider(nil)
+	p.coverages = append(p.coverages, &coverage0)
+
+	req := CoverageUploadRequest{
+		RepoURL:  "http://mockscm.com/mockowner/mockrepo",
+		Revision: "012345",
+		Time:     time.Now(),
+		Entries: []*CoverageEntryUploadRequest{
 			{
-				Name:  "go",
-				Hits:  13,
-				Lines: 17,
-				profiles: map[string]*profile.Profile{
-					"test2.go": {
+				EntryName: "go",
+				Hits:      0,
+				Lines:     3,
+				Profiles: []*profile.Profile{
+					{
 						FileName: "test2.go",
 						Hits:     0,
 						Lines:    3,
@@ -245,9 +248,6 @@ func TestAddOrMergeCoverage(t *testing.T) {
 		},
 	}
 
-	p := NewMoraCoverageProvider(nil)
-	merged0 := p.addOrMergeCoverage(&coverage0)
-	require.Nil(t, merged0)
-	merged1 := p.addOrMergeCoverage(&coverage1)
-	require.NotNil(t, merged1)
+	err := p.HandleUploadRequest(&req)
+	require.NoError(t, err)
 }
