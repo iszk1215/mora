@@ -202,93 +202,52 @@ func TestHandleUpload(t *testing.T) {
 	// require.Equal(t, http.StatusOK, res.StatusCode)
 }
 
-func TestHandleUploadMerge(t *testing.T) {
-
-	profile0 := &profile.Profile{
-		FileName: "test.go",
-		Hits:     13,
-		Lines:    17,
-		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
-	}
-
-	entry := CoverageEntry{
-		Name:  "go",
-		Hits:  13,
-		Lines: 17,
-		profiles: map[string]*profile.Profile{
-			"test.go": profile0,
-		},
-	}
-
-	coverage := Coverage{
+func TestAddOrMergeCoverage(t *testing.T) {
+	coverage0 := Coverage{
 		url:      "http://mockscm.com/mockowner/mockrepo",
 		revision: "012345",
 		time:     time.Now(),
-		entries:  []*CoverageEntry{&entry},
-	}
-
-	profile1 := &profile.Profile{
-		FileName: "test2.go",
-		Hits:     0,
-		Lines:    3,
-		Blocks:   [][]int{{1, 3, 0}},
-	}
-
-	p := NewMoraCoverageProvider(nil)
-	p.addOrMergeCoverage(&coverage)
-	/*
-		e := &CoverageEntryUploadRequest{
-			EntryName: "go",
-			Profiles:  []*profile.Profile{profile0},
-			Hits:      13,
-			Lines:     20,
-		}
-		entries := []*CoverageEntryUploadRequest{e}
-
-		req := CoverageUploadRequest{
-			RepoURL:  "http://mockscm.com/mockowner/mockrepo",
-			Revision: "012345",
-			Time:     time.Now(),
-			Entries:  entries,
-		}
-
-		p := NewMoraCoverageProvider(nil)
-		require.Equal(t, 0, len(p.coverages))
-
-		err := p.HandleUploadRequest(&req)
-		require.NoError(t, err)
-
-		require.Equal(t, 1, len(p.coverages))
-		cov := p.coverages[0]
-		assert.Equal(t, cov.Revision(), req.Revision)
-		require.Equal(t, 1, len(cov.entries))
-	*/
-
-	// request2
-	req2 := CoverageUploadRequest{
-		RepoURL:  "http://mockscm.com/mockowner/mockrepo",
-		Revision: "012345",
-		Time:     time.Now(),
-		Entries: []*CoverageEntryUploadRequest{
+		entries: []*CoverageEntry{
 			{
-				EntryName: "go",
-				Profiles:  []*profile.Profile{profile1},
-				Hits:      13,
-				Lines:     20,
+				Name:  "go",
+				Hits:  13,
+				Lines: 17,
+				profiles: map[string]*profile.Profile{
+					"test.go": {
+						FileName: "test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+				},
 			},
 		},
 	}
 
-	err2 := p.HandleUploadRequest(&req2)
-	require.NoError(t, err2)
-	require.Equal(t, 1, len(p.coverages))
-	cov := p.coverages[0]
-	require.Equal(t, 1, len(cov.entries))
+	coverage1 := Coverage{
+		url:      "http://mockscm.com/mockowner/mockrepo",
+		revision: "012345",
+		time:     time.Now(),
+		entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 17,
+				profiles: map[string]*profile.Profile{
+					"test2.go": {
+						FileName: "test2.go",
+						Hits:     0,
+						Lines:    3,
+						Blocks:   [][]int{{1, 3, 0}},
+					},
+				},
+			},
+		},
+	}
 
-	/*
-		entry := cov.entries[0]
-		assert.Equal(t, 13, entry.Hits)
-		assert.Equal(t, 20, entry.Lines)
-		assert.Equal(t, 2, len(entry.profiles))
-	*/
+	p := NewMoraCoverageProvider(nil)
+	merged0 := p.addOrMergeCoverage(&coverage0)
+	require.Nil(t, merged0)
+	merged1 := p.addOrMergeCoverage(&coverage1)
+	require.NotNil(t, merged1)
 }
