@@ -26,6 +26,10 @@ func NewMoraCoverageProvider(store *CoverageStore) *MoraCoverageProvider {
 	return p
 }
 
+func (p *MoraCoverageProvider) Coverages() []*Coverage {
+	return p.coverages
+}
+
 func (p *MoraCoverageProvider) findCoverage(cov Coverage) int {
 	for i, c := range p.coverages {
 		if c.RepoURL() == cov.RepoURL() && c.Revision() == cov.Revision() {
@@ -101,10 +105,6 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 		p.coverages[idx] = merged
 		return merged
 	}
-}
-
-func (p *MoraCoverageProvider) Coverages() []*Coverage {
-	return p.coverages
 }
 
 func (p *MoraCoverageProvider) Sync() error {
