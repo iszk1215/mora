@@ -19,10 +19,10 @@ import (
 )
 
 type CoverageEntry struct {
-	Name     string `json:"name"`
-	Hits     int    `json:"hits"`
-	Lines    int    `json:"lines"`
-	profiles map[string]*profile.Profile
+	Name  string `json:"name"`
+	Hits  int    `json:"hits"`
+	Lines int    `json:"lines"`
+	files map[string]*profile.Profile
 }
 
 type Coverage struct {
@@ -274,7 +274,7 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	files := []*FileResponse{}
-	for _, pr := range entry.profiles {
+	for _, pr := range entry.files {
 		files = append(files, &FileResponse{
 			FileName: pr.FileName, Lines: pr.Lines, Hits: pr.Hits})
 	}
@@ -332,7 +332,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	file := chi.URLParam(r, "*")
 	log.Print("file=", file)
 
-	profile, ok := entry.profiles[file]
+	profile, ok := entry.files[file]
 	if !ok {
 		log.Error().Msg("handleEntry")
 		render.NotFound(w, render.ErrNotFound)

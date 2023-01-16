@@ -14,7 +14,7 @@ func TestMergeEntry(t *testing.T) {
 		Name:  "go",
 		Hits:  13,
 		Lines: 17,
-		profiles: map[string]*profile.Profile{
+		files: map[string]*profile.Profile{
 			"test.go": {
 				FileName: "test.go",
 				Hits:     13,
@@ -28,7 +28,7 @@ func TestMergeEntry(t *testing.T) {
 		Name:  "go",
 		Hits:  2,
 		Lines: 4,
-		profiles: map[string]*profile.Profile{
+		files: map[string]*profile.Profile{
 			"test2.go": {
 				FileName: "test2.go",
 				Hits:     2,
@@ -43,9 +43,9 @@ func TestMergeEntry(t *testing.T) {
 	assert.Equal(t, "go", merged.Name)
 	assert.Equal(t, 15, merged.Hits)
 	assert.Equal(t, 21, merged.Lines)
-	assert.Equal(t, 2, len(merged.profiles))
-	assert.Contains(t, merged.profiles, "test.go")
-	assert.Contains(t, merged.profiles, "test2.go")
+	assert.Equal(t, 2, len(merged.files))
+	assert.Contains(t, merged.files, "test.go")
+	assert.Contains(t, merged.files, "test2.go")
 }
 
 func TestMergeCoverage(t *testing.T) {
@@ -61,7 +61,7 @@ func TestMergeCoverage(t *testing.T) {
 				Name:  "go",
 				Hits:  13,
 				Lines: 17,
-				profiles: map[string]*profile.Profile{
+				files: map[string]*profile.Profile{
 					"test.go": {
 						FileName: "test.go",
 						Hits:     13,
@@ -82,7 +82,7 @@ func TestMergeCoverage(t *testing.T) {
 				Name:  "cc",
 				Hits:  13,
 				Lines: 17,
-				profiles: map[string]*profile.Profile{
+				files: map[string]*profile.Profile{
 					"test.cc": {
 						FileName: "test.cc",
 						Hits:     13,
@@ -197,7 +197,7 @@ func TestHandleUpload(t *testing.T) {
 	entry := cov.entries[0]
 	assert.Equal(t, 13, entry.Hits)
 	assert.Equal(t, 20, entry.Lines)
-	assert.Equal(t, 2, len(entry.profiles))
+	assert.Equal(t, 2, len(entry.files))
 
 	// require.Equal(t, http.StatusOK, res.StatusCode)
 }
@@ -212,7 +212,7 @@ func TestHandlerUploadMerge(t *testing.T) {
 				Name:  "go",
 				Hits:  13,
 				Lines: 17,
-				profiles: map[string]*profile.Profile{
+				files: map[string]*profile.Profile{
 					"test.go": {
 						FileName: "test.go",
 						Hits:     13,

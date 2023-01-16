@@ -42,19 +42,19 @@ func (p *MoraCoverageProvider) findCoverage(cov Coverage) int {
 
 // Profile is not deep-copied because it is read-only
 func mergeEntry(a, b *CoverageEntry) *CoverageEntry {
-	c := &CoverageEntry{Name: a.Name, profiles: map[string]*profile.Profile{}}
+	c := &CoverageEntry{Name: a.Name, files: map[string]*profile.Profile{}}
 
-	for file, p := range a.profiles {
-		c.profiles[file] = p
+	for file, p := range a.files {
+		c.files[file] = p
 	}
 
-	for file, p := range b.profiles {
-		c.profiles[file] = p
+	for file, p := range b.files {
+		c.files[file] = p
 	}
 
 	c.Hits = 0
 	c.Lines = 0
-	for _, p := range c.profiles {
+	for _, p := range c.files {
 		c.Hits += p.Hits
 		c.Lines += p.Lines
 	}
@@ -176,7 +176,7 @@ func parseEntry(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
 
 	entry := &CoverageEntry{}
 	entry.Name = req.EntryName
-	entry.profiles = profiles
+	entry.files = profiles
 	entry.Hits = req.Hits
 	entry.Lines = req.Lines
 
@@ -235,7 +235,7 @@ func (p *MoraCoverageProvider) HandleUploadRequest(req *CoverageUploadRequest) e
 						EntryName: e.Name,
 						Hits:      e.Hits,
 						Lines:     e.Lines,
-						Profiles:  pie.Values(e.profiles),
+						Profiles:  pie.Values(e.files),
 					})
 			}
 		}
