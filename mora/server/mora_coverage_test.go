@@ -98,7 +98,9 @@ func TestMergeCoverage(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, url, merged.RepoURL())
 	assert.Equal(t, revision, merged.Revision())
-	assert.Equal(t, 2, len(merged.Entries()))
+	require.Equal(t, 2, len(merged.Entries()))
+	assert.Contains(t, merged.Entries()[0].Name, "go")
+	assert.Contains(t, merged.Entries()[1].Name, "cc")
 }
 
 func TestMergeCoverageErrorUrl(t *testing.T) {
