@@ -19,7 +19,12 @@ CREATE TABLE IF NOT EXISTS coverage (
     contents TEXT NOT NULL
 )`
 
-type CoverageStore struct {
+type CoverageStore interface {
+	Put(Coverage, string) error
+	Scan() ([]ScanedCoverage, error)
+}
+
+type CoverageStoreSQLX struct {
 	db *sqlx.DB
 	sync.Mutex
 }
@@ -39,11 +44,11 @@ func Connect(filename string) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func NewCoverageStore(db *sqlx.DB) *CoverageStore {
-	return &CoverageStore{db: db}
+func NewCoverageStore(db *sqlx.DB) *CoverageStoreSQLX {
+	return &CoverageStoreSQLX{db: db}
 }
 
-func (s *CoverageStore) Put(cov Coverage, contents string) error {
+func (s *CoverageStoreSQLX) Put(cov Coverage, contents string) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -80,7 +85,7 @@ type ScanedCoverage struct {
 	Contents string    `db:"contents"`
 }
 
-func (s *CoverageStore) Scan() ([]ScanedCoverage, error) {
+func (s *CoverageStoreSQLX) Scan() ([]ScanedCoverage, error) {
 	rows := []ScanedCoverage{}
 	err := s.db.Select(&rows, "SELECT url, revision, time, contents FROM coverage")
 	return rows, err

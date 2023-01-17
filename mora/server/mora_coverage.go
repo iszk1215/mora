@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -13,11 +14,11 @@ import (
 
 type MoraCoverageProvider struct {
 	coverages []*Coverage
-	store     *CoverageStore
+	store     CoverageStore
 	sync.Mutex
 }
 
-func NewMoraCoverageProvider(store *CoverageStore) *MoraCoverageProvider {
+func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {
 	p := &MoraCoverageProvider{}
 	p.store = store
 
@@ -82,11 +83,16 @@ func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 		}
 	}
 
+	tmp := pie.Values(entries)
+	sort.Slice(tmp, func(i, j int) bool {
+		return tmp[i].Name < tmp[j].Name
+	})
+
 	merged := &Coverage{
 		url:      a.url,
 		revision: a.revision,
 		time:     a.time,
-		entries:  pie.Values(entries),
+		entries:  tmp,
 	}
 
 	return merged, nil

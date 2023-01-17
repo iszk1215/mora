@@ -468,7 +468,7 @@ func createSCMs(config MoraConfig) []SCM {
 	return scms
 }
 
-func initCoverageStore() (*CoverageStore, error) {
+func initCoverageStore() (*CoverageStoreSQLX, error) {
 	db, err := Connect("mora.db")
 	if err != nil {
 		return nil, err
