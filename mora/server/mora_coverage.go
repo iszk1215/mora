@@ -169,14 +169,14 @@ func parseEntry(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
 		return nil, errors.New("entry name is empty")
 	}
 
-	profiles := map[string]*profile.Profile{}
+	files := map[string]*profile.Profile{}
 	for _, p := range req.Profiles {
-		profiles[p.FileName] = p
+		files[p.FileName] = p
 	}
 
 	entry := &CoverageEntry{}
 	entry.Name = req.EntryName
-	entry.files = profiles
+	entry.files = files
 	entry.Hits = req.Hits
 	entry.Lines = req.Lines
 
