@@ -220,7 +220,7 @@ func setupServer(scm SCM, repos []*Repo) (*MoraServer, error) {
 	provider := NewMockCoverageProvider()
 	for _, repo := range repos {
 		cov := Coverage{url: repo.Link}
-		provider.AddCoverage(repo.Link, &cov)
+		provider.addCoverage(repo.Link, &cov)
 	}
 
 	coverage := NewCoverageService()

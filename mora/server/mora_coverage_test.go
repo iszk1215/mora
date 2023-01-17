@@ -146,33 +146,61 @@ func TestMergeCoverageErrorRevision(t *testing.T) {
 }
 
 func TestHandleUpload(t *testing.T) {
-	profile0 := &profile.Profile{
-		FileName: "test.go",
-		Hits:     13,
-		Lines:    17,
-		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
-	}
-	profile1 := &profile.Profile{
-		FileName: "test2.go",
-		Hits:     0,
-		Lines:    3,
-		Blocks:   [][]int{{1, 3, 0}},
-	}
-	profiles := []*profile.Profile{profile0, profile1}
+	/*
+		profile0 := &profile.Profile{
+			FileName: "test.go",
+			Hits:     13,
+			Lines:    17,
+			Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+		}
+		profile1 := &profile.Profile{
+			FileName: "test2.go",
+			Hits:     0,
+			Lines:    3,
+			Blocks:   [][]int{{1, 3, 0}},
+		}
+			profiles := []*profile.Profile{profile0, profile1}
 
-	e := &CoverageEntryUploadRequest{
-		EntryName: "go",
-		Profiles:  profiles,
-		Hits:      13,
-		Lines:     20,
-	}
-	entries := []*CoverageEntryUploadRequest{e}
+				e := &CoverageEntryUploadRequest{
+					EntryName: "go",
+					Profiles:  profiles,
+					Hits:      13,
+					Lines:     20,
+				}
+				entries := []*CoverageEntryUploadRequest{e}
 
-	req := CoverageUploadRequest{
-		RepoURL:  "http://mockscm.com/mockowner/mockrepo",
-		Revision: "012345",
-		Time:     time.Now(),
-		Entries:  entries,
+				req := CoverageUploadRequest{
+					RepoURL:  "http://mockscm.com/mockowner/mockrepo",
+					Revision: "012345",
+					Time:     time.Now(),
+					Entries:  entries,
+				}
+	*/
+	cov := Coverage{
+		url:      "http://mockscm.com/mockowner/mockrepo",
+		revision: "012345",
+		time:     time.Now(),
+		entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 20,
+				files: map[string]*profile.Profile{
+					"test.go": {
+						FileName: "test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+					"test2.go": {
+						FileName: "test2.go",
+						Hits:     0,
+						Lines:    3,
+						Blocks:   [][]int{{1, 3, 0}},
+					},
+				},
+			},
+		},
 	}
 
 	// body, err := json.Marshal(req)
@@ -182,7 +210,7 @@ func TestHandleUpload(t *testing.T) {
 
 	// w := httptest.NewRecorder()
 	// r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
-	err := p.HandleUploadRequest(&req)
+	err := p.AddCoverage(&cov)
 	require.NoError(t, err)
 
 	/*
@@ -192,11 +220,11 @@ func TestHandleUpload(t *testing.T) {
 		require.Equal(t, 1, len(p.coverages))
 	*/
 
-	cov := p.coverages[0]
-	assert.Equal(t, cov.Revision(), req.Revision)
-	require.Equal(t, 1, len(cov.entries))
+	got := p.coverages[0]
+	assert.Equal(t, cov.Revision(), got.Revision())
+	require.Equal(t, 1, len(got.entries))
 
-	entry := cov.entries[0]
+	entry := got.entries[0]
 	assert.Equal(t, 13, entry.Hits)
 	assert.Equal(t, 20, entry.Lines)
 	assert.Equal(t, 2, len(entry.files))
@@ -250,6 +278,15 @@ func TestHandlerUploadMerge(t *testing.T) {
 		},
 	}
 
-	err := p.HandleUploadRequest(&req)
+	cov, err := parseCoverage(&req)
 	require.NoError(t, err)
+
+	contents, err := p.makeContents(cov)
+	require.NoError(t, err)
+	t.Log(string(contents))
+	exp := `[{"entry":"go","profiles":[{"filename":"test.go","hits":13,"lines":17,"blocks":[[1,5,1],[10,13,0],[13,20,1]]},{"filename":"test2.go","hits":0,"lines":3,"blocks":[[1,3,0]]}],"hits":13,"lines":20}]`
+	assert.Equal(t, exp, string(contents))
+
+	// err := p.HandleUploadRequest(&req)
+	//require.NoError(t, err)
 }

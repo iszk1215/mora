@@ -92,7 +92,7 @@ func NewMockCoverageProvider() *MockCoverageProvider {
 	return p
 }
 
-func (p *MockCoverageProvider) HandleUploadRequest(req *CoverageUploadRequest) error {
+func (p *MockCoverageProvider) AddCoverage(cov *Coverage) error {
 	return nil
 }
 
@@ -104,7 +104,7 @@ func (p *MockCoverageProvider) Coverages() []*Coverage {
 	return list
 }
 
-func (p *MockCoverageProvider) AddCoverage(repo string, cov *Coverage) {
+func (p *MockCoverageProvider) addCoverage(repo string, cov *Coverage) {
 	p.coverages[repo] = append(p.coverages[repo], cov)
 }
 
@@ -165,8 +165,8 @@ func TestCoverageList(t *testing.T) {
 	cov1 := Coverage{time: time1, revision: "abc123"}
 	cov0.url = repo.Link
 	cov1.url = repo.Link
-	p.AddCoverage(repo.Link, &cov0)
-	p.AddCoverage(repo.Link, &cov1)
+	p.addCoverage(repo.Link, &cov0)
+	p.addCoverage(repo.Link, &cov1)
 
 	s := NewCoverageService()
 	s.AddProvider(p)

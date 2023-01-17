@@ -215,40 +215,43 @@ func parseCoverage(req *CoverageUploadRequest) (*Coverage, error) {
 	return cov, nil
 }
 
-func (p *MoraCoverageProvider) HandleUploadRequest(req *CoverageUploadRequest) error {
-	cov, err := parseCoverage(req)
+func (p *MoraCoverageProvider) makeContents(cov *Coverage) ([]byte, error) {
+	merged := p.addOrMergeCoverage(cov)
+
+	var requests []*CoverageEntryUploadRequest
+	if merged == nil {
+		merged = cov
+	}
+
+	// rebuild upload request
+	for _, e := range merged.entries {
+		requests = append(requests,
+			&CoverageEntryUploadRequest{
+				EntryName: e.Name,
+				Hits:      e.Hits,
+				Lines:     e.Lines,
+				Profiles:  pie.Values(e.files),
+			})
+	}
+	contents, err := json.Marshal(requests)
+	if err != nil {
+		return nil, err
+	}
+
+	return contents, nil
+}
+
+func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
+	contents, err := p.makeContents(cov)
 	if err != nil {
 		return err
 	}
 
-	merged := p.addOrMergeCoverage(cov)
-
 	if p.store != nil {
-		var requests []*CoverageEntryUploadRequest
-		if merged == nil {
-			requests = req.Entries
-		} else {
-			// rebuild upload request
-			for _, e := range merged.entries {
-				requests = append(requests,
-					&CoverageEntryUploadRequest{
-						EntryName: e.Name,
-						Hits:      e.Hits,
-						Lines:     e.Lines,
-						Profiles:  pie.Values(e.files),
-					})
-			}
-		}
-		contents, err := json.Marshal(requests)
-		if err != nil {
-			return err
-		}
-
 		err = p.store.Put(*cov, string(contents))
-		if err != nil {
-			return err
-		}
 	}
+
+	return err
 
 	return nil
 }

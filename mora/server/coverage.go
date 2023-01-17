@@ -50,7 +50,7 @@ func (c *Coverage) Entries() []*CoverageEntry {
 
 type CoverageProvider interface {
 	Coverages() []*Coverage
-	HandleUploadRequest(*CoverageUploadRequest) error
+	AddCoverage(*Coverage) error
 	Sync() error
 }
 
@@ -392,11 +392,20 @@ func parseFromReader(reader io.Reader) (*CoverageUploadRequest, error) {
 	return req, nil
 }
 
+func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error {
+	cov, err := parseCoverage(req)
+	if err == nil {
+		err = s.provider.AddCoverage(cov)
+	}
+
+	return err
+}
+
 func (s *CoverageService) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	req, err := parseFromReader(r.Body)
 
 	if err == nil {
-		err = s.provider.HandleUploadRequest(req)
+		err = s.processUploadRequest(req)
 	}
 
 	if err != nil {
