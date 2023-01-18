@@ -10,17 +10,36 @@ import (
 )
 
 type MockStore struct {
-	rec ScanedCoverage
+	rec []ScanedCoverage
 	got string
 }
 
 func (s *MockStore) Scan() ([]ScanedCoverage, error) {
-	return []ScanedCoverage{s.rec}, nil
+	return s.rec, nil
 }
 
 func (s *MockStore) Put(cov Coverage, contents string) error {
 	s.got = contents
 	return nil
+}
+
+func assertEqualProfileBlock(t *testing.T, a [][]int, b [][]int) {
+	require.Equal(t, len(a), len(b))
+	for i, aa := range a {
+		bb := b[i]
+		require.Equal(t, 3, len(aa))
+		require.Equal(t, 3, len(bb))
+		for j := 0; j < 3; j++ {
+			assert.Equal(t, aa[j], bb[j])
+		}
+	}
+}
+
+func assertEqualProfile(t *testing.T, a *profile.Profile, b *profile.Profile) {
+	assert.Equal(t, a.FileName, b.FileName)
+	assert.Equal(t, a.Hits, b.Hits)
+	assert.Equal(t, a.Lines, b.Lines)
+	assertEqualProfileBlock(t, a.Blocks, b.Blocks)
 }
 
 func TestMergeEntry(t *testing.T) {
@@ -277,7 +296,7 @@ func TestHandlerUploadMerge(t *testing.T) {
 
 	contents, err := p.makeContents(cov)
 	require.NoError(t, err)
-	t.Log(string(contents))
+	// t.Log(string(contents))
 
 	entries, err := parseScanedCoverageContents(string(contents))
 	require.NoError(t, err)
@@ -290,11 +309,13 @@ func TestHandlerUploadMerge(t *testing.T) {
 
 	require.Equal(t, 2, len(entry.Profiles))
 
-	require.Contains(t, entry.Profiles, "test.go")
-	require.Contains(t, entry.Profiles, "test2.go")
+	p1, ok := entry.Profiles["test.go"]
+	require.True(t, ok)
+	assertEqualProfile(t, coverage0.entries[0].Profiles["test.go"], p1)
 
-	exp := `[{"entry":"go","profiles":[{"filename":"test.go","hits":13,"lines":17,"blocks":[[1,5,1],[10,13,0],[13,20,1]]},{"filename":"test2.go","hits":0,"lines":3,"blocks":[[1,3,0]]}],"hits":13,"lines":20}]`
-	assert.Equal(t, exp, string(contents))
+	p2, ok := entry.Profiles["test2.go"]
+	require.True(t, ok)
+	assertEqualProfile(t, req.Entries[0].Profiles[0], p2)
 }
 
 func TestMoraCoverageProviderNew(t *testing.T) {
@@ -305,7 +326,7 @@ func TestMoraCoverageProviderNew(t *testing.T) {
 		Contents: `[{"entry":"go","hits":1,"lines":2}]`,
 	}
 
-	store := MockStore{rec: rec}
+	store := MockStore{rec: []ScanedCoverage{rec}}
 
 	provider := NewMoraCoverageProvider(&store)
 	coverages := provider.Coverages()

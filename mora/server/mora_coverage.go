@@ -28,7 +28,7 @@ func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {
 	if p.store != nil {
 		err := p.loadFromStore()
 		if err != nil {
-			log.Error().Err(err).Msg("")
+			log.Error().Err(err).Msg("Ignored")
 		}
 	}
 
