@@ -250,7 +250,6 @@ func TestMergeCoverageErrorRevision(t *testing.T) {
 }
 
 func TestMoraCoverageProviderAddCoverage(t *testing.T) {
-	// TODO: more simple coverage
 	cov := Coverage{
 		url:      "http://mockscm.com/mockowner/mockrepo",
 		revision: "012345",
