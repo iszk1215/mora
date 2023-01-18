@@ -116,8 +116,6 @@ func (p *MockCoverageProvider) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 }
 
-func (p *MockCoverageProvider) Sync() error { return nil }
-
 func (p *MockCoverageProvider) Repos() []string {
 	repos := []string{}
 	for k := range p.coverages {

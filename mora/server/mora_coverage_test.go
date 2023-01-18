@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -11,11 +10,12 @@ import (
 )
 
 type MockStore struct {
+	rec ScanedCoverage
 	got string
 }
 
 func (s *MockStore) Scan() ([]ScanedCoverage, error) {
-	return nil, errors.New("Do not call me")
+	return []ScanedCoverage{s.rec}, nil
 }
 
 func (s *MockStore) Put(cov Coverage, contents string) error {
@@ -28,7 +28,7 @@ func TestMergeEntry(t *testing.T) {
 		Name:  "go",
 		Hits:  13,
 		Lines: 17,
-		files: map[string]*profile.Profile{
+		Profiles: map[string]*profile.Profile{
 			"test.go": {
 				FileName: "test.go",
 				Hits:     13,
@@ -42,7 +42,7 @@ func TestMergeEntry(t *testing.T) {
 		Name:  "go",
 		Hits:  2,
 		Lines: 4,
-		files: map[string]*profile.Profile{
+		Profiles: map[string]*profile.Profile{
 			"test2.go": {
 				FileName: "test2.go",
 				Hits:     2,
@@ -57,9 +57,9 @@ func TestMergeEntry(t *testing.T) {
 	assert.Equal(t, "go", merged.Name)
 	assert.Equal(t, 15, merged.Hits)
 	assert.Equal(t, 21, merged.Lines)
-	assert.Equal(t, 2, len(merged.files))
-	assert.Contains(t, merged.files, "test.go")
-	assert.Contains(t, merged.files, "test2.go")
+	assert.Equal(t, 2, len(merged.Profiles))
+	assert.Contains(t, merged.Profiles, "test.go")
+	assert.Contains(t, merged.Profiles, "test2.go")
 }
 
 func TestMergeCoverage(t *testing.T) {
@@ -75,7 +75,7 @@ func TestMergeCoverage(t *testing.T) {
 				Name:  "go",
 				Hits:  13,
 				Lines: 17,
-				files: map[string]*profile.Profile{
+				Profiles: map[string]*profile.Profile{
 					"test.go": {
 						FileName: "test.go",
 						Hits:     13,
@@ -96,7 +96,7 @@ func TestMergeCoverage(t *testing.T) {
 				Name:  "cc",
 				Hits:  13,
 				Lines: 17,
-				files: map[string]*profile.Profile{
+				Profiles: map[string]*profile.Profile{
 					"test.cc": {
 						FileName: "test.cc",
 						Hits:     13,
@@ -170,7 +170,7 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 				Name:  "go",
 				Hits:  13,
 				Lines: 20,
-				files: map[string]*profile.Profile{
+				Profiles: map[string]*profile.Profile{
 					"test.go": {
 						FileName: "test.go",
 						Hits:     13,
@@ -235,7 +235,7 @@ func TestHandlerUploadMerge(t *testing.T) {
 				Name:  "go",
 				Hits:  13,
 				Lines: 17,
-				files: map[string]*profile.Profile{
+				Profiles: map[string]*profile.Profile{
 					"test.go": {
 						FileName: "test.go",
 						Hits:     13,
@@ -278,11 +278,41 @@ func TestHandlerUploadMerge(t *testing.T) {
 	contents, err := p.makeContents(cov)
 	require.NoError(t, err)
 	t.Log(string(contents))
+
+	entries, err := parseScanedCoverageContents(string(contents))
+	require.NoError(t, err)
+	require.Equal(t, 1, len(entries))
+
+	entry := entries[0]
+	assert.Equal(t, "go", entry.Name)
+	assert.Equal(t, 13, entry.Hits)
+	assert.Equal(t, 20, entry.Lines)
+
+	require.Equal(t, 2, len(entry.Profiles))
+
+	require.Contains(t, entry.Profiles, "test.go")
+	require.Contains(t, entry.Profiles, "test2.go")
+
 	exp := `[{"entry":"go","profiles":[{"filename":"test.go","hits":13,"lines":17,"blocks":[[1,5,1],[10,13,0],[13,20,1]]},{"filename":"test2.go","hits":0,"lines":3,"blocks":[[1,3,0]]}],"hits":13,"lines":20}]`
 	assert.Equal(t, exp, string(contents))
+}
 
-	t.Log(store.got)
+func TestMoraCoverageProviderNew(t *testing.T) {
+	rec := ScanedCoverage{
+		RepoURL:  "url",
+		Revision: "0123",
+		Time:     time.Now(),
+		Contents: `[{"entry":"go","hits":1,"lines":2}]`,
+	}
 
-	// err := p.HandleUploadRequest(&req)
-	//require.NoError(t, err)
+	store := MockStore{rec: rec}
+
+	provider := NewMoraCoverageProvider(&store)
+	coverages := provider.Coverages()
+	require.Equal(t, 1, len(coverages))
+
+	cov := coverages[0]
+	assert.Equal(t, rec.RepoURL, cov.RepoURL())
+	assert.Equal(t, rec.Revision, cov.Revision())
+	assert.Equal(t, rec.Time, cov.Time())
 }

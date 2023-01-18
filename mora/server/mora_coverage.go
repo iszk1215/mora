@@ -10,6 +10,7 @@ import (
 
 	"github.com/elliotchance/pie/v2"
 	"github.com/iszk1215/mora/mora/profile"
+	"github.com/rs/zerolog/log"
 )
 
 type MoraCoverageProvider struct {
@@ -23,6 +24,13 @@ func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {
 	p.store = store
 
 	p.coverages = []*Coverage{}
+
+	if p.store != nil {
+		err := p.loadFromStore()
+		if err != nil {
+			log.Error().Err(err).Msg("")
+		}
+	}
 
 	return p
 }
@@ -43,19 +51,19 @@ func (p *MoraCoverageProvider) findCoverage(cov Coverage) int {
 
 // Profile is not deep-copied because it is read-only
 func mergeEntry(a, b *CoverageEntry) *CoverageEntry {
-	c := &CoverageEntry{Name: a.Name, files: map[string]*profile.Profile{}}
+	c := &CoverageEntry{Name: a.Name, Profiles: map[string]*profile.Profile{}}
 
-	for file, p := range a.files {
-		c.files[file] = p
+	for file, p := range a.Profiles {
+		c.Profiles[file] = p
 	}
 
-	for file, p := range b.files {
-		c.files[file] = p
+	for file, p := range b.Profiles {
+		c.Profiles[file] = p
 	}
 
 	c.Hits = 0
 	c.Lines = 0
-	for _, p := range c.files {
+	for _, p := range c.Profiles {
 		c.Hits += p.Hits
 		c.Lines += p.Lines
 	}
@@ -113,18 +121,24 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 	}
 }
 
-func (p *MoraCoverageProvider) Sync() error {
-	return p.loadFromStore()
-}
-
-func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
+func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
 	var req []*CoverageEntryUploadRequest
-	err := json.Unmarshal([]byte(record.Contents), &req)
+
+	err := json.Unmarshal([]byte(contents), &req)
 	if err != nil {
 		return nil, err
 	}
 
 	entries, err := parseEntries(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
+	entries, err := parseScanedCoverageContents(record.Contents)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +196,7 @@ func parseEntry(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
 
 	entry := &CoverageEntry{}
 	entry.Name = req.EntryName
-	entry.files = files
+	entry.Profiles = files
 	entry.Hits = req.Hits
 	entry.Lines = req.Lines
 
@@ -236,7 +250,7 @@ func (p *MoraCoverageProvider) makeContents(cov *Coverage) ([]byte, error) {
 				EntryName: e.Name,
 				Hits:      e.Hits,
 				Lines:     e.Lines,
-				Profiles:  pie.Values(e.files),
+				Profiles:  pie.Values(e.Profiles),
 			})
 	}
 	contents, err := json.Marshal(requests)

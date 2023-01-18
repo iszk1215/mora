@@ -19,10 +19,10 @@ import (
 )
 
 type CoverageEntry struct {
-	Name  string `json:"name"`
-	Hits  int    `json:"hits"`
-	Lines int    `json:"lines"`
-	files map[string]*profile.Profile
+	Name     string `json:"name"`
+	Hits     int    `json:"hits"`
+	Lines    int    `json:"lines"`
+	Profiles map[string]*profile.Profile
 }
 
 type Coverage struct {
@@ -51,7 +51,6 @@ func (c *Coverage) Entries() []*CoverageEntry {
 type CoverageProvider interface {
 	Coverages() []*Coverage
 	AddCoverage(*Coverage) error
-	Sync() error
 }
 
 type CoverageResponse struct {
@@ -78,7 +77,6 @@ func (s *CoverageService) AddProvider(provider CoverageProvider) {
 }
 
 func (s *CoverageService) SyncProviders() {
-	s.provider.Sync()
 }
 
 func (s *CoverageService) Sync() {
@@ -274,7 +272,7 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	files := []*FileResponse{}
-	for _, pr := range entry.files {
+	for _, pr := range entry.Profiles {
 		files = append(files, &FileResponse{
 			FileName: pr.FileName, Lines: pr.Lines, Hits: pr.Hits})
 	}
@@ -332,7 +330,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	file := chi.URLParam(r, "*")
 	log.Print("file=", file)
 
-	profile, ok := entry.files[file]
+	profile, ok := entry.Profiles[file]
 	if !ok {
 		log.Error().Msg("handleEntry")
 		render.NotFound(w, render.ErrNotFound)
