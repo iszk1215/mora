@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func assertEqualCoverage(t *testing.T, expected Coverage, got CoverageResponse) bool {
+func assertEqualCoverageAndResponse(t *testing.T, expected Coverage, got CoverageResponse) bool {
 	ok := assert.True(t, expected.Time().Equal(got.Time))
 	ok = ok && assert.Equal(t, expected.Revision(), got.Revision)
 
@@ -38,7 +38,7 @@ func assertEqualCoverageList(t *testing.T, expected []Coverage, got []CoverageRe
 	}
 
 	for i := range expected {
-		ok = ok && assertEqualCoverage(t, expected[i], got[i])
+		ok = ok && assertEqualCoverageAndResponse(t, expected[i], got[i])
 	}
 
 	return ok
@@ -141,7 +141,7 @@ func TestSerializeCoverage(t *testing.T) {
 	data := makeCoverageResponseList(scm, repo, []*Coverage{&cov})
 
 	require.Equal(t, 1, len(data))
-	assertEqualCoverage(t, cov, data[0])
+	assertEqualCoverageAndResponse(t, cov, data[0])
 }
 
 func getResultFromCovrageListHandler(handler http.Handler, repo *Repo) *http.Response {
