@@ -11,15 +11,15 @@ import (
 
 type MockStore struct {
 	rec []ScanedCoverage
-	got string
+	got *ScanedCoverage
 }
 
 func (s *MockStore) Scan() ([]ScanedCoverage, error) {
 	return s.rec, nil
 }
 
-func (s *MockStore) Put(cov Coverage, contents string) error {
-	s.got = contents
+func (s *MockStore) Put(cov ScanedCoverage) error {
+	s.got = &cov
 	return nil
 }
 
@@ -273,7 +273,7 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 
 	store := MockStore{}
 	p := NewMoraCoverageProvider(&store)
-	require.Equal(t, "", store.got)
+	require.Nil(t, store.got)
 
 	err := p.AddCoverage(&cov)
 	require.NoError(t, err)
@@ -281,12 +281,11 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 	require.Equal(t, 1, len(p.Coverages()))
 	assertEqualCoverage(t, &cov, p.Coverages()[0])
 
-	require.NotEqual(t, "", store.got)
-	entries, err := parseScanedCoverageContents(store.got)
+	require.NotNil(t, store.got)
+	got, err := parseScanedCoverage(*store.got)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(entries))
-	assertEqualCoverageEntry(t, cov.Entries()[0], entries[0])
+	assertEqualCoverage(t, &cov, got)
 }
 
 func TestParseCoverage(t *testing.T) {
@@ -399,17 +398,18 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 
 	store := MockStore{}
 	p := NewMoraCoverageProvider(&store)
+	require.Nil(t, store.got)
 	p.coverages = append(p.coverages, &existing)
 
 	err := p.AddCoverage(&added)
 	require.NoError(t, err)
+	require.NotNil(t, store.got)
 
-	entries, err := parseScanedCoverageContents(store.got)
+	cov, err := parseScanedCoverage(*store.got)
 	require.NoError(t, err)
-	require.Equal(t, 1, len(entries))
 
-	entry := entries[0]
-	assertEqualCoverageEntry(t, &expected, entry)
+	require.Equal(t, 1, len(cov.Entries()))
+	assertEqualCoverageEntry(t, &expected, cov.Entries()[0])
 }
 
 func TestMoraCoverageProviderNew(t *testing.T) {

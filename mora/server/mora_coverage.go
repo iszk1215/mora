@@ -168,7 +168,13 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 	}
 }
 
-func (p *MoraCoverageProvider) makeContents(cov *Coverage) ([]byte, error) {
+func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
+	cov = p.addOrMergeCoverage(cov)
+
+	if p.store == nil {
+		return nil
+	}
+
 	var requests []*CoverageEntryUploadRequest
 	for _, e := range cov.entries {
 		requests = append(requests,
@@ -179,20 +185,18 @@ func (p *MoraCoverageProvider) makeContents(cov *Coverage) ([]byte, error) {
 				Profiles:  pie.Values(e.Profiles),
 			})
 	}
-	return json.Marshal(requests)
-}
 
-func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
-	merged := p.addOrMergeCoverage(cov)
-
-	if p.store == nil {
-		return nil
-	}
-
-	contents, err := p.makeContents(merged)
+	contents, err := json.Marshal(requests)
 	if err != nil {
 		return err
 	}
 
-	return p.store.Put(*merged, string(contents))
+	scaned := ScanedCoverage{
+		RepoURL:  cov.RepoURL(),
+		Revision: cov.Revision(),
+		Time:     cov.Time(),
+		Contents: string(contents),
+	}
+
+	return p.store.Put(scaned)
 }
