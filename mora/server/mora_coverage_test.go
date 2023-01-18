@@ -42,6 +42,16 @@ func assertEqualProfile(t *testing.T, a *profile.Profile, b *profile.Profile) {
 	assertEqualProfileBlock(t, a.Blocks, b.Blocks)
 }
 
+func assertEqualCoverageEntry(t *testing.T, a *CoverageEntry, b *CoverageEntry) {
+	assert.Equal(t, a.Name, b.Name)
+	assert.Equal(t, a.Hits, b.Hits)
+	assert.Equal(t, a.Lines, b.Lines)
+	require.Equal(t, len(a.Profiles), len(b.Profiles))
+	for i, pa := range a.Profiles {
+		assertEqualProfile(t, pa, b.Profiles[i])
+	}
+}
+
 func TestMergeEntry(t *testing.T) {
 	entry0 := CoverageEntry{
 		Name:  "go",
@@ -73,12 +83,35 @@ func TestMergeEntry(t *testing.T) {
 
 	merged := mergeEntry(&entry0, &entry1)
 
-	assert.Equal(t, "go", merged.Name)
-	assert.Equal(t, 15, merged.Hits)
-	assert.Equal(t, 21, merged.Lines)
-	assert.Equal(t, 2, len(merged.Profiles))
-	assert.Contains(t, merged.Profiles, "test.go")
-	assert.Contains(t, merged.Profiles, "test2.go")
+	expected := CoverageEntry{
+		Name:  "go",
+		Hits:  15,
+		Lines: 21,
+		Profiles: map[string]*profile.Profile{
+			"test.go": {
+				FileName: "test.go",
+				Hits:     13,
+				Lines:    17,
+				Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+			},
+			"test2.go": {
+				FileName: "test2.go",
+				Hits:     2,
+				Lines:    4,
+				Blocks:   [][]int{{1, 2, 1}, {3, 4, 0}},
+			},
+		},
+	}
+
+	assertEqualCoverageEntry(t, &expected, merged)
+	/*
+		assert.Equal(t, "go", merged.Name)
+		assert.Equal(t, 15, merged.Hits)
+		assert.Equal(t, 21, merged.Lines)
+		assert.Equal(t, 2, len(merged.Profiles))
+		assert.Contains(t, merged.Profiles, "test.go")
+		assert.Contains(t, merged.Profiles, "test2.go")
+	*/
 }
 
 func TestMergeCoverage(t *testing.T) {
