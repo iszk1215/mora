@@ -2,11 +2,9 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/elliotchance/pie/v2"
 	"github.com/iszk1215/mora/mora/profile"
@@ -39,7 +37,56 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
-func (p *MoraCoverageProvider) findCoverage(cov Coverage) int {
+func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
+	var req []*CoverageEntryUploadRequest
+
+	err := json.Unmarshal([]byte(contents), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := parseEntries(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
+	entries, err := parseScanedCoverageContents(record.Contents)
+	if err != nil {
+		return nil, err
+	}
+
+	cov := &Coverage{}
+	cov.url = record.RepoURL
+	cov.revision = record.Revision
+	cov.entries = entries
+	cov.time = record.Time
+
+	return cov, nil
+}
+
+func (p *MoraCoverageProvider) loadFromStore() error {
+	records, err := p.store.Scan()
+	if err != nil {
+		return err
+	}
+
+	for _, record := range records {
+		cov, err := parseScanedCoverage(record)
+		if err != nil {
+			return err
+		}
+
+		p.coverages = append(p.coverages, cov)
+	}
+
+	return nil
+}
+
+func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {
 	for i, c := range p.coverages {
 		if c.RepoURL() == cov.RepoURL() && c.Revision() == cov.Revision() {
 			return i
@@ -110,10 +157,10 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 	p.Lock()
 	defer p.Unlock()
 
-	idx := p.findCoverage(*cov)
+	idx := p.findCoverage(cov)
 	if idx < 0 {
 		p.coverages = append(p.coverages, cov)
-		return nil
+		return cov
 	} else {
 		merged, _ := mergeCoverage(p.coverages[idx], cov)
 		p.coverages[idx] = merged
@@ -121,130 +168,9 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 	}
 }
 
-func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
-	var req []*CoverageEntryUploadRequest
-
-	err := json.Unmarshal([]byte(contents), &req)
-	if err != nil {
-		return nil, err
-	}
-
-	entries, err := parseEntries(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return entries, nil
-}
-
-func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
-	entries, err := parseScanedCoverageContents(record.Contents)
-	if err != nil {
-		return nil, err
-	}
-
-	cov := &Coverage{}
-	cov.url = record.RepoURL
-	cov.revision = record.Revision
-	cov.entries = entries
-	cov.time = record.Time
-
-	return cov, nil
-}
-
-func (p *MoraCoverageProvider) loadFromStore() error {
-	records, err := p.store.Scan()
-	if err != nil {
-		return err
-	}
-
-	for _, record := range records {
-		cov, err := parseScanedCoverage(record)
-		if err != nil {
-			return err
-		}
-
-		p.coverages = append(p.coverages, cov)
-	}
-
-	return nil
-}
-
-type CoverageEntryUploadRequest struct {
-	EntryName string             `json:"entry"`
-	Profiles  []*profile.Profile `json:"profiles"`
-	Hits      int                `json:"hits"`
-	Lines     int                `json:"lines"`
-}
-
-type CoverageUploadRequest struct {
-	RepoURL  string                        `json:"repo"`
-	Revision string                        `json:"revision"`
-	Time     time.Time                     `json:"time"`
-	Entries  []*CoverageEntryUploadRequest `json:"entries"`
-}
-
-func parseEntry(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
-	if req.EntryName == "" {
-		return nil, errors.New("entry name is empty")
-	}
-
-	files := map[string]*profile.Profile{}
-	for _, p := range req.Profiles {
-		files[p.FileName] = p
-	}
-
-	entry := &CoverageEntry{}
-	entry.Name = req.EntryName
-	entry.Profiles = files
-	entry.Hits = req.Hits
-	entry.Lines = req.Lines
-
-	return entry, nil
-}
-
-func parseEntries(req []*CoverageEntryUploadRequest) ([]*CoverageEntry, error) {
-	entries := []*CoverageEntry{}
-	for _, e := range req {
-		entry, err := parseEntry(e)
-		if err != nil {
-			return nil, err
-		}
-		entries = append(entries, entry)
-	}
-
-	return entries, nil
-}
-
-func parseCoverage(req *CoverageUploadRequest) (*Coverage, error) {
-	if req.RepoURL == "" {
-		return nil, errors.New("repo url is empty")
-	}
-
-	entries, err := parseEntries(req.Entries)
-	if err != nil {
-		return nil, err
-	}
-
-	cov := &Coverage{}
-	cov.url = req.RepoURL
-	cov.revision = req.Revision
-	cov.entries = entries
-	cov.time = req.Time
-
-	return cov, nil
-}
-
 func (p *MoraCoverageProvider) makeContents(cov *Coverage) ([]byte, error) {
-	merged := p.addOrMergeCoverage(cov)
-
 	var requests []*CoverageEntryUploadRequest
-	if merged == nil {
-		merged = cov
-	}
-
-	// rebuild upload request
-	for _, e := range merged.entries {
+	for _, e := range cov.entries {
 		requests = append(requests,
 			&CoverageEntryUploadRequest{
 				EntryName: e.Name,
@@ -253,25 +179,20 @@ func (p *MoraCoverageProvider) makeContents(cov *Coverage) ([]byte, error) {
 				Profiles:  pie.Values(e.Profiles),
 			})
 	}
-	contents, err := json.Marshal(requests)
-	if err != nil {
-		return nil, err
-	}
-
-	return contents, nil
+	return json.Marshal(requests)
 }
 
 func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
-	contents, err := p.makeContents(cov)
+	merged := p.addOrMergeCoverage(cov)
+
+	if p.store == nil {
+		return nil
+	}
+
+	contents, err := p.makeContents(merged)
 	if err != nil {
 		return err
 	}
 
-	if p.store != nil {
-		err = p.store.Put(*cov, string(contents))
-	}
-
-	return err
-
-	return nil
+	return p.store.Put(*merged, string(contents))
 }

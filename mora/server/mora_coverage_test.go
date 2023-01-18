@@ -356,21 +356,17 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 		},
 	}
 
-	store := MockStore{}
-	p := NewMoraCoverageProvider(&store)
-	p.coverages = append(p.coverages, &existing)
-
-	req := CoverageUploadRequest{
-		RepoURL:  "http://mockscm.com/mockowner/mockrepo",
-		Revision: "012345",
-		Time:     time.Now(),
-		Entries: []*CoverageEntryUploadRequest{
+	added := Coverage{
+		url:      "http://mockscm.com/mockowner/mockrepo",
+		revision: "012345",
+		time:     time.Now(),
+		entries: []*CoverageEntry{
 			{
-				EntryName: "go",
-				Hits:      0,
-				Lines:     3,
-				Profiles: []*profile.Profile{
-					{
+				Name:  "go",
+				Hits:  0,
+				Lines: 3,
+				Profiles: map[string]*profile.Profile{
+					"test2.go": {
 						FileName: "test2.go",
 						Hits:     0,
 						Lines:    3,
@@ -381,31 +377,39 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 		},
 	}
 
-	cov, err := parseCoverage(&req)
+	expected := CoverageEntry{
+		Name:  "go",
+		Hits:  13,
+		Lines: 20,
+		Profiles: map[string]*profile.Profile{
+			"test.go": {
+				FileName: "test.go",
+				Hits:     13,
+				Lines:    17,
+				Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+			},
+			"test2.go": {
+				FileName: "test2.go",
+				Hits:     0,
+				Lines:    3,
+				Blocks:   [][]int{{1, 3, 0}},
+			},
+		},
+	}
+
+	store := MockStore{}
+	p := NewMoraCoverageProvider(&store)
+	p.coverages = append(p.coverages, &existing)
+
+	err := p.AddCoverage(&added)
 	require.NoError(t, err)
 
-	contents, err := p.makeContents(cov)
-	require.NoError(t, err)
-	// t.Log(string(contents))
-
-	entries, err := parseScanedCoverageContents(string(contents))
+	entries, err := parseScanedCoverageContents(store.got)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(entries))
 
 	entry := entries[0]
-	assert.Equal(t, "go", entry.Name)
-	assert.Equal(t, 13, entry.Hits)
-	assert.Equal(t, 20, entry.Lines)
-
-	require.Equal(t, 2, len(entry.Profiles))
-
-	p1, ok := entry.Profiles["test.go"]
-	require.True(t, ok)
-	assertEqualProfile(t, existing.entries[0].Profiles["test.go"], p1)
-
-	p2, ok := entry.Profiles["test2.go"]
-	require.True(t, ok)
-	assertEqualProfile(t, req.Entries[0].Profiles[0], p2)
+	assertEqualCoverageEntry(t, &expected, entry)
 }
 
 func TestMoraCoverageProviderNew(t *testing.T) {

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"sort"
@@ -59,6 +60,71 @@ type CoverageResponse struct {
 	Revision    string           `json:"revision"`
 	RevisionURL string           `json:"revision_url"`
 	Entries     []*CoverageEntry `json:"entries"`
+}
+
+type CoverageEntryUploadRequest struct {
+	EntryName string             `json:"entry"`
+	Profiles  []*profile.Profile `json:"profiles"`
+	Hits      int                `json:"hits"`
+	Lines     int                `json:"lines"`
+}
+
+type CoverageUploadRequest struct {
+	RepoURL  string                        `json:"repo"`
+	Revision string                        `json:"revision"`
+	Time     time.Time                     `json:"time"`
+	Entries  []*CoverageEntryUploadRequest `json:"entries"`
+}
+
+func parseEntry(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
+	if req.EntryName == "" {
+		return nil, errors.New("entry name is empty")
+	}
+
+	files := map[string]*profile.Profile{}
+	for _, p := range req.Profiles {
+		files[p.FileName] = p
+	}
+
+	entry := &CoverageEntry{}
+	entry.Name = req.EntryName
+	entry.Profiles = files
+	entry.Hits = req.Hits
+	entry.Lines = req.Lines
+
+	return entry, nil
+}
+
+func parseEntries(req []*CoverageEntryUploadRequest) ([]*CoverageEntry, error) {
+	entries := []*CoverageEntry{}
+	for _, e := range req {
+		entry, err := parseEntry(e)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
+}
+
+func parseCoverage(req *CoverageUploadRequest) (*Coverage, error) {
+	if req.RepoURL == "" {
+		return nil, errors.New("repo url is empty")
+	}
+
+	entries, err := parseEntries(req.Entries)
+	if err != nil {
+		return nil, err
+	}
+
+	cov := &Coverage{}
+	cov.url = req.RepoURL
+	cov.revision = req.Revision
+	cov.entries = entries
+	cov.time = req.Time
+
+	return cov, nil
 }
 
 type CoverageService struct {
