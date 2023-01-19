@@ -62,51 +62,6 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 	assertEqualCoverage(t, &cov, got)
 }
 
-func TestParseCoverage(t *testing.T) {
-	now := time.Now()
-	prof := profile.Profile{
-		FileName: "test2.go",
-		Hits:     0,
-		Lines:    3,
-		Blocks:   [][]int{{1, 3, 0}},
-	}
-
-	req := CoverageUploadRequest{
-		RepoURL:  "http://mockscm.com/mockowner/mockrepo",
-		Revision: "012345",
-		Time:     now,
-		Entries: []*CoverageEntryUploadRequest{
-			{
-				EntryName: "go",
-				Hits:      0,
-				Lines:     3,
-				Profiles:  []*profile.Profile{&prof},
-			},
-		},
-	}
-
-	got, err := parseCoverage(&req)
-	require.NoError(t, err)
-
-	expected := Coverage{
-		url:      "http://mockscm.com/mockowner/mockrepo",
-		revision: "012345",
-		time:     now,
-		entries: []*CoverageEntry{
-			{
-				Name:  "go",
-				Hits:  0,
-				Lines: 3,
-				Profiles: map[string]*profile.Profile{
-					"test2.go": &prof,
-				},
-			},
-		},
-	}
-
-	assertEqualCoverage(t, &expected, got)
-}
-
 func TestHandlerAddCoveragedMerge(t *testing.T) {
 	existing := Coverage{
 		url:      "http://mockscm.com/mockowner/mockrepo",

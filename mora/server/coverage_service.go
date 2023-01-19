@@ -78,7 +78,7 @@ func parseEntries(req []*CoverageEntryUploadRequest) ([]*CoverageEntry, error) {
 	return entries, nil
 }
 
-func parseCoverage(req *CoverageUploadRequest) (*Coverage, error) {
+func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	if req.RepoURL == "" {
 		return nil, errors.New("repo url is empty")
 	}
@@ -427,7 +427,7 @@ func parseFromReader(reader io.Reader) (*CoverageUploadRequest, error) {
 }
 
 func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error {
-	cov, err := parseCoverage(req)
+	cov, err := parseCoverageUploadRequest(req)
 	if err == nil {
 		err = s.provider.AddCoverage(cov)
 	}

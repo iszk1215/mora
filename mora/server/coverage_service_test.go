@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iszk1215/mora/mora/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,6 +65,54 @@ func createMockCoverage() Coverage {
 	cov.entries = []*CoverageEntry{&cc, &py}
 
 	return cov
+}
+
+func TestParseCoverageUploadRequest(t *testing.T) {
+	url := "http://mockscm.com/mockowner/mockrepo"
+	revision := "12345"
+	now := time.Now()
+
+	prof := profile.Profile{
+		FileName: "test2.go",
+		Hits:     0,
+		Lines:    3,
+		Blocks:   [][]int{{1, 3, 0}},
+	}
+
+	req := CoverageUploadRequest{
+		RepoURL:  url,
+		Revision: revision,
+		Time:     now,
+		Entries: []*CoverageEntryUploadRequest{
+			{
+				EntryName: "go",
+				Hits:      0,
+				Lines:     3,
+				Profiles:  []*profile.Profile{&prof},
+			},
+		},
+	}
+
+	got, err := parseCoverageUploadRequest(&req)
+	require.NoError(t, err)
+
+	expected := Coverage{
+		url:      url,
+		revision: revision,
+		time:     now,
+		entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  0,
+				Lines: 3,
+				Profiles: map[string]*profile.Profile{
+					"test2.go": &prof,
+				},
+			},
+		},
+	}
+
+	assertEqualCoverage(t, &expected, got)
 }
 
 func TestSerializeCoverage(t *testing.T) {
