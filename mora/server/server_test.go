@@ -223,9 +223,7 @@ func setupServer(scm SCM, repos []*Repo) (*MoraServer, error) {
 		provider.AddCoverage(&cov)
 	}
 
-	coverage := NewCoverageService()
-	coverage.AddProvider(provider)
-	coverage.Sync()
+	coverage := NewCoverageService(provider)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	log.Print(err)

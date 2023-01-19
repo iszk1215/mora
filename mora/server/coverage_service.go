@@ -104,15 +104,13 @@ type CoverageService struct {
 	sync.Mutex
 }
 
-func NewCoverageService() *CoverageService {
-	return &CoverageService{}
+func NewCoverageService(provider CoverageProvider) *CoverageService {
+	s := &CoverageService{provider: provider}
+	s.load()
+	return s
 }
 
-func (s *CoverageService) AddProvider(provider CoverageProvider) {
-	s.provider = provider
-}
-
-func (s *CoverageService) Sync() {
+func (s *CoverageService) load() {
 	coverages := map[string][]*Coverage{}
 	repos := mapset.NewSet[string]()
 	for _, cov := range s.provider.Coverages() {

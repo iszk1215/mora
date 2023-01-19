@@ -148,10 +148,6 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, 200)
 }
 
-func (s *MoraServer) HandleSync(w http.ResponseWriter, r *http.Request) {
-	s.coverage.Sync()
-}
-
 // Web Handler
 
 type TemplateLoader struct {
@@ -304,7 +300,6 @@ func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	if s.moraCoverageProvider != nil {
 		// s.moraCoverageProvider.HandleUpload(w, r)
 		s.coverage.HandleUpload(w, r)
-		s.coverage.Sync()
 	}
 }
 
@@ -315,7 +310,6 @@ func (s *MoraServer) Handler() http.Handler {
 
 	// api
 
-	r.Post("/api/sync", s.HandleSync)
 	r.Get("/api/scms", s.handleSCMList)
 	r.Get("/api/repos", s.handleRepoList)
 
@@ -494,9 +488,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	}
 	moraCoverageProvider := NewMoraCoverageProvider(store)
 
-	coverage := NewCoverageService()
-	coverage.AddProvider(moraCoverageProvider)
-	coverage.Sync()
+	coverage := NewCoverageService(moraCoverageProvider)
 
 	s.coverage = coverage
 	s.moraCoverageProvider = moraCoverageProvider
