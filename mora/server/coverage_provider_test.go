@@ -52,14 +52,13 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 	err := p.AddCoverage(&cov)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(p.Coverages()))
-	assertEqualCoverage(t, &cov, p.Coverages()[0])
+	require.Equal(t, []*Coverage{&cov}, p.Coverages())
 
 	require.NotNil(t, store.got)
 	got, err := parseScanedCoverage(*store.got)
 	require.NoError(t, err)
 
-	assertEqualCoverage(t, &cov, got)
+	assert.Equal(t, &cov, got)
 }
 
 func TestHandlerAddCoveragedMerge(t *testing.T) {
@@ -137,8 +136,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 	cov, err := parseScanedCoverage(*store.got)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(cov.Entries()))
-	assertEqualCoverageEntry(t, &expected, cov.Entries()[0])
+	assert.Equal(t, []*CoverageEntry{&expected}, cov.Entries())
 }
 
 func TestMoraCoverageProviderNew(t *testing.T) {

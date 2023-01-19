@@ -14,15 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func assertEqualCoverageAndResponse(t *testing.T, expected Coverage, got CoverageResponse) bool {
-	ok := assert.True(t, expected.Time().Equal(got.Time))
-	ok = ok && assert.Equal(t, expected.Revision(), got.Revision)
+func assertEqualCoverageAndResponse(t *testing.T, want Coverage, got CoverageResponse) bool {
+	ok := assert.True(t, want.Time().Equal(got.Time))
+	ok = ok && assert.Equal(t, want.Revision(), got.Revision)
 
-	ok = ok && assert.Equal(t, len(expected.Entries()), len(got.Entries))
-	if len(expected.Entries()) != len(got.Entries) {
+	ok = ok && assert.Equal(t, len(want.Entries()), len(got.Entries))
+	if len(want.Entries()) != len(got.Entries) {
 		return false
 	}
-	for i, a := range expected.Entries() {
+	for i, a := range want.Entries() {
 		b := got.Entries[i]
 		ok = ok && assert.Equal(t, a.Name, b.Name)
 		ok = ok && assert.Equal(t, a.Lines, b.Lines)
@@ -32,20 +32,69 @@ func assertEqualCoverageAndResponse(t *testing.T, expected Coverage, got Coverag
 	return ok
 }
 
-func assertEqualCoverageList(t *testing.T, expected []Coverage, got []CoverageResponse) bool {
-	ok := assert.Equal(t, len(expected), len(got))
+func assertEqualCoverageList(t *testing.T, want []Coverage, got []CoverageResponse) bool {
+	ok := assert.Equal(t, len(want), len(got))
 	if !ok {
 		return false
 	}
 
-	for i := range expected {
-		ok = ok && assertEqualCoverageAndResponse(t, expected[i], got[i])
+	for i := range want {
+		ok = ok && assertEqualCoverageAndResponse(t, want[i], got[i])
 	}
 
 	return ok
 }
 
-func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Response) {
+// Test Data
+
+func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
+	url := "http://mockscm.com/mockowner/mockrepo"
+	revision := "12345"
+	now := time.Now()
+
+	prof := profile.Profile{
+		FileName: "test2.go",
+		Hits:     0,
+		Lines:    3,
+		Blocks:   [][]int{{1, 3, 0}},
+	}
+
+	req := CoverageUploadRequest{
+		RepoURL:  url,
+		Revision: revision,
+		Time:     now,
+		Entries: []*CoverageEntryUploadRequest{
+			{
+				EntryName: "go",
+				Hits:      0,
+				Lines:     3,
+				Profiles:  []*profile.Profile{&prof},
+			},
+		},
+	}
+
+	want := Coverage{
+		url:      url,
+		revision: revision,
+		time:     now,
+		entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  0,
+				Lines: 3,
+				Profiles: map[string]*profile.Profile{
+					"test2.go": &prof,
+				},
+			},
+		},
+	}
+
+	return &req, &want
+}
+
+// Test Cases
+
+func testCoverageListResponse(t *testing.T, want []Coverage, res *http.Response) {
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
 	body, err := io.ReadAll(res.Body)
@@ -55,33 +104,14 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 	err = json.Unmarshal(body, &data)
 	require.NoError(t, err)
 
-	assertEqualCoverageList(t, expected, data)
+	assertEqualCoverageList(t, want, data)
 }
 
 func TestParseCoverageUploadRequest(t *testing.T) {
-	req := makeCoverageUploadRequest()
-	prof := req.Entries[0].Profiles[0]
-
+	req, want := makeCoverageUploadRequest()
 	got, err := parseCoverageUploadRequest(req)
 	require.NoError(t, err)
-
-	expected := Coverage{
-		url:      req.RepoURL,
-		revision: req.Revision,
-		time:     req.Time,
-		entries: []*CoverageEntry{
-			{
-				Name:  "go",
-				Hits:  0,
-				Lines: 3,
-				Profiles: map[string]*profile.Profile{
-					"test2.go": prof,
-				},
-			},
-		},
-	}
-
-	assertEqualCoverage(t, &expected, got)
+	assert.Equal(t, want, got)
 }
 
 func TestMakeCoverageResponseList(t *testing.T) {
@@ -142,41 +172,13 @@ func TestCoverageList(t *testing.T) {
 	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
 }
 
-func makeCoverageUploadRequest() *CoverageUploadRequest {
-	url := "http://mockscm.com/mockowner/mockrepo"
-	revision := "12345"
-	now := time.Now()
-
-	prof := profile.Profile{
-		FileName: "test2.go",
-		Hits:     0,
-		Lines:    3,
-		Blocks:   [][]int{{1, 3, 0}},
-	}
-
-	req := CoverageUploadRequest{
-		RepoURL:  url,
-		Revision: revision,
-		Time:     now,
-		Entries: []*CoverageEntryUploadRequest{
-			{
-				EntryName: "go",
-				Hits:      0,
-				Lines:     3,
-				Profiles:  []*profile.Profile{&prof},
-			},
-		},
-	}
-
-	return &req
-}
-
 func TestCoverageServiceProcessUploadRequest(t *testing.T) {
-
 	p := NewMoraCoverageProvider(nil)
 	s := NewCoverageService(p)
 
-	req := makeCoverageUploadRequest()
+	req, want := makeCoverageUploadRequest()
 	err := s.processUploadRequest(req)
 	require.NoError(t, err)
+
+	assert.Equal(t, []*Coverage{want}, p.Coverages())
 }

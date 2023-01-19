@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/iszk1215/mora/mora/profile"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,7 +60,7 @@ func TestMergeEntry(t *testing.T) {
 		},
 	}
 
-	assertEqualCoverageEntry(t, &expected, merged)
+	assert.Equal(t, expected, *merged)
 }
 
 func TestMergeCoverage(t *testing.T) {
@@ -145,7 +146,7 @@ func TestMergeCoverage(t *testing.T) {
 		},
 	}
 
-	assertEqualCoverage(t, &expected, merged)
+	assert.Equal(t, &expected, merged)
 }
 
 func TestMergeCoverageErrorUrl(t *testing.T) {
