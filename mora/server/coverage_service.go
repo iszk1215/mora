@@ -46,7 +46,7 @@ type CoverageUploadRequest struct {
 	Entries  []*CoverageEntryUploadRequest `json:"entries"`
 }
 
-func parseEntry(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
+func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
 	if req.EntryName == "" {
 		return nil, errors.New("entry name is empty")
 	}
@@ -65,10 +65,10 @@ func parseEntry(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
 	return entry, nil
 }
 
-func parseEntries(req []*CoverageEntryUploadRequest) ([]*CoverageEntry, error) {
+func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*CoverageEntry, error) {
 	entries := []*CoverageEntry{}
 	for _, e := range req {
-		entry, err := parseEntry(e)
+		entry, err := parseCoverageEntryUploadRequest(e)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 		return nil, errors.New("repo url is empty")
 	}
 
-	entries, err := parseEntries(req.Entries)
+	entries, err := parseCoverageEntryUploadRequests(req.Entries)
 	if err != nil {
 		return nil, err
 	}

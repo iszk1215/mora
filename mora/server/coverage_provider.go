@@ -37,6 +37,7 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
+// contents is serialized []CoverageEntryUploadRequest
 func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
 	var req []*CoverageEntryUploadRequest
 
@@ -45,7 +46,7 @@ func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
 		return nil, err
 	}
 
-	entries, err := parseEntries(req)
+	entries, err := parseCoverageEntryUploadRequests(req)
 	if err != nil {
 		return nil, err
 	}
