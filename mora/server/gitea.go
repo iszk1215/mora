@@ -14,8 +14,8 @@ type Gitea struct {
 	BaseSCM
 }
 
-func (g *Gitea) RevisionURL(repo *Repo, revision string) string {
-	return repo.Link + "/src/commit/" + revision
+func (g *Gitea) RevisionURL(baseURL string, revision string) string {
+	return baseURL + "/src/commit/" + revision
 }
 
 // from drone

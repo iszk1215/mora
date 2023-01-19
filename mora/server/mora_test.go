@@ -36,8 +36,8 @@ func (m *MockSCM) URL() *url.URL {
 	return m.url
 }
 
-func (m *MockSCM) RevisionURL(repo *Repo, revision string) string {
-	return path.Join(repo.Link, "revision", revision)
+func (m *MockSCM) RevisionURL(baseURL string, revision string) string {
+	return path.Join(baseURL, "revision", revision)
 }
 
 func (m *MockSCM) LoginHandler(next http.Handler) http.Handler {

@@ -233,7 +233,7 @@ func makeCoverageResponse(revisionURL string, cov *Coverage, index int) Coverage
 func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
 	var ret []CoverageResponse
 	for i, cov := range coverages {
-		revURL := scm.RevisionURL(repo, cov.Revision())
+		revURL := scm.RevisionURL(repo.Link, cov.Revision())
 		ret = append(ret, makeCoverageResponse(revURL, cov, i))
 	}
 
@@ -318,7 +318,7 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 		Files: files,
 		Meta: MetaResonse{
 			Revision:    cov.Revision(),
-			RevisionURL: scm.RevisionURL(repo, cov.Revision()),
+			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision()),
 			Time:        cov.Time(),
 			Hits:        entry.Hits,
 			Lines:       entry.Lines,

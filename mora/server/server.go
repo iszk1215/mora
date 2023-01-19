@@ -31,7 +31,7 @@ type SCM interface {
 	Name() string // unique name in mora
 	URL() *url.URL
 	Client() *scm.Client
-	RevisionURL(repo *Repo, revision string) string
+	RevisionURL(baseURL string, revision string) string
 	LoginHandler(next http.Handler) http.Handler
 }
 
