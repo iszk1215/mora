@@ -406,7 +406,7 @@ func (s *CoverageService) Handler() http.Handler {
 	return r
 }
 
-func parseFromReader(reader io.Reader) (*CoverageUploadRequest, error) {
+func readCoverageUploadRequest(reader io.Reader) (*CoverageUploadRequest, error) {
 	b, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -426,19 +426,18 @@ func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error
 	if err == nil {
 		err = s.provider.AddCoverage(cov)
 	}
+	if err == nil {
+		s.Sync()
+	}
 
 	return err
 }
 
 func (s *CoverageService) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	req, err := parseFromReader(r.Body)
+	req, err := readCoverageUploadRequest(r.Body)
 
 	if err == nil {
 		err = s.processUploadRequest(req)
-	}
-
-	if err == nil {
-		s.Sync()
 	}
 
 	if err != nil {

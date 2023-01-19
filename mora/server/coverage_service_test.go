@@ -59,45 +59,23 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 }
 
 func TestParseCoverageUploadRequest(t *testing.T) {
-	url := "http://mockscm.com/mockowner/mockrepo"
-	revision := "12345"
-	now := time.Now()
+	req := makeCoverageUploadRequest()
+	prof := req.Entries[0].Profiles[0]
 
-	prof := profile.Profile{
-		FileName: "test2.go",
-		Hits:     0,
-		Lines:    3,
-		Blocks:   [][]int{{1, 3, 0}},
-	}
-
-	req := CoverageUploadRequest{
-		RepoURL:  url,
-		Revision: revision,
-		Time:     now,
-		Entries: []*CoverageEntryUploadRequest{
-			{
-				EntryName: "go",
-				Hits:      0,
-				Lines:     3,
-				Profiles:  []*profile.Profile{&prof},
-			},
-		},
-	}
-
-	got, err := parseCoverageUploadRequest(&req)
+	got, err := parseCoverageUploadRequest(req)
 	require.NoError(t, err)
 
 	expected := Coverage{
-		url:      url,
-		revision: revision,
-		time:     now,
+		url:      req.RepoURL,
+		revision: req.Revision,
+		time:     req.Time,
 		entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  0,
 				Lines: 3,
 				Profiles: map[string]*profile.Profile{
-					"test2.go": &prof,
+					"test2.go": prof,
 				},
 			},
 		},
@@ -162,4 +140,43 @@ func TestCoverageList(t *testing.T) {
 	res := getResultFromCoverageListHandler(handler, repo)
 
 	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
+}
+
+func makeCoverageUploadRequest() *CoverageUploadRequest {
+	url := "http://mockscm.com/mockowner/mockrepo"
+	revision := "12345"
+	now := time.Now()
+
+	prof := profile.Profile{
+		FileName: "test2.go",
+		Hits:     0,
+		Lines:    3,
+		Blocks:   [][]int{{1, 3, 0}},
+	}
+
+	req := CoverageUploadRequest{
+		RepoURL:  url,
+		Revision: revision,
+		Time:     now,
+		Entries: []*CoverageEntryUploadRequest{
+			{
+				EntryName: "go",
+				Hits:      0,
+				Lines:     3,
+				Profiles:  []*profile.Profile{&prof},
+			},
+		},
+	}
+
+	return &req
+}
+
+func TestCoverageServiceProcessUploadRequest(t *testing.T) {
+
+	p := NewMoraCoverageProvider(nil)
+	s := NewCoverageService(p)
+
+	req := makeCoverageUploadRequest()
+	err := s.processUploadRequest(req)
+	require.NoError(t, err)
 }
