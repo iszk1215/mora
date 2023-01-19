@@ -300,6 +300,7 @@ func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	if s.moraCoverageProvider != nil {
 		// s.moraCoverageProvider.HandleUpload(w, r)
 		s.coverage.HandleUpload(w, r)
+		s.coverage.Sync()
 	}
 }
 

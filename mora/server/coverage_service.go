@@ -106,11 +106,11 @@ type CoverageService struct {
 
 func NewCoverageService(provider CoverageProvider) *CoverageService {
 	s := &CoverageService{provider: provider}
-	s.load()
+	s.Sync()
 	return s
 }
 
-func (s *CoverageService) load() {
+func (s *CoverageService) Sync() {
 	coverages := map[string][]*Coverage{}
 	repos := mapset.NewSet[string]()
 	for _, cov := range s.provider.Coverages() {
