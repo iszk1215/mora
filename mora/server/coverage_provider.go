@@ -14,6 +14,7 @@ type MoraCoverageProvider struct {
 	sync.Mutex
 }
 
+// TODO: return error
 func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {
 	p := &MoraCoverageProvider{}
 	p.store = store
@@ -21,9 +22,11 @@ func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {
 	p.coverages = []*Coverage{}
 
 	if p.store != nil {
-		err := p.loadFromStore()
+		coverages, err := loadFromStore(p.store)
 		if err != nil {
 			log.Error().Err(err).Msg("Ignored")
+		} else {
+			p.coverages = coverages
 		}
 	}
 
@@ -65,22 +68,23 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 	return cov, nil
 }
 
-func (p *MoraCoverageProvider) loadFromStore() error {
-	records, err := p.store.Scan()
+func loadFromStore(store CoverageStore) ([]*Coverage, error) {
+	records, err := store.Scan()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	coverages := []*Coverage{}
 	for _, record := range records {
 		cov, err := parseScanedCoverage(record)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		p.coverages = append(p.coverages, cov)
+		coverages = append(coverages, cov)
 	}
 
-	return nil
+	return coverages, nil
 }
 
 func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {
