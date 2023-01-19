@@ -297,11 +297,8 @@ func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
 }
 
 func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	if s.moraCoverageProvider != nil {
-		// s.moraCoverageProvider.HandleUpload(w, r)
-		s.coverage.HandleUpload(w, r)
-		s.coverage.Sync()
-	}
+	s.coverage.HandleUpload(w, r)
+	// s.coverage.Sync()
 }
 
 func (s *MoraServer) Handler() http.Handler {

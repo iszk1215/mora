@@ -438,6 +438,7 @@ func (s *CoverageService) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
+		s.Sync()
 		log.Err(err).Msg("HandleUpload")
 		render.NotFound(w, render.ErrNotFound)
 		return
