@@ -104,7 +104,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 		},
 	}
 
-	expected := CoverageEntry{
+	want := CoverageEntry{
 		Name:  "go",
 		Hits:  13,
 		Lines: 20,
@@ -136,7 +136,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 	cov, err := parseScanedCoverage(*store.got)
 	require.NoError(t, err)
 
-	assert.Equal(t, []*CoverageEntry{&expected}, cov.Entries())
+	assert.Equal(t, []*CoverageEntry{&want}, cov.Entries())
 }
 
 func TestMoraCoverageProviderNew(t *testing.T) {
