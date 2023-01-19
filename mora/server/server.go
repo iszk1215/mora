@@ -298,7 +298,6 @@ func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
 
 func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	s.coverage.HandleUpload(w, r)
-	// s.coverage.Sync()
 }
 
 func (s *MoraServer) Handler() http.Handler {
