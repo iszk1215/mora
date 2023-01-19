@@ -112,9 +112,6 @@ func (s *CoverageService) AddProvider(provider CoverageProvider) {
 	s.provider = provider
 }
 
-func (s *CoverageService) SyncProviders() {
-}
-
 func (s *CoverageService) Sync() {
 	coverages := map[string][]*Coverage{}
 	repos := mapset.NewSet[string]()

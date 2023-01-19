@@ -496,7 +496,6 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 
 	coverage := NewCoverageService()
 	coverage.AddProvider(moraCoverageProvider)
-	coverage.SyncProviders()
 	coverage.Sync()
 
 	s.coverage = coverage

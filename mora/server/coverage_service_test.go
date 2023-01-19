@@ -136,7 +136,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	assertEqualCoverageAndResponse(t, cov, data[0])
 }
 
-func getResultFromCovrageListHandler(handler http.Handler, repo *Repo) *http.Response {
+func getResultFromCoverageListHandler(handler http.Handler, repo *Repo) *http.Response {
 	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
 	scm := NewMockSCM("scm")
 	r = r.WithContext(WithRepo(WithSCM(r.Context(), scm), repo))
@@ -146,26 +146,22 @@ func getResultFromCovrageListHandler(handler http.Handler, repo *Repo) *http.Res
 }
 
 func TestCoverageList(t *testing.T) {
-	repo := &Repo{Namespace: "owner", Name: "repo"}
+	repo := &Repo{Namespace: "owner", Name: "repo", Link: "url"}
 	p := NewMoraCoverageProvider(nil)
 
 	time0 := time.Now()
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := Coverage{url: "url", time: time0, revision: "abc123"}
-	cov1 := Coverage{url: "url", time: time1, revision: "abc124"}
-	cov0.url = repo.Link
-	cov1.url = repo.Link
+	cov0 := Coverage{url: repo.Link, time: time0, revision: "abc123"}
+	cov1 := Coverage{url: repo.Link, time: time1, revision: "abc124"}
 	p.AddCoverage(&cov0)
 	p.AddCoverage(&cov1)
-	//p.addCoverage(repo.Link, &cov0)
-	//p.addCoverage(repo.Link, &cov1)
 
 	s := NewCoverageService()
 	s.AddProvider(p)
 	s.Sync()
 
 	handler := http.HandlerFunc(s.handleCoverageList)
-	res := getResultFromCovrageListHandler(handler, repo)
+	res := getResultFromCoverageListHandler(handler, repo)
 
 	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
 }
