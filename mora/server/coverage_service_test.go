@@ -58,15 +58,6 @@ func testCoverageListResponse(t *testing.T, expected []Coverage, res *http.Respo
 	assertEqualCoverageList(t, expected, data)
 }
 
-func createMockCoverage() Coverage {
-	cc := CoverageEntry{"cc", 100, 20, nil}
-	py := CoverageEntry{"python", 300, 280, nil}
-	cov := Coverage{time: time.Now(), revision: "abc123"}
-	cov.entries = []*CoverageEntry{&cc, &py}
-
-	return cov
-}
-
 func TestParseCoverageUploadRequest(t *testing.T) {
 	url := "http://mockscm.com/mockowner/mockrepo"
 	revision := "12345"
@@ -115,10 +106,29 @@ func TestParseCoverageUploadRequest(t *testing.T) {
 	assertEqualCoverage(t, &expected, got)
 }
 
-func TestSerializeCoverage(t *testing.T) {
+func TestMakeCoverageResponseList(t *testing.T) {
 	scm := NewMockSCM("scm")
 	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
-	cov := createMockCoverage()
+
+	cov := Coverage{
+		url:      "dummyURL",
+		revision: "abcde",
+		time:     time.Now(),
+		entries: []*CoverageEntry{
+			{
+				Name:     "cc",
+				Hits:     20,
+				Lines:    100,
+				Profiles: nil,
+			},
+			{
+				Name:     "py",
+				Hits:     280,
+				Lines:    300,
+				Profiles: nil,
+			},
+		},
+	}
 
 	data := makeCoverageResponseList(scm, repo, []*Coverage{&cov})
 
