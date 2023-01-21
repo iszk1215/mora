@@ -252,7 +252,6 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 func Test_CoverageService_FileList(t *testing.T) {
 	filename := "test.go"
 	revision := "revision"
-	timestamp := time.Date(2023, time.January, 22, 5, 56, 23, 664946422, time.Local)
 
 	scm := NewMockSCM("mock")
 	repo := &Repo{Link: "link"}
