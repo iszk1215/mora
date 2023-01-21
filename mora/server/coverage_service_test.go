@@ -231,7 +231,7 @@ func getResultFromCoverageListHandler(handler http.Handler, repo *Repo) *http.Re
 	return w.Result()
 }
 
-func TestCoverageList(t *testing.T) {
+func Test_CoverageService_CoverageList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo", Link: "url"}
 	p := NewMoraCoverageProvider(nil)
 
@@ -244,7 +244,7 @@ func TestCoverageList(t *testing.T) {
 
 	s := NewCoverageService(p)
 
-	handler := http.HandlerFunc(s.handleCoverageList)
+	handler := http.HandlerFunc(s.Handler())
 	res := getResultFromCoverageListHandler(handler, repo)
 
 	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
