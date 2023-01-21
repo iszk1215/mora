@@ -293,6 +293,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 }
 
 func Test_CoverageService_File(t *testing.T) {
+	scmName := "mockscm"
 	repoName := "repo"
 	orgName := "org"
 	repoURL := "link"
@@ -315,7 +316,7 @@ func Test_CoverageService_File(t *testing.T) {
 	content := scm.Content{Data: []byte(code)}
 	contents.EXPECT().Find(gomock.Any(), orgName+"/"+repoName, filename, revision).Return(&content, nil, nil)
 
-	scm := NewMockSCM("mock")
+	scm := NewMockSCM(scmName)
 	scm.client.Contents = contents
 
 	repo := &Repo{Namespace: orgName, Name: repoName, Link: repoURL}
