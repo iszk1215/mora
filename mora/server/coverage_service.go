@@ -66,7 +66,7 @@ type (
 		Meta  MetaResonse     `json:"meta"`
 	}
 
-	CodeReponse struct {
+	CodeResponse struct {
 		FileName string  `json:"filename"`
 		Code     string  `json:"code"`
 		Blocks   [][]int `json:"blocks"`
@@ -388,7 +388,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := CodeReponse{
+	resp := CodeResponse{
 		FileName: profile.FileName,
 		Code:     string(code),
 		Blocks:   profile.Blocks,

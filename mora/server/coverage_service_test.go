@@ -18,6 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	timestamp = time.Date(2023, time.January, 22, 5, 56, 23, 664946422, time.Local)
+)
+
 func assertEqualCoverageAndResponse(t *testing.T, want Coverage, got CoverageResponse) bool {
 	ok := assert.True(t, want.Time().Equal(got.Time))
 	ok = ok && assert.Equal(t, want.Revision(), got.Revision)
@@ -54,7 +58,7 @@ func assertEqualCoverageList(t *testing.T, want []Coverage, got []CoverageRespon
 func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	url := "http://mockscm.com/mockowner/mockrepo"
 	revision := "12345"
-	now := time.Now()
+	now := timestamp
 
 	prof := profile.Profile{
 		FileName: "test2.go",
@@ -124,7 +128,7 @@ func Test_injectCoverage(t *testing.T) {
 	want := Coverage{
 		url:      repo.Link,
 		revision: "revision",
-		time:     time.Now(),
+		time:     timestamp,
 		entries:  nil,
 	}
 
@@ -195,7 +199,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	cov := Coverage{
 		url:      "dummyURL",
 		revision: "abcde",
-		time:     time.Now(),
+		time:     timestamp,
 		entries: []*CoverageEntry{
 			{
 				Name:     "cc",
@@ -231,7 +235,7 @@ func TestCoverageList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo", Link: "url"}
 	p := NewMoraCoverageProvider(nil)
 
-	time0 := time.Now()
+	time0 := timestamp
 	time1 := time0.Add(-10 * time.Hour * 24)
 	cov0 := Coverage{url: repo.Link, time: time0, revision: "abc123"}
 	cov1 := Coverage{url: repo.Link, time: time1, revision: "abc124"}
@@ -247,21 +251,25 @@ func TestCoverageList(t *testing.T) {
 }
 
 func Test_CoverageService_FileList(t *testing.T) {
+	filename := "test.go"
+	revision := "revision"
+	timestamp := time.Date(2023, time.January, 22, 5, 56, 23, 664946422, time.Local)
+
 	scm := NewMockSCM("mock")
 	repo := &Repo{Link: "link"}
 
-	want := Coverage{
+	cov := Coverage{
 		url:      repo.Link,
-		revision: "revision",
-		time:     time.Now(),
+		revision: revision,
+		time:     timestamp,
 		entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  13,
 				Lines: 17,
 				Profiles: map[string]*profile.Profile{
-					"test.go": {
-						FileName: "test.go",
+					filename: {
+						FileName: filename,
 						Hits:     13,
 						Lines:    17,
 						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
@@ -272,7 +280,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 	}
 
 	p := NewMoraCoverageProvider(nil)
-	p.coverages = []*Coverage{&want}
+	p.coverages = []*Coverage{&cov}
 
 	s := NewCoverageService(p)
 
@@ -288,8 +296,36 @@ func Test_CoverageService_FileList(t *testing.T) {
 
 	s.Handler().ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusOK, w.Result().StatusCode)
-	//assert.Equal(t, &want, got)
+	result := w.Result()
+	require.Equal(t, http.StatusOK, result.StatusCode)
+
+	body, err := io.ReadAll(result.Body)
+	require.NoError(t, err)
+
+	var got FileListResponse
+	err = json.Unmarshal(body, &got)
+	require.NoError(t, err)
+
+	fileRes := FileResponse{
+		FileName: filename,
+		Hits:     13,
+		Lines:    17,
+	}
+
+	metaRes := MetaResonse{
+		Revision:    revision,
+		RevisionURL: repo.Link + "/revision/" + revision, // MockSCM
+		Time:        timestamp,
+		Hits:        13,
+		Lines:       17,
+	}
+
+	want := FileListResponse{
+		Files: []*FileResponse{&fileRes},
+		Meta:  metaRes,
+	}
+
+	assert.Equal(t, want, got)
 }
 
 func Test_CoverageService_File(t *testing.T) {
@@ -324,7 +360,7 @@ func Test_CoverageService_File(t *testing.T) {
 	cov := Coverage{
 		url:      repo.Link,
 		revision: revision,
-		time:     time.Now(),
+		time:     timestamp,
 		entries: []*CoverageEntry{
 			{
 				Name:  entryName,
@@ -356,14 +392,15 @@ func Test_CoverageService_File(t *testing.T) {
 
 	result := w.Result()
 	require.Equal(t, http.StatusOK, result.StatusCode)
+
 	body, err := io.ReadAll(result.Body)
 	require.NoError(t, err)
 
-	var got CodeReponse
+	var got CodeResponse
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
 
-	want := CodeReponse{
+	want := CodeResponse{
 		FileName: prof.FileName,
 		Code:     code,
 		Blocks:   prof.Blocks,
