@@ -358,11 +358,11 @@ func Test_CoverageService_File(t *testing.T) {
 	body, err := io.ReadAll(result.Body)
 	require.NoError(t, err)
 
-	var got FileResponse
+	var got CodeReponse
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
 
-	want := FileResponse{
+	want := CodeReponse{
 		FileName: prof.FileName,
 		Code:     code,
 		Blocks:   prof.Blocks,

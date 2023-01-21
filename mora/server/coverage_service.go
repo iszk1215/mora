@@ -47,7 +47,7 @@ type (
 		Entries  []*CoverageEntryUploadRequest `json:"entries"`
 	}
 
-	FileResponse struct {
+	CodeReponse struct {
 		FileName string  `json:"filename"`
 		Code     string  `json:"code"`
 		Blocks   [][]int `json:"blocks"`
@@ -388,7 +388,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := FileResponse{
+	resp := CodeReponse{
 		FileName: profile.FileName,
 		Code:     string(code),
 		Blocks:   profile.Blocks,
