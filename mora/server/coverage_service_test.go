@@ -148,6 +148,7 @@ func Test_injectCoverage(t *testing.T) {
 
 func Test_injectCoverage_malformed_index(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
+	req = req.WithContext(WithRepo(req.Context(), &Repo{Link: "link"}))
 	w := httptest.NewRecorder()
 
 	s := NewCoverageService(nil)
