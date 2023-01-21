@@ -231,6 +231,8 @@ func getResultFromCoverageListHandler(handler http.Handler, repo *Repo) *http.Re
 	return w.Result()
 }
 
+// API Test
+
 func Test_CoverageService_CoverageList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo", Link: "url"}
 	p := NewMoraCoverageProvider(nil)
