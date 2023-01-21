@@ -271,7 +271,7 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 
 	_, ok := s.coverages[repo.Link]
 	if !ok {
-		log.Error().Msg("handleCoverageList: no coverage for repo")
+		log.Error().Msgf("Unknown repo.Link: %s", repo.Link)
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
@@ -279,8 +279,6 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	resp := makeCoverageResponseList(scm, repo, s.coverages[repo.Link])
 	render.JSON(w, resp, http.StatusOK)
 }
-
-// API
 
 func entryImplFrom(ctx context.Context) (*Coverage, *CoverageEntry, bool) {
 	cov, ok0 := CoverageFrom(ctx)
@@ -298,6 +296,29 @@ func entryImplFrom(ctx context.Context) (*Coverage, *CoverageEntry, bool) {
 	return cov, entry, ok0 && ok1
 }
 
+func makeFileListResponse(scm SCM, repo *Repo, cov *Coverage, entry *CoverageEntry) FileListResponse {
+	files := []*FileResponse{}
+	for _, pr := range entry.Profiles {
+		files = append(files, &FileResponse{
+			FileName: pr.FileName, Lines: pr.Lines, Hits: pr.Hits})
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].FileName < files[j].FileName
+	})
+
+	return FileListResponse{
+		Files: files,
+		Meta: MetaResonse{
+			Revision:    cov.Revision(),
+			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision()),
+			Time:        cov.Time(),
+			Hits:        entry.Hits,
+			Lines:       entry.Lines,
+		},
+	}
+}
+
 func handleFileList(w http.ResponseWriter, r *http.Request) {
 	log.Print("handleFileList")
 	scm, _ := SCMFrom(r.Context())
@@ -310,46 +331,26 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	files := []*FileResponse{}
-	for _, pr := range entry.Profiles {
-		files = append(files, &FileResponse{
-			FileName: pr.FileName, Lines: pr.Lines, Hits: pr.Hits})
-	}
-
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].FileName < files[j].FileName
-	})
-
-	resp := FileListResponse{
-		Files: files,
-		Meta: MetaResonse{
-			Revision:    cov.Revision(),
-			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision()),
-			Time:        cov.Time(),
-			Hits:        entry.Hits,
-			Lines:       entry.Lines,
-		},
-	}
-
+	resp := makeFileListResponse(scm, repo, cov, entry)
 	render.JSON(w, resp, http.StatusOK)
 }
 
 func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
-	repo, _ := RepoFrom(ctx)
-	repoPath := repo.Namespace + "/" + repo.Name
-
 	scm, _ := SCMFrom(ctx)
-	client := scm.Client()
+	repo, _ := RepoFrom(ctx)
 
 	sess, ok := MoraSessionFrom(ctx)
 	if !ok {
 		return nil, errors.New("MoraSession not found in a context")
 	}
+
 	ctx, err := sess.WithToken(context.Background(), scm.Name())
 	if err != nil {
 		return nil, err
 	}
 
+	client := scm.Client()
+	repoPath := repo.Namespace + "/" + repo.Name
 	content, meta, err := client.Contents.Find(ctx, repoPath, path, revision)
 	if err != nil {
 		log.Print(meta)
@@ -374,14 +375,14 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 
 	profile, ok := entry.Profiles[file]
 	if !ok {
-		log.Error().Msg("handleEntry")
+		log.Error().Msgf("No file found in a CoverageEntry: %s", file)
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
 
 	code, err := getSourceCode(r.Context(), cov.Revision(), file)
 	if err != nil {
-		log.Err(err).Msg("handleFile")
+		log.Error().Err(err).Msg("handleFile")
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
