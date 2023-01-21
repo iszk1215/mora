@@ -47,6 +47,25 @@ type (
 		Entries  []*CoverageEntryUploadRequest `json:"entries"`
 	}
 
+	FileResponse struct {
+		FileName string `json:"filename"`
+		Hits     int    `json:"hits"`
+		Lines    int    `json:"lines"`
+	}
+
+	MetaResonse struct {
+		Revision    string    `json:"revision"`
+		RevisionURL string    `json:"revision_url"`
+		Time        time.Time `json:"time"`
+		Hits        int       `json:"hits"`
+		Lines       int       `json:"lines"`
+	}
+
+	FileListResponse struct {
+		Files []*FileResponse `json:"files"`
+		Meta  MetaResonse     `json:"meta"`
+	}
+
 	CodeReponse struct {
 		FileName string  `json:"filename"`
 		Code     string  `json:"code"`
@@ -293,25 +312,6 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type FileResponse struct {
-		FileName string `json:"filename"`
-		Hits     int    `json:"hits"`
-		Lines    int    `json:"lines"`
-	}
-
-	type MetaResonse struct {
-		Revision    string    `json:"revision"`
-		RevisionURL string    `json:"revision_url"`
-		Time        time.Time `json:"time"`
-		Hits        int       `json:"hits"`
-		Lines       int       `json:"lines"`
-	}
-
-	type Response struct {
-		Files []*FileResponse `json:"files"`
-		Meta  MetaResonse     `json:"meta"`
-	}
-
 	files := []*FileResponse{}
 	for _, pr := range entry.Profiles {
 		files = append(files, &FileResponse{
@@ -322,7 +322,7 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 		return files[i].FileName < files[j].FileName
 	})
 
-	resp := Response{
+	resp := FileListResponse{
 		Files: files,
 		Meta: MetaResonse{
 			Revision:    cov.Revision(),
