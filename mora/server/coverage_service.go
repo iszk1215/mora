@@ -193,15 +193,15 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 
 func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		index, err := strconv.Atoi(chi.URLParam(r, "index"))
-		if err != nil {
-			log.Error().Err(err).Msg("")
+		repo, ok := RepoFrom(r.Context())
+		if !ok {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
-		repo, ok := RepoFrom(r.Context())
-		if !ok {
+		index, err := strconv.Atoi(chi.URLParam(r, "index"))
+		if err != nil {
+			log.Error().Err(err).Msg("")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}

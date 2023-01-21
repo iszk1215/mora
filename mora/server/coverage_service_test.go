@@ -147,26 +147,34 @@ func Test_injectCoverage(t *testing.T) {
 }
 
 func Test_injectCoverage_malformed_index(t *testing.T) {
-	called := false
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		called = true
-	}
-
-	s := NewCoverageService(nil)
-
-	r := chi.NewRouter()
-	r.Route("/{index}", func(r chi.Router) {
-		r.Use(s.injectCoverage)
-		r.Get("/", handler)
-	})
-
 	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
 	w := httptest.NewRecorder()
 
-	r.ServeHTTP(w, req)
+	s := NewCoverageService(nil)
+	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
-	require.False(t, called)
+}
+
+func Test_injectCoverage_no_repo_in_context(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
+	w := httptest.NewRecorder()
+
+	s := NewCoverageService(nil)
+	s.Handler().ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+}
+
+func Test_injectCoverage_no_repo_in_service(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
+	req = req.WithContext(WithRepo(req.Context(), &Repo{Link: "link"}))
+	w := httptest.NewRecorder()
+
+	s := NewCoverageService(nil)
+	s.Handler().ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 }
 
 func TestParseCoverageUploadRequest(t *testing.T) {
