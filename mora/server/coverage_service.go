@@ -33,20 +33,6 @@ type (
 		Entries     []*CoverageEntry `json:"entries"`
 	}
 
-	CoverageEntryUploadRequest struct {
-		EntryName string             `json:"entry"`
-		Profiles  []*profile.Profile `json:"profiles"`
-		Hits      int                `json:"hits"`
-		Lines     int                `json:"lines"`
-	}
-
-	CoverageUploadRequest struct {
-		RepoURL  string                        `json:"repo"`
-		Revision string                        `json:"revision"`
-		Time     time.Time                     `json:"time"`
-		Entries  []*CoverageEntryUploadRequest `json:"entries"`
-	}
-
 	FileResponse struct {
 		FileName string `json:"filename"`
 		Hits     int    `json:"hits"`
@@ -70,6 +56,20 @@ type (
 		FileName string  `json:"filename"`
 		Code     string  `json:"code"`
 		Blocks   [][]int `json:"blocks"`
+	}
+
+	CoverageEntryUploadRequest struct {
+		EntryName string             `json:"entry"`
+		Profiles  []*profile.Profile `json:"profiles"`
+		Hits      int                `json:"hits"`
+		Lines     int                `json:"lines"`
+	}
+
+	CoverageUploadRequest struct {
+		RepoURL  string                        `json:"repo"`
+		Revision string                        `json:"revision"`
+		Time     time.Time                     `json:"time"`
+		Entries  []*CoverageEntryUploadRequest `json:"entries"`
 	}
 )
 
@@ -246,15 +246,13 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 }
 
 func makeCoverageResponse(revisionURL string, cov *Coverage, index int) CoverageResponse {
-	ret := CoverageResponse{
+	return CoverageResponse{
 		Index:       index,
 		Time:        cov.Time(),
 		Revision:    cov.Revision(),
 		RevisionURL: revisionURL,
 		Entries:     cov.Entries(),
 	}
-
-	return ret
 }
 
 func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
