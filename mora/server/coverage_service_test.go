@@ -244,8 +244,7 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 
 	s := NewCoverageService(p)
 
-	handler := http.HandlerFunc(s.handleCoverageList)
-	res := getResultFromCoverageListHandler(handler, repo)
+	res := getResultFromCoverageListHandler(s.Handler(), repo)
 
 	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
 }
