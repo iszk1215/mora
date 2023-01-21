@@ -146,9 +146,8 @@ func Test_injectCoverage(t *testing.T) {
 	assert.Equal(t, &want, got)
 }
 
-func Test_injectCoverage_malformed_index(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
-	req = req.WithContext(WithRepo(req.Context(), &Repo{Link: "link"}))
+func Test_injectCoverage_no_repo_in_context(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
 	w := httptest.NewRecorder()
 
 	s := NewCoverageService(nil)
@@ -157,8 +156,9 @@ func Test_injectCoverage_malformed_index(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 }
 
-func Test_injectCoverage_no_repo_in_context(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
+func Test_injectCoverage_malformed_index(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
+	req = req.WithContext(WithRepo(req.Context(), &Repo{Link: "link"}))
 	w := httptest.NewRecorder()
 
 	s := NewCoverageService(nil)
