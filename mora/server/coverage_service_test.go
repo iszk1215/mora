@@ -243,6 +243,51 @@ func TestCoverageList(t *testing.T) {
 	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
 }
 
+func Test_CoverageService_FileList(t *testing.T) {
+	scm := NewMockSCM("mock")
+	repo := &Repo{Link: "link"}
+
+	want := Coverage{
+		url:      repo.Link,
+		revision: "revision",
+		time:     time.Now(),
+		entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 17,
+				Profiles: map[string]*profile.Profile{
+					"test.go": {
+						FileName: "test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+				},
+			},
+		},
+	}
+
+	p := NewMoraCoverageProvider(nil)
+	p.coverages = []*Coverage{&want}
+
+	s := NewCoverageService(p)
+
+	r := s.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/0/go/files", strings.NewReader(""))
+	ctx := req.Context()
+	ctx = WithSCM(ctx, scm)
+	ctx = WithRepo(ctx, repo)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Result().StatusCode)
+	//assert.Equal(t, &want, got)
+}
+
 func TestCoverageServiceProcessUploadRequest(t *testing.T) {
 	p := NewMoraCoverageProvider(nil)
 	s := NewCoverageService(p)
