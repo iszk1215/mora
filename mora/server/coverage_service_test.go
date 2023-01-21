@@ -293,35 +293,44 @@ func Test_CoverageService_FileList(t *testing.T) {
 }
 
 func Test_CoverageService_File(t *testing.T) {
+	repoName := "repo"
+	orgName := "org"
+	repoURL := "link"
+	entryName := "go"
+	filename := "go/test.go"
+	revision := "revision"
+	code := "hello, world"
+
+	prof := profile.Profile{
+		FileName: filename,
+		Hits:     13,
+		Lines:    17,
+		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+	}
+
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	contents := mockscm.NewMockContentService(mockCtrl)
-	content := scm.Content{
-		Data: []byte("hoge"),
-	}
-	contents.EXPECT().Find(gomock.Any(), "org/repo", "go/test.go", "revision").Return(&content, nil, nil)
+	content := scm.Content{Data: []byte(code)}
+	contents.EXPECT().Find(gomock.Any(), orgName+"/"+repoName, filename, revision).Return(&content, nil, nil)
 
 	scm := NewMockSCM("mock")
 	scm.client.Contents = contents
-	repo := &Repo{Namespace: "org", Name: "repo", Link: "link"}
+
+	repo := &Repo{Namespace: orgName, Name: repoName, Link: repoURL}
 
 	cov := Coverage{
 		url:      repo.Link,
-		revision: "revision",
+		revision: revision,
 		time:     time.Now(),
 		entries: []*CoverageEntry{
 			{
-				Name:  "go",
+				Name:  entryName,
 				Hits:  13,
 				Lines: 17,
 				Profiles: map[string]*profile.Profile{
-					"go/test.go": {
-						FileName: "go/test.go",
-						Hits:     13,
-						Lines:    17,
-						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
-					},
+					prof.FileName: &prof,
 				},
 			},
 		},
@@ -334,7 +343,7 @@ func Test_CoverageService_File(t *testing.T) {
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
-	req := httptest.NewRequest(http.MethodGet, "/0/go/files/go/test.go", strings.NewReader(""))
+	req := httptest.NewRequest(http.MethodGet, "/0/"+entryName+"/files/"+filename, strings.NewReader(""))
 	ctx := req.Context()
 	ctx = WithMoraSession(ctx, sess)
 	ctx = WithSCM(ctx, scm)
@@ -343,8 +352,8 @@ func Test_CoverageService_File(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	s.Handler().ServeHTTP(w, req)
-	result := w.Result()
 
+	result := w.Result()
 	require.Equal(t, http.StatusOK, result.StatusCode)
 	body, err := io.ReadAll(result.Body)
 	require.NoError(t, err)
@@ -354,9 +363,9 @@ func Test_CoverageService_File(t *testing.T) {
 	require.NoError(t, err)
 
 	want := FileResponse{
-		FileName: "go/test.go",
-		Code:     "hoge",
-		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+		FileName: prof.FileName,
+		Code:     code,
+		Blocks:   prof.Blocks,
 	}
 
 	assert.Equal(t, want, got)
