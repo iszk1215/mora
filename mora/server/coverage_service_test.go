@@ -9,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
+	"github.com/golang/mock/gomock"
+	"github.com/iszk1215/mora/mora/mockscm"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -273,19 +276,90 @@ func Test_CoverageService_FileList(t *testing.T) {
 
 	s := NewCoverageService(p)
 
-	r := s.Handler()
+	sess := NewMoraSessionWithTokenFor(scm.Name())
 
 	req := httptest.NewRequest(http.MethodGet, "/0/go/files", strings.NewReader(""))
 	ctx := req.Context()
+	ctx = WithMoraSession(ctx, sess)
 	ctx = WithSCM(ctx, scm)
 	ctx = WithRepo(ctx, repo)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 
-	r.ServeHTTP(w, req)
+	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Result().StatusCode)
 	//assert.Equal(t, &want, got)
+}
+
+func Test_CoverageService_File(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	contents := mockscm.NewMockContentService(mockCtrl)
+	content := scm.Content{
+		Data: []byte("hoge"),
+	}
+	contents.EXPECT().Find(gomock.Any(), "org/repo", "go/test.go", "revision").Return(&content, nil, nil)
+
+	scm := NewMockSCM("mock")
+	scm.client.Contents = contents
+	repo := &Repo{Namespace: "org", Name: "repo", Link: "link"}
+
+	cov := Coverage{
+		url:      repo.Link,
+		revision: "revision",
+		time:     time.Now(),
+		entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 17,
+				Profiles: map[string]*profile.Profile{
+					"go/test.go": {
+						FileName: "go/test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+				},
+			},
+		},
+	}
+
+	p := NewMoraCoverageProvider(nil)
+	p.coverages = []*Coverage{&cov}
+
+	s := NewCoverageService(p)
+
+	sess := NewMoraSessionWithTokenFor(scm.Name())
+
+	req := httptest.NewRequest(http.MethodGet, "/0/go/files/go/test.go", strings.NewReader(""))
+	ctx := req.Context()
+	ctx = WithMoraSession(ctx, sess)
+	ctx = WithSCM(ctx, scm)
+	ctx = WithRepo(ctx, repo)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+
+	s.Handler().ServeHTTP(w, req)
+	result := w.Result()
+
+	require.Equal(t, http.StatusOK, result.StatusCode)
+	body, err := io.ReadAll(result.Body)
+	require.NoError(t, err)
+
+	var got FileResponse
+	err = json.Unmarshal(body, &got)
+	require.NoError(t, err)
+
+	want := FileResponse{
+		FileName: "go/test.go",
+		Code:     "hoge",
+		Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+	}
+
+	assert.Equal(t, want, got)
 }
 
 func TestCoverageServiceProcessUploadRequest(t *testing.T) {

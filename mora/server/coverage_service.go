@@ -19,32 +19,40 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
-type CoverageProvider interface {
-	Coverages() []*Coverage
-	AddCoverage(*Coverage) error
-}
+type (
+	CoverageProvider interface {
+		Coverages() []*Coverage
+		AddCoverage(*Coverage) error
+	}
 
-type CoverageResponse struct {
-	Index       int              `json:"index"`
-	Time        time.Time        `json:"time"`
-	Revision    string           `json:"revision"`
-	RevisionURL string           `json:"revision_url"`
-	Entries     []*CoverageEntry `json:"entries"`
-}
+	CoverageResponse struct {
+		Index       int              `json:"index"`
+		Time        time.Time        `json:"time"`
+		Revision    string           `json:"revision"`
+		RevisionURL string           `json:"revision_url"`
+		Entries     []*CoverageEntry `json:"entries"`
+	}
 
-type CoverageEntryUploadRequest struct {
-	EntryName string             `json:"entry"`
-	Profiles  []*profile.Profile `json:"profiles"`
-	Hits      int                `json:"hits"`
-	Lines     int                `json:"lines"`
-}
+	CoverageEntryUploadRequest struct {
+		EntryName string             `json:"entry"`
+		Profiles  []*profile.Profile `json:"profiles"`
+		Hits      int                `json:"hits"`
+		Lines     int                `json:"lines"`
+	}
 
-type CoverageUploadRequest struct {
-	RepoURL  string                        `json:"repo"`
-	Revision string                        `json:"revision"`
-	Time     time.Time                     `json:"time"`
-	Entries  []*CoverageEntryUploadRequest `json:"entries"`
-}
+	CoverageUploadRequest struct {
+		RepoURL  string                        `json:"repo"`
+		Revision string                        `json:"revision"`
+		Time     time.Time                     `json:"time"`
+		Entries  []*CoverageEntryUploadRequest `json:"entries"`
+	}
+
+	FileResponse struct {
+		FileName string  `json:"filename"`
+		Code     string  `json:"code"`
+		Blocks   [][]int `json:"blocks"`
+	}
+)
 
 func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
 	if req.EntryName == "" {
@@ -335,7 +343,10 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 	scm, _ := SCMFrom(ctx)
 	client := scm.Client()
 
-	sess, _ := MoraSessionFrom(ctx)
+	sess, ok := MoraSessionFrom(ctx)
+	if !ok {
+		return nil, errors.New("MoraSession not found in a context")
+	}
 	ctx, err := sess.WithToken(context.Background(), scm.Name())
 	if err != nil {
 		return nil, err
@@ -377,13 +388,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type ProfileResponse struct {
-		FileName string  `json:"filename"`
-		Code     string  `json:"code"`
-		Blocks   [][]int `json:"blocks"`
-	}
-
-	resp := ProfileResponse{
+	resp := FileResponse{
 		FileName: profile.FileName,
 		Code:     string(code),
 		Blocks:   profile.Blocks,
