@@ -106,7 +106,9 @@ type CoverageService struct {
 
 func NewCoverageService(provider CoverageProvider) *CoverageService {
 	s := &CoverageService{provider: provider}
-	s.Sync()
+	if provider != nil {
+		s.Sync()
+	}
 	return s
 }
 

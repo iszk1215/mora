@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,6 +106,67 @@ func testCoverageListResponse(t *testing.T, want []Coverage, res *http.Response)
 	require.NoError(t, err)
 
 	assertEqualCoverageList(t, want, data)
+}
+
+func Test_injectCoverage(t *testing.T) {
+	var got *Coverage = nil
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		cov, ok := CoverageFrom(r.Context())
+		require.True(t, ok)
+		got = cov
+	}
+
+	repo := &Repo{Link: "link"}
+
+	want := Coverage{
+		url:      repo.Link,
+		revision: "revision",
+		time:     time.Now(),
+		entries:  nil,
+	}
+
+	s := NewCoverageService(nil)
+	s.coverages = map[string][]*Coverage{
+		repo.Link: {&want},
+	}
+
+	r := chi.NewRouter()
+	r.Route("/{index}", func(r chi.Router) {
+		r.Use(s.injectCoverage)
+		r.Get("/", handler)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
+	req = req.WithContext(WithRepo(req.Context(), repo))
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Result().StatusCode)
+	assert.Equal(t, &want, got)
+}
+
+func Test_injectCoverage_malformed_index(t *testing.T) {
+	called := false
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}
+
+	s := NewCoverageService(nil)
+
+	r := chi.NewRouter()
+	r.Route("/{index}", func(r chi.Router) {
+		r.Use(s.injectCoverage)
+		r.Get("/", handler)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+	require.False(t, called)
 }
 
 func TestParseCoverageUploadRequest(t *testing.T) {
