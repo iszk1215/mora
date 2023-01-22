@@ -18,10 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	timestamp = time.Date(2023, time.January, 22, 5, 56, 23, 664946422, time.Local)
-)
-
 func assertEqualCoverageAndResponse(t *testing.T, want Coverage, got CoverageResponse) bool {
 	ok := assert.True(t, want.Time().Equal(got.Time))
 	ok = ok && assert.Equal(t, want.Revision(), got.Revision)
@@ -58,7 +54,7 @@ func assertEqualCoverageList(t *testing.T, want []Coverage, got []CoverageRespon
 func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	url := "http://mockscm.com/mockowner/mockrepo"
 	revision := "12345"
-	now := timestamp
+	now := time.Now().Round(0)
 
 	prof := profile.Profile{
 		FileName: "test2.go",
@@ -128,7 +124,7 @@ func Test_injectCoverage(t *testing.T) {
 	want := Coverage{
 		url:      repo.Link,
 		revision: "revision",
-		time:     timestamp,
+		time:     time.Now().Round(0),
 		entries:  nil,
 	}
 
@@ -199,7 +195,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	cov := Coverage{
 		url:      "dummyURL",
 		revision: "abcde",
-		time:     timestamp,
+		time:     time.Now().Round(0),
 		entries: []*CoverageEntry{
 			{
 				Name:     "cc",
@@ -237,7 +233,7 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo", Link: "url"}
 	p := NewMoraCoverageProvider(nil)
 
-	time0 := timestamp
+	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
 	cov0 := Coverage{url: repo.Link, time: time0, revision: "abc123"}
 	cov1 := Coverage{url: repo.Link, time: time1, revision: "abc124"}
@@ -261,7 +257,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 	cov := Coverage{
 		url:      repo.Link,
 		revision: revision,
-		time:     timestamp,
+		time:     time.Now().Round(0),
 		entries: []*CoverageEntry{
 			{
 				Name:  "go",
@@ -315,7 +311,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 	metaRes := MetaResonse{
 		Revision:    revision,
 		RevisionURL: repo.Link + "/revision/" + revision, // MockSCM
-		Time:        timestamp,
+		Time:        cov.time,
 		Hits:        13,
 		Lines:       17,
 	}
@@ -360,7 +356,7 @@ func Test_CoverageService_File(t *testing.T) {
 	cov := Coverage{
 		url:      repo.Link,
 		revision: revision,
-		time:     timestamp,
+		time:     time.Now().Round(0),
 		entries: []*CoverageEntry{
 			{
 				Name:  entryName,
