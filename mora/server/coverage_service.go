@@ -22,9 +22,9 @@ import (
 type (
 	CoverageResponse struct {
 		Index       int              `json:"index"`
-		Time        time.Time        `json:"time"`
-		Revision    string           `json:"revision"`
 		RevisionURL string           `json:"revision_url"`
+		Revision    string           `json:"revision"`
+		Time        time.Time        `json:"time"`
 		Entries     []*CoverageEntry `json:"entries"`
 	}
 
@@ -43,8 +43,8 @@ type (
 	}
 
 	FileListResponse struct {
-		Files []*FileResponse `json:"files"`
 		Meta  MetaResonse     `json:"meta"`
+		Files []*FileResponse `json:"files"`
 	}
 
 	CodeResponse struct {
