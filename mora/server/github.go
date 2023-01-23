@@ -11,8 +11,8 @@ type Github struct {
 	BaseSCM
 }
 
-func (g *Github) RevisionURL(repo *Repo, revision string) string {
-	return repo.Link + "/tree/" + revision
+func (g *Github) RevisionURL(baseURL string, revision string) string {
+	return baseURL + "/tree/" + revision
 }
 
 func NewGithub(name string, config login.Config) *Github {

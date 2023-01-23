@@ -6,7 +6,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/drone/drone v1.10.1
 	github.com/drone/go-login v1.1.0
-	github.com/drone/go-scm v1.23.0
+	github.com/drone/go-scm v1.28.0
 	github.com/elliotchance/pie/v2 v2.0.1
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-git/go-git/v5 v5.4.2

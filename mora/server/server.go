@@ -31,7 +31,7 @@ type SCM interface {
 	Name() string // unique name in mora
 	URL() *url.URL
 	Client() *scm.Client
-	RevisionURL(repo *Repo, revision string) string
+	RevisionURL(baseURL string, revision string) string
 	LoginHandler(next http.Handler) http.Handler
 }
 
@@ -146,10 +146,6 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.JSON(w, resp, 200)
-}
-
-func (s *MoraServer) HandleSync(w http.ResponseWriter, r *http.Request) {
-	s.coverage.Sync()
 }
 
 // Web Handler
@@ -301,10 +297,7 @@ func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
 }
 
 func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	if s.moraCoverageProvider != nil {
-		s.moraCoverageProvider.HandleUpload(w, r)
-		s.coverage.Sync()
-	}
+	s.coverage.HandleUpload(w, r)
 }
 
 func (s *MoraServer) Handler() http.Handler {
@@ -314,7 +307,6 @@ func (s *MoraServer) Handler() http.Handler {
 
 	// api
 
-	r.Post("/api/sync", s.HandleSync)
 	r.Get("/api/scms", s.handleSCMList)
 	r.Get("/api/repos", s.handleRepoList)
 
@@ -322,7 +314,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	r.Route("/api/{scm}/{owner}/{repo}", func(r chi.Router) {
 		r.Use(injectRepo(s.scms))
-		r.Mount("/coverages", s.coverage.APIHandler())
+		r.Mount("/coverages", s.coverage.Handler())
 	})
 
 	// web
@@ -353,7 +345,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 		r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
 			r.Use(injectRepo(s.scms))
-			r.Mount("/coverages", s.coverage.WebHandler())
+			// r.Mount("/coverages", s.coverage.WebHandler())
 		})
 
 		r.Get("/public/*", func(w http.ResponseWriter, r *http.Request) {
@@ -467,7 +459,7 @@ func createSCMs(config MoraConfig) []SCM {
 	return scms
 }
 
-func initCoverageStore() (*CoverageStore, error) {
+func initCoverageStore() (*CoverageStoreSQLX, error) {
 	db, err := Connect("mora.db")
 	if err != nil {
 		return nil, err
@@ -487,23 +479,15 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	// dir := os.DirFS("data") // TODO
-	// htmlCoverageProvider := NewHTMLCoverageProvider(dir)
-
 	store, err := initCoverageStore()
 	if err != nil {
 		return nil, err
 	}
 	moraCoverageProvider := NewMoraCoverageProvider(store)
 
-	coverage := NewCoverageService()
-	coverage.AddProvider(moraCoverageProvider)
-	// coverage.AddProvider(htmlCoverageProvider)
-	coverage.SyncProviders()
-	coverage.Sync()
+	coverage := NewCoverageService(moraCoverageProvider)
 
 	s.coverage = coverage
-	// s.htmlCoverageProvider = htmlCoverageProvider
 	s.moraCoverageProvider = moraCoverageProvider
 
 	if err != nil {
