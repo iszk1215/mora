@@ -73,7 +73,6 @@ type MoraServer struct {
 	coverage *CoverageService
 
 	sessionManager     *MoraSessionManager
-	publicFileServer   http.Handler
 	frontendFileServer http.Handler
 
 	moraCoverageProvider *MoraCoverageProvider
@@ -323,20 +322,7 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 
 	sessionManager := NewMoraSessionManager()
 
-	staticDir := "mora/server/static" // FIXME
-	/*
-		fsys, err := getStaticFS(staticDir, "templates", debug)
-		if err != nil {
-			return nil, err
-		}
-		initTemplateLoader(fsys)
-	*/
-
-	publicFS, err := getStaticFS(staticDir, "public", debug)
-	if err != nil {
-		return nil, err
-	}
-
+	staticDir := "mora/server/static"
 	frontendFS, err := getStaticFS(staticDir, "public", debug)
 	if err != nil {
 		return nil, err
@@ -344,7 +330,6 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 
 	s.sessionManager = sessionManager
 	s.scms = scms
-	s.publicFileServer = http.FileServer(http.FS(publicFS))
 	s.frontendFileServer = http.FileServer(http.FS(frontendFS))
 
 	return s, nil
