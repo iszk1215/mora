@@ -76,7 +76,6 @@ type MoraServer struct {
 	frontendFileServer http.Handler
 
 	moraCoverageProvider *MoraCoverageProvider
-	// htmlCoverageProvider *HTMLCoverageProvider
 }
 
 func parseRepoURL(str string) (string, string, string, error) {
