@@ -76,7 +76,6 @@ type MoraServer struct {
 	frontendFileServer http.Handler
 
 	moraCoverageProvider *MoraCoverageProvider
-	// htmlCoverageProvider *HTMLCoverageProvider
 }
 
 func parseRepoURL(str string) (string, string, string, error) {
@@ -144,16 +143,6 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.JSON(w, resp, 200)
-}
-
-// Web Handler
-
-type TemplateLoader struct {
-	fsys fs.FS
-}
-
-func NewTemplateLoader(fsys fs.FS) *TemplateLoader {
-	return &TemplateLoader{fsys}
 }
 
 // ----------------------------------------------------------------------
@@ -279,7 +268,7 @@ func (s *MoraServer) Handler() http.Handler {
 		r.Mount("/coverages", s.coverage.Handler())
 	})
 
-	// web
+	// login/logout
 
 	redirectHandler := http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
