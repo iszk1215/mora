@@ -157,44 +157,6 @@ func NewTemplateLoader(fsys fs.FS) *TemplateLoader {
 	return &TemplateLoader{fsys}
 }
 
-/*
-func (l *TemplateLoader) load(filename string) (*template.Template, error) {
-	t, err := template.ParseFS(l.fsys, filename, "header.html", "footer.html")
-	if err != nil {
-		return nil, err
-	}
-	return t, nil
-}
-
-var templateLoader *TemplateLoader
-
-func initTemplateLoader(fsys fs.FS) {
-	templateLoader = NewTemplateLoader(fsys)
-}
-
-func loadTemplate(filename string) (*template.Template, error) {
-	return templateLoader.load(filename)
-}
-
-func renderTemplate(w http.ResponseWriter, filename string) error {
-	templ, err := loadTemplate(filename)
-	if err != nil {
-		return err
-	}
-	return templ.Execute(w, nil)
-}
-
-func templateRenderingHandler(filename string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		err := renderTemplate(w, filename)
-		if err != nil {
-			log.Err(err).Msg(filename)
-			render.NotFound(w, render.ErrNotFound)
-		}
-	}
-}
-*/
-
 // ----------------------------------------------------------------------
 
 func findSCM(list []SCM, f func(scm SCM) bool) SCM {
@@ -322,53 +284,18 @@ func (s *MoraServer) Handler() http.Handler {
 
 	redirectHandler := http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			// sess, _ := MoraSessionFrom(r.Context())
-			// path := sess.getLoginRedirectPath()
-
 			http.Redirect(w, r, "/scms", http.StatusSeeOther)
-			// http.Redirect(w, r, path, http.StatusSeeOther)
 		})
 
 	r.Mount("/login", LoginHandler(s.scms, redirectHandler))
 	r.Mount("/logout", LogoutHandler(s.scms, redirectHandler))
 
-	// frontend v1
-
-	/*
-		r.Route("/", func(r chi.Router) {
-			topPageHandler := templateRenderingHandler("index.html")
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				log.Print("setLoginRedirectPath to /scms")
-				sess, _ := MoraSessionFrom(r.Context())
-				sess.setLoginRedirectPath("/scms")
-				topPageHandler(w, r)
-			})
-			r.Get("/scms", templateRenderingHandler("login.html"))
-
-			r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
-				r.Use(injectRepo(s.scms))
-				// r.Mount("/coverages", s.coverage.WebHandler())
-			})
-
-			r.Get("/public/*", func(w http.ResponseWriter, r *http.Request) {
-				fs := http.StripPrefix("/public/", s.publicFileServer)
-				fs.ServeHTTP(w, r)
-			})
-		})
-	*/
-
-	// frontend v2
+	// frontend
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {
 			s.frontendFileServer.ServeHTTP(w, r)
 		})
-
-		/*
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				s.frontendFileServer.ServeHTTP(w, r)
-			})
-		*/
 
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 			r.URL.Path = "/"

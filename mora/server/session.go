@@ -21,9 +21,8 @@ const (
 )
 
 type MoraSession struct {
-	reposMap map[string]map[string]*Repo // [scm][owner/repo]
-	tokenMap map[string]scm.Token
-	//loginRedirectPath string
+	reposMap  map[string]map[string]*Repo // [scm][owner/repo]
+	tokenMap  map[string]scm.Token
 	timestamp time.Time
 }
 
@@ -47,16 +46,6 @@ func (s *MoraSession) getToken(scm string) (scm.Token, bool) {
 func (s *MoraSession) setToken(scm string, token scm.Token) {
 	s.tokenMap[scm] = token
 }
-
-/*
-func (s *MoraSession) getLoginRedirectPath() string {
-	return s.loginRedirectPath
-}
-
-func (s *MoraSession) setLoginRedirectPath(root string) {
-	s.loginRedirectPath = root
-}
-*/
 
 func (s *MoraSession) Remove(scm string) {
 	delete(s.tokenMap, scm)
