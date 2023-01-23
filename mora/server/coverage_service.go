@@ -71,6 +71,20 @@ type (
 		Time     time.Time                     `json:"time"`
 		Entries  []*CoverageEntryUploadRequest `json:"entries"`
 	}
+
+	CoverageService struct {
+		provider  CoverageProvider
+		repos     []string
+		coverages map[string][]*Coverage
+		sync.Mutex
+	}
+
+	coverageContextKey int
+)
+
+const (
+	coverageKey      coverageContextKey = iota
+	coverageEntryKey coverageContextKey = iota
 )
 
 func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
@@ -124,13 +138,6 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	return cov, nil
 }
 
-type CoverageService struct {
-	provider  CoverageProvider
-	repos     []string
-	coverages map[string][]*Coverage
-	sync.Mutex
-}
-
 func NewCoverageService(provider CoverageProvider) *CoverageService {
 	s := &CoverageService{provider: provider}
 	if provider != nil {
@@ -163,13 +170,6 @@ func (s *CoverageService) Sync() {
 func (s *CoverageService) Repos() []string {
 	return s.repos
 }
-
-type coverageContextKey int
-
-const (
-	coverageKey      coverageContextKey = iota
-	coverageEntryKey coverageContextKey = iota
-)
 
 func withCoverage(ctx context.Context, cov *Coverage) context.Context {
 	return context.WithValue(ctx, coverageKey, cov)
