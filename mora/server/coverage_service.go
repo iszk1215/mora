@@ -20,11 +20,6 @@ import (
 )
 
 type (
-	CoverageProvider interface {
-		Coverages() []*Coverage
-		AddCoverage(*Coverage) error
-	}
-
 	CoverageResponse struct {
 		Index       int              `json:"index"`
 		Time        time.Time        `json:"time"`
@@ -60,9 +55,9 @@ type (
 
 	CoverageEntryUploadRequest struct {
 		EntryName string             `json:"entry"`
-		Profiles  []*profile.Profile `json:"profiles"`
 		Hits      int                `json:"hits"`
 		Lines     int                `json:"lines"`
+		Profiles  []*profile.Profile `json:"profiles"`
 	}
 
 	CoverageUploadRequest struct {
@@ -70,6 +65,11 @@ type (
 		Revision string                        `json:"revision"`
 		Time     time.Time                     `json:"time"`
 		Entries  []*CoverageEntryUploadRequest `json:"entries"`
+	}
+
+	CoverageProvider interface {
+		Coverages() []*Coverage
+		AddCoverage(*Coverage) error
 	}
 
 	CoverageService struct {
