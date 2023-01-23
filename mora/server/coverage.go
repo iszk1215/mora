@@ -39,6 +39,16 @@ func (c *Coverage) Entries() []*CoverageEntry {
 	return c.entries
 }
 
+func (c *Coverage) FindEntry(name string) *CoverageEntry {
+	for _, e := range c.Entries() {
+		if e.Name == name {
+			return e
+		}
+	}
+
+	return nil
+}
+
 // Profile is not deep-copied because it is read-only
 func mergeEntry(a, b *CoverageEntry) *CoverageEntry {
 	c := &CoverageEntry{Name: a.Name, Profiles: map[string]*profile.Profile{}}
