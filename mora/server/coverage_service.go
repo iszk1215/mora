@@ -20,16 +20,11 @@ import (
 )
 
 type (
-	CoverageProvider interface {
-		Coverages() []*Coverage
-		AddCoverage(*Coverage) error
-	}
-
 	CoverageResponse struct {
 		Index       int              `json:"index"`
-		Time        time.Time        `json:"time"`
-		Revision    string           `json:"revision"`
 		RevisionURL string           `json:"revision_url"`
+		Revision    string           `json:"revision"`
+		Time        time.Time        `json:"time"`
 		Entries     []*CoverageEntry `json:"entries"`
 	}
 
@@ -48,8 +43,8 @@ type (
 	}
 
 	FileListResponse struct {
-		Files []*FileResponse `json:"files"`
 		Meta  MetaResonse     `json:"meta"`
+		Files []*FileResponse `json:"files"`
 	}
 
 	CodeResponse struct {
@@ -60,9 +55,9 @@ type (
 
 	CoverageEntryUploadRequest struct {
 		EntryName string             `json:"entry"`
-		Profiles  []*profile.Profile `json:"profiles"`
 		Hits      int                `json:"hits"`
 		Lines     int                `json:"lines"`
+		Profiles  []*profile.Profile `json:"profiles"`
 	}
 
 	CoverageUploadRequest struct {
@@ -71,6 +66,25 @@ type (
 		Time     time.Time                     `json:"time"`
 		Entries  []*CoverageEntryUploadRequest `json:"entries"`
 	}
+
+	CoverageProvider interface {
+		Coverages() []*Coverage
+		AddCoverage(*Coverage) error
+	}
+
+	CoverageService struct {
+		provider  CoverageProvider
+		repos     []string
+		coverages map[string][]*Coverage
+		sync.Mutex
+	}
+
+	coverageContextKey int
+)
+
+const (
+	coverageKey      coverageContextKey = iota
+	coverageEntryKey coverageContextKey = iota
 )
 
 func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
@@ -124,13 +138,6 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	return cov, nil
 }
 
-type CoverageService struct {
-	provider  CoverageProvider
-	repos     []string
-	coverages map[string][]*Coverage
-	sync.Mutex
-}
-
 func NewCoverageService(provider CoverageProvider) *CoverageService {
 	s := &CoverageService{provider: provider}
 	if provider != nil {
@@ -164,13 +171,6 @@ func (s *CoverageService) Repos() []string {
 	return s.repos
 }
 
-type coverageContextKey int
-
-const (
-	coverageKey      coverageContextKey = iota
-	coverageEntryKey coverageContextKey = iota
-)
-
 func withCoverage(ctx context.Context, cov *Coverage) context.Context {
 	return context.WithValue(ctx, coverageKey, cov)
 }
@@ -180,12 +180,12 @@ func CoverageFrom(ctx context.Context) (*Coverage, bool) {
 	return cov, ok
 }
 
-func WithCoverageEntry(ctx context.Context, entry string) context.Context {
+func WithCoverageEntry(ctx context.Context, entry *CoverageEntry) context.Context {
 	return context.WithValue(ctx, coverageEntryKey, entry)
 }
 
-func CoverageEntryFrom(ctx context.Context) (string, bool) {
-	entry, ok := ctx.Value(coverageEntryKey).(string)
+func CoverageEntryFrom(ctx context.Context) (*CoverageEntry, bool) {
+	entry, ok := ctx.Value(coverageEntryKey).(*CoverageEntry)
 	return entry, ok
 }
 
@@ -201,20 +201,14 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 			return
 		}
 
-		found := false
-		for _, e := range cov.Entries() {
-			if e.Name == entryName {
-				found = true
-			}
-		}
-
-		if !found {
+		entry := cov.FindEntry(entryName)
+		if entry == nil {
 			log.Error().Msg("can not find entry")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
-		next.ServeHTTP(w, r.WithContext(WithCoverageEntry(r.Context(), entryName)))
+		next.ServeHTTP(w, r.WithContext(WithCoverageEntry(r.Context(), entry)))
 	})
 }
 
@@ -280,22 +274,6 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func entryImplFrom(ctx context.Context) (*Coverage, *CoverageEntry, bool) {
-	cov, ok0 := CoverageFrom(ctx)
-	name, _ := CoverageEntryFrom(ctx)
-
-	var entry *CoverageEntry
-	ok1 := false
-	for _, e := range cov.entries {
-		if e.Name == name {
-			entry = e
-			ok1 = true
-		}
-	}
-
-	return cov, entry, ok0 && ok1
-}
-
 func makeFileListResponse(scm SCM, repo *Repo, cov *Coverage, entry *CoverageEntry) FileListResponse {
 	files := []*FileResponse{}
 	for _, pr := range entry.Profiles {
@@ -323,13 +301,8 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 	log.Print("handleFileList")
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
-
-	cov, entry, ok := entryImplFrom(r.Context())
-	if !ok {
-		log.Error().Msg("entry not found")
-		render.NotFound(w, render.ErrNotFound)
-		return
-	}
+	cov, _ := CoverageFrom(r.Context())
+	entry, _ := CoverageEntryFrom(r.Context())
 
 	resp := makeFileListResponse(scm, repo, cov, entry)
 	render.JSON(w, resp, http.StatusOK)
@@ -362,13 +335,8 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 
 func handleFile(w http.ResponseWriter, r *http.Request) {
 	log.Print("handleFile")
-
-	cov, entry, ok := entryImplFrom(r.Context())
-	if !ok {
-		log.Error().Msg("entryImplFrom returns false")
-		render.NotFound(w, render.ErrNotFound)
-		return
-	}
+	cov, _ := CoverageFrom(r.Context())
+	entry, _ := CoverageEntryFrom(r.Context())
 
 	file := chi.URLParam(r, "*")
 	log.Print("file=", file)

@@ -9,19 +9,21 @@ import (
 	"github.com/iszk1215/mora/mora/profile"
 )
 
-type CoverageEntry struct {
-	Name     string `json:"name"`
-	Hits     int    `json:"hits"`
-	Lines    int    `json:"lines"`
-	Profiles map[string]*profile.Profile
-}
+type (
+	CoverageEntry struct {
+		Name     string `json:"name"`
+		Hits     int    `json:"hits"`
+		Lines    int    `json:"lines"`
+		Profiles map[string]*profile.Profile
+	}
 
-type Coverage struct {
-	url      string
-	revision string
-	time     time.Time
-	entries  []*CoverageEntry
-}
+	Coverage struct {
+		url      string
+		revision string
+		time     time.Time
+		entries  []*CoverageEntry
+	}
+)
 
 func (c *Coverage) RepoURL() string {
 	return c.url
@@ -37,6 +39,16 @@ func (c *Coverage) Revision() string {
 
 func (c *Coverage) Entries() []*CoverageEntry {
 	return c.entries
+}
+
+func (c *Coverage) FindEntry(name string) *CoverageEntry {
+	for _, e := range c.Entries() {
+		if e.Name == name {
+			return e
+		}
+	}
+
+	return nil
 }
 
 // Profile is not deep-copied because it is read-only
