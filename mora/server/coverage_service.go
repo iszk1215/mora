@@ -240,13 +240,24 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 }
 
 func makeCoverageResponse(revisionURL string, cov *Coverage, index int) CoverageResponse {
-	return CoverageResponse{
+	resp := CoverageResponse{
 		Index:       index,
 		Time:        cov.Time(),
 		Revision:    cov.Revision(),
 		RevisionURL: revisionURL,
-		Entries:     cov.Entries(),
+		Entries:     []*CoverageEntry{},
 	}
+
+	for _, e := range cov.Entries() {
+		f := &CoverageEntry{
+			Name:  e.Name,
+			Hits:  e.Hits,
+			Lines: e.Lines,
+		}
+		resp.Entries = append(resp.Entries, f)
+	}
+
+	return resp
 }
 
 func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
