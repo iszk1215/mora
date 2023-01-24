@@ -130,10 +130,10 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	}
 
 	cov := &Coverage{}
-	cov.url = req.RepoURL
-	cov.revision = req.Revision
-	cov.entries = entries
-	cov.time = req.Time
+	cov.URL = req.RepoURL
+	cov.Revision = req.Revision
+	cov.Entries = entries
+	cov.Timestamp = req.Time
 
 	return cov, nil
 }
@@ -150,14 +150,14 @@ func (s *CoverageService) Sync() {
 	coverages := map[string][]*Coverage{}
 	repos := mapset.NewSet[string]()
 	for _, cov := range s.provider.Coverages() {
-		url := cov.RepoURL()
+		url := cov.URL
 		repos.Add(url)
 		coverages[url] = append(coverages[url], cov)
 	}
 
 	for _, list := range coverages {
 		sort.Slice(list, func(i, j int) bool {
-			return list[i].Time().Before(list[j].Time())
+			return list[i].Timestamp.Before(list[j].Timestamp)
 		})
 	}
 
@@ -242,13 +242,13 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 func makeCoverageResponse(revisionURL string, cov *Coverage, index int) CoverageResponse {
 	resp := CoverageResponse{
 		Index:       index,
-		Time:        cov.Time(),
-		Revision:    cov.Revision(),
+		Time:        cov.Timestamp,
+		Revision:    cov.Revision,
 		RevisionURL: revisionURL,
 		Entries:     []*CoverageEntry{},
 	}
 
-	for _, e := range cov.Entries() {
+	for _, e := range cov.Entries {
 		f := &CoverageEntry{
 			Name:  e.Name,
 			Hits:  e.Hits,
@@ -263,7 +263,7 @@ func makeCoverageResponse(revisionURL string, cov *Coverage, index int) Coverage
 func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
 	var ret []CoverageResponse
 	for i, cov := range coverages {
-		revURL := scm.RevisionURL(repo.Link, cov.Revision())
+		revURL := scm.RevisionURL(repo.Link, cov.Revision)
 		ret = append(ret, makeCoverageResponse(revURL, cov, i))
 	}
 
@@ -299,9 +299,9 @@ func makeFileListResponse(scm SCM, repo *Repo, cov *Coverage, entry *CoverageEnt
 	return FileListResponse{
 		Files: files,
 		Meta: MetaResonse{
-			Revision:    cov.Revision(),
-			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision()),
-			Time:        cov.Time(),
+			Revision:    cov.Revision,
+			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
+			Time:        cov.Timestamp,
 			Hits:        entry.Hits,
 			Lines:       entry.Lines,
 		},
@@ -359,7 +359,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code, err := getSourceCode(r.Context(), cov.Revision(), file)
+	code, err := getSourceCode(r.Context(), cov.Revision, file)
 	if err != nil {
 		log.Error().Err(err).Msg("handleFile")
 		render.NotFound(w, render.ErrNotFound)

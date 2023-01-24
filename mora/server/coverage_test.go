@@ -68,10 +68,10 @@ func TestMergeCoverage(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		url:      url,
-		revision: revision,
-		time:     time.Now(),
-		entries: []*CoverageEntry{
+		URL:       url,
+		Revision:  revision,
+		Timestamp: time.Now(),
+		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  13,
@@ -89,10 +89,10 @@ func TestMergeCoverage(t *testing.T) {
 	}
 
 	coverage1 := Coverage{
-		url:      url,
-		revision: revision,
-		time:     time.Now(),
-		entries: []*CoverageEntry{
+		URL:       url,
+		Revision:  revision,
+		Timestamp: time.Now(),
+		Entries: []*CoverageEntry{
 			{
 				Name:  "cc",
 				Hits:  13,
@@ -113,10 +113,10 @@ func TestMergeCoverage(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := Coverage{
-		url:      url,
-		revision: revision,
-		time:     coverage0.Time(),
-		entries: []*CoverageEntry{ // alphabetical
+		URL:       url,
+		Revision:  revision,
+		Timestamp: coverage0.Timestamp,
+		Entries: []*CoverageEntry{ // alphabetical
 			{
 				Name:  "cc",
 				Hits:  13,
@@ -154,16 +154,16 @@ func TestMergeCoverageErrorUrl(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		url:      url,
-		revision: revision,
-		time:     time.Now(),
-		entries:  nil,
+		URL:       url,
+		Revision:  revision,
+		Timestamp: time.Now(),
+		Entries:   nil,
 	}
 
 	coverage1 := Coverage{
-		url:      "http://foo.com/bar",
-		revision: revision,
-		time:     time.Now(),
+		URL:       "http://foo.com/bar",
+		Revision:  revision,
+		Timestamp: time.Now(),
 	}
 
 	_, err := mergeCoverage(&coverage0, &coverage1)
@@ -175,16 +175,16 @@ func TestMergeCoverageErrorRevision(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		url:      url,
-		revision: revision,
-		time:     time.Now(),
-		entries:  nil,
+		URL:       url,
+		Revision:  revision,
+		Timestamp: time.Now(),
+		Entries:   nil,
 	}
 
 	coverage1 := Coverage{
-		url:      url,
-		revision: "3456",
-		time:     time.Now(),
+		URL:       url,
+		Revision:  "3456",
+		Timestamp: time.Now(),
 	}
 
 	_, err := mergeCoverage(&coverage0, &coverage1)

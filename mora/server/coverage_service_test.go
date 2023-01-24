@@ -19,14 +19,14 @@ import (
 )
 
 func assertEqualCoverageAndResponse(t *testing.T, want Coverage, got CoverageResponse) bool {
-	ok := assert.True(t, want.Time().Equal(got.Time))
-	ok = ok && assert.Equal(t, want.Revision(), got.Revision)
+	ok := assert.True(t, want.Timestamp.Equal(got.Time))
+	ok = ok && assert.Equal(t, want.Revision, got.Revision)
 
-	ok = ok && assert.Equal(t, len(want.Entries()), len(got.Entries))
-	if len(want.Entries()) != len(got.Entries) {
+	ok = ok && assert.Equal(t, len(want.Entries), len(got.Entries))
+	if len(want.Entries) != len(got.Entries) {
 		return false
 	}
-	for i, a := range want.Entries() {
+	for i, a := range want.Entries {
 		b := got.Entries[i]
 		ok = ok && assert.Equal(t, a.Name, b.Name)
 		ok = ok && assert.Equal(t, a.Lines, b.Lines)
@@ -78,10 +78,10 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	}
 
 	want := Coverage{
-		url:      url,
-		revision: revision,
-		time:     now,
-		entries: []*CoverageEntry{
+		URL:       url,
+		Revision:  revision,
+		Timestamp: now,
+		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  0,
@@ -122,10 +122,10 @@ func Test_injectCoverage(t *testing.T) {
 	repo := &Repo{Link: "link"}
 
 	want := Coverage{
-		url:      repo.Link,
-		revision: "revision",
-		time:     time.Now().Round(0),
-		entries:  nil,
+		URL:       repo.Link,
+		Revision:  "revision",
+		Timestamp: time.Now().Round(0),
+		Entries:   nil,
 	}
 
 	s := NewCoverageService(nil)
@@ -193,10 +193,10 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
 
 	cov := Coverage{
-		url:      "dummyURL",
-		revision: "abcde",
-		time:     time.Now().Round(0),
-		entries: []*CoverageEntry{
+		URL:       "dummyURL",
+		Revision:  "abcde",
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
 			{
 				Name:     "cc",
 				Hits:     20,
@@ -235,8 +235,8 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := Coverage{url: repo.Link, time: time0, revision: "abc123"}
-	cov1 := Coverage{url: repo.Link, time: time1, revision: "abc124"}
+	cov0 := Coverage{URL: repo.Link, Timestamp: time0, Revision: "abc123"}
+	cov1 := Coverage{URL: repo.Link, Timestamp: time1, Revision: "abc124"}
 	p.AddCoverage(&cov0)
 	p.AddCoverage(&cov1)
 
@@ -255,10 +255,10 @@ func Test_CoverageService_FileList(t *testing.T) {
 	repo := &Repo{Link: "link"}
 
 	cov := Coverage{
-		url:      repo.Link,
-		revision: revision,
-		time:     time.Now().Round(0),
-		entries: []*CoverageEntry{
+		URL:       repo.Link,
+		Revision:  revision,
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  13,
@@ -311,7 +311,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 	metaRes := MetaResonse{
 		Revision:    revision,
 		RevisionURL: repo.Link + "/revision/" + revision, // MockSCM
-		Time:        cov.time,
+		Time:        cov.Timestamp,
 		Hits:        13,
 		Lines:       17,
 	}
@@ -354,10 +354,10 @@ func Test_CoverageService_File(t *testing.T) {
 	repo := &Repo{Namespace: orgName, Name: repoName, Link: repoURL}
 
 	cov := Coverage{
-		url:      repo.Link,
-		revision: revision,
-		time:     time.Now().Round(0),
-		entries: []*CoverageEntry{
+		URL:       repo.Link,
+		Revision:  revision,
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
 			{
 				Name:  entryName,
 				Hits:  13,
