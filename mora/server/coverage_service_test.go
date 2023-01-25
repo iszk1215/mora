@@ -249,17 +249,22 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 }
 
 func Test_CoverageService_FileList(t *testing.T) {
+	scm := NewMockSCM("mock")
+	p := NewMoraCoverageProvider(nil)
+	s := NewCoverageService(p)
+
+	repoURL := "http://mock.scm/org/name"
 	filename := "test.go"
 	revision := "abcde"
+	timestamp := time.Now().Round(0)
 
-	scm := NewMockSCM("mock")
-	repo := &Repo{Link: "//test.scm/org/name"}
+	repo := &Repo{Link: repoURL}
 
 	cov := Coverage{
 		ID:        123,
-		URL:       repo.Link,
+		URL:       repoURL,
 		Revision:  revision,
-		Timestamp: time.Now().Round(0),
+		Timestamp: timestamp,
 		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
@@ -277,10 +282,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 		},
 	}
 
-	p := NewMoraCoverageProvider(nil)
 	p.AddCoverage(&cov)
-
-	s := NewCoverageService(p)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
@@ -312,7 +314,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 
 	metaRes := MetaResonse{
 		Revision:    revision,
-		RevisionURL: repo.Link + "/revision/" + revision, // MockSCM
+		RevisionURL: repoURL + "/revision/" + revision, // MockSCM
 		Time:        cov.Timestamp,
 		Hits:        13,
 		Lines:       17,
