@@ -165,9 +165,6 @@ func TestMoraCoverageProviderNew(t *testing.T) {
 	store := MockStore{rec: []ScanedCoverage{rec}}
 
 	provider := NewMoraCoverageProvider(&store)
-	coverages := provider.Coverages()
-	require.Equal(t, 1, len(coverages))
-
-	cov := coverages[0]
-	assert.Equal(t, &want, cov)
+	got := provider.Coverages()
+	assert.Equal(t, []*Coverage{&want}, got)
 }
