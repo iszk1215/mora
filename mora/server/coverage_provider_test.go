@@ -140,10 +140,25 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 }
 
 func TestMoraCoverageProviderNew(t *testing.T) {
+	want := Coverage{
+		ID:        123,
+		URL:       "url",
+		Revision:  "0123",
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
+			{
+				Name:     "go",
+				Hits:     1,
+				Lines:    2,
+				Profiles: map[string]*profile.Profile{}},
+		},
+	}
+
 	rec := ScanedCoverage{
-		RepoURL:  "url",
-		Revision: "0123",
-		Time:     time.Now(),
+		ID:       want.ID,
+		RepoURL:  want.URL,
+		Revision: want.Revision,
+		Time:     want.Timestamp,
 		Contents: `[{"entry":"go","hits":1,"lines":2}]`,
 	}
 
@@ -154,7 +169,5 @@ func TestMoraCoverageProviderNew(t *testing.T) {
 	require.Equal(t, 1, len(coverages))
 
 	cov := coverages[0]
-	assert.Equal(t, rec.RepoURL, cov.URL)
-	assert.Equal(t, rec.Revision, cov.Revision)
-	assert.Equal(t, rec.Time, cov.Timestamp)
+	assert.Equal(t, &want, cov)
 }

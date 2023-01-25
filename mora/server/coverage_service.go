@@ -45,8 +45,8 @@ type (
 	}
 
 	FileListResponse struct {
-		Meta  MetaResonse     `json:"meta"`
-		Files []*FileResponse `json:"files"`
+		Metadata MetaResonse     `json:"meta"`
+		Files    []*FileResponse `json:"files"`
 	}
 
 	// handleFile
@@ -302,7 +302,7 @@ func makeFileListResponse(scm SCM, repo *Repo, cov *Coverage, entry *CoverageEnt
 
 	return FileListResponse{
 		Files: files,
-		Meta: MetaResonse{
+		Metadata: MetaResonse{
 			Revision:    cov.Revision,
 			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
 			Time:        cov.Timestamp,

@@ -317,8 +317,8 @@ func Test_CoverageService_FileList(t *testing.T) {
 	}
 
 	want := FileListResponse{
-		Files: []*FileResponse{&fileRes},
-		Meta:  metaRes,
+		Files:    []*FileResponse{&fileRes},
+		Metadata: metaRes,
 	}
 
 	assert.Equal(t, want, got)

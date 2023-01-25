@@ -37,6 +37,16 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
+func (p *MoraCoverageProvider) FindByRepo(url string) []*Coverage {
+	found := []*Coverage{}
+	for _, cov := range p.coverages {
+		if cov.URL == url {
+			found = append(found, cov)
+		}
+	}
+	return found
+}
+
 // contents is serialized []CoverageEntryUploadRequest
 func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
 	var req []*CoverageEntryUploadRequest
@@ -61,6 +71,7 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 	}
 
 	cov := &Coverage{}
+	cov.ID = record.ID
 	cov.URL = record.RepoURL
 	cov.Revision = record.Revision
 	cov.Entries = entries

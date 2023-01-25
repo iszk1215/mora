@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS coverage (
 )`
 
 type ScanedCoverage struct {
+	ID       int       `db:"id"`
 	RepoURL  string    `db:"url"`
 	Revision string    `db:"revision"`
 	Time     time.Time `db:"time"`
