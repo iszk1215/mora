@@ -37,6 +37,15 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
+func (p *MoraCoverageProvider) FindByID(id int) *Coverage {
+	for _, cov := range p.coverages {
+		if cov.ID == id {
+			return cov
+		}
+	}
+	return nil
+}
+
 func (p *MoraCoverageProvider) FindByRepo(url string) []*Coverage {
 	found := []*Coverage{}
 	for _, cov := range p.coverages {

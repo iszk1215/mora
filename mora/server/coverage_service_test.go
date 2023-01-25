@@ -113,6 +113,7 @@ func testCoverageListResponse(t *testing.T, want []Coverage, res *http.Response)
 
 func Test_injectCoverage(t *testing.T) {
 	var got *Coverage = nil
+
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		cov, ok := CoverageFrom(r.Context())
 		require.True(t, ok)
@@ -122,16 +123,16 @@ func Test_injectCoverage(t *testing.T) {
 	repo := &Repo{Link: "link"}
 
 	want := Coverage{
+		ID:        123,
 		URL:       repo.Link,
 		Revision:  "revision",
 		Timestamp: time.Now().Round(0),
 		Entries:   nil,
 	}
 
-	s := NewCoverageService(nil)
-	s.coverages = map[string][]*Coverage{
-		repo.Link: {&want},
-	}
+	p := NewMoraCoverageProvider(nil)
+	p.AddCoverage(&want)
+	s := NewCoverageService(p)
 
 	r := chi.NewRouter()
 	r.Route("/{index}", func(r chi.Router) {
@@ -139,7 +140,7 @@ func Test_injectCoverage(t *testing.T) {
 		r.Get("/", handler)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
+	req := httptest.NewRequest(http.MethodGet, "/123", strings.NewReader(""))
 	req = req.WithContext(WithRepo(req.Context(), repo))
 	w := httptest.NewRecorder()
 

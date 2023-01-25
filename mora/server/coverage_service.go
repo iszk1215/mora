@@ -74,6 +74,7 @@ type (
 	CoverageProvider interface {
 		Coverages() []*Coverage
 		AddCoverage(*Coverage) error
+		FindByID(int) *Coverage
 	}
 
 	CoverageService struct {
@@ -216,8 +217,14 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 	})
 }
 
-func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
+func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.provider == nil {
+			log.Print("No provider enabled")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
 		repo, ok := RepoFrom(r.Context())
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
@@ -231,14 +238,13 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		coverages := m.coverages[repo.Link]
-		if index < 0 || index >= len(coverages) {
-			log.Error().Msgf("coverage index is out of range: index=%d", index)
+		cov := s.provider.FindByID(index)
+		log.Print(cov)
+		if cov == nil || cov.URL != repo.Link {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-
-		r = r.WithContext(withCoverage(r.Context(), coverages[index]))
+		r = r.WithContext(withCoverage(r.Context(), cov))
 		next.ServeHTTP(w, r)
 	})
 }
