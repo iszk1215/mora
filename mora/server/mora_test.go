@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +36,8 @@ func (m *MockSCM) URL() *url.URL {
 }
 
 func (m *MockSCM) RevisionURL(baseURL string, revision string) string {
-	return path.Join(baseURL, "revision", revision)
+	joined, _ := url.JoinPath(baseURL, "revision", revision)
+	return joined
 }
 
 func (m *MockSCM) LoginHandler(next http.Handler) http.Handler {

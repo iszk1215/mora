@@ -250,12 +250,13 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 
 func Test_CoverageService_FileList(t *testing.T) {
 	filename := "test.go"
-	revision := "revision"
+	revision := "abcde"
 
 	scm := NewMockSCM("mock")
-	repo := &Repo{Link: "link"}
+	repo := &Repo{Link: "//test.scm/org/name"}
 
 	cov := Coverage{
+		ID:        123,
 		URL:       repo.Link,
 		Revision:  revision,
 		Timestamp: time.Now().Round(0),
@@ -277,13 +278,13 @@ func Test_CoverageService_FileList(t *testing.T) {
 	}
 
 	p := NewMoraCoverageProvider(nil)
-	p.coverages = []*Coverage{&cov}
+	p.AddCoverage(&cov)
 
 	s := NewCoverageService(p)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
-	req := httptest.NewRequest(http.MethodGet, "/0/go/files", strings.NewReader(""))
+	req := httptest.NewRequest(http.MethodGet, "/123/go/files", strings.NewReader(""))
 	ctx := req.Context()
 	ctx = WithMoraSession(ctx, sess)
 	ctx = WithSCM(ctx, scm)

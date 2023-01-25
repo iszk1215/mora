@@ -74,7 +74,7 @@ type (
 	CoverageProvider interface {
 		Coverages() []*Coverage
 		AddCoverage(*Coverage) error
-		FindByID(int) *Coverage
+		FindByURLandID(string, int) *Coverage
 	}
 
 	CoverageService struct {
@@ -238,9 +238,8 @@ func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		cov := s.provider.FindByID(index)
-		log.Print(cov)
-		if cov == nil || cov.URL != repo.Link {
+		cov := s.provider.FindByURLandID(repo.Link, index)
+		if cov == nil {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
