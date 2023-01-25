@@ -20,14 +20,16 @@ import (
 )
 
 type (
+	// handleCoverageList
 	CoverageResponse struct {
 		Index       int              `json:"index"`
 		RevisionURL string           `json:"revision_url"`
 		Revision    string           `json:"revision"`
-		Time        time.Time        `json:"time"`
+		Timestamp   time.Time        `json:"time"`
 		Entries     []*CoverageEntry `json:"entries"`
 	}
 
+	// hanldleFileList
 	FileResponse struct {
 		FileName string `json:"filename"`
 		Hits     int    `json:"hits"`
@@ -47,12 +49,14 @@ type (
 		Files []*FileResponse `json:"files"`
 	}
 
+	// handleFile
 	CodeResponse struct {
 		FileName string  `json:"filename"`
 		Code     string  `json:"code"`
 		Blocks   [][]int `json:"blocks"`
 	}
 
+	// Upload
 	CoverageEntryUploadRequest struct {
 		EntryName string             `json:"entry"`
 		Hits      int                `json:"hits"`
@@ -242,7 +246,7 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 func makeCoverageResponse(revisionURL string, cov *Coverage, index int) CoverageResponse {
 	resp := CoverageResponse{
 		Index:       index,
-		Time:        cov.Timestamp,
+		Timestamp:   cov.Timestamp,
 		Revision:    cov.Revision,
 		RevisionURL: revisionURL,
 		Entries:     []*CoverageEntry{},

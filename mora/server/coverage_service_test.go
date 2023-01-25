@@ -19,7 +19,7 @@ import (
 )
 
 func assertEqualCoverageAndResponse(t *testing.T, want Coverage, got CoverageResponse) bool {
-	ok := assert.True(t, want.Timestamp.Equal(got.Time))
+	ok := assert.True(t, want.Timestamp.Equal(got.Timestamp))
 	ok = ok && assert.Equal(t, want.Revision, got.Revision)
 
 	ok = ok && assert.Equal(t, len(want.Entries), len(got.Entries))
