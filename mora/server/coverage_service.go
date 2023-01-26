@@ -80,7 +80,6 @@ type (
 
 	CoverageService struct {
 		provider CoverageProvider
-		repos    []string
 		sync.Mutex
 	}
 
@@ -145,26 +144,17 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 
 func NewCoverageService(provider CoverageProvider) *CoverageService {
 	s := &CoverageService{provider: provider}
-	if provider != nil {
-		s.Sync()
-	}
 	return s
 }
 
-func (s *CoverageService) Sync() {
+func (s *CoverageService) Repos() []string {
 	repos := mapset.NewSet[string]()
 	for _, cov := range s.provider.Coverages() {
 		url := cov.URL
 		repos.Add(url)
 	}
 
-	s.Lock()
-	defer s.Unlock()
-	s.repos = repos.ToSlice()
-}
-
-func (s *CoverageService) Repos() []string {
-	return s.repos
+	return repos.ToSlice()
 }
 
 func withCoverage(ctx context.Context, cov *Coverage) context.Context {
@@ -415,9 +405,6 @@ func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error
 	cov, err := parseCoverageUploadRequest(req)
 	if err == nil {
 		err = s.provider.AddCoverage(cov)
-	}
-	if err == nil {
-		s.Sync()
 	}
 
 	return err
