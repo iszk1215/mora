@@ -229,9 +229,9 @@ func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
 	})
 }
 
-func makeCoverageResponse(revisionURL string, cov *Coverage, index int) CoverageResponse {
+func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	resp := CoverageResponse{
-		Index:       index,
+		Index:       cov.ID,
 		Timestamp:   cov.Timestamp,
 		Revision:    cov.Revision,
 		RevisionURL: revisionURL,
@@ -252,9 +252,9 @@ func makeCoverageResponse(revisionURL string, cov *Coverage, index int) Coverage
 
 func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
 	var ret []CoverageResponse
-	for i, cov := range coverages {
+	for _, cov := range coverages {
 		revURL := scm.RevisionURL(repo.Link, cov.Revision)
-		ret = append(ret, makeCoverageResponse(revURL, cov, i))
+		ret = append(ret, makeCoverageResponse(revURL, cov))
 	}
 
 	return ret
