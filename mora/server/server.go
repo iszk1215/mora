@@ -74,8 +74,6 @@ type MoraServer struct {
 
 	sessionManager     *MoraSessionManager
 	frontendFileServer http.Handler
-
-	moraCoverageProvider *MoraCoverageProvider
 }
 
 func parseRepoURL(str string) (string, string, string, error) {
@@ -386,11 +384,9 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 	moraCoverageProvider := NewMoraCoverageProvider(store)
-
 	coverage := NewCoverageService(moraCoverageProvider)
 
 	s.coverage = coverage
-	s.moraCoverageProvider = moraCoverageProvider
 
 	if err != nil {
 		log.Err(err).Msg("init_store")
