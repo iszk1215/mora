@@ -75,12 +75,12 @@ type (
 		Coverages() []*Coverage
 		AddCoverage(*Coverage) error
 		FindByURLandID(string, int) *Coverage
+		FindByRepoURL(string) []*Coverage
 	}
 
 	CoverageService struct {
-		provider  CoverageProvider
-		repos     []string
-		coverages map[string][]*Coverage
+		provider CoverageProvider
+		repos    []string
 		sync.Mutex
 	}
 
@@ -152,24 +152,15 @@ func NewCoverageService(provider CoverageProvider) *CoverageService {
 }
 
 func (s *CoverageService) Sync() {
-	coverages := map[string][]*Coverage{}
 	repos := mapset.NewSet[string]()
 	for _, cov := range s.provider.Coverages() {
 		url := cov.URL
 		repos.Add(url)
-		coverages[url] = append(coverages[url], cov)
-	}
-
-	for _, list := range coverages {
-		sort.Slice(list, func(i, j int) bool {
-			return list[i].Timestamp.Before(list[j].Timestamp)
-		})
 	}
 
 	s.Lock()
 	defer s.Unlock()
 	s.repos = repos.ToSlice()
-	s.coverages = coverages
 }
 
 func (s *CoverageService) Repos() []string {
@@ -283,14 +274,19 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
-	_, ok := s.coverages[repo.Link]
-	if !ok {
+	coverages := s.provider.FindByRepoURL(repo.Link)
+
+	if len(coverages) == 0 {
 		log.Error().Msgf("Unknown repo.Link: %s", repo.Link)
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
 
-	resp := makeCoverageResponseList(scm, repo, s.coverages[repo.Link])
+	sort.Slice(coverages, func(i, j int) bool {
+		return coverages[i].Timestamp.Before(coverages[j].Timestamp)
+	})
+
+	resp := makeCoverageResponseList(scm, repo, coverages)
 	render.JSON(w, resp, http.StatusOK)
 }
 
