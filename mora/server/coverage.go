@@ -18,31 +18,16 @@ type (
 	}
 
 	Coverage struct {
-		url      string
-		revision string
-		time     time.Time
-		entries  []*CoverageEntry
+		ID        int
+		RepoURL   string
+		Revision  string
+		Timestamp time.Time
+		Entries   []*CoverageEntry
 	}
 )
 
-func (c *Coverage) RepoURL() string {
-	return c.url
-}
-
-func (c *Coverage) Time() time.Time {
-	return c.time
-}
-
-func (c *Coverage) Revision() string {
-	return c.revision
-}
-
-func (c *Coverage) Entries() []*CoverageEntry {
-	return c.entries
-}
-
 func (c *Coverage) FindEntry(name string) *CoverageEntry {
-	for _, e := range c.Entries() {
+	for _, e := range c.Entries {
 		if e.Name == name {
 			return e
 		}
@@ -74,17 +59,17 @@ func mergeEntry(a, b *CoverageEntry) *CoverageEntry {
 }
 
 func mergeCoverage(a, b *Coverage) (*Coverage, error) {
-	if a.url != b.url || a.revision != b.revision {
-		return nil, fmt.Errorf("can not merge two coverages with different urls and/or revisions")
+	if a.RepoURL != b.RepoURL || a.Revision != b.Revision {
+		return nil, fmt.Errorf("can not merge two coverages with different URLs and/or revisions")
 	}
 
 	entries := map[string]*CoverageEntry{}
 
-	for _, e := range a.entries {
+	for _, e := range a.Entries {
 		entries[e.Name] = e
 	}
 
-	for _, e := range b.entries {
+	for _, e := range b.Entries {
 		ea, ok := entries[e.Name]
 		if ok {
 			entries[e.Name] = mergeEntry(ea, e)
@@ -99,10 +84,10 @@ func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 	})
 
 	merged := &Coverage{
-		url:      a.url,
-		revision: a.revision,
-		time:     a.time,
-		entries:  tmp,
+		RepoURL:   a.RepoURL,
+		Revision:  a.Revision,
+		Timestamp: a.Timestamp,
+		Entries:   tmp,
 	}
 
 	return merged, nil

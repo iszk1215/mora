@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS coverage (
 )`
 
 type ScanedCoverage struct {
+	ID       int       `db:"id"`
 	RepoURL  string    `db:"url"`
 	Revision string    `db:"revision"`
 	Time     time.Time `db:"time"`
@@ -87,6 +88,6 @@ func (s *CoverageStoreSQLX) Put(cov ScanedCoverage) error {
 
 func (s *CoverageStoreSQLX) Scan() ([]ScanedCoverage, error) {
 	rows := []ScanedCoverage{}
-	err := s.db.Select(&rows, "SELECT url, revision, time, contents FROM coverage")
+	err := s.db.Select(&rows, "SELECT id, url, revision, time, contents FROM coverage")
 	return rows, err
 }

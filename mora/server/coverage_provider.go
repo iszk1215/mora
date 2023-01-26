@@ -37,6 +37,25 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
+func (p *MoraCoverageProvider) FindByURLandID(url string, id int) *Coverage {
+	for _, cov := range p.coverages {
+		if cov.ID == id && cov.RepoURL == url {
+			return cov
+		}
+	}
+	return nil
+}
+
+func (p *MoraCoverageProvider) FindByRepoURL(url string) []*Coverage {
+	found := []*Coverage{}
+	for _, cov := range p.coverages {
+		if cov.RepoURL == url {
+			found = append(found, cov)
+		}
+	}
+	return found
+}
+
 // contents is serialized []CoverageEntryUploadRequest
 func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
 	var req []*CoverageEntryUploadRequest
@@ -61,10 +80,11 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 	}
 
 	cov := &Coverage{}
-	cov.url = record.RepoURL
-	cov.revision = record.Revision
-	cov.entries = entries
-	cov.time = record.Time
+	cov.ID = record.ID
+	cov.RepoURL = record.RepoURL
+	cov.Revision = record.Revision
+	cov.Entries = entries
+	cov.Timestamp = record.Time
 
 	return cov, nil
 }
@@ -90,7 +110,7 @@ func loadFromStore(store CoverageStore) ([]*Coverage, error) {
 
 func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {
 	for i, c := range p.coverages {
-		if c.RepoURL() == cov.RepoURL() && c.Revision() == cov.Revision() {
+		if c.RepoURL == cov.RepoURL && c.Revision == cov.Revision {
 			return i
 		}
 	}
@@ -121,13 +141,13 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 	}
 
 	var requests []*CoverageEntryUploadRequest
-	for _, e := range cov.entries {
+	for _, e := range cov.Entries {
 		requests = append(requests,
 			&CoverageEntryUploadRequest{
-				EntryName: e.Name,
-				Hits:      e.Hits,
-				Lines:     e.Lines,
-				Profiles:  pie.Values(e.Profiles),
+				Name:     e.Name,
+				Hits:     e.Hits,
+				Lines:    e.Lines,
+				Profiles: pie.Values(e.Profiles),
 			})
 	}
 
@@ -137,9 +157,9 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 	}
 
 	scaned := ScanedCoverage{
-		RepoURL:  cov.RepoURL(),
-		Revision: cov.Revision(),
-		Time:     cov.Time(),
+		RepoURL:  cov.RepoURL,
+		Revision: cov.Revision,
+		Time:     cov.Timestamp,
 		Contents: string(contents),
 	}
 

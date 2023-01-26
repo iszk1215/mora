@@ -25,10 +25,10 @@ func (s *MockStore) Put(cov ScanedCoverage) error {
 
 func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 	cov := Coverage{
-		url:      "http://mockscm.com/mockowner/mockrepo",
-		revision: "012345",
-		time:     time.Now(),
-		entries: []*CoverageEntry{
+		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
+		Revision:  "012345",
+		Timestamp: time.Now(),
+		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  13,
@@ -63,10 +63,10 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 
 func TestHandlerAddCoveragedMerge(t *testing.T) {
 	existing := Coverage{
-		url:      "http://mockscm.com/mockowner/mockrepo",
-		revision: "012345",
-		time:     time.Now(),
-		entries: []*CoverageEntry{
+		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
+		Revision:  "012345",
+		Timestamp: time.Now(),
+		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  13,
@@ -84,10 +84,10 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 	}
 
 	added := Coverage{
-		url:      "http://mockscm.com/mockowner/mockrepo",
-		revision: "012345",
-		time:     time.Now(),
-		entries: []*CoverageEntry{
+		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
+		Revision:  "012345",
+		Timestamp: time.Now(),
+		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  0,
@@ -136,25 +136,35 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 	cov, err := parseScanedCoverage(*store.got)
 	require.NoError(t, err)
 
-	assert.Equal(t, []*CoverageEntry{&want}, cov.Entries())
+	assert.Equal(t, []*CoverageEntry{&want}, cov.Entries)
 }
 
 func TestMoraCoverageProviderNew(t *testing.T) {
+	want := Coverage{
+		ID:        123,
+		RepoURL:   "url",
+		Revision:  "0123",
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
+			{
+				Name:     "go",
+				Hits:     1,
+				Lines:    2,
+				Profiles: map[string]*profile.Profile{}},
+		},
+	}
+
 	rec := ScanedCoverage{
-		RepoURL:  "url",
-		Revision: "0123",
-		Time:     time.Now(),
+		ID:       want.ID,
+		RepoURL:  want.RepoURL,
+		Revision: want.Revision,
+		Time:     want.Timestamp,
 		Contents: `[{"entry":"go","hits":1,"lines":2}]`,
 	}
 
 	store := MockStore{rec: []ScanedCoverage{rec}}
 
 	provider := NewMoraCoverageProvider(&store)
-	coverages := provider.Coverages()
-	require.Equal(t, 1, len(coverages))
-
-	cov := coverages[0]
-	assert.Equal(t, rec.RepoURL, cov.RepoURL())
-	assert.Equal(t, rec.Revision, cov.Revision())
-	assert.Equal(t, rec.Time, cov.Time())
+	got := provider.Coverages()
+	assert.Equal(t, []*Coverage{&want}, got)
 }

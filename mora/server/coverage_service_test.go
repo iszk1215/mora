@@ -19,14 +19,14 @@ import (
 )
 
 func assertEqualCoverageAndResponse(t *testing.T, want Coverage, got CoverageResponse) bool {
-	ok := assert.True(t, want.Time().Equal(got.Time))
-	ok = ok && assert.Equal(t, want.Revision(), got.Revision)
+	ok := assert.True(t, want.Timestamp.Equal(got.Timestamp))
+	ok = ok && assert.Equal(t, want.Revision, got.Revision)
 
-	ok = ok && assert.Equal(t, len(want.Entries()), len(got.Entries))
-	if len(want.Entries()) != len(got.Entries) {
+	ok = ok && assert.Equal(t, len(want.Entries), len(got.Entries))
+	if len(want.Entries) != len(got.Entries) {
 		return false
 	}
-	for i, a := range want.Entries() {
+	for i, a := range want.Entries {
 		b := got.Entries[i]
 		ok = ok && assert.Equal(t, a.Name, b.Name)
 		ok = ok && assert.Equal(t, a.Lines, b.Lines)
@@ -64,24 +64,24 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	}
 
 	req := CoverageUploadRequest{
-		RepoURL:  url,
-		Revision: revision,
-		Time:     now,
+		RepoURL:   url,
+		Revision:  revision,
+		Timestamp: now,
 		Entries: []*CoverageEntryUploadRequest{
 			{
-				EntryName: "go",
-				Hits:      0,
-				Lines:     3,
-				Profiles:  []*profile.Profile{&prof},
+				Name:     "go",
+				Hits:     0,
+				Lines:    3,
+				Profiles: []*profile.Profile{&prof},
 			},
 		},
 	}
 
 	want := Coverage{
-		url:      url,
-		revision: revision,
-		time:     now,
-		entries: []*CoverageEntry{
+		RepoURL:   url,
+		Revision:  revision,
+		Timestamp: now,
+		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  0,
@@ -113,6 +113,7 @@ func testCoverageListResponse(t *testing.T, want []Coverage, res *http.Response)
 
 func Test_injectCoverage(t *testing.T) {
 	var got *Coverage = nil
+
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		cov, ok := CoverageFrom(r.Context())
 		require.True(t, ok)
@@ -122,16 +123,16 @@ func Test_injectCoverage(t *testing.T) {
 	repo := &Repo{Link: "link"}
 
 	want := Coverage{
-		url:      repo.Link,
-		revision: "revision",
-		time:     time.Now().Round(0),
-		entries:  nil,
+		ID:        123,
+		RepoURL:   repo.Link,
+		Revision:  "revision",
+		Timestamp: time.Now().Round(0),
+		Entries:   nil,
 	}
 
-	s := NewCoverageService(nil)
-	s.coverages = map[string][]*Coverage{
-		repo.Link: {&want},
-	}
+	p := NewMoraCoverageProvider(nil)
+	p.AddCoverage(&want)
+	s := NewCoverageService(p)
 
 	r := chi.NewRouter()
 	r.Route("/{index}", func(r chi.Router) {
@@ -139,7 +140,7 @@ func Test_injectCoverage(t *testing.T) {
 		r.Get("/", handler)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
+	req := httptest.NewRequest(http.MethodGet, "/123", strings.NewReader(""))
 	req = req.WithContext(WithRepo(req.Context(), repo))
 	w := httptest.NewRecorder()
 
@@ -193,10 +194,10 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
 
 	cov := Coverage{
-		url:      "dummyURL",
-		revision: "abcde",
-		time:     time.Now().Round(0),
-		entries: []*CoverageEntry{
+		RepoURL:   "dummyURL",
+		Revision:  "abcde",
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
 			{
 				Name:     "cc",
 				Hits:     20,
@@ -235,8 +236,8 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := Coverage{url: repo.Link, time: time0, revision: "abc123"}
-	cov1 := Coverage{url: repo.Link, time: time1, revision: "abc124"}
+	cov0 := Coverage{RepoURL: repo.Link, Timestamp: time0, Revision: "abc123"}
+	cov1 := Coverage{RepoURL: repo.Link, Timestamp: time1, Revision: "abc124"}
 	p.AddCoverage(&cov0)
 	p.AddCoverage(&cov1)
 
@@ -248,17 +249,23 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 }
 
 func Test_CoverageService_FileList(t *testing.T) {
-	filename := "test.go"
-	revision := "revision"
-
 	scm := NewMockSCM("mock")
-	repo := &Repo{Link: "link"}
+	p := NewMoraCoverageProvider(nil)
+	s := NewCoverageService(p)
+
+	repoURL := "http://mock.scm/org/name"
+	filename := "test.go"
+	revision := "abcde"
+	timestamp := time.Now().Round(0)
+
+	repo := &Repo{Link: repoURL}
 
 	cov := Coverage{
-		url:      repo.Link,
-		revision: revision,
-		time:     time.Now().Round(0),
-		entries: []*CoverageEntry{
+		ID:        123,
+		RepoURL:   repoURL,
+		Revision:  revision,
+		Timestamp: timestamp,
+		Entries: []*CoverageEntry{
 			{
 				Name:  "go",
 				Hits:  13,
@@ -275,14 +282,11 @@ func Test_CoverageService_FileList(t *testing.T) {
 		},
 	}
 
-	p := NewMoraCoverageProvider(nil)
-	p.coverages = []*Coverage{&cov}
-
-	s := NewCoverageService(p)
+	p.AddCoverage(&cov)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
-	req := httptest.NewRequest(http.MethodGet, "/0/go/files", strings.NewReader(""))
+	req := httptest.NewRequest(http.MethodGet, "/123/go/files", strings.NewReader(""))
 	ctx := req.Context()
 	ctx = WithMoraSession(ctx, sess)
 	ctx = WithSCM(ctx, scm)
@@ -310,15 +314,15 @@ func Test_CoverageService_FileList(t *testing.T) {
 
 	metaRes := MetaResonse{
 		Revision:    revision,
-		RevisionURL: repo.Link + "/revision/" + revision, // MockSCM
-		Time:        cov.time,
+		RevisionURL: repoURL + "/revision/" + revision, // MockSCM
+		Time:        cov.Timestamp,
 		Hits:        13,
 		Lines:       17,
 	}
 
 	want := FileListResponse{
-		Files: []*FileResponse{&fileRes},
-		Meta:  metaRes,
+		Files:    []*FileResponse{&fileRes},
+		Metadata: metaRes,
 	}
 
 	assert.Equal(t, want, got)
@@ -354,10 +358,10 @@ func Test_CoverageService_File(t *testing.T) {
 	repo := &Repo{Namespace: orgName, Name: repoName, Link: repoURL}
 
 	cov := Coverage{
-		url:      repo.Link,
-		revision: revision,
-		time:     time.Now().Round(0),
-		entries: []*CoverageEntry{
+		RepoURL:   repo.Link,
+		Revision:  revision,
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
 			{
 				Name:  entryName,
 				Hits:  13,

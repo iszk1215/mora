@@ -70,10 +70,10 @@ func parseFile(filename, entryName string, root fs.FS) (*server.CoverageEntryUpl
 	}
 
 	e := &server.CoverageEntryUploadRequest{
-		EntryName: entryName,
-		Profiles:  profiles,
-		Hits:      hits,
-		Lines:     lines,
+		Name:     entryName,
+		Profiles: profiles,
+		Hits:     hits,
+		Lines:    lines,
 	}
 
 	return e, nil
@@ -176,10 +176,10 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 	}
 
 	req := &server.CoverageUploadRequest{
-		RepoURL:  url,
-		Revision: commit.Hash.String(),
-		Time:     commit.Committer.When,
-		Entries:  entries,
+		RepoURL:   url,
+		Revision:  commit.Hash.String(),
+		Timestamp: commit.Committer.When,
+		Entries:   entries,
 	}
 
 	return req, nil
@@ -209,7 +209,7 @@ func printRequest(req *server.CoverageUploadRequest) {
 
 	fmt.Printf("%-20s%s\n", "Repository", req.RepoURL)
 	fmt.Printf("%-20s%s\n", "Revision", req.Revision)
-	fmt.Printf("%-20s%s\n", "Time:", req.Time)
+	fmt.Printf("%-20s%s\n", "Time:", req.Timestamp)
 	fmt.Printf("%-20s%.1f%% (%d Hit / %d Lines, %d Files)\n", "Coverage",
 		float64(s.Hits)*100.0/float64(s.Lines), s.Hits, s.Lines, nfiles)
 

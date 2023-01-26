@@ -20,14 +20,17 @@ import (
 )
 
 type (
+	// handleCoverageList
 	CoverageResponse struct {
 		Index       int              `json:"index"`
 		RevisionURL string           `json:"revision_url"`
 		Revision    string           `json:"revision"`
-		Time        time.Time        `json:"time"`
+		Timestamp   time.Time        `json:"time"`
 		Entries     []*CoverageEntry `json:"entries"`
+		// profiles are emptry
 	}
 
+	// hanldleFileList
 	FileResponse struct {
 		FileName string `json:"filename"`
 		Hits     int    `json:"hits"`
@@ -43,39 +46,41 @@ type (
 	}
 
 	FileListResponse struct {
-		Meta  MetaResonse     `json:"meta"`
-		Files []*FileResponse `json:"files"`
+		Metadata MetaResonse     `json:"meta"`
+		Files    []*FileResponse `json:"files"`
 	}
 
+	// handleFile
 	CodeResponse struct {
 		FileName string  `json:"filename"`
 		Code     string  `json:"code"`
 		Blocks   [][]int `json:"blocks"`
 	}
 
+	// Upload
 	CoverageEntryUploadRequest struct {
-		EntryName string             `json:"entry"`
-		Hits      int                `json:"hits"`
-		Lines     int                `json:"lines"`
-		Profiles  []*profile.Profile `json:"profiles"`
+		Name     string             `json:"entry"`
+		Hits     int                `json:"hits"`
+		Lines    int                `json:"lines"`
+		Profiles []*profile.Profile `json:"profiles"`
 	}
 
 	CoverageUploadRequest struct {
-		RepoURL  string                        `json:"repo"`
-		Revision string                        `json:"revision"`
-		Time     time.Time                     `json:"time"`
-		Entries  []*CoverageEntryUploadRequest `json:"entries"`
+		RepoURL   string                        `json:"repo"`
+		Revision  string                        `json:"revision"`
+		Timestamp time.Time                     `json:"time"`
+		Entries   []*CoverageEntryUploadRequest `json:"entries"`
 	}
 
 	CoverageProvider interface {
 		Coverages() []*Coverage
 		AddCoverage(*Coverage) error
+		FindByURLandID(string, int) *Coverage
+		FindByRepoURL(string) []*Coverage
 	}
 
 	CoverageService struct {
-		provider  CoverageProvider
-		repos     []string
-		coverages map[string][]*Coverage
+		provider CoverageProvider
 		sync.Mutex
 	}
 
@@ -88,7 +93,7 @@ const (
 )
 
 func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
-	if req.EntryName == "" {
+	if req.Name == "" {
 		return nil, errors.New("entry name is empty")
 	}
 
@@ -98,7 +103,7 @@ func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*Coverage
 	}
 
 	entry := &CoverageEntry{}
-	entry.Name = req.EntryName
+	entry.Name = req.Name
 	entry.Profiles = files
 	entry.Hits = req.Hits
 	entry.Lines = req.Lines
@@ -130,45 +135,27 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	}
 
 	cov := &Coverage{}
-	cov.url = req.RepoURL
-	cov.revision = req.Revision
-	cov.entries = entries
-	cov.time = req.Time
+	cov.RepoURL = req.RepoURL
+	cov.Revision = req.Revision
+	cov.Entries = entries
+	cov.Timestamp = req.Timestamp
 
 	return cov, nil
 }
 
 func NewCoverageService(provider CoverageProvider) *CoverageService {
 	s := &CoverageService{provider: provider}
-	if provider != nil {
-		s.Sync()
-	}
 	return s
 }
 
-func (s *CoverageService) Sync() {
-	coverages := map[string][]*Coverage{}
+func (s *CoverageService) Repos() []string {
 	repos := mapset.NewSet[string]()
 	for _, cov := range s.provider.Coverages() {
-		url := cov.RepoURL()
+		url := cov.RepoURL
 		repos.Add(url)
-		coverages[url] = append(coverages[url], cov)
 	}
 
-	for _, list := range coverages {
-		sort.Slice(list, func(i, j int) bool {
-			return list[i].Time().Before(list[j].Time())
-		})
-	}
-
-	s.Lock()
-	defer s.Unlock()
-	s.repos = repos.ToSlice()
-	s.coverages = coverages
-}
-
-func (s *CoverageService) Repos() []string {
-	return s.repos
+	return repos.ToSlice()
 }
 
 func withCoverage(ctx context.Context, cov *Coverage) context.Context {
@@ -212,8 +199,14 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 	})
 }
 
-func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
+func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.provider == nil {
+			log.Print("No provider enabled")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
 		repo, ok := RepoFrom(r.Context())
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
@@ -227,28 +220,26 @@ func (m *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		coverages := m.coverages[repo.Link]
-		if index < 0 || index >= len(coverages) {
-			log.Error().Msgf("coverage index is out of range: index=%d", index)
+		cov := s.provider.FindByURLandID(repo.Link, index)
+		if cov == nil {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-
-		r = r.WithContext(withCoverage(r.Context(), coverages[index]))
+		r = r.WithContext(withCoverage(r.Context(), cov))
 		next.ServeHTTP(w, r)
 	})
 }
 
-func makeCoverageResponse(revisionURL string, cov *Coverage, index int) CoverageResponse {
+func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	resp := CoverageResponse{
-		Index:       index,
-		Time:        cov.Time(),
-		Revision:    cov.Revision(),
+		Index:       cov.ID,
+		Timestamp:   cov.Timestamp,
+		Revision:    cov.Revision,
 		RevisionURL: revisionURL,
 		Entries:     []*CoverageEntry{},
 	}
 
-	for _, e := range cov.Entries() {
+	for _, e := range cov.Entries {
 		f := &CoverageEntry{
 			Name:  e.Name,
 			Hits:  e.Hits,
@@ -262,9 +253,9 @@ func makeCoverageResponse(revisionURL string, cov *Coverage, index int) Coverage
 
 func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
 	var ret []CoverageResponse
-	for i, cov := range coverages {
-		revURL := scm.RevisionURL(repo.Link, cov.Revision())
-		ret = append(ret, makeCoverageResponse(revURL, cov, i))
+	for _, cov := range coverages {
+		revURL := scm.RevisionURL(repo.Link, cov.Revision)
+		ret = append(ret, makeCoverageResponse(revURL, cov))
 	}
 
 	return ret
@@ -274,14 +265,19 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
-	_, ok := s.coverages[repo.Link]
-	if !ok {
+	coverages := s.provider.FindByRepoURL(repo.Link)
+
+	if len(coverages) == 0 {
 		log.Error().Msgf("Unknown repo.Link: %s", repo.Link)
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
 
-	resp := makeCoverageResponseList(scm, repo, s.coverages[repo.Link])
+	sort.Slice(coverages, func(i, j int) bool {
+		return coverages[i].Timestamp.Before(coverages[j].Timestamp)
+	})
+
+	resp := makeCoverageResponseList(scm, repo, coverages)
 	render.JSON(w, resp, http.StatusOK)
 }
 
@@ -298,10 +294,10 @@ func makeFileListResponse(scm SCM, repo *Repo, cov *Coverage, entry *CoverageEnt
 
 	return FileListResponse{
 		Files: files,
-		Meta: MetaResonse{
-			Revision:    cov.Revision(),
-			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision()),
-			Time:        cov.Time(),
+		Metadata: MetaResonse{
+			Revision:    cov.Revision,
+			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
+			Time:        cov.Timestamp,
 			Hits:        entry.Hits,
 			Lines:       entry.Lines,
 		},
@@ -359,7 +355,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code, err := getSourceCode(r.Context(), cov.Revision(), file)
+	code, err := getSourceCode(r.Context(), cov.Revision, file)
 	if err != nil {
 		log.Error().Err(err).Msg("handleFile")
 		render.NotFound(w, render.ErrNotFound)
@@ -410,9 +406,6 @@ func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error
 	cov, err := parseCoverageUploadRequest(req)
 	if err == nil {
 		err = s.provider.AddCoverage(cov)
-	}
-	if err == nil {
-		s.Sync()
 	}
 
 	return err
