@@ -70,10 +70,10 @@ func parseFile(filename, entryName string, root fs.FS) (*server.CoverageEntryUpl
 	}
 
 	e := &server.CoverageEntryUploadRequest{
-		EntryName: entryName,
-		Profiles:  profiles,
-		Hits:      hits,
-		Lines:     lines,
+		Name:     entryName,
+		Profiles: profiles,
+		Hits:     hits,
+		Lines:    lines,
 	}
 
 	return e, nil

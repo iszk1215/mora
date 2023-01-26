@@ -144,10 +144,10 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 	for _, e := range cov.Entries {
 		requests = append(requests,
 			&CoverageEntryUploadRequest{
-				EntryName: e.Name,
-				Hits:      e.Hits,
-				Lines:     e.Lines,
-				Profiles:  pie.Values(e.Profiles),
+				Name:     e.Name,
+				Hits:     e.Hits,
+				Lines:    e.Lines,
+				Profiles: pie.Values(e.Profiles),
 			})
 	}
 

@@ -58,10 +58,10 @@ type (
 
 	// Upload
 	CoverageEntryUploadRequest struct {
-		EntryName string             `json:"entry"`
-		Hits      int                `json:"hits"`
-		Lines     int                `json:"lines"`
-		Profiles  []*profile.Profile `json:"profiles"`
+		Name     string             `json:"entry"`
+		Hits     int                `json:"hits"`
+		Lines    int                `json:"lines"`
+		Profiles []*profile.Profile `json:"profiles"`
 	}
 
 	CoverageUploadRequest struct {
@@ -92,7 +92,7 @@ const (
 )
 
 func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
-	if req.EntryName == "" {
+	if req.Name == "" {
 		return nil, errors.New("entry name is empty")
 	}
 
@@ -102,7 +102,7 @@ func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*Coverage
 	}
 
 	entry := &CoverageEntry{}
-	entry.Name = req.EntryName
+	entry.Name = req.Name
 	entry.Profiles = files
 	entry.Hits = req.Hits
 	entry.Lines = req.Lines

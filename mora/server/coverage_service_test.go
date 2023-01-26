@@ -69,10 +69,10 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 		Time:     now,
 		Entries: []*CoverageEntryUploadRequest{
 			{
-				EntryName: "go",
-				Hits:      0,
-				Lines:     3,
-				Profiles:  []*profile.Profile{&prof},
+				Name:     "go",
+				Hits:     0,
+				Lines:    3,
+				Profiles: []*profile.Profile{&prof},
 			},
 		},
 	}
