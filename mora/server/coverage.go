@@ -19,7 +19,7 @@ type (
 
 	Coverage struct {
 		ID        int
-		URL       string
+		RepoURL   string
 		Revision  string
 		Timestamp time.Time
 		Entries   []*CoverageEntry
@@ -59,7 +59,7 @@ func mergeEntry(a, b *CoverageEntry) *CoverageEntry {
 }
 
 func mergeCoverage(a, b *Coverage) (*Coverage, error) {
-	if a.URL != b.URL || a.Revision != b.Revision {
+	if a.RepoURL != b.RepoURL || a.Revision != b.Revision {
 		return nil, fmt.Errorf("can not merge two coverages with different URLs and/or revisions")
 	}
 
@@ -84,7 +84,7 @@ func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 	})
 
 	merged := &Coverage{
-		URL:       a.URL,
+		RepoURL:   a.RepoURL,
 		Revision:  a.Revision,
 		Timestamp: a.Timestamp,
 		Entries:   tmp,

@@ -64,9 +64,9 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	}
 
 	req := CoverageUploadRequest{
-		RepoURL:  url,
-		Revision: revision,
-		Time:     now,
+		RepoURL:   url,
+		Revision:  revision,
+		Timestamp: now,
 		Entries: []*CoverageEntryUploadRequest{
 			{
 				Name:     "go",
@@ -78,7 +78,7 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	}
 
 	want := Coverage{
-		URL:       url,
+		RepoURL:   url,
 		Revision:  revision,
 		Timestamp: now,
 		Entries: []*CoverageEntry{
@@ -124,7 +124,7 @@ func Test_injectCoverage(t *testing.T) {
 
 	want := Coverage{
 		ID:        123,
-		URL:       repo.Link,
+		RepoURL:   repo.Link,
 		Revision:  "revision",
 		Timestamp: time.Now().Round(0),
 		Entries:   nil,
@@ -194,7 +194,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
 
 	cov := Coverage{
-		URL:       "dummyURL",
+		RepoURL:   "dummyURL",
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -236,8 +236,8 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := Coverage{URL: repo.Link, Timestamp: time0, Revision: "abc123"}
-	cov1 := Coverage{URL: repo.Link, Timestamp: time1, Revision: "abc124"}
+	cov0 := Coverage{RepoURL: repo.Link, Timestamp: time0, Revision: "abc123"}
+	cov1 := Coverage{RepoURL: repo.Link, Timestamp: time1, Revision: "abc124"}
 	p.AddCoverage(&cov0)
 	p.AddCoverage(&cov1)
 
@@ -262,7 +262,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 
 	cov := Coverage{
 		ID:        123,
-		URL:       repoURL,
+		RepoURL:   repoURL,
 		Revision:  revision,
 		Timestamp: timestamp,
 		Entries: []*CoverageEntry{
@@ -358,7 +358,7 @@ func Test_CoverageService_File(t *testing.T) {
 	repo := &Repo{Namespace: orgName, Name: repoName, Link: repoURL}
 
 	cov := Coverage{
-		URL:       repo.Link,
+		RepoURL:   repo.Link,
 		Revision:  revision,
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{

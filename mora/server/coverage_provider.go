@@ -39,7 +39,7 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 
 func (p *MoraCoverageProvider) FindByURLandID(url string, id int) *Coverage {
 	for _, cov := range p.coverages {
-		if cov.ID == id && cov.URL == url {
+		if cov.ID == id && cov.RepoURL == url {
 			return cov
 		}
 	}
@@ -49,7 +49,7 @@ func (p *MoraCoverageProvider) FindByURLandID(url string, id int) *Coverage {
 func (p *MoraCoverageProvider) FindByRepoURL(url string) []*Coverage {
 	found := []*Coverage{}
 	for _, cov := range p.coverages {
-		if cov.URL == url {
+		if cov.RepoURL == url {
 			found = append(found, cov)
 		}
 	}
@@ -81,7 +81,7 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 
 	cov := &Coverage{}
 	cov.ID = record.ID
-	cov.URL = record.RepoURL
+	cov.RepoURL = record.RepoURL
 	cov.Revision = record.Revision
 	cov.Entries = entries
 	cov.Timestamp = record.Time
@@ -110,7 +110,7 @@ func loadFromStore(store CoverageStore) ([]*Coverage, error) {
 
 func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {
 	for i, c := range p.coverages {
-		if c.URL == cov.URL && c.Revision == cov.Revision {
+		if c.RepoURL == cov.RepoURL && c.Revision == cov.Revision {
 			return i
 		}
 	}
@@ -157,7 +157,7 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 	}
 
 	scaned := ScanedCoverage{
-		RepoURL:  cov.URL,
+		RepoURL:  cov.RepoURL,
 		Revision: cov.Revision,
 		Time:     cov.Timestamp,
 		Contents: string(contents),

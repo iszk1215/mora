@@ -68,7 +68,7 @@ func TestMergeCoverage(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		URL:       url,
+		RepoURL:   url,
 		Revision:  revision,
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -89,7 +89,7 @@ func TestMergeCoverage(t *testing.T) {
 	}
 
 	coverage1 := Coverage{
-		URL:       url,
+		RepoURL:   url,
 		Revision:  revision,
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -113,7 +113,7 @@ func TestMergeCoverage(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := Coverage{
-		URL:       url,
+		RepoURL:   url,
 		Revision:  revision,
 		Timestamp: coverage0.Timestamp,
 		Entries: []*CoverageEntry{ // alphabetical
@@ -154,14 +154,14 @@ func TestMergeCoverageErrorUrl(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		URL:       url,
+		RepoURL:   url,
 		Revision:  revision,
 		Timestamp: time.Now(),
 		Entries:   nil,
 	}
 
 	coverage1 := Coverage{
-		URL:       "http://foo.com/bar",
+		RepoURL:   "http://foo.com/bar",
 		Revision:  revision,
 		Timestamp: time.Now(),
 	}
@@ -175,14 +175,14 @@ func TestMergeCoverageErrorRevision(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		URL:       url,
+		RepoURL:   url,
 		Revision:  revision,
 		Timestamp: time.Now(),
 		Entries:   nil,
 	}
 
 	coverage1 := Coverage{
-		URL:       url,
+		RepoURL:   url,
 		Revision:  "3456",
 		Timestamp: time.Now(),
 	}

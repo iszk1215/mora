@@ -25,7 +25,7 @@ func (s *MockStore) Put(cov ScanedCoverage) error {
 
 func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 	cov := Coverage{
-		URL:       "http://mockscm.com/mockowner/mockrepo",
+		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
 		Revision:  "012345",
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -63,7 +63,7 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 
 func TestHandlerAddCoveragedMerge(t *testing.T) {
 	existing := Coverage{
-		URL:       "http://mockscm.com/mockowner/mockrepo",
+		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
 		Revision:  "012345",
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -84,7 +84,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 	}
 
 	added := Coverage{
-		URL:       "http://mockscm.com/mockowner/mockrepo",
+		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
 		Revision:  "012345",
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -142,7 +142,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 func TestMoraCoverageProviderNew(t *testing.T) {
 	want := Coverage{
 		ID:        123,
-		URL:       "url",
+		RepoURL:   "url",
 		Revision:  "0123",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -156,7 +156,7 @@ func TestMoraCoverageProviderNew(t *testing.T) {
 
 	rec := ScanedCoverage{
 		ID:       want.ID,
-		RepoURL:  want.URL,
+		RepoURL:  want.RepoURL,
 		Revision: want.Revision,
 		Time:     want.Timestamp,
 		Contents: `[{"entry":"go","hits":1,"lines":2}]`,

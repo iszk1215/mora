@@ -27,6 +27,7 @@ type (
 		Revision    string           `json:"revision"`
 		Timestamp   time.Time        `json:"time"`
 		Entries     []*CoverageEntry `json:"entries"`
+		// profiles are emptry
 	}
 
 	// hanldleFileList
@@ -65,10 +66,10 @@ type (
 	}
 
 	CoverageUploadRequest struct {
-		RepoURL  string                        `json:"repo"`
-		Revision string                        `json:"revision"`
-		Time     time.Time                     `json:"time"`
-		Entries  []*CoverageEntryUploadRequest `json:"entries"`
+		RepoURL   string                        `json:"repo"`
+		Revision  string                        `json:"revision"`
+		Timestamp time.Time                     `json:"time"`
+		Entries   []*CoverageEntryUploadRequest `json:"entries"`
 	}
 
 	CoverageProvider interface {
@@ -134,10 +135,10 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	}
 
 	cov := &Coverage{}
-	cov.URL = req.RepoURL
+	cov.RepoURL = req.RepoURL
 	cov.Revision = req.Revision
 	cov.Entries = entries
-	cov.Timestamp = req.Time
+	cov.Timestamp = req.Timestamp
 
 	return cov, nil
 }
@@ -150,7 +151,7 @@ func NewCoverageService(provider CoverageProvider) *CoverageService {
 func (s *CoverageService) Repos() []string {
 	repos := mapset.NewSet[string]()
 	for _, cov := range s.provider.Coverages() {
-		url := cov.URL
+		url := cov.RepoURL
 		repos.Add(url)
 	}
 
