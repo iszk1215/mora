@@ -23,18 +23,41 @@ var (
 	errorTokenNotFound = errors.New("token not found in a session")
 )
 
-type Repo = scm.Repository
+type (
+	Repo = scm.Repository
 
-// Source Code Management System
-type SCM interface {
-	Name() string // unique name in mora
-	URL() *url.URL
-	Client() *scm.Client
-	RevisionURL(baseURL string, revision string) string
-	LoginHandler(next http.Handler) http.Handler
-}
+	// Source Code Management System
+	SCM interface {
+		Name() string // unique name in mora
+		URL() *url.URL
+		Client() *scm.Client
+		RevisionURL(baseURL string, revision string) string
+		LoginHandler(next http.Handler) http.Handler
+	}
 
-type contextKey int
+	contextKey int
+
+	RepoResponse struct {
+		SCM       string `json:"scm"`
+		Namespace string `json:"namespace"`
+		Name      string `json:"name"`
+		Link      string `json:"link"`
+	}
+
+	SCMResponse struct {
+		URL     string `json:"url"`
+		Name    string `json:"name"`
+		Logined bool   `json:"logined"`
+	}
+
+	MoraServer struct {
+		scms     []SCM
+		coverage *CoverageService
+
+		sessionManager     *MoraSessionManager
+		frontendFileServer http.Handler
+	}
+)
 
 const (
 	contextRepoKey contextKey = iota
@@ -60,21 +83,6 @@ func RepoFrom(ctx context.Context) (*Repo, bool) {
 }
 
 // API Handler
-
-type RepoResponse struct {
-	SCM       string `json:"scm"`
-	Namespace string `json:"namespace"`
-	Name      string `json:"name"`
-	Link      string `json:"link"`
-}
-
-type MoraServer struct {
-	scms     []SCM
-	coverage *CoverageService
-
-	sessionManager     *MoraSessionManager
-	frontendFileServer http.Handler
-}
 
 func parseRepoURL(str string) (string, string, string, error) {
 	tmp := strings.Split(str, "/")
@@ -119,12 +127,6 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.JSON(w, repos, http.StatusOK)
-}
-
-type SCMResponse struct {
-	URL     string `json:"url"`
-	Name    string `json:"name"`
-	Logined bool   `json:"logined"`
 }
 
 func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
