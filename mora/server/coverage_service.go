@@ -267,6 +267,8 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 
 	coverages := s.provider.FindByRepoURL(repo.Link)
 
+	log.Print("len(coverages)=", len(coverages))
+
 	if len(coverages) == 0 {
 		log.Error().Msgf("Unknown repo.Link: %s", repo.Link)
 		render.NotFound(w, render.ErrNotFound)

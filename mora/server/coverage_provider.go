@@ -136,6 +136,8 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 	cov = p.addOrMergeCoverage(cov)
 
+	log.Print("len=", len(p.coverages))
+
 	if p.store == nil {
 		return nil
 	}
