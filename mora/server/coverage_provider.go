@@ -127,6 +127,7 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 		p.coverages = append(p.coverages, cov)
 		return cov
 	} else {
+		cov.ID = p.coverages[idx].ID
 		merged, _ := mergeCoverage(p.coverages[idx], cov)
 		p.coverages[idx] = merged
 		return merged
@@ -135,8 +136,6 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 
 func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 	cov = p.addOrMergeCoverage(cov)
-
-	log.Print("len=", len(p.coverages))
 
 	if p.store == nil {
 		return nil
@@ -165,5 +164,11 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 		Contents: string(contents),
 	}
 
-	return p.store.Put(scaned)
+	id, err := p.store.Put(scaned)
+	if err != nil {
+		return err
+	}
+	log.Print("new id is ", id)
+	cov.ID = id
+	return nil
 }

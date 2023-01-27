@@ -28,7 +28,7 @@ type ScanedCoverage struct {
 }
 
 type CoverageStore interface {
-	Put(ScanedCoverage) error
+	Put(ScanedCoverage) (int, error)
 	Scan() ([]ScanedCoverage, error)
 }
 
@@ -56,34 +56,73 @@ func NewCoverageStore(db *sqlx.DB) *CoverageStoreSQLX {
 	return &CoverageStoreSQLX{db: db}
 }
 
-func (s *CoverageStoreSQLX) Put(cov ScanedCoverage) error {
-	s.Lock()
-	defer s.Unlock()
-
+func (s *CoverageStoreSQLX) getCoverageID(cov ScanedCoverage) (int, error) {
 	rows := []int{}
-	err := s.db.Select(&rows, "SELECT id FROM coverage WHERE url = $1 and revision = $2", cov.RepoURL, cov.Revision)
+	err := s.db.Select(&rows,
+		"SELECT id FROM coverage WHERE url = $1 and revision = $2",
+		cov.RepoURL, cov.Revision)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	if len(rows) > 1 {
-		return fmt.Errorf(
+		return 0, fmt.Errorf(
 			"multiple records in store found for url=%s and revision=%s",
 			cov.RepoURL, cov.Revision)
 	}
 
-	if len(rows) == 0 { // insert
+	if len(rows) == 0 {
+		return -1, nil
+	}
+
+	return rows[0], nil
+}
+
+func (s *CoverageStoreSQLX) Put(cov ScanedCoverage) (int, error) {
+	s.Lock()
+	defer s.Unlock()
+
+	/*
+		rows := []int{}
+		err := s.db.Select(&rows,
+			"SELECT id FROM coverage WHERE url = $1 and revision = $2",
+			cov.RepoURL, cov.Revision)
+		if err != nil {
+			return 0, err
+		}
+
+		if len(rows) > 1 {
+			return 0, fmt.Errorf(
+				"multiple records in store found for url=%s and revision=%s",
+				cov.RepoURL, cov.Revision)
+		}
+	*/
+	id, err := s.getCoverageID(cov)
+	if err != nil {
+		return -1, err
+	}
+
+	if id == -1 { // insert
 		log.Print("Insert")
 		_, err = s.db.Exec(
 			"INSERT INTO coverage (url, revision, time, contents) VALUES ($1, $2, $3, $4)",
 			cov.RepoURL, cov.Revision, cov.Time, cov.Contents)
+		if err != nil {
+			return -1, err
+		}
+
+		id, err := s.getCoverageID(cov)
+		if err != nil {
+			return -1, err
+		}
+		return id, nil
 	} else { // update
 		log.Print("Update")
 		_, err = s.db.Exec(
 			"UPDATE coverage SET contents = $1 WHERE url = $2 and revision = $3",
 			cov.Contents, cov.RepoURL, cov.Revision)
+		return id, err
 	}
-	return err
 }
 
 func (s *CoverageStoreSQLX) Scan() ([]ScanedCoverage, error) {
