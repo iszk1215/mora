@@ -37,7 +37,7 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
-func (p *MoraCoverageProvider) FindByURLandID(url string, id int) *Coverage {
+func (p *MoraCoverageProvider) FindByURLandID(url string, id int64) *Coverage {
 	for _, cov := range p.coverages {
 		if cov.ID == id && cov.RepoURL == url {
 			return cov
@@ -164,11 +164,11 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 		Contents: string(contents),
 	}
 
-	id, err := p.store.Put(scaned)
+	err = p.store.Put(&scaned)
 	if err != nil {
 		return err
 	}
-	log.Print("new id is ", id)
-	cov.ID = id
+
+	cov.ID = scaned.ID
 	return nil
 }

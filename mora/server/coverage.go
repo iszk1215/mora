@@ -18,7 +18,7 @@ type (
 	}
 
 	Coverage struct {
-		ID        int
+		ID        int64
 		RepoURL   string
 		Revision  string
 		Timestamp time.Time

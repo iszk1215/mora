@@ -22,7 +22,7 @@ import (
 type (
 	// handleCoverageList
 	CoverageResponse struct {
-		Index       int              `json:"index"`
+		Index       int64            `json:"index"`
 		RevisionURL string           `json:"revision_url"`
 		Revision    string           `json:"revision"`
 		Timestamp   time.Time        `json:"time"`
@@ -75,7 +75,7 @@ type (
 	CoverageProvider interface {
 		Coverages() []*Coverage
 		AddCoverage(*Coverage) error
-		FindByURLandID(string, int) *Coverage
+		FindByURLandID(string, int64) *Coverage
 		FindByRepoURL(string) []*Coverage
 	}
 
@@ -213,7 +213,7 @@ func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		index, err := strconv.Atoi(chi.URLParam(r, "index"))
+		index, err := strconv.ParseInt(chi.URLParam(r, "index"), 10, 64)
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			render.NotFound(w, render.ErrNotFound)

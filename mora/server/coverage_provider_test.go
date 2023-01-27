@@ -18,9 +18,9 @@ func (s *MockStore) Scan() ([]ScanedCoverage, error) {
 	return s.rec, nil
 }
 
-func (s *MockStore) Put(cov ScanedCoverage) (int, error) {
-	s.got = &cov
-	return cov.ID, nil
+func (s *MockStore) Put(cov *ScanedCoverage) error {
+	s.got = cov
+	return nil
 }
 
 func TestMoraCoverageProviderAddCoverage(t *testing.T) {
