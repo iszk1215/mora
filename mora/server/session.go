@@ -30,26 +30,26 @@ func NewMoraSession() *MoraSession {
 	return &MoraSession{map[string]map[string]*Repo{}, map[string]scm.Token{}, time.Now()}
 }
 
-func (s *MoraSession) getReposCache(scm string) map[string]*Repo {
-	return s.reposMap[scm]
+func (s *MoraSession) getReposCache(scmName string) map[string]*Repo {
+	return s.reposMap[scmName]
 }
 
-func (s *MoraSession) setReposCache(scm string, repos map[string]*Repo) {
-	s.reposMap[scm] = repos
+func (s *MoraSession) setReposCache(scmName string, repos map[string]*Repo) {
+	s.reposMap[scmName] = repos
 }
 
-func (s *MoraSession) getToken(scm string) (scm.Token, bool) {
-	token, ok := s.tokenMap[scm]
+func (s *MoraSession) getToken(scmName string) (scm.Token, bool) {
+	token, ok := s.tokenMap[scmName]
 	return token, ok
 }
 
-func (s *MoraSession) setToken(scm string, token scm.Token) {
-	s.tokenMap[scm] = token
+func (s *MoraSession) setToken(scmName string, token scm.Token) {
+	s.tokenMap[scmName] = token
 }
 
-func (s *MoraSession) Remove(scm string) {
-	delete(s.tokenMap, scm)
-	delete(s.reposMap, scm)
+func (s *MoraSession) Remove(scmName string) {
+	delete(s.tokenMap, scmName)
+	delete(s.reposMap, scmName)
 }
 
 func (s *MoraSession) WithToken(ctx context.Context, name string) (context.Context, error) {
