@@ -251,7 +251,7 @@ func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	return resp
 }
 
-func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
+func makeCoverageResponseList(scm SCM, repo Repository, coverages []*Coverage) []CoverageResponse {
 	var ret []CoverageResponse
 	for _, cov := range coverages {
 		revURL := scm.RevisionURL(repo.Link, cov.Revision)
@@ -283,7 +283,7 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func makeFileListResponse(scm SCM, repo *Repo, cov *Coverage, entry *CoverageEntry) FileListResponse {
+func makeFileListResponse(scm SCM, repo Repository, cov *Coverage, entry *CoverageEntry) FileListResponse {
 	files := []*FileResponse{}
 	for _, pr := range entry.Profiles {
 		files = append(files, &FileResponse{

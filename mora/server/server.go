@@ -24,7 +24,14 @@ var (
 )
 
 type (
-	Repo = scm.Repository
+	//Repo = scm.Repository
+
+	Repository struct {
+		ID        int64
+		Namespace string
+		Name      string
+		Link      string
+	}
 
 	// Source Code Management System
 	SCM interface {
@@ -73,12 +80,12 @@ func SCMFrom(ctx context.Context) (SCM, bool) {
 	return scm, ok
 }
 
-func WithRepo(ctx context.Context, repo *Repo) context.Context {
+func WithRepo(ctx context.Context, repo Repository) context.Context {
 	return context.WithValue(ctx, contextRepoKey, repo)
 }
 
-func RepoFrom(ctx context.Context) (*Repo, bool) {
-	repo, ok := ctx.Value(contextRepoKey).(*Repo)
+func RepoFrom(ctx context.Context) (Repository, bool) {
+	repo, ok := ctx.Value(contextRepoKey).(Repository)
 	return repo, ok
 }
 
@@ -168,27 +175,31 @@ func findSCMFromURL(scms []SCM, url string) SCM {
 	})
 }
 
-func findRepoFromSCM(session *MoraSession, scm SCM, owner, name string) (*Repo, error) {
+func findRepoFromSCM(session *MoraSession, scm SCM, owner, name string) (Repository, error) {
 	ctx, err := session.WithToken(context.Background(), scm.Name())
 	if err != nil {
-		return nil, err
+		return Repository{}, err
 	}
 
 	repo, meta, err := scm.Client().Repositories.Find(ctx, owner+"/"+name)
 	if err != nil {
 		log.Print(meta)
-		return nil, err
+		return Repository{}, err
 	}
 
-	return repo, nil
+	return Repository{
+		Name:      repo.Name,
+		Namespace: repo.Namespace,
+		Link:      repo.Link,
+	}, nil
 }
 
 // checkRepoAccess checks if token in session can access a repo 'owner/name'
-func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (*Repo, error) {
+func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (Repository, error) {
 	cache := sess.getReposCache(scm.Name())
 	key := owner + "/" + name
-	repo := cache[key]
-	if repo != nil {
+	repo, ok := cache[key]
+	if ok {
 		log.Print("checkRepoAccess: found in cache")
 		return repo, nil
 	}
@@ -198,11 +209,12 @@ func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (*Repo, err
 		log.Print("checkRepoAccess: found in SCM")
 	} else {
 		log.Print("checkRepoAccess: no repo or no access")
+		return Repository{}, err
 	}
 
 	// store cache
 	if cache == nil {
-		cache = map[string]*Repo{}
+		cache = map[string]Repository{}
 	}
 	cache[key] = repo
 	sess.setReposCache(scm.Name(), cache)
@@ -239,9 +251,15 @@ func injectRepo(scms []SCM) func(next http.Handler) http.Handler {
 				return
 			}
 
+			repository := Repository{
+				Name:      repo.Name,
+				Namespace: repo.Namespace,
+				Link:      repo.Link,
+			}
+
 			ctx := r.Context()
 			ctx = WithSCM(ctx, scm)
-			ctx = WithRepo(ctx, repo)
+			ctx = WithRepo(ctx, repository)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
