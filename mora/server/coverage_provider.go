@@ -8,11 +8,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type MoraCoverageProvider struct {
-	coverages []*Coverage
-	store     CoverageStore
-	sync.Mutex
-}
+type (
+	CoverageStore interface {
+		Put(*ScanedCoverage) error
+		Scan() ([]ScanedCoverage, error)
+	}
+
+	MoraCoverageProvider struct {
+		coverages []*Coverage
+		store     CoverageStore
+		sync.Mutex
+	}
+)
 
 // TODO: return error
 func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {

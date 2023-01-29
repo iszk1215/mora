@@ -19,23 +19,20 @@ CREATE TABLE IF NOT EXISTS coverage (
     contents TEXT NOT NULL
 )`
 
-type ScanedCoverage struct {
-	ID       int64     `db:"id"`
-	RepoURL  string    `db:"url"`
-	Revision string    `db:"revision"`
-	Time     time.Time `db:"time"`
-	Contents string    `db:"contents"`
-}
+type (
+	ScanedCoverage struct {
+		ID       int64     `db:"id"`
+		RepoURL  string    `db:"url"`
+		Revision string    `db:"revision"`
+		Time     time.Time `db:"time"`
+		Contents string    `db:"contents"`
+	}
 
-type CoverageStore interface {
-	Put(*ScanedCoverage) error
-	Scan() ([]ScanedCoverage, error)
-}
-
-type CoverageStoreSQLX struct {
-	db *sqlx.DB
-	sync.Mutex
-}
+	coverageStoreImpl struct {
+		db *sqlx.DB
+		sync.Mutex
+	}
+)
 
 func Connect(filename string) (*sqlx.DB, error) {
 	db, err := sqlx.Connect("sqlite3", filename)
@@ -52,11 +49,11 @@ func Connect(filename string) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func NewCoverageStore(db *sqlx.DB) *CoverageStoreSQLX {
-	return &CoverageStoreSQLX{db: db}
+func NewCoverageStore(db *sqlx.DB) *coverageStoreImpl {
+	return &coverageStoreImpl{db: db}
 }
 
-func (s *CoverageStoreSQLX) Put(cov *ScanedCoverage) error {
+func (s *coverageStoreImpl) Put(cov *ScanedCoverage) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -94,7 +91,7 @@ func (s *CoverageStoreSQLX) Put(cov *ScanedCoverage) error {
 	}
 }
 
-func (s *CoverageStoreSQLX) Scan() ([]ScanedCoverage, error) {
+func (s *coverageStoreImpl) Scan() ([]ScanedCoverage, error) {
 	rows := []ScanedCoverage{}
 	err := s.db.Select(&rows, "SELECT id, url, revision, time, contents FROM coverage")
 	return rows, err
