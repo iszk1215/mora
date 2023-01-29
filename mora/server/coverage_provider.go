@@ -8,11 +8,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type MoraCoverageProvider struct {
-	coverages []*Coverage
-	store     CoverageStore
-	sync.Mutex
-}
+type (
+	CoverageStore interface {
+		Put(*ScanedCoverage) error
+		Scan() ([]ScanedCoverage, error)
+	}
+
+	MoraCoverageProvider struct {
+		coverages []*Coverage
+		store     CoverageStore
+		sync.Mutex
+	}
+)
 
 // TODO: return error
 func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {
@@ -37,7 +44,7 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
-func (p *MoraCoverageProvider) FindByURLandID(url string, id int) *Coverage {
+func (p *MoraCoverageProvider) FindByURLandID(url string, id int64) *Coverage {
 	for _, cov := range p.coverages {
 		if cov.ID == id && cov.RepoURL == url {
 			return cov
@@ -127,6 +134,7 @@ func (p *MoraCoverageProvider) addOrMergeCoverage(cov *Coverage) *Coverage {
 		p.coverages = append(p.coverages, cov)
 		return cov
 	} else {
+		cov.ID = p.coverages[idx].ID
 		merged, _ := mergeCoverage(p.coverages[idx], cov)
 		p.coverages[idx] = merged
 		return merged
@@ -163,5 +171,11 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 		Contents: string(contents),
 	}
 
-	return p.store.Put(scaned)
+	err = p.store.Put(&scaned)
+	if err != nil {
+		return err
+	}
+
+	cov.ID = scaned.ID
+	return nil
 }

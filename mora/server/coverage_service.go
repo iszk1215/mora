@@ -22,7 +22,7 @@ import (
 type (
 	// handleCoverageList
 	CoverageResponse struct {
-		Index       int              `json:"index"`
+		Index       int64            `json:"index"`
 		RevisionURL string           `json:"revision_url"`
 		Revision    string           `json:"revision"`
 		Timestamp   time.Time        `json:"time"`
@@ -75,7 +75,7 @@ type (
 	CoverageProvider interface {
 		Coverages() []*Coverage
 		AddCoverage(*Coverage) error
-		FindByURLandID(string, int) *Coverage
+		FindByURLandID(string, int64) *Coverage
 		FindByRepoURL(string) []*Coverage
 	}
 
@@ -213,7 +213,7 @@ func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		index, err := strconv.Atoi(chi.URLParam(r, "index"))
+		index, err := strconv.ParseInt(chi.URLParam(r, "index"), 10, 64)
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			render.NotFound(w, render.ErrNotFound)
@@ -251,7 +251,7 @@ func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	return resp
 }
 
-func makeCoverageResponseList(scm SCM, repo *Repo, coverages []*Coverage) []CoverageResponse {
+func makeCoverageResponseList(scm SCM, repo Repository, coverages []*Coverage) []CoverageResponse {
 	var ret []CoverageResponse
 	for _, cov := range coverages {
 		revURL := scm.RevisionURL(repo.Link, cov.Revision)
@@ -267,6 +267,8 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 
 	coverages := s.provider.FindByRepoURL(repo.Link)
 
+	log.Print("len(coverages)=", len(coverages))
+
 	if len(coverages) == 0 {
 		log.Error().Msgf("Unknown repo.Link: %s", repo.Link)
 		render.NotFound(w, render.ErrNotFound)
@@ -281,7 +283,7 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func makeFileListResponse(scm SCM, repo *Repo, cov *Coverage, entry *CoverageEntry) FileListResponse {
+func makeFileListResponse(scm SCM, repo Repository, cov *Coverage, entry *CoverageEntry) FileListResponse {
 	files := []*FileResponse{}
 	for _, pr := range entry.Profiles {
 		files = append(files, &FileResponse{

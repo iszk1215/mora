@@ -120,7 +120,7 @@ func Test_injectCoverage(t *testing.T) {
 		got = cov
 	}
 
-	repo := &Repo{Link: "link"}
+	repo := Repository{Link: "link"}
 
 	want := Coverage{
 		ID:        123,
@@ -162,7 +162,7 @@ func Test_injectCoverage_no_repo_in_context(t *testing.T) {
 
 func Test_injectCoverage_malformed_index(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
-	req = req.WithContext(WithRepo(req.Context(), &Repo{Link: "link"}))
+	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
 	w := httptest.NewRecorder()
 
 	s := NewCoverageService(nil)
@@ -173,7 +173,7 @@ func Test_injectCoverage_malformed_index(t *testing.T) {
 
 func Test_injectCoverage_no_repo_in_service(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
-	req = req.WithContext(WithRepo(req.Context(), &Repo{Link: "link"}))
+	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
 	w := httptest.NewRecorder()
 
 	s := NewCoverageService(nil)
@@ -191,7 +191,7 @@ func TestParseCoverageUploadRequest(t *testing.T) {
 
 func TestMakeCoverageResponseList(t *testing.T) {
 	scm := NewMockSCM("scm")
-	repo := &Repo{Namespace: "owner", Name: "repo"} // FIXME
+	repo := Repository{Namespace: "owner", Name: "repo"} // FIXME
 
 	cov := Coverage{
 		RepoURL:   "dummyURL",
@@ -219,7 +219,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	assertEqualCoverageAndResponse(t, cov, data[0])
 }
 
-func getResultFromCoverageListHandler(handler http.Handler, repo *Repo) *http.Response {
+func getResultFromCoverageListHandler(handler http.Handler, repo Repository) *http.Response {
 	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
 	scm := NewMockSCM("scm")
 	r = r.WithContext(WithRepo(WithSCM(r.Context(), scm), repo))
@@ -231,7 +231,7 @@ func getResultFromCoverageListHandler(handler http.Handler, repo *Repo) *http.Re
 // API Test
 
 func Test_CoverageService_CoverageList(t *testing.T) {
-	repo := &Repo{Namespace: "owner", Name: "repo", Link: "url"}
+	repo := Repository{Namespace: "owner", Name: "repo", Link: "url"}
 	p := NewMoraCoverageProvider(nil)
 
 	time0 := time.Now().Round(0)
@@ -258,7 +258,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 	revision := "abcde"
 	timestamp := time.Now().Round(0)
 
-	repo := &Repo{Link: repoURL}
+	repo := Repository{Link: repoURL}
 
 	cov := Coverage{
 		ID:        123,
@@ -355,7 +355,7 @@ func Test_CoverageService_File(t *testing.T) {
 	scm := NewMockSCM(scmName)
 	scm.client.Contents = contents
 
-	repo := &Repo{Namespace: orgName, Name: repoName, Link: repoURL}
+	repo := Repository{Namespace: orgName, Name: repoName, Link: repoURL}
 
 	cov := Coverage{
 		RepoURL:   repo.Link,

@@ -18,8 +18,8 @@ func (s *MockStore) Scan() ([]ScanedCoverage, error) {
 	return s.rec, nil
 }
 
-func (s *MockStore) Put(cov ScanedCoverage) error {
-	s.got = &cov
+func (s *MockStore) Put(cov *ScanedCoverage) error {
+	s.got = cov
 	return nil
 }
 
