@@ -43,19 +43,19 @@ func (p *MoraCoverageProvider) Coverages() []*Coverage {
 	return p.coverages
 }
 
-func (p *MoraCoverageProvider) FindByURLandID(url string, id int64) *Coverage {
+func (p *MoraCoverageProvider) FindByRepoIDAndID(repo_id int64, id int64) *Coverage {
 	for _, cov := range p.coverages {
-		if cov.ID == id && cov.RepoURL == url {
+		if cov.ID == id && cov.RepoID == repo_id {
 			return cov
 		}
 	}
 	return nil
 }
 
-func (p *MoraCoverageProvider) FindByRepoURL(url string) []*Coverage {
+func (p *MoraCoverageProvider) FindByRepoID(id int64) []*Coverage {
 	found := []*Coverage{}
 	for _, cov := range p.coverages {
-		if cov.RepoURL == url {
+		if cov.RepoID == id {
 			found = append(found, cov)
 		}
 	}
@@ -122,7 +122,7 @@ func loadFromStore(store CoverageStore) ([]*Coverage, error) {
 
 func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {
 	for i, c := range p.coverages {
-		if c.RepoURL == cov.RepoURL && c.Revision == cov.Revision {
+		if c.RepoID == cov.RepoID && c.Revision == cov.Revision {
 			return i
 		}
 	}

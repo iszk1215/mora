@@ -96,15 +96,15 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 
 	if len(rows) > 1 {
 		return fmt.Errorf(
-			"multiple records in store found for url=%s and revision=%s",
-			cov.RepoURL, cov.Revision)
+			"multiple records in store found for repo_id=%d and revision=%s",
+			cov.RepoID, cov.Revision)
 	}
 
 	if len(rows) == 0 { // insert
 		log.Print("Insert")
 		res, err := s.db.Exec(
-			"INSERT INTO coverage (repo_id, url, revision, time, contents) VALUES ($1, $2, $3, $4, $5)",
-			cov.RepoID, cov.RepoURL, cov.Revision, cov.Timestamp, contents)
+			"INSERT INTO coverage (repo_id, revision, time, contents) VALUES ($1, $2, $3, $4)",
+			cov.RepoID, cov.Revision, cov.Timestamp, contents)
 		if err != nil {
 			return err
 		}
@@ -129,7 +129,6 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 	cov := &Coverage{}
 	cov.ID = record.ID
 	cov.RepoID = record.RepoID
-	cov.RepoURL = record.RepoURL
 	cov.Revision = record.Revision
 	cov.Entries = entries
 	cov.Timestamp = record.Time

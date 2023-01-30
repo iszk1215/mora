@@ -79,7 +79,6 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 
 	want := Coverage{
 		RepoID:    2,
-		RepoURL:   url,
 		Revision:  revision,
 		Timestamp: now,
 		Entries: []*CoverageEntry{
@@ -125,7 +124,6 @@ func Test_injectCoverage(t *testing.T) {
 
 	want := Coverage{
 		ID:        123,
-		RepoURL:   repo.Link,
 		Revision:  "revision",
 		Timestamp: time.Now().Round(0),
 		Entries:   nil,
@@ -195,7 +193,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	repo := Repository{Namespace: "owner", Name: "repo"} // FIXME
 
 	cov := Coverage{
-		RepoURL:   "dummyURL",
+		RepoID:    1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -232,13 +230,13 @@ func getResultFromCoverageListHandler(handler http.Handler, repo Repository) *ht
 // API Test
 
 func Test_CoverageService_CoverageList(t *testing.T) {
-	repo := Repository{Namespace: "owner", Name: "repo", Link: "url"}
+	repo := Repository{ID: 1215, Namespace: "owner", Name: "repo", Link: "url"}
 	p := NewMoraCoverageProvider(nil)
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := Coverage{RepoURL: repo.Link, Timestamp: time0, Revision: "abc123"}
-	cov1 := Coverage{RepoURL: repo.Link, Timestamp: time1, Revision: "abc124"}
+	cov0 := Coverage{RepoID: repo.ID, Timestamp: time0, Revision: "abc123"}
+	cov1 := Coverage{RepoID: repo.ID, Timestamp: time1, Revision: "abc124"}
 	p.AddCoverage(&cov0)
 	p.AddCoverage(&cov1)
 
@@ -263,7 +261,6 @@ func Test_CoverageService_FileList(t *testing.T) {
 
 	cov := Coverage{
 		ID:        123,
-		RepoURL:   repoURL,
 		Revision:  revision,
 		Timestamp: timestamp,
 		Entries: []*CoverageEntry{
@@ -351,15 +348,15 @@ func Test_CoverageService_File(t *testing.T) {
 
 	contents := mockscm.NewMockContentService(mockCtrl)
 	content := scm.Content{Data: []byte(code)}
-	contents.EXPECT().Find(gomock.Any(), orgName+"/"+repoName, filename, revision).Return(&content, nil, nil)
+	contents.EXPECT().Find( /*ctx*/ gomock.Any(), orgName+"/"+repoName, filename, revision).Return(&content, nil, nil)
 
 	scm := NewMockSCM(scmName)
 	scm.client.Contents = contents
 
-	repo := Repository{Namespace: orgName, Name: repoName, Link: repoURL}
+	repo := Repository{ID: 1215, Namespace: orgName, Name: repoName, Link: repoURL}
 
 	cov := Coverage{
-		RepoURL:   repo.Link,
+		RepoID:    repo.ID,
 		Revision:  revision,
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{

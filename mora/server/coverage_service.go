@@ -75,8 +75,8 @@ type (
 	CoverageProvider interface {
 		Coverages() []*Coverage
 		AddCoverage(*Coverage) error
-		FindByURLandID(string, int64) *Coverage
-		FindByRepoURL(string) []*Coverage
+		FindByRepoIDAndID(int64, int64) *Coverage
+		FindByRepoID(int64) []*Coverage
 	}
 
 	CoverageService struct {
@@ -136,7 +136,7 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 
 	cov := &Coverage{}
 	cov.RepoID = 2
-	cov.RepoURL = req.RepoURL
+	// cov.RepoURL = req.RepoURL
 	cov.Revision = req.Revision
 	cov.Entries = entries
 	cov.Timestamp = req.Timestamp
@@ -149,10 +149,11 @@ func NewCoverageService(provider CoverageProvider) *CoverageService {
 	return s
 }
 
-func (s *CoverageService) Repos() []string {
-	repos := mapset.NewSet[string]()
+func (s *CoverageService) Repos() []int64 {
+	repos := mapset.NewSet[int64]()
 	for _, cov := range s.provider.Coverages() {
-		url := cov.RepoURL
+		log.Print("CoverageService.Repos: id=", cov.RepoID)
+		url := cov.RepoID
 		repos.Add(url)
 	}
 
@@ -221,7 +222,7 @@ func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		cov := s.provider.FindByURLandID(repo.Link, index)
+		cov := s.provider.FindByRepoIDAndID(repo.ID, index)
 		if cov == nil {
 			render.NotFound(w, render.ErrNotFound)
 			return
@@ -266,7 +267,7 @@ func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
-	coverages := s.provider.FindByRepoURL(repo.Link)
+	coverages := s.provider.FindByRepoID(repo.ID)
 
 	log.Print("len(coverages)=", len(coverages))
 

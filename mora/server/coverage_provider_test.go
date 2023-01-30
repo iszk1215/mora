@@ -25,7 +25,7 @@ func (s *MockStore) Put(cov *Coverage) error {
 
 func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 	cov := Coverage{
-		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
+		RepoID:    1215,
 		Revision:  "012345",
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -63,7 +63,7 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 
 func TestHandlerAddCoveragedMerge(t *testing.T) {
 	existing := Coverage{
-		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
+		RepoID:    1215,
 		Revision:  "012345",
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -84,7 +84,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 	}
 
 	added := Coverage{
-		RepoURL:   "http://mockscm.com/mockowner/mockrepo",
+		RepoID:    1215,
 		Revision:  "012345",
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -142,7 +142,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 func TestMoraCoverageProviderNew(t *testing.T) {
 	want := Coverage{
 		ID:        123,
-		RepoURL:   "url",
+		RepoID:    1215,
 		Revision:  "0123",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
