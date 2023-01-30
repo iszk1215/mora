@@ -106,29 +106,7 @@ func parseRepoURL(str string) (string, string, string, error) {
 }
 
 func (s *MoraServer) findRepoByID(id int64) (Repository, bool) {
-	_repositories := []Repository{
-		{
-			ID:        1,
-			Namespace: "mora",
-			Name:      "moratest",
-			Link:      "http://localhost:3001/mora/moratest",
-		},
-		{
-			ID:        2,
-			Namespace: "kazuhisa",
-			Name:      "mora",
-			Link:      "http://localhost:3001/kazuhisa/mora",
-		},
-	}
-
-	var repositories []Repository
-	if len(s.repositories) == 0 {
-		repositories = _repositories
-	} else {
-		repositories = s.repositories
-	}
-
-	for _, repo := range repositories {
+	for _, repo := range s.repositories {
 		if repo.ID == id {
 			return repo, true
 		}
@@ -425,12 +403,20 @@ func createSCMs(config MoraConfig) []SCM {
 	return scms
 }
 
-func initCoverageStore() (CoverageStore, error) {
+func initStore() (RepositoryStore, CoverageStore, error) {
 	db, err := Connect("mora.db")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return NewCoverageStore(db), nil
+
+	rs := NewRepositoryStore(db)
+	if err := rs.Init(); err != nil {
+		return nil, nil, err
+	}
+
+	cs := NewCoverageStore(db)
+
+	return rs, cs, nil
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
@@ -445,18 +431,16 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	store, err := initCoverageStore()
+	repoStore, covStore, err := initStore()
 	if err != nil {
+		log.Err(err).Msg("initStore")
 		return nil, err
 	}
-	moraCoverageProvider := NewMoraCoverageProvider(store)
+	moraCoverageProvider := NewMoraCoverageProvider(covStore)
 	coverage := NewCoverageService(moraCoverageProvider)
 
 	s.coverage = coverage
+	s.repositories, err = repoStore.Scan()
 
-	if err != nil {
-		log.Err(err).Msg("init_store")
-	}
-
-	return s, nil
+	return s, err
 }
