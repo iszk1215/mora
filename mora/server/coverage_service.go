@@ -135,6 +135,7 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	}
 
 	cov := &Coverage{}
+	cov.RepoID = 2
 	cov.RepoURL = req.RepoURL
 	cov.Revision = req.Revision
 	cov.Entries = entries

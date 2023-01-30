@@ -19,6 +19,7 @@ type (
 
 	Coverage struct {
 		ID        int64
+		RepoID    int64
 		RepoURL   string
 		Revision  string
 		Timestamp time.Time

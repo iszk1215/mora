@@ -78,6 +78,7 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	}
 
 	want := Coverage{
+		RepoID:    2,
 		RepoURL:   url,
 		Revision:  revision,
 		Timestamp: now,

@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/elliotchance/pie/v2"
 	"github.com/rs/zerolog/log"
 )
 
 type (
 	CoverageStore interface {
-		Put(*ScanedCoverage) error
-		Scan() ([]ScanedCoverage, error)
+		Put(*Coverage) error
+		Scan() ([]*Coverage, error)
 	}
 
 	MoraCoverageProvider struct {
@@ -80,6 +79,7 @@ func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
 	return entries, nil
 }
 
+/*
 func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 	entries, err := parseScanedCoverageContents(record.Contents)
 	if err != nil {
@@ -88,6 +88,7 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 
 	cov := &Coverage{}
 	cov.ID = record.ID
+	cov.RepoID = record.RepoID
 	cov.RepoURL = record.RepoURL
 	cov.Revision = record.Revision
 	cov.Entries = entries
@@ -95,24 +96,28 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 
 	return cov, nil
 }
+*/
 
 func loadFromStore(store CoverageStore) ([]*Coverage, error) {
-	records, err := store.Scan()
-	if err != nil {
-		return nil, err
-	}
-
-	coverages := []*Coverage{}
-	for _, record := range records {
-		cov, err := parseScanedCoverage(record)
+	/*
+		records, err := store.Scan()
 		if err != nil {
 			return nil, err
 		}
 
-		coverages = append(coverages, cov)
-	}
+		coverages := []*Coverage{}
+		for _, record := range records {
+			cov, err := parseScanedCoverage(record)
+			if err != nil {
+				return nil, err
+			}
 
-	return coverages, nil
+			coverages = append(coverages, cov)
+		}
+
+		return coverages, nil
+	*/
+	return store.Scan()
 }
 
 func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {
@@ -148,34 +153,38 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 		return nil
 	}
 
-	var requests []*CoverageEntryUploadRequest
-	for _, e := range cov.Entries {
-		requests = append(requests,
-			&CoverageEntryUploadRequest{
-				Name:     e.Name,
-				Hits:     e.Hits,
-				Lines:    e.Lines,
-				Profiles: pie.Values(e.Profiles),
-			})
-	}
+	return p.store.Put(cov)
 
-	contents, err := json.Marshal(requests)
-	if err != nil {
-		return err
-	}
+	/*
+		var requests []*CoverageEntryUploadRequest
+		for _, e := range cov.Entries {
+			requests = append(requests,
+				&CoverageEntryUploadRequest{
+					Name:     e.Name,
+					Hits:     e.Hits,
+					Lines:    e.Lines,
+					Profiles: pie.Values(e.Profiles),
+				})
+		}
 
-	scaned := ScanedCoverage{
-		RepoURL:  cov.RepoURL,
-		Revision: cov.Revision,
-		Time:     cov.Timestamp,
-		Contents: string(contents),
-	}
+		contents, err := json.Marshal(requests)
+		if err != nil {
+			return err
+		}
 
-	err = p.store.Put(&scaned)
-	if err != nil {
-		return err
-	}
+		scaned := ScanedCoverage{
+			RepoURL:  cov.RepoURL,
+			Revision: cov.Revision,
+			Time:     cov.Timestamp,
+			Contents: string(contents),
+		}
 
-	cov.ID = scaned.ID
-	return nil
+		err = p.store.Put(&scaned)
+		if err != nil {
+			return err
+		}
+
+		cov.ID = scaned.ID
+		return nil
+	*/
 }
