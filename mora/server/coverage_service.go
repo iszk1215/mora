@@ -81,7 +81,7 @@ type (
 
 	CoverageService struct {
 		provider CoverageProvider
-		repos    RepositoryManager
+		repos    RepositoryService
 		sync.Mutex
 	}
 
@@ -150,7 +150,7 @@ func (s *CoverageService) parseCoverageUploadRequest(req *CoverageUploadRequest)
 	return cov, nil
 }
 
-func NewCoverageService(provider CoverageProvider, repos RepositoryManager) *CoverageService {
+func NewCoverageService(provider CoverageProvider, repos RepositoryService) *CoverageService {
 	s := &CoverageService{provider: provider, repos: repos}
 	return s
 }

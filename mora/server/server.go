@@ -57,7 +57,7 @@ type (
 		Logined bool   `json:"logined"`
 	}
 
-	RepositoryManager interface {
+	RepositoryService interface {
 		FindRepoByURL(string) (Repository, bool)
 	}
 
