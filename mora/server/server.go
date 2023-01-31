@@ -64,7 +64,7 @@ type (
 	MoraServer struct {
 		scms         []SCM
 		repositories []Repository
-		coverage     *CoverageService
+		coverage     *CoverageHandler
 
 		sessionManager     *MoraSessionManager
 		frontendFileServer http.Handler
@@ -437,7 +437,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 	moraCoverageProvider := NewMoraCoverageProvider(covStore)
-	coverage := NewCoverageService(moraCoverageProvider, s)
+	coverage := NewCoverageHandler(moraCoverageProvider, s)
 
 	s.coverage = coverage
 	s.repositories, err = repoStore.Scan()

@@ -131,7 +131,7 @@ func Test_injectCoverage(t *testing.T) {
 
 	p := NewMoraCoverageProvider(nil)
 	p.AddCoverage(&want)
-	s := NewCoverageService(p, nil)
+	s := NewCoverageHandler(p, nil)
 
 	r := chi.NewRouter()
 	r.Route("/{index}", func(r chi.Router) {
@@ -153,7 +153,7 @@ func Test_injectCoverage_no_repo_in_context(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
 	w := httptest.NewRecorder()
 
-	s := NewCoverageService(nil, nil)
+	s := NewCoverageHandler(nil, nil)
 	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
@@ -164,7 +164,7 @@ func Test_injectCoverage_malformed_index(t *testing.T) {
 	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
 	w := httptest.NewRecorder()
 
-	s := NewCoverageService(nil, nil)
+	s := NewCoverageHandler(nil, nil)
 	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
@@ -175,7 +175,7 @@ func Test_injectCoverage_no_repo_in_service(t *testing.T) {
 	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
 	w := httptest.NewRecorder()
 
-	s := NewCoverageService(nil, nil)
+	s := NewCoverageHandler(nil, nil)
 	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
@@ -231,7 +231,7 @@ func getResultFromCoverageListHandler(handler http.Handler, repo Repository) *ht
 
 // API Test
 
-func Test_CoverageService_CoverageList(t *testing.T) {
+func Test_CoverageHandler_CoverageList(t *testing.T) {
 	repo := Repository{ID: 1215, Namespace: "owner", Name: "repo", Link: "url"}
 	p := NewMoraCoverageProvider(nil)
 
@@ -242,17 +242,17 @@ func Test_CoverageService_CoverageList(t *testing.T) {
 	p.AddCoverage(&cov0)
 	p.AddCoverage(&cov1)
 
-	s := NewCoverageService(p, nil)
+	s := NewCoverageHandler(p, nil)
 
 	res := getResultFromCoverageListHandler(s.Handler(), repo)
 
 	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
 }
 
-func Test_CoverageService_FileList(t *testing.T) {
+func Test_CoverageHandler_FileList(t *testing.T) {
 	scm := NewMockSCM("mock")
 	p := NewMoraCoverageProvider(nil)
-	s := NewCoverageService(p, nil)
+	s := NewCoverageHandler(p, nil)
 
 	repoURL := "http://mock.scm/org/name"
 	filename := "test.go"
@@ -328,7 +328,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func Test_CoverageService_File(t *testing.T) {
+func Test_CoverageHandler_File(t *testing.T) {
 	scmName := "mockscm"
 	repoName := "repo"
 	orgName := "org"
@@ -376,7 +376,7 @@ func Test_CoverageService_File(t *testing.T) {
 	p := NewMoraCoverageProvider(nil)
 	p.coverages = []*Coverage{&cov}
 
-	s := NewCoverageService(p, nil)
+	s := NewCoverageHandler(p, nil)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
@@ -416,10 +416,10 @@ func (m MockRepoManager) FindRepoByURL(url string) (Repository, bool) {
 	return Repository{ID: 1215}, true
 }
 
-func TestCoverageServiceProcessUploadRequest(t *testing.T) {
+func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	p := NewMoraCoverageProvider(nil)
 	m := MockRepoManager{}
-	s := NewCoverageService(p, m)
+	s := NewCoverageHandler(p, m)
 
 	req, want := makeCoverageUploadRequest()
 	err := s.processUploadRequest(req)

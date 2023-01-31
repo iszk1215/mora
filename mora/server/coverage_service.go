@@ -79,7 +79,7 @@ type (
 		FindByRepoID(int64) []*Coverage
 	}
 
-	CoverageService struct {
+	CoverageHandler struct {
 		provider CoverageProvider
 		repos    RepositoryService
 		sync.Mutex
@@ -125,7 +125,7 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 	return entries, nil
 }
 
-func (s *CoverageService) parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
+func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	if req.RepoURL == "" {
 		return nil, errors.New("repo url is empty")
 	}
@@ -150,15 +150,15 @@ func (s *CoverageService) parseCoverageUploadRequest(req *CoverageUploadRequest)
 	return cov, nil
 }
 
-func NewCoverageService(provider CoverageProvider, repos RepositoryService) *CoverageService {
-	s := &CoverageService{provider: provider, repos: repos}
+func NewCoverageHandler(provider CoverageProvider, repos RepositoryService) *CoverageHandler {
+	s := &CoverageHandler{provider: provider, repos: repos}
 	return s
 }
 
-func (s *CoverageService) Repos() []int64 {
+func (s *CoverageHandler) Repos() []int64 {
 	repos := mapset.NewSet[int64]()
 	for _, cov := range s.provider.Coverages() {
-		log.Print("CoverageService.Repos: id=", cov.RepoID)
+		log.Print("CoverageHandler.Repos: id=", cov.RepoID)
 		url := cov.RepoID
 		repos.Add(url)
 	}
@@ -207,7 +207,7 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 	})
 }
 
-func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
+func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.provider == nil {
 			log.Print("No provider enabled")
@@ -269,7 +269,7 @@ func makeCoverageResponseList(scm SCM, repo Repository, coverages []*Coverage) [
 	return ret
 }
 
-func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Request) {
+func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Request) {
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
@@ -381,7 +381,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func (s *CoverageService) Handler() http.Handler {
+func (s *CoverageHandler) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", s.handleCoverageList)
 
@@ -412,7 +412,7 @@ func readUploadRequest(reader io.Reader) (*CoverageUploadRequest, error) {
 	return req, nil
 }
 
-func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error {
+func (s *CoverageHandler) processUploadRequest(req *CoverageUploadRequest) error {
 	cov, err := s.parseCoverageUploadRequest(req)
 	if err == nil {
 		err = s.provider.AddCoverage(cov)
@@ -421,7 +421,7 @@ func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error
 	return err
 }
 
-func (s *CoverageService) HandleUpload(w http.ResponseWriter, r *http.Request) {
+func (s *CoverageHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	req, err := readUploadRequest(r.Body)
 
 	if err == nil {
