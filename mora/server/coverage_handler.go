@@ -81,7 +81,7 @@ type (
 
 	CoverageHandler struct {
 		provider CoverageProvider
-		repos    RepositoryService
+		repos    RepositoryStore
 		sync.Mutex
 	}
 
@@ -131,8 +131,8 @@ func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest)
 	}
 
 	log.Print(s.repos)
-	repo, ok := s.repos.FindRepoByURL(req.RepoURL)
-	if !ok {
+	repo, err := s.repos.FindByURL(req.RepoURL)
+	if err != nil {
 		return nil, errors.New("repo is not found")
 	}
 
@@ -150,7 +150,7 @@ func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest)
 	return cov, nil
 }
 
-func NewCoverageHandler(provider CoverageProvider, repos RepositoryService) *CoverageHandler {
+func NewCoverageHandler(provider CoverageProvider, repos RepositoryStore) *CoverageHandler {
 	s := &CoverageHandler{provider: provider, repos: repos}
 	return s
 }

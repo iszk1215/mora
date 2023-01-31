@@ -57,10 +57,6 @@ type (
 		Logined bool   `json:"logined"`
 	}
 
-	RepositoryService interface {
-		FindRepoByURL(string) (Repository, bool)
-	}
-
 	MoraServer struct {
 		scms         []SCM
 		repositories []Repository
@@ -409,14 +405,14 @@ func initStore() (RepositoryStore, CoverageStore, error) {
 		return nil, nil, err
 	}
 
-	rs := NewRepositoryStore(db)
-	if err := rs.Init(); err != nil {
+	repoStore := NewRepositoryStore(db)
+	if err := repoStore.Init(); err != nil {
 		return nil, nil, err
 	}
 
-	cs := NewCoverageStore(db)
+	covStore := NewCoverageStore(db)
 
-	return rs, cs, nil
+	return repoStore, covStore, nil
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
@@ -437,7 +433,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 	moraCoverageProvider := NewMoraCoverageProvider(covStore)
-	coverage := NewCoverageHandler(moraCoverageProvider, s)
+	coverage := NewCoverageHandler(moraCoverageProvider, repoStore)
 
 	s.coverage = coverage
 	s.repositories, err = repoStore.Scan()

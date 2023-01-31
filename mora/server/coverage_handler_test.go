@@ -409,16 +409,24 @@ func Test_CoverageHandler_File(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-type MockRepoManager struct {
+type MockRepoStore struct {
 }
 
-func (m MockRepoManager) FindRepoByURL(url string) (Repository, bool) {
-	return Repository{ID: 1215}, true
+func (m MockRepoStore) FindByURL(url string) (Repository, error) {
+	return Repository{ID: 1215}, nil
+}
+
+func (m MockRepoStore) Init() error {
+	return nil
+}
+
+func (m MockRepoStore) Scan() ([]Repository, error) {
+	return []Repository{}, nil
 }
 
 func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	p := NewMoraCoverageProvider(nil)
-	m := MockRepoManager{}
+	m := MockRepoStore{}
 	s := NewCoverageHandler(p, m)
 
 	req, want := makeCoverageUploadRequest()

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"errors"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 )
@@ -24,6 +26,7 @@ type (
 	RepositoryStore interface {
 		Init() error
 		Scan() ([]Repository, error)
+		FindByURL(string) (Repository, error)
 	}
 
 	RepositoryStoreImpl struct {
@@ -42,6 +45,29 @@ func (s *RepositoryStoreImpl) Init() error {
 		return err
 	}
 	return nil
+}
+
+func toRepo(from storableRepository) Repository {
+	return Repository{
+		ID:        from.ID,
+		Namespace: from.Namespace,
+		Name:      from.Name,
+		Link:      from.URL,
+	}
+}
+
+func (s *RepositoryStoreImpl) FindByURL(url string) (Repository, error) {
+	rows := []storableRepository{}
+	err := s.db.Select(&rows, "SELECT id, name, namespace, url FROM repository WHERE url = ?", url)
+	if err != nil {
+		return Repository{}, err
+	}
+
+	if len(rows) == 0 {
+		return Repository{}, errors.New("no repo")
+	}
+
+	return toRepo(rows[0]), nil
 }
 
 func (s *RepositoryStoreImpl) Scan() ([]Repository, error) {
