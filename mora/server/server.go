@@ -58,9 +58,9 @@ type (
 	}
 
 	MoraServer struct {
-		scms         []SCM
-		repositories []Repository
-		coverage     *CoverageHandler
+		scms     []SCM
+		repos    RepositoryStore
+		coverage *CoverageHandler
 
 		sessionManager     *MoraSessionManager
 		frontendFileServer http.Handler
@@ -105,62 +105,47 @@ func parseRepoURL(str string) (string, string, string, error) {
 	return scm, owner, name, nil
 }
 
-func (s *MoraServer) FindRepoByURL(url string) (Repository, bool) {
-	for _, repo := range s.repositories {
-		if repo.Link == url {
-			return repo, true
-		}
-	}
-
-	return Repository{}, false
-}
-
-func (s *MoraServer) findRepoByID(id int64) (Repository, bool) {
-	for _, repo := range s.repositories {
-		if repo.ID == id {
-			return repo, true
-		}
-	}
-
-	return Repository{}, false
-}
-
 func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleRepoList")
 
-	repos := []RepoResponse{}
+	resp := []RepoResponse{}
 	sess, _ := MoraSessionFrom(r.Context())
 
-	if s.coverage != nil {
-		for _, repoID := range s.coverage.Repos() {
-			repo, ok := s.findRepoByID(repoID)
-			if !ok {
-				log.Error().Msgf("repoID not found: %d", repoID)
-				render.NotFound(w, render.ErrNotFound)
-				return
-			}
-			scmURL, owner, name, err := parseRepoURL(repo.Link)
-			if err != nil {
-				log.Err(err).Msg("")
-				render.NotFound(w, render.ErrNotFound)
-				return
-			}
+	var repositories []Repository
+	if s.repos != nil {
+		var err error
+		repositories, err = s.repos.Scan()
+		if err != nil {
+			log.Err(err).Msg("")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+	} else {
+		repositories = []Repository{}
+	}
 
-			scm := findSCMFromURL(s.scms, scmURL)
-			if scm == nil {
-				log.Print("scm not found for repository: ", repoID, " (skipped)")
-				continue
-			}
+	for _, repo := range repositories {
+		scmURL, owner, name, err := parseRepoURL(repo.Link)
+		if err != nil {
+			log.Err(err).Msg("")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 
-			repo, err = checkRepoAccess(sess, scm, owner, name)
-			if err == nil {
-				repos = append(repos, RepoResponse{
-					scm.Name(), repo.Namespace, repo.Name, repo.Link})
-			}
+		scm := findSCMFromURL(s.scms, scmURL)
+		if scm == nil {
+			log.Print("scm not found for repository: ", repo.ID, " (skipped)")
+			continue
+		}
+
+		repo, err = checkRepoAccess(sess, scm, owner, name)
+		if err == nil {
+			resp = append(resp, RepoResponse{
+				scm.Name(), repo.Namespace, repo.Name, repo.Link})
 		}
 	}
 
-	render.JSON(w, repos, http.StatusOK)
+	render.JSON(w, resp, http.StatusOK)
 }
 
 func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +261,7 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		}
 
 		// TODO: move to checkRepoAccess
-		repository, _ := s.FindRepoByURL(scmRepo.Link)
+		repository, _ := s.repos.FindByURL(scmRepo.Link)
 
 		ctx := r.Context()
 		ctx = WithSCM(ctx, scm)
@@ -436,7 +421,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	coverage := NewCoverageHandler(moraCoverageProvider, repoStore)
 
 	s.coverage = coverage
-	s.repositories, err = repoStore.Scan()
+	s.repos = repoStore
 
 	return s, err
 }

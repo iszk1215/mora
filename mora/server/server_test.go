@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +19,27 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type MockRepoStore struct {
+	repos []Repository
+}
+
+func (m MockRepoStore) FindByURL(url string) (Repository, error) {
+	for _, r := range m.repos {
+		if r.Link == url {
+			return r, nil
+		}
+	}
+	return Repository{}, errors.New("no repo")
+}
+
+func (m MockRepoStore) Init() error {
+	return nil
+}
+
+func (m MockRepoStore) Scan() ([]Repository, error) {
+	return m.repos, nil
+}
 
 /*
 func requireLocation(t *testing.T, expected string, r *http.Response) {
@@ -151,7 +173,10 @@ func Test_injectRepo_OK(t *testing.T) {
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	require.NoError(t, err)
-	server.repositories = []Repository{repo}
+
+	repoStore := MockRepoStore{}
+	repoStore.repos = []Repository{repo}
+	server.repos = repoStore
 
 	called := false
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -240,7 +265,10 @@ func setupServer(scm SCM, repos []Repository) (*MoraServer, error) {
 		provider.AddCoverage(&cov)
 	}
 
-	coverage := NewCoverageHandler(provider, nil)
+	repoStore := MockRepoStore{}
+	repoStore.repos = repos
+
+	coverage := NewCoverageHandler(provider, repoStore)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	log.Print(err)
@@ -248,7 +276,7 @@ func setupServer(scm SCM, repos []Repository) (*MoraServer, error) {
 		server.coverage = coverage
 	}
 
-	server.repositories = repos
+	server.repos = repoStore
 
 	return server, err
 }

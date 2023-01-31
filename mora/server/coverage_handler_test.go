@@ -51,8 +51,7 @@ func assertEqualCoverageList(t *testing.T, want []Coverage, got []CoverageRespon
 
 // Test Data
 
-func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
-	url := "http://mockscm.com/mockowner/mockrepo"
+func makeCoverageUploadRequest(repo Repository) (*CoverageUploadRequest, *Coverage) {
 	revision := "12345"
 	now := time.Now().Round(0)
 
@@ -64,7 +63,7 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	}
 
 	req := CoverageUploadRequest{
-		RepoURL:   url,
+		RepoURL:   repo.Link,
 		Revision:  revision,
 		Timestamp: now,
 		Entries: []*CoverageEntryUploadRequest{
@@ -409,27 +408,19 @@ func Test_CoverageHandler_File(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-type MockRepoStore struct {
-}
-
-func (m MockRepoStore) FindByURL(url string) (Repository, error) {
-	return Repository{ID: 1215}, nil
-}
-
-func (m MockRepoStore) Init() error {
-	return nil
-}
-
-func (m MockRepoStore) Scan() ([]Repository, error) {
-	return []Repository{}, nil
-}
-
 func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	p := NewMoraCoverageProvider(nil)
 	m := MockRepoStore{}
+	repo := Repository{
+		ID:        1215,
+		Namespace: "mockowner",
+		Name:      "mockrepo",
+		Link:      "http://mock.scm/mockowner/mockrepo",
+	}
+	m.repos = []Repository{repo}
 	s := NewCoverageHandler(p, m)
 
-	req, want := makeCoverageUploadRequest()
+	req, want := makeCoverageUploadRequest(repo)
 	err := s.processUploadRequest(req)
 	require.NoError(t, err)
 
