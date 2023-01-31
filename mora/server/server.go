@@ -57,6 +57,10 @@ type (
 		Logined bool   `json:"logined"`
 	}
 
+	RepositoryManager interface {
+		FindRepoByURL(string) (Repository, bool)
+	}
+
 	MoraServer struct {
 		scms         []SCM
 		repositories []Repository
@@ -103,6 +107,16 @@ func parseRepoURL(str string) (string, string, string, error) {
 	name := tmp[4]
 
 	return scm, owner, name, nil
+}
+
+func (s *MoraServer) FindRepoByURL(url string) (Repository, bool) {
+	for _, repo := range s.repositories {
+		if repo.Link == url {
+			return repo, true
+		}
+	}
+
+	return Repository{}, false
 }
 
 func (s *MoraServer) findRepoByID(id int64) (Repository, bool) {
@@ -437,7 +451,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 	moraCoverageProvider := NewMoraCoverageProvider(covStore)
-	coverage := NewCoverageService(moraCoverageProvider)
+	coverage := NewCoverageService(moraCoverageProvider, s)
 
 	s.coverage = coverage
 	s.repositories, err = repoStore.Scan()

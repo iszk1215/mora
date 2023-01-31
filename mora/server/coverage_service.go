@@ -81,6 +81,7 @@ type (
 
 	CoverageService struct {
 		provider CoverageProvider
+		repos    RepositoryManager
 		sync.Mutex
 	}
 
@@ -124,9 +125,15 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 	return entries, nil
 }
 
-func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
+func (s *CoverageService) parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	if req.RepoURL == "" {
 		return nil, errors.New("repo url is empty")
+	}
+
+	log.Print(s.repos)
+	repo, ok := s.repos.FindRepoByURL(req.RepoURL)
+	if !ok {
+		return nil, errors.New("repo is not found")
 	}
 
 	entries, err := parseCoverageEntryUploadRequests(req.Entries)
@@ -135,8 +142,7 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	}
 
 	cov := &Coverage{}
-	cov.RepoID = 2
-	// cov.RepoURL = req.RepoURL
+	cov.RepoID = repo.ID
 	cov.Revision = req.Revision
 	cov.Entries = entries
 	cov.Timestamp = req.Timestamp
@@ -144,8 +150,8 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	return cov, nil
 }
 
-func NewCoverageService(provider CoverageProvider) *CoverageService {
-	s := &CoverageService{provider: provider}
+func NewCoverageService(provider CoverageProvider, repos RepositoryManager) *CoverageService {
+	s := &CoverageService{provider: provider, repos: repos}
 	return s
 }
 
@@ -407,7 +413,7 @@ func readUploadRequest(reader io.Reader) (*CoverageUploadRequest, error) {
 }
 
 func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error {
-	cov, err := parseCoverageUploadRequest(req)
+	cov, err := s.parseCoverageUploadRequest(req)
 	if err == nil {
 		err = s.provider.AddCoverage(cov)
 	}

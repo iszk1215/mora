@@ -240,7 +240,7 @@ func setupServer(scm SCM, repos []Repository) (*MoraServer, error) {
 		provider.AddCoverage(&cov)
 	}
 
-	coverage := NewCoverageService(provider)
+	coverage := NewCoverageService(provider, nil)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	log.Print(err)
