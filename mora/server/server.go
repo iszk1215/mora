@@ -268,11 +268,9 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 			return
 		}
 
-		// FIXME: Do not render here. Set an error
 		sess, _ := MoraSessionFrom(r.Context())
-		repo, err := checkRepoAccess(sess, scm, owner, repoName)
+		scmRepo, err := checkRepoAccess(sess, scm, owner, repoName)
 		if err == errorTokenNotFound {
-			// http.Redirect(w, r, "/scms", http.StatusSeeOther)
 			render.Forbidden(w, render.ErrForbidden)
 			return
 		} else if err != nil {
@@ -281,20 +279,8 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 			return
 		}
 
-		repository := Repository{}
-		for _, r := range s.repositories {
-			if r.Link == repo.Link {
-				repository = r
-			}
-		}
-
-		/*
-			repository := Repository{
-				Name:      repo.Name,
-				Namespace: repo.Namespace,
-				Link:      repo.Link,
-			}
-		*/
+		// TODO: move to checkRepoAccess
+		repository, _ := s.FindRepoByURL(scmRepo.Link)
 
 		ctx := r.Context()
 		ctx = WithSCM(ctx, scm)

@@ -74,15 +74,6 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		return err
 	}
 
-	/*
-		scaned := ScanedCoverage{
-			RepoURL:  cov.RepoURL,
-			Revision: cov.Revision,
-			Time:     cov.Timestamp,
-			Contents: string(contents),
-		}
-	*/
-
 	s.Lock()
 	defer s.Unlock()
 
