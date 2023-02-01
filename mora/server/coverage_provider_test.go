@@ -9,16 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type MockStore struct {
+type MockCoverageStore struct {
 	rec []*Coverage
 	got *Coverage
 }
 
-func (s *MockStore) Scan() ([]*Coverage, error) {
+func (s *MockCoverageStore) Scan() ([]*Coverage, error) {
 	return s.rec, nil
 }
 
-func (s *MockStore) Put(cov *Coverage) error {
+func (s *MockCoverageStore) Put(cov *Coverage) error {
 	s.got = cov
 	return nil
 }
@@ -45,18 +45,13 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 		},
 	}
 
-	store := MockStore{}
+	store := MockCoverageStore{}
 	p := NewMoraCoverageProvider(&store)
 	require.Nil(t, store.got)
 
 	err := p.AddCoverage(&cov)
 	require.NoError(t, err)
-
-	require.Equal(t, []*Coverage{&cov}, p.Coverages())
-
 	require.NotNil(t, store.got)
-	// got, err := parseScanedCoverage(*store.got)
-	// require.NoError(t, err)
 
 	assert.Equal(t, &cov, store.got)
 }
@@ -124,7 +119,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 		},
 	}
 
-	store := MockStore{}
+	store := MockCoverageStore{}
 	p := NewMoraCoverageProvider(&store)
 	require.Nil(t, store.got)
 	p.coverages = append(p.coverages, &existing)
@@ -137,36 +132,4 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 	// require.NoError(t, err)
 
 	assert.Equal(t, []*CoverageEntry{&want}, store.got.Entries)
-}
-
-func TestMoraCoverageProviderNew(t *testing.T) {
-	want := Coverage{
-		ID:        123,
-		RepoID:    1215,
-		Revision:  "0123",
-		Timestamp: time.Now().Round(0),
-		Entries: []*CoverageEntry{
-			{
-				Name:     "go",
-				Hits:     1,
-				Lines:    2,
-				Profiles: map[string]*profile.Profile{}},
-		},
-	}
-
-	/*
-		rec := ScanedCoverage{
-			ID:       want.ID,
-			RepoURL:  want.RepoURL,
-			Revision: want.Revision,
-			Time:     want.Timestamp,
-			Contents: `[{"entry":"go","hits":1,"lines":2}]`,
-		}
-	*/
-
-	store := MockStore{rec: []*Coverage{&want}}
-
-	provider := NewMoraCoverageProvider(&store)
-	got := provider.Coverages()
-	assert.Equal(t, []*Coverage{&want}, got)
 }

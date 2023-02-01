@@ -409,7 +409,8 @@ func Test_CoverageHandler_File(t *testing.T) {
 }
 
 func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
-	p := NewMoraCoverageProvider(nil)
+	covStore := MockCoverageStore{}
+	p := NewMoraCoverageProvider(&covStore)
 	m := MockRepoStore{}
 	repo := Repository{
 		ID:        1215,
@@ -424,5 +425,5 @@ func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	err := s.processUploadRequest(req)
 	require.NoError(t, err)
 
-	assert.Equal(t, []*Coverage{want}, p.Coverages())
+	assert.Equal(t, want, covStore.got)
 }

@@ -38,10 +38,6 @@ func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {
 	return p
 }
 
-func (p *MoraCoverageProvider) Coverages() []*Coverage {
-	return p.coverages
-}
-
 func (p *MoraCoverageProvider) FindByRepoIDAndID(repo_id int64, id int64) *Coverage {
 	for _, cov := range p.coverages {
 		if cov.ID == id && cov.RepoID == repo_id {

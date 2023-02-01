@@ -15,8 +15,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/rs/zerolog/log"
-
-	mapset "github.com/deckarep/golang-set/v2"
 )
 
 type (
@@ -73,7 +71,6 @@ type (
 	}
 
 	CoverageProvider interface {
-		Coverages() []*Coverage
 		AddCoverage(*Coverage) error
 		FindByRepoIDAndID(int64, int64) *Coverage
 		FindByRepoID(int64) []*Coverage
@@ -153,17 +150,6 @@ func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest)
 func NewCoverageHandler(provider CoverageProvider, repos RepositoryStore) *CoverageHandler {
 	s := &CoverageHandler{provider: provider, repos: repos}
 	return s
-}
-
-func (s *CoverageHandler) Repos() []int64 {
-	repos := mapset.NewSet[int64]()
-	for _, cov := range s.provider.Coverages() {
-		log.Print("CoverageHandler.Repos: id=", cov.RepoID)
-		url := cov.RepoID
-		repos.Add(url)
-	}
-
-	return repos.ToSlice()
 }
 
 func withCoverage(ctx context.Context, cov *Coverage) context.Context {
