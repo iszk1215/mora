@@ -142,7 +142,7 @@ func toCoverage(record StorableCoverage) (*Coverage, error) {
 	return cov, nil
 }
 
-func (s *coverageStoreImpl) Scan() ([]*Coverage, error) {
+func (s *coverageStoreImpl) ListAll() ([]*Coverage, error) {
 	rows := []StorableCoverage{}
 	err := s.db.Select(&rows, "SELECT id, repo_id, revision, time, contents FROM coverage")
 

@@ -9,7 +9,7 @@ import (
 type (
 	CoverageStore interface {
 		Put(*Coverage) error
-		Scan() ([]*Coverage, error)
+		ListAll() ([]*Coverage, error)
 	}
 
 	MoraCoverageProvider struct {
@@ -27,7 +27,7 @@ func NewMoraCoverageProvider(store CoverageStore) *MoraCoverageProvider {
 	p.coverages = []*Coverage{}
 
 	if p.store != nil {
-		coverages, err := loadFromStore(p.store)
+		coverages, err := p.store.ListAll()
 		if err != nil {
 			log.Error().Err(err).Msg("Ignored")
 		} else {
@@ -55,10 +55,6 @@ func (p *MoraCoverageProvider) FindByRepoID(id int64) []*Coverage {
 		}
 	}
 	return found
-}
-
-func loadFromStore(store CoverageStore) ([]*Coverage, error) {
-	return store.Scan()
 }
 
 func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {
@@ -95,37 +91,4 @@ func (p *MoraCoverageProvider) AddCoverage(cov *Coverage) error {
 	}
 
 	return p.store.Put(cov)
-
-	/*
-		var requests []*CoverageEntryUploadRequest
-		for _, e := range cov.Entries {
-			requests = append(requests,
-				&CoverageEntryUploadRequest{
-					Name:     e.Name,
-					Hits:     e.Hits,
-					Lines:    e.Lines,
-					Profiles: pie.Values(e.Profiles),
-				})
-		}
-
-		contents, err := json.Marshal(requests)
-		if err != nil {
-			return err
-		}
-
-		scaned := ScanedCoverage{
-			RepoURL:  cov.RepoURL,
-			Revision: cov.Revision,
-			Time:     cov.Timestamp,
-			Contents: string(contents),
-		}
-
-		err = p.store.Put(&scaned)
-		if err != nil {
-			return err
-		}
-
-		cov.ID = scaned.ID
-		return nil
-	*/
 }

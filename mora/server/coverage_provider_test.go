@@ -14,7 +14,7 @@ type MockCoverageStore struct {
 	got *Coverage
 }
 
-func (s *MockCoverageStore) Scan() ([]*Coverage, error) {
+func (s *MockCoverageStore) ListAll() ([]*Coverage, error) {
 	return s.rec, nil
 }
 
