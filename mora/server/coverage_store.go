@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS coverage (
 )`
 
 type (
-	ScanedCoverage struct {
+	StorableCoverage struct {
 		ID       int64     `db:"id"`
 		RepoID   int64     `db:"repo_id"`
 		Revision string    `db:"revision"`
@@ -109,8 +109,25 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 	}
 }
 
-func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
-	entries, err := parseScanedCoverageContents(record.Contents)
+// contents is serialized []CoverageEntryUploadRequest
+func parseStorableCoverageContents(contents string) ([]*CoverageEntry, error) {
+	var req []*CoverageEntryUploadRequest
+
+	err := json.Unmarshal([]byte(contents), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := parseCoverageEntryUploadRequests(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+func toCoverage(record StorableCoverage) (*Coverage, error) {
+	entries, err := parseStorableCoverageContents(record.Contents)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +143,7 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 }
 
 func (s *coverageStoreImpl) Scan() ([]*Coverage, error) {
-	rows := []ScanedCoverage{}
+	rows := []StorableCoverage{}
 	err := s.db.Select(&rows, "SELECT id, repo_id, revision, time, contents FROM coverage")
 
 	if err != nil {
@@ -135,7 +152,7 @@ func (s *coverageStoreImpl) Scan() ([]*Coverage, error) {
 
 	coverages := []*Coverage{}
 	for _, record := range rows {
-		cov, err := parseScanedCoverage(record)
+		cov, err := toCoverage(record)
 		if err != nil {
 			return nil, err
 		}

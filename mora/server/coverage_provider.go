@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -62,61 +61,7 @@ func (p *MoraCoverageProvider) FindByRepoID(id int64) []*Coverage {
 	return found
 }
 
-// contents is serialized []CoverageEntryUploadRequest
-func parseScanedCoverageContents(contents string) ([]*CoverageEntry, error) {
-	var req []*CoverageEntryUploadRequest
-
-	err := json.Unmarshal([]byte(contents), &req)
-	if err != nil {
-		return nil, err
-	}
-
-	entries, err := parseCoverageEntryUploadRequests(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return entries, nil
-}
-
-/*
-func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
-	entries, err := parseScanedCoverageContents(record.Contents)
-	if err != nil {
-		return nil, err
-	}
-
-	cov := &Coverage{}
-	cov.ID = record.ID
-	cov.RepoID = record.RepoID
-	cov.RepoURL = record.RepoURL
-	cov.Revision = record.Revision
-	cov.Entries = entries
-	cov.Timestamp = record.Time
-
-	return cov, nil
-}
-*/
-
 func loadFromStore(store CoverageStore) ([]*Coverage, error) {
-	/*
-		records, err := store.Scan()
-		if err != nil {
-			return nil, err
-		}
-
-		coverages := []*Coverage{}
-		for _, record := range records {
-			cov, err := parseScanedCoverage(record)
-			if err != nil {
-				return nil, err
-			}
-
-			coverages = append(coverages, cov)
-		}
-
-		return coverages, nil
-	*/
 	return store.Scan()
 }
 
