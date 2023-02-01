@@ -73,7 +73,6 @@ type (
 	CoverageProvider interface {
 		AddCoverage(*Coverage) error
 		FindByRepoIDAndID(int64, int64) *Coverage
-		FindByRepoID(int64) []*Coverage
 	}
 
 	CoverageHandler struct {
@@ -261,7 +260,12 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	repo, _ := RepoFrom(r.Context())
 
 	log.Print("repo.ID=", repo.ID)
-	coverages := s.provider.FindByRepoID(repo.ID)
+	coverages, err := s.coverages.List(repo.ID)
+	if err != nil {
+		log.Err(err).Msg("")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
 
 	log.Print("len(coverages)=", len(coverages))
 

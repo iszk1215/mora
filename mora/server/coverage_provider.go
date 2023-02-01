@@ -48,18 +48,6 @@ func (p *MoraCoverageProvider) FindByRepoIDAndID(repo_id int64, id int64) *Cover
 	return nil
 }
 
-func (p *MoraCoverageProvider) FindByRepoID(id int64) []*Coverage {
-	if p.store != nil {
-		coverages, err := p.store.List(id)
-		if err != nil {
-			return []*Coverage{}
-		}
-		return coverages
-	}
-
-	return []*Coverage{}
-}
-
 func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {
 	for i, c := range p.coverages {
 		if c.RepoID == cov.RepoID && c.Revision == cov.Revision {
