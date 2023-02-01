@@ -15,8 +15,7 @@ import (
 var schema = `
 CREATE TABLE IF NOT EXISTS coverage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    repo_id INTEGER,
-    url TEXT NOT NULL,
+    repo_id INTEGER NOT NULL,
     revision TEXT NOT NULL,
     time DATETIME NOT NULL,
     contents TEXT NOT NULL
@@ -26,7 +25,6 @@ type (
 	ScanedCoverage struct {
 		ID       int64     `db:"id"`
 		RepoID   int64     `db:"repo_id"`
-		RepoURL  string    `db:"url"`
 		Revision string    `db:"revision"`
 		Time     time.Time `db:"time"`
 		Contents string    `db:"contents"`
@@ -129,7 +127,7 @@ func parseScanedCoverage(record ScanedCoverage) (*Coverage, error) {
 
 func (s *coverageStoreImpl) Scan() ([]*Coverage, error) {
 	rows := []ScanedCoverage{}
-	err := s.db.Select(&rows, "SELECT id, repo_id, url, revision, time, contents FROM coverage")
+	err := s.db.Select(&rows, "SELECT id, repo_id, revision, time, contents FROM coverage")
 
 	if err != nil {
 		return nil, err
