@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -12,6 +13,17 @@ import (
 
 type MockCoverageStore struct {
 	coverages []*Coverage
+}
+
+func (s *MockCoverageStore) Find(id int64) (*Coverage, error) {
+	filtered := pie.Filter(s.coverages,
+		func(cov *Coverage) bool { return cov.ID == id })
+
+	if len(filtered) == 0 {
+		return nil, errors.New("no cov")
+	}
+
+	return filtered[0], nil
 }
 
 func (s *MockCoverageStore) List(repo_id int64) ([]*Coverage, error) {

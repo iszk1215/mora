@@ -128,9 +128,11 @@ func Test_injectCoverage(t *testing.T) {
 		Entries:   nil,
 	}
 
-	p := NewMoraCoverageProvider(nil)
+	covStore := &MockCoverageStore{}
+
+	p := NewMoraCoverageProvider(covStore)
 	p.AddCoverage(&want)
-	s := NewCoverageHandler(p, nil, nil)
+	s := NewCoverageHandler(p, nil, covStore)
 
 	r := chi.NewRouter()
 	r.Route("/{index}", func(r chi.Router) {
@@ -253,8 +255,9 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 
 func Test_CoverageHandler_FileList(t *testing.T) {
 	scm := NewMockSCM("mock")
-	p := NewMoraCoverageProvider(nil)
-	s := NewCoverageHandler(p, nil, nil)
+	covStore := &MockCoverageStore{}
+	p := NewMoraCoverageProvider(covStore)
+	s := NewCoverageHandler(p, nil, covStore)
 
 	repoURL := "http://mock.scm/org/name"
 	filename := "test.go"
@@ -375,10 +378,11 @@ func Test_CoverageHandler_File(t *testing.T) {
 		},
 	}
 
-	p := NewMoraCoverageProvider(nil)
-	p.coverages = []*Coverage{&cov}
+	covStore := &MockCoverageStore{}
+	p := NewMoraCoverageProvider(covStore)
+	p.AddCoverage(&cov)
 
-	s := NewCoverageHandler(p, nil, nil)
+	s := NewCoverageHandler(p, nil, covStore)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 

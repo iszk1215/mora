@@ -72,7 +72,6 @@ type (
 
 	CoverageProvider interface {
 		AddCoverage(*Coverage) error
-		FindByRepoIDAndID(int64, int64) *Coverage
 	}
 
 	CoverageHandler struct {
@@ -201,11 +200,13 @@ func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		repo, ok := RepoFrom(r.Context())
-		if !ok {
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
+		/*
+			repo, ok := RepoFrom(r.Context())
+			if !ok {
+				render.NotFound(w, render.ErrNotFound)
+				return
+			}
+		*/
 
 		index, err := strconv.ParseInt(chi.URLParam(r, "index"), 10, 64)
 		if err != nil {
@@ -214,8 +215,16 @@ func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		cov := s.provider.FindByRepoIDAndID(repo.ID, index)
+		log.Print("injectCoverage: index=", index)
+
+		cov, err := s.coverages.Find(index)
+		if err != nil {
+			log.Error().Err(err).Msg("")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 		if cov == nil {
+			log.Print("injectCoverage: cov is nil")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}

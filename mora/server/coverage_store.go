@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -161,6 +162,18 @@ func (s *coverageStoreImpl) scan(query string, params ...interface{}) ([]*Covera
 	}
 
 	return coverages, nil
+}
+
+func (s *coverageStoreImpl) Find(id int64) (*Coverage, error) {
+	query := "SELECT id, repo_id, revision, time, contents FROM coverage WHERE id = ?"
+	coverages, err := s.scan(query, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(coverages) == 0 {
+		return nil, errors.New("no coverage found")
+	}
+	return coverages[0], nil
 }
 
 func (s *coverageStoreImpl) List(repo_id int64) ([]*Coverage, error) {
