@@ -418,7 +418,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 	moraCoverageProvider := NewMoraCoverageProvider(covStore)
-	coverage := NewCoverageHandler(moraCoverageProvider, repoStore)
+	coverage := NewCoverageHandler(moraCoverageProvider, repoStore, covStore)
 
 	s.coverage = coverage
 	s.repos = repoStore

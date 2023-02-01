@@ -268,7 +268,7 @@ func setupServer(scm SCM, repos []Repository) (*MoraServer, error) {
 	repoStore := MockRepoStore{}
 	repoStore.repos = repos
 
-	coverage := NewCoverageHandler(provider, repoStore)
+	coverage := NewCoverageHandler(provider, repoStore, nil)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	log.Print(err)
