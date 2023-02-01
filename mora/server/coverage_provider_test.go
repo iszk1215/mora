@@ -4,22 +4,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elliotchance/pie/v2"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type MockCoverageStore struct {
-	rec []*Coverage
-	got *Coverage
+	coverages []*Coverage
+}
+
+func (s *MockCoverageStore) List(repo_id int64) ([]*Coverage, error) {
+	return pie.Filter(s.coverages, func(cov *Coverage) bool { return cov.RepoID == repo_id }), nil
 }
 
 func (s *MockCoverageStore) ListAll() ([]*Coverage, error) {
-	return s.rec, nil
+	return s.coverages, nil
 }
 
 func (s *MockCoverageStore) Put(cov *Coverage) error {
-	s.got = cov
+	s.coverages = append(s.coverages, cov)
 	return nil
 }
 
@@ -46,14 +50,12 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 	}
 
 	store := MockCoverageStore{}
-	p := NewMoraCoverageProvider(&store)
-	require.Nil(t, store.got)
 
+	p := NewMoraCoverageProvider(&store)
 	err := p.AddCoverage(&cov)
 	require.NoError(t, err)
-	require.NotNil(t, store.got)
 
-	assert.Equal(t, &cov, store.got)
+	assert.Equal(t, []*Coverage{&cov}, store.coverages)
 }
 
 func TestHandlerAddCoveragedMerge(t *testing.T) {
@@ -99,37 +101,38 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 		},
 	}
 
-	want := CoverageEntry{
-		Name:  "go",
-		Hits:  13,
-		Lines: 20,
-		Profiles: map[string]*profile.Profile{
-			"test.go": {
-				FileName: "test.go",
-				Hits:     13,
-				Lines:    17,
-				Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
-			},
-			"test2.go": {
-				FileName: "test2.go",
-				Hits:     0,
-				Lines:    3,
-				Blocks:   [][]int{{1, 3, 0}},
+	want := Coverage{
+		RepoID:    1215,
+		Revision:  "012345",
+		Timestamp: existing.Timestamp,
+		Entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 20,
+				Profiles: map[string]*profile.Profile{
+					"test.go": {
+						FileName: "test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+					"test2.go": {
+						FileName: "test2.go",
+						Hits:     0,
+						Lines:    3,
+						Blocks:   [][]int{{1, 3, 0}},
+					},
+				},
 			},
 		},
 	}
 
 	store := MockCoverageStore{}
 	p := NewMoraCoverageProvider(&store)
-	require.Nil(t, store.got)
 	p.coverages = append(p.coverages, &existing)
 
 	err := p.AddCoverage(&added)
 	require.NoError(t, err)
-	require.NotNil(t, store.got)
-
-	// cov, err := parseScanedCoverage(*store.got)
-	// require.NoError(t, err)
-
-	assert.Equal(t, []*CoverageEntry{&want}, store.got.Entries)
+	assert.Equal(t, []*Coverage{&want}, store.coverages)
 }

@@ -232,7 +232,10 @@ func getResultFromCoverageListHandler(handler http.Handler, repo Repository) *ht
 
 func Test_CoverageHandler_CoverageList(t *testing.T) {
 	repo := Repository{ID: 1215, Namespace: "owner", Name: "repo", Link: "url"}
-	p := NewMoraCoverageProvider(nil)
+
+	covStore := MockCoverageStore{}
+
+	p := NewMoraCoverageProvider(&covStore)
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
@@ -425,5 +428,5 @@ func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	err := s.processUploadRequest(req)
 	require.NoError(t, err)
 
-	assert.Equal(t, want, covStore.got)
+	assert.Equal(t, []*Coverage{want}, covStore.coverages)
 }

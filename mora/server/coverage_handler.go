@@ -259,6 +259,7 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
+	log.Print("repo.ID=", repo.ID)
 	coverages := s.provider.FindByRepoID(repo.ID)
 
 	log.Print("len(coverages)=", len(coverages))

@@ -9,6 +9,7 @@ import (
 type (
 	CoverageStore interface {
 		Put(*Coverage) error
+		List(int64) ([]*Coverage, error)
 		ListAll() ([]*Coverage, error)
 	}
 
@@ -48,13 +49,15 @@ func (p *MoraCoverageProvider) FindByRepoIDAndID(repo_id int64, id int64) *Cover
 }
 
 func (p *MoraCoverageProvider) FindByRepoID(id int64) []*Coverage {
-	found := []*Coverage{}
-	for _, cov := range p.coverages {
-		if cov.RepoID == id {
-			found = append(found, cov)
+	if p.store != nil {
+		coverages, err := p.store.List(id)
+		if err != nil {
+			return []*Coverage{}
 		}
+		return coverages
 	}
-	return found
+
+	return []*Coverage{}
 }
 
 func (p *MoraCoverageProvider) findCoverage(cov *Coverage) int {

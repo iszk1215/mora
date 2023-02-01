@@ -142,9 +142,9 @@ func toCoverage(record StorableCoverage) (*Coverage, error) {
 	return cov, nil
 }
 
-func (s *coverageStoreImpl) ListAll() ([]*Coverage, error) {
+func (s *coverageStoreImpl) scan(query string, params ...interface{}) ([]*Coverage, error) {
 	rows := []StorableCoverage{}
-	err := s.db.Select(&rows, "SELECT id, repo_id, revision, time, contents FROM coverage")
+	err := s.db.Select(&rows, query, params...)
 
 	if err != nil {
 		return nil, err
@@ -161,4 +161,14 @@ func (s *coverageStoreImpl) ListAll() ([]*Coverage, error) {
 	}
 
 	return coverages, nil
+}
+
+func (s *coverageStoreImpl) List(repo_id int64) ([]*Coverage, error) {
+	query := "SELECT id, repo_id, revision, time, contents FROM coverage WHERE repo_id = ?"
+	return s.scan(query, repo_id)
+}
+
+func (s *coverageStoreImpl) ListAll() ([]*Coverage, error) {
+	query := "SELECT id, repo_id, revision, time, contents FROM coverage"
+	return s.scan(query)
 }
