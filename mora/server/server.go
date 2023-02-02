@@ -16,6 +16,7 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 )
 
@@ -57,10 +58,15 @@ type (
 		Logined bool   `json:"logined"`
 	}
 
+	ResourceHandler interface {
+		Handler() http.Handler
+		HandleUpload(w http.ResponseWriter, r *http.Request)
+	}
+
 	MoraServer struct {
 		scms     []SCM
 		repos    RepositoryStore
-		coverage *CoverageHandler
+		coverage ResourceHandler
 
 		sessionManager     *MoraSessionManager
 		frontendFileServer http.Handler
@@ -288,7 +294,9 @@ func (s *MoraServer) Handler() http.Handler {
 
 	r.Route("/api/{scm}/{owner}/{repo}", func(r chi.Router) {
 		r.Use(s.injectRepo)
-		r.Mount("/coverages", s.coverage.Handler())
+		if s.coverage != nil {
+			r.Mount("/coverages", s.coverage.Handler())
+		}
 	})
 
 	// login/logout
@@ -317,7 +325,6 @@ func (s *MoraServer) Handler() http.Handler {
 	return r
 }
 
-// static includes public and templates
 //go:embed static
 var embedded embed.FS
 
@@ -384,6 +391,15 @@ func createSCMs(config MoraConfig) []SCM {
 	return scms
 }
 
+func Connect(filename string) (*sqlx.DB, error) {
+	db, err := sqlx.Connect("sqlite3", filename)
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
 func initStore() (RepositoryStore, CoverageStore, error) {
 	db, err := Connect("mora.db")
 	if err != nil {
@@ -396,6 +412,9 @@ func initStore() (RepositoryStore, CoverageStore, error) {
 	}
 
 	covStore := NewCoverageStore(db)
+	if err := covStore.Init(); err != nil {
+		return nil, nil, err
+	}
 
 	return repoStore, covStore, nil
 }

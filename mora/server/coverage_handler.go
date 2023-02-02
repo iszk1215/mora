@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/drone/drone/handler/api/render"
@@ -81,7 +80,6 @@ type (
 	CoverageHandler struct {
 		repos     RepositoryStore
 		coverages CoverageStore
-		sync.Mutex
 	}
 
 	coverageContextKey int

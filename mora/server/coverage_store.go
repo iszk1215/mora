@@ -36,23 +36,13 @@ type (
 	}
 )
 
-func Connect(filename string) (*sqlx.DB, error) {
-	db, err := sqlx.Connect("sqlite3", filename)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = db.Exec(schema)
-	if err != nil {
-		log.Err(err).Msg("")
-		return nil, err
-	}
-
-	return db, nil
-}
-
 func NewCoverageStore(db *sqlx.DB) *coverageStoreImpl {
 	return &coverageStoreImpl{db: db}
+}
+
+func (s *coverageStoreImpl) Init() error {
+	_, err := s.db.Exec(schema)
+	return err
 }
 
 func (s *coverageStoreImpl) Put(cov *Coverage) error {
@@ -176,7 +166,7 @@ func (s *coverageStoreImpl) findOne(query string, params ...interface{}) (*Cover
 
 func (s *coverageStoreImpl) Find(id int64) (*Coverage, error) {
 	query := "SELECT id, repo_id, revision, time, contents FROM coverage WHERE id = ?"
-	return s.findOne(query)
+	return s.findOne(query, id)
 }
 
 func (s *coverageStoreImpl) FindRevision(repoID int64, revision string) (*Coverage, error) {
