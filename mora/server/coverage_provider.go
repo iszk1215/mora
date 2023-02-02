@@ -7,14 +7,6 @@ import (
 )
 
 type (
-	CoverageStore interface {
-		Put(*Coverage) error
-		Find(int64) (*Coverage, error)
-		FindRevision(int64, string) (*Coverage, error)
-		List(int64) ([]*Coverage, error)
-		ListAll() ([]*Coverage, error)
-	}
-
 	MoraCoverageProvider struct {
 		store CoverageStore
 		sync.Mutex

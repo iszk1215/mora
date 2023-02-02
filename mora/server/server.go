@@ -417,8 +417,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		log.Err(err).Msg("initStore")
 		return nil, err
 	}
-	moraCoverageProvider := NewMoraCoverageProvider(covStore)
-	coverage := NewCoverageHandler(moraCoverageProvider, repoStore, covStore)
+	coverage := NewCoverageHandler(repoStore, covStore)
 
 	s.coverage = coverage
 	s.repos = repoStore

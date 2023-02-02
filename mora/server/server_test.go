@@ -259,16 +259,16 @@ func requireLogin(t *testing.T, handler http.Handler, scm string) *http.Cookie {
 }
 
 func setupServer(scm SCM, repos []Repository) (*MoraServer, error) {
-	provider := NewMoraCoverageProvider(nil)
+	covStore := &MockCoverageStore{}
 	for _, repo := range repos {
-		cov := Coverage{RepoID: repo.ID}
-		provider.AddCoverage(&cov)
+		cov := &Coverage{RepoID: repo.ID}
+		covStore.Put(cov)
 	}
 
 	repoStore := MockRepoStore{}
 	repoStore.repos = repos
 
-	coverage := NewCoverageHandler(provider, repoStore, nil)
+	coverage := NewCoverageHandler(repoStore, covStore)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	log.Print(err)

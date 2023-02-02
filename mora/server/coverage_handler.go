@@ -70,12 +70,15 @@ type (
 		Entries   []*CoverageEntryUploadRequest `json:"entries"`
 	}
 
-	CoverageProvider interface {
-		AddCoverage(*Coverage) error
+	CoverageStore interface {
+		Put(*Coverage) error
+		Find(int64) (*Coverage, error)
+		FindRevision(int64, string) (*Coverage, error)
+		List(int64) ([]*Coverage, error)
+		ListAll() ([]*Coverage, error)
 	}
 
 	CoverageHandler struct {
-		provider  CoverageProvider
 		repos     RepositoryStore
 		coverages CoverageStore
 		sync.Mutex
@@ -146,8 +149,8 @@ func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest)
 	return cov, nil
 }
 
-func NewCoverageHandler(provider CoverageProvider, repos RepositoryStore, coverages CoverageStore) *CoverageHandler {
-	s := &CoverageHandler{provider: provider, repos: repos, coverages: coverages}
+func NewCoverageHandler(repos RepositoryStore, coverages CoverageStore) *CoverageHandler {
+	s := &CoverageHandler{repos: repos, coverages: coverages}
 	return s
 }
 
@@ -194,20 +197,6 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 
 func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.provider == nil {
-			log.Print("No provider enabled")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
-		/*
-			repo, ok := RepoFrom(r.Context())
-			if !ok {
-				render.NotFound(w, render.ErrNotFound)
-				return
-			}
-		*/
-
 		index, err := strconv.ParseInt(chi.URLParam(r, "index"), 10, 64)
 		if err != nil {
 			log.Error().Err(err).Msg("")
@@ -415,11 +404,28 @@ func readUploadRequest(reader io.Reader) (*CoverageUploadRequest, error) {
 
 func (s *CoverageHandler) processUploadRequest(req *CoverageUploadRequest) error {
 	cov, err := s.parseCoverageUploadRequest(req)
-	if err == nil {
-		err = s.provider.AddCoverage(cov)
+	if err != nil {
+		return err
 	}
 
-	return err
+	log.Print("processUploadRequest: Add coverage to CoverageStore")
+
+	found, err := s.coverages.FindRevision(cov.RepoID, cov.Revision)
+	if err != nil {
+		return err
+	}
+
+	if found != nil {
+		log.Print("Merge with ", found.ID)
+		cov.ID = found.ID
+		cov, err = mergeCoverage(found, cov)
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Print("processUploadRequest: Put: cov.ID=", cov.ID)
+	return s.coverages.Put(cov)
 }
 
 func (s *CoverageHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {

@@ -129,10 +129,8 @@ func Test_injectCoverage(t *testing.T) {
 	}
 
 	covStore := &MockCoverageStore{}
-
-	p := NewMoraCoverageProvider(covStore)
-	p.AddCoverage(&want)
-	s := NewCoverageHandler(p, nil, covStore)
+	covStore.Put(&want)
+	s := NewCoverageHandler(nil, covStore)
 
 	r := chi.NewRouter()
 	r.Route("/{index}", func(r chi.Router) {
@@ -150,46 +148,16 @@ func Test_injectCoverage(t *testing.T) {
 	assert.Equal(t, &want, got)
 }
 
-func Test_injectCoverage_no_repo_in_context(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
-	w := httptest.NewRecorder()
-
-	s := NewCoverageHandler(nil, nil, nil)
-	s.Handler().ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
-}
-
 func Test_injectCoverage_malformed_index(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
 	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
 	w := httptest.NewRecorder()
 
-	s := NewCoverageHandler(nil, nil, nil)
+	s := NewCoverageHandler(nil, nil)
 	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 }
-
-func Test_injectCoverage_no_repo_in_service(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
-	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
-	w := httptest.NewRecorder()
-
-	s := NewCoverageHandler(nil, nil, nil)
-	s.Handler().ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
-}
-
-/*
-func TestParseCoverageUploadRequest(t *testing.T) {
-	req, want := makeCoverageUploadRequest()
-	got, err := parseCoverageUploadRequest(req)
-	require.NoError(t, err)
-	assert.Equal(t, want, got)
-}
-*/
 
 func TestMakeCoverageResponseList(t *testing.T) {
 	scm := NewMockSCM("scm")
@@ -237,27 +205,25 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 
 	covStore := MockCoverageStore{}
 
-	p := NewMoraCoverageProvider(&covStore)
-
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := Coverage{ID: 0, RepoID: repo.ID, Timestamp: time0, Revision: "abc123"}
-	cov1 := Coverage{ID: 1, RepoID: repo.ID, Timestamp: time1, Revision: "abc124"}
-	p.AddCoverage(&cov0)
-	p.AddCoverage(&cov1)
+	cov0 := &Coverage{ID: 0, RepoID: repo.ID, Timestamp: time0, Revision: "abc123"}
+	cov1 := &Coverage{ID: 1, RepoID: repo.ID, Timestamp: time1, Revision: "abc124"}
 
-	s := NewCoverageHandler(p, nil, &covStore)
+	covStore.Put(cov0)
+	covStore.Put(cov1)
+
+	s := NewCoverageHandler(nil, &covStore)
 
 	res := getResultFromCoverageListHandler(s.Handler(), repo)
 
-	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
+	testCoverageListResponse(t, []Coverage{*cov1, *cov0}, res)
 }
 
 func Test_CoverageHandler_FileList(t *testing.T) {
 	scm := NewMockSCM("mock")
 	covStore := &MockCoverageStore{}
-	p := NewMoraCoverageProvider(covStore)
-	s := NewCoverageHandler(p, nil, covStore)
+	s := NewCoverageHandler(nil, covStore)
 
 	repoURL := "http://mock.scm/org/name"
 	filename := "test.go"
@@ -287,7 +253,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 		},
 	}
 
-	p.AddCoverage(&cov)
+	covStore.Put(&cov)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
@@ -379,10 +345,9 @@ func Test_CoverageHandler_File(t *testing.T) {
 	}
 
 	covStore := &MockCoverageStore{}
-	p := NewMoraCoverageProvider(covStore)
-	p.AddCoverage(&cov)
+	covStore.Put(&cov)
 
-	s := NewCoverageHandler(p, nil, covStore)
+	s := NewCoverageHandler(nil, covStore)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
@@ -417,7 +382,6 @@ func Test_CoverageHandler_File(t *testing.T) {
 
 func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	covStore := MockCoverageStore{}
-	p := NewMoraCoverageProvider(&covStore)
 	m := MockRepoStore{}
 	repo := Repository{
 		ID:        1215,
@@ -426,7 +390,7 @@ func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 		Link:      "http://mock.scm/mockowner/mockrepo",
 	}
 	m.repos = []Repository{repo}
-	s := NewCoverageHandler(p, m, &covStore)
+	s := NewCoverageHandler(m, &covStore)
 
 	req, want := makeCoverageUploadRequest(repo)
 	err := s.processUploadRequest(req)
