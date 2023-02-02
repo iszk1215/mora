@@ -129,7 +129,6 @@ func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest)
 		return nil, errors.New("repo url is empty")
 	}
 
-	log.Print(s.repos)
 	repo, err := s.repos.FindByURL(req.RepoURL)
 	if err != nil {
 		return nil, errors.New("repo is not found")
