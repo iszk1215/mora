@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -15,15 +14,25 @@ type MockCoverageStore struct {
 	coverages []*Coverage
 }
 
-func (s *MockCoverageStore) Find(id int64) (*Coverage, error) {
-	filtered := pie.Filter(s.coverages,
-		func(cov *Coverage) bool { return cov.ID == id })
+func (s *MockCoverageStore) findOne(f func(cov *Coverage) bool) (*Coverage, error) {
+	filtered := pie.Filter(s.coverages, f)
 
 	if len(filtered) == 0 {
-		return nil, errors.New("no cov")
+		return nil, nil
 	}
 
 	return filtered[0], nil
+}
+
+func (s *MockCoverageStore) Find(id int64) (*Coverage, error) {
+	return s.findOne(func(cov *Coverage) bool { return cov.ID == id })
+}
+
+func (s *MockCoverageStore) FindRevision(repoID int64, revision string) (*Coverage, error) {
+	return s.findOne(
+		func(cov *Coverage) bool {
+			return cov.RepoID == repoID && cov.Revision == revision
+		})
 }
 
 func (s *MockCoverageStore) List(repo_id int64) ([]*Coverage, error) {
@@ -35,7 +44,20 @@ func (s *MockCoverageStore) ListAll() ([]*Coverage, error) {
 }
 
 func (s *MockCoverageStore) Put(cov *Coverage) error {
-	s.coverages = append(s.coverages, cov)
+	found, _ := s.Find(cov.ID)
+	if found != nil {
+		added := []*Coverage{}
+		for _, c := range s.coverages {
+			if c.ID == found.ID {
+				added = append(added, cov)
+			} else {
+				added = append(added, c)
+			}
+		}
+		s.coverages = added
+	} else {
+		s.coverages = append(s.coverages, cov)
+	}
 	return nil
 }
 
@@ -142,7 +164,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 
 	store := MockCoverageStore{}
 	p := NewMoraCoverageProvider(&store)
-	p.coverages = append(p.coverages, &existing)
+	p.AddCoverage(&existing)
 
 	err := p.AddCoverage(&added)
 	require.NoError(t, err)

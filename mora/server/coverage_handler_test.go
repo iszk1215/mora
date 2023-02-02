@@ -241,8 +241,8 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := Coverage{RepoID: repo.ID, Timestamp: time0, Revision: "abc123"}
-	cov1 := Coverage{RepoID: repo.ID, Timestamp: time1, Revision: "abc124"}
+	cov0 := Coverage{ID: 0, RepoID: repo.ID, Timestamp: time0, Revision: "abc123"}
+	cov1 := Coverage{ID: 1, RepoID: repo.ID, Timestamp: time1, Revision: "abc124"}
 	p.AddCoverage(&cov0)
 	p.AddCoverage(&cov1)
 
