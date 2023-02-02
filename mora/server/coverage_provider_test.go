@@ -62,7 +62,7 @@ func (s *MockCoverageStore) Put(cov *Coverage) error {
 }
 
 func TestMoraCoverageProviderAddCoverage(t *testing.T) {
-	cov := Coverage{
+	cov := &Coverage{
 		RepoID:    1215,
 		Revision:  "012345",
 		Timestamp: time.Now(),
@@ -83,13 +83,12 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 		},
 	}
 
-	store := MockCoverageStore{}
+	store := &MockCoverageStore{}
+	handler := NewCoverageHandler(nil, store)
+	err := handler.AddCoverage(cov)
 
-	p := NewMoraCoverageProvider(&store)
-	err := p.AddCoverage(&cov)
 	require.NoError(t, err)
-
-	assert.Equal(t, []*Coverage{&cov}, store.coverages)
+	assert.Equal(t, []*Coverage{cov}, store.coverages)
 }
 
 func TestHandlerAddCoveragedMerge(t *testing.T) {
@@ -162,11 +161,12 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 		},
 	}
 
-	store := MockCoverageStore{}
-	p := NewMoraCoverageProvider(&store)
-	p.AddCoverage(&existing)
+	store := &MockCoverageStore{}
+	store.Put(&existing)
 
-	err := p.AddCoverage(&added)
+	handler := NewCoverageHandler(nil, store)
+	err := handler.AddCoverage(&added)
+
 	require.NoError(t, err)
 	assert.Equal(t, []*Coverage{&want}, store.coverages)
 }

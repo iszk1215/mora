@@ -402,14 +402,8 @@ func readUploadRequest(reader io.Reader) (*CoverageUploadRequest, error) {
 	return req, nil
 }
 
-func (s *CoverageHandler) processUploadRequest(req *CoverageUploadRequest) error {
-	cov, err := s.parseCoverageUploadRequest(req)
-	if err != nil {
-		return err
-	}
-
-	log.Print("processUploadRequest: Add coverage to CoverageStore")
-
+func (s *CoverageHandler) AddCoverage(cov *Coverage) error {
+	log.Print("AddCoverage: Add coverage to CoverageStore")
 	found, err := s.coverages.FindRevision(cov.RepoID, cov.Revision)
 	if err != nil {
 		return err
@@ -424,8 +418,17 @@ func (s *CoverageHandler) processUploadRequest(req *CoverageUploadRequest) error
 		}
 	}
 
-	log.Print("processUploadRequest: Put: cov.ID=", cov.ID)
+	log.Print("AddCoverage: Put: cov.ID=", cov.ID)
 	return s.coverages.Put(cov)
+}
+
+func (s *CoverageHandler) processUploadRequest(req *CoverageUploadRequest) error {
+	cov, err := s.parseCoverageUploadRequest(req)
+	if err != nil {
+		return err
+	}
+
+	return s.AddCoverage(cov)
 }
 
 func (s *CoverageHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
