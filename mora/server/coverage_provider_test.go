@@ -92,7 +92,7 @@ func TestMoraCoverageProviderAddCoverage(t *testing.T) {
 }
 
 func TestHandlerAddCoveragedMerge(t *testing.T) {
-	existing := Coverage{
+	existing := &Coverage{
 		RepoID:    1215,
 		Revision:  "012345",
 		Timestamp: time.Now(),
@@ -134,7 +134,7 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 		},
 	}
 
-	want := Coverage{
+	want := &Coverage{
 		RepoID:    1215,
 		Revision:  "012345",
 		Timestamp: existing.Timestamp,
@@ -162,11 +162,11 @@ func TestHandlerAddCoveragedMerge(t *testing.T) {
 	}
 
 	store := &MockCoverageStore{}
-	store.Put(&existing)
+	store.Put(existing)
 
 	handler := NewCoverageHandler(nil, store)
 	err := handler.AddCoverage(&added)
 
 	require.NoError(t, err)
-	assert.Equal(t, []*Coverage{&want}, store.coverages)
+	assert.Equal(t, []*Coverage{want}, store.coverages)
 }
