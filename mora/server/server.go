@@ -403,17 +403,8 @@ func createSCMs(config MoraConfig) []SCM {
 	return scms
 }
 
-func Connect(filename string) (*sqlx.DB, error) {
+func initStore(filename string) (RepositoryStore, CoverageStore, error) {
 	db, err := sqlx.Connect("sqlite3", filename)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
-func initStore() (RepositoryStore, CoverageStore, error) {
-	db, err := Connect("mora.db")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -443,7 +434,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	repoStore, covStore, err := initStore()
+	repoStore, covStore, err := initStore("mora.db")
 	if err != nil {
 		log.Err(err).Msg("initStore")
 		return nil, err
