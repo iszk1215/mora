@@ -25,8 +25,6 @@ var (
 )
 
 type (
-	//Repo = scm.Repository
-
 	Repository struct {
 		ID        int64
 		Namespace string
