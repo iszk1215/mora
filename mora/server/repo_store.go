@@ -23,22 +23,16 @@ type (
 		URL       string `db:"url"`
 	}
 
-	RepositoryStore interface {
-		Init() error
-		Scan() ([]Repository, error)
-		FindByURL(string) (Repository, error)
-	}
-
-	RepositoryStoreImpl struct {
+	repositoryStoreImpl struct {
 		db *sqlx.DB
 	}
 )
 
 func NewRepositoryStore(db *sqlx.DB) RepositoryStore {
-	return &RepositoryStoreImpl{db}
+	return &repositoryStoreImpl{db}
 }
 
-func (s *RepositoryStoreImpl) Init() error {
+func (s *repositoryStoreImpl) Init() error {
 	_, err := s.db.Exec(schema_repo)
 	if err != nil {
 		log.Err(err).Msg("")
@@ -56,7 +50,7 @@ func toRepo(from storableRepository) Repository {
 	}
 }
 
-func (s *RepositoryStoreImpl) FindByURL(url string) (Repository, error) {
+func (s *repositoryStoreImpl) FindByURL(url string) (Repository, error) {
 	rows := []storableRepository{}
 	err := s.db.Select(&rows, "SELECT id, name, namespace, url FROM repository WHERE url = ?", url)
 	if err != nil {
@@ -70,7 +64,7 @@ func (s *RepositoryStoreImpl) FindByURL(url string) (Repository, error) {
 	return toRepo(rows[0]), nil
 }
 
-func (s *RepositoryStoreImpl) Scan() ([]Repository, error) {
+func (s *repositoryStoreImpl) Scan() ([]Repository, error) {
 	rows := []storableRepository{}
 	err := s.db.Select(&rows, "SELECT id, name, namespace, url FROM repository")
 

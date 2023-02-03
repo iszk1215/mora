@@ -69,14 +69,6 @@ type (
 		Entries   []*CoverageEntryUploadRequest `json:"entries"`
 	}
 
-	CoverageStore interface {
-		Put(*Coverage) error
-		Find(int64) (*Coverage, error)
-		FindRevision(int64, string) (*Coverage, error)
-		List(int64) ([]*Coverage, error)
-		ListAll() ([]*Coverage, error)
-	}
-
 	CoverageHandler struct {
 		repos     RepositoryStore
 		coverages CoverageStore

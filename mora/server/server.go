@@ -58,6 +58,20 @@ type (
 		Logined bool   `json:"logined"`
 	}
 
+	RepositoryStore interface {
+		Init() error
+		Scan() ([]Repository, error)
+		FindByURL(string) (Repository, error)
+	}
+
+	CoverageStore interface {
+		Put(*Coverage) error
+		Find(int64) (*Coverage, error)
+		FindRevision(int64, string) (*Coverage, error)
+		List(int64) ([]*Coverage, error)
+		ListAll() ([]*Coverage, error)
+	}
+
 	ResourceHandler interface {
 		Handler() http.Handler
 		HandleUpload(w http.ResponseWriter, r *http.Request)

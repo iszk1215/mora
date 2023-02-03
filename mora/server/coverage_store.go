@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS coverage (
 )`
 
 type (
-	StorableCoverage struct {
+	storableCoverage struct {
 		ID       int64     `db:"id"`
 		RepoID   int64     `db:"repo_id"`
 		Revision string    `db:"revision"`
@@ -116,7 +116,7 @@ func parseStorableCoverageContents(contents string) ([]*CoverageEntry, error) {
 	return entries, nil
 }
 
-func toCoverage(record StorableCoverage) (*Coverage, error) {
+func toCoverage(record storableCoverage) (*Coverage, error) {
 	entries, err := parseStorableCoverageContents(record.Contents)
 	if err != nil {
 		return nil, err
@@ -133,7 +133,7 @@ func toCoverage(record StorableCoverage) (*Coverage, error) {
 }
 
 func (s *coverageStoreImpl) scan(query string, params ...interface{}) ([]*Coverage, error) {
-	rows := []StorableCoverage{}
+	rows := []storableCoverage{}
 	err := s.db.Select(&rows, query, params...)
 
 	if err != nil {
