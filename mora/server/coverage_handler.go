@@ -8,15 +8,12 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/drone/drone/handler/api/render"
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/rs/zerolog/log"
-
-	mapset "github.com/deckarep/golang-set/v2"
 )
 
 type (
@@ -72,16 +69,9 @@ type (
 		Entries   []*CoverageEntryUploadRequest `json:"entries"`
 	}
 
-	CoverageProvider interface {
-		Coverages() []*Coverage
-		AddCoverage(*Coverage) error
-		FindByURLandID(string, int64) *Coverage
-		FindByRepoURL(string) []*Coverage
-	}
-
-	CoverageService struct {
-		provider CoverageProvider
-		sync.Mutex
+	CoverageHandler struct {
+		repos     RepositoryStore
+		coverages CoverageStore
 	}
 
 	coverageContextKey int
@@ -124,9 +114,14 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 	return entries, nil
 }
 
-func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
+func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	if req.RepoURL == "" {
 		return nil, errors.New("repo url is empty")
+	}
+
+	repo, err := s.repos.FindByURL(req.RepoURL)
+	if err != nil {
+		return nil, errors.New("repo is not found")
 	}
 
 	entries, err := parseCoverageEntryUploadRequests(req.Entries)
@@ -135,7 +130,7 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	}
 
 	cov := &Coverage{}
-	cov.RepoURL = req.RepoURL
+	cov.RepoID = repo.ID
 	cov.Revision = req.Revision
 	cov.Entries = entries
 	cov.Timestamp = req.Timestamp
@@ -143,19 +138,9 @@ func parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
 	return cov, nil
 }
 
-func NewCoverageService(provider CoverageProvider) *CoverageService {
-	s := &CoverageService{provider: provider}
+func NewCoverageHandler(repos RepositoryStore, coverages CoverageStore) *CoverageHandler {
+	s := &CoverageHandler{repos: repos, coverages: coverages}
 	return s
-}
-
-func (s *CoverageService) Repos() []string {
-	repos := mapset.NewSet[string]()
-	for _, cov := range s.provider.Coverages() {
-		url := cov.RepoURL
-		repos.Add(url)
-	}
-
-	return repos.ToSlice()
 }
 
 func withCoverage(ctx context.Context, cov *Coverage) context.Context {
@@ -199,20 +184,8 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 	})
 }
 
-func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
+func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.provider == nil {
-			log.Print("No provider enabled")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
-		repo, ok := RepoFrom(r.Context())
-		if !ok {
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
 		index, err := strconv.ParseInt(chi.URLParam(r, "index"), 10, 64)
 		if err != nil {
 			log.Error().Err(err).Msg("")
@@ -220,8 +193,16 @@ func (s *CoverageService) injectCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		cov := s.provider.FindByURLandID(repo.Link, index)
+		log.Print("injectCoverage: index=", index)
+
+		cov, err := s.coverages.Find(index)
+		if err != nil {
+			log.Error().Err(err).Msg("")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 		if cov == nil {
+			log.Print("injectCoverage: cov is nil")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
@@ -261,11 +242,17 @@ func makeCoverageResponseList(scm SCM, repo Repository, coverages []*Coverage) [
 	return ret
 }
 
-func (s *CoverageService) handleCoverageList(w http.ResponseWriter, r *http.Request) {
+func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Request) {
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
-	coverages := s.provider.FindByRepoURL(repo.Link)
+	log.Print("repo.ID=", repo.ID)
+	coverages, err := s.coverages.List(repo.ID)
+	if err != nil {
+		log.Err(err).Msg("")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
 
 	log.Print("len(coverages)=", len(coverages))
 
@@ -373,7 +360,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func (s *CoverageService) Handler() http.Handler {
+func (s *CoverageHandler) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", s.handleCoverageList)
 
@@ -404,16 +391,36 @@ func readUploadRequest(reader io.Reader) (*CoverageUploadRequest, error) {
 	return req, nil
 }
 
-func (s *CoverageService) processUploadRequest(req *CoverageUploadRequest) error {
-	cov, err := parseCoverageUploadRequest(req)
-	if err == nil {
-		err = s.provider.AddCoverage(cov)
+func (s *CoverageHandler) AddCoverage(cov *Coverage) error {
+	log.Print("AddCoverage: Add coverage to CoverageStore")
+	found, err := s.coverages.FindRevision(cov.RepoID, cov.Revision)
+	if err != nil {
+		return err
 	}
 
-	return err
+	if found != nil {
+		log.Print("Merge with ", found.ID)
+		cov.ID = found.ID
+		cov, err = mergeCoverage(found, cov)
+		if err != nil {
+			return err
+		}
+	}
+
+	log.Print("AddCoverage: Put: cov.ID=", cov.ID)
+	return s.coverages.Put(cov)
 }
 
-func (s *CoverageService) HandleUpload(w http.ResponseWriter, r *http.Request) {
+func (s *CoverageHandler) processUploadRequest(req *CoverageUploadRequest) error {
+	cov, err := s.parseCoverageUploadRequest(req)
+	if err != nil {
+		return err
+	}
+
+	return s.AddCoverage(cov)
+}
+
+func (s *CoverageHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
 	req, err := readUploadRequest(r.Body)
 
 	if err == nil {

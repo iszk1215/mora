@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/drone/go-scm/scm"
+	"github.com/elliotchance/pie/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/iszk1215/mora/mora/mockscm"
@@ -17,6 +18,57 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type MockCoverageStore struct {
+	coverages []*Coverage
+}
+
+func (s *MockCoverageStore) findOne(f func(cov *Coverage) bool) (*Coverage, error) {
+	filtered := pie.Filter(s.coverages, f)
+
+	if len(filtered) == 0 {
+		return nil, nil
+	}
+
+	return filtered[0], nil
+}
+
+func (s *MockCoverageStore) Find(id int64) (*Coverage, error) {
+	return s.findOne(func(cov *Coverage) bool { return cov.ID == id })
+}
+
+func (s *MockCoverageStore) FindRevision(repoID int64, revision string) (*Coverage, error) {
+	return s.findOne(
+		func(cov *Coverage) bool {
+			return cov.RepoID == repoID && cov.Revision == revision
+		})
+}
+
+func (s *MockCoverageStore) List(repo_id int64) ([]*Coverage, error) {
+	return pie.Filter(s.coverages, func(cov *Coverage) bool { return cov.RepoID == repo_id }), nil
+}
+
+func (s *MockCoverageStore) ListAll() ([]*Coverage, error) {
+	return s.coverages, nil
+}
+
+func (s *MockCoverageStore) Put(cov *Coverage) error {
+	found, _ := s.Find(cov.ID)
+	if found != nil {
+		added := []*Coverage{}
+		for _, c := range s.coverages {
+			if c.ID == found.ID {
+				added = append(added, cov)
+			} else {
+				added = append(added, c)
+			}
+		}
+		s.coverages = added
+	} else {
+		s.coverages = append(s.coverages, cov)
+	}
+	return nil
+}
 
 func assertEqualCoverageAndResponse(t *testing.T, want Coverage, got CoverageResponse) bool {
 	ok := assert.True(t, want.Timestamp.Equal(got.Timestamp))
@@ -51,8 +103,7 @@ func assertEqualCoverageList(t *testing.T, want []Coverage, got []CoverageRespon
 
 // Test Data
 
-func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
-	url := "http://mockscm.com/mockowner/mockrepo"
+func makeCoverageUploadRequest(repo Repository) (*CoverageUploadRequest, *Coverage) {
 	revision := "12345"
 	now := time.Now().Round(0)
 
@@ -64,7 +115,7 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	}
 
 	req := CoverageUploadRequest{
-		RepoURL:   url,
+		RepoURL:   repo.Link,
 		Revision:  revision,
 		Timestamp: now,
 		Entries: []*CoverageEntryUploadRequest{
@@ -78,7 +129,7 @@ func makeCoverageUploadRequest() (*CoverageUploadRequest, *Coverage) {
 	}
 
 	want := Coverage{
-		RepoURL:   url,
+		RepoID:    1215,
 		Revision:  revision,
 		Timestamp: now,
 		Entries: []*CoverageEntry{
@@ -124,15 +175,14 @@ func Test_injectCoverage(t *testing.T) {
 
 	want := Coverage{
 		ID:        123,
-		RepoURL:   repo.Link,
 		Revision:  "revision",
 		Timestamp: time.Now().Round(0),
 		Entries:   nil,
 	}
 
-	p := NewMoraCoverageProvider(nil)
-	p.AddCoverage(&want)
-	s := NewCoverageService(p)
+	covStore := &MockCoverageStore{}
+	covStore.Put(&want)
+	s := NewCoverageHandler(nil, covStore)
 
 	r := chi.NewRouter()
 	r.Route("/{index}", func(r chi.Router) {
@@ -150,43 +200,15 @@ func Test_injectCoverage(t *testing.T) {
 	assert.Equal(t, &want, got)
 }
 
-func Test_injectCoverage_no_repo_in_context(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
-	w := httptest.NewRecorder()
-
-	s := NewCoverageService(nil)
-	s.Handler().ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
-}
-
 func Test_injectCoverage_malformed_index(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
 	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
 	w := httptest.NewRecorder()
 
-	s := NewCoverageService(nil)
+	s := NewCoverageHandler(nil, nil)
 	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
-}
-
-func Test_injectCoverage_no_repo_in_service(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/0", strings.NewReader(""))
-	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
-	w := httptest.NewRecorder()
-
-	s := NewCoverageService(nil)
-	s.Handler().ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
-}
-
-func TestParseCoverageUploadRequest(t *testing.T) {
-	req, want := makeCoverageUploadRequest()
-	got, err := parseCoverageUploadRequest(req)
-	require.NoError(t, err)
-	assert.Equal(t, want, got)
 }
 
 func TestMakeCoverageResponseList(t *testing.T) {
@@ -194,7 +216,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	repo := Repository{Namespace: "owner", Name: "repo"} // FIXME
 
 	cov := Coverage{
-		RepoURL:   "dummyURL",
+		RepoID:    1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -230,28 +252,30 @@ func getResultFromCoverageListHandler(handler http.Handler, repo Repository) *ht
 
 // API Test
 
-func Test_CoverageService_CoverageList(t *testing.T) {
-	repo := Repository{Namespace: "owner", Name: "repo", Link: "url"}
-	p := NewMoraCoverageProvider(nil)
+func Test_CoverageHandler_CoverageList(t *testing.T) {
+	repo := Repository{ID: 1215, Namespace: "owner", Name: "repo", Link: "url"}
+
+	covStore := MockCoverageStore{}
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := Coverage{RepoURL: repo.Link, Timestamp: time0, Revision: "abc123"}
-	cov1 := Coverage{RepoURL: repo.Link, Timestamp: time1, Revision: "abc124"}
-	p.AddCoverage(&cov0)
-	p.AddCoverage(&cov1)
+	cov0 := &Coverage{ID: 0, RepoID: repo.ID, Timestamp: time0, Revision: "abc123"}
+	cov1 := &Coverage{ID: 1, RepoID: repo.ID, Timestamp: time1, Revision: "abc124"}
 
-	s := NewCoverageService(p)
+	covStore.Put(cov0)
+	covStore.Put(cov1)
+
+	s := NewCoverageHandler(nil, &covStore)
 
 	res := getResultFromCoverageListHandler(s.Handler(), repo)
 
-	testCoverageListResponse(t, []Coverage{cov1, cov0}, res)
+	testCoverageListResponse(t, []Coverage{*cov1, *cov0}, res)
 }
 
-func Test_CoverageService_FileList(t *testing.T) {
+func Test_CoverageHandler_FileList(t *testing.T) {
 	scm := NewMockSCM("mock")
-	p := NewMoraCoverageProvider(nil)
-	s := NewCoverageService(p)
+	covStore := &MockCoverageStore{}
+	s := NewCoverageHandler(nil, covStore)
 
 	repoURL := "http://mock.scm/org/name"
 	filename := "test.go"
@@ -262,7 +286,6 @@ func Test_CoverageService_FileList(t *testing.T) {
 
 	cov := Coverage{
 		ID:        123,
-		RepoURL:   repoURL,
 		Revision:  revision,
 		Timestamp: timestamp,
 		Entries: []*CoverageEntry{
@@ -282,7 +305,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 		},
 	}
 
-	p.AddCoverage(&cov)
+	covStore.Put(&cov)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
@@ -328,7 +351,7 @@ func Test_CoverageService_FileList(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func Test_CoverageService_File(t *testing.T) {
+func Test_CoverageHandler_File(t *testing.T) {
 	scmName := "mockscm"
 	repoName := "repo"
 	orgName := "org"
@@ -350,15 +373,15 @@ func Test_CoverageService_File(t *testing.T) {
 
 	contents := mockscm.NewMockContentService(mockCtrl)
 	content := scm.Content{Data: []byte(code)}
-	contents.EXPECT().Find(gomock.Any(), orgName+"/"+repoName, filename, revision).Return(&content, nil, nil)
+	contents.EXPECT().Find( /*ctx*/ gomock.Any(), orgName+"/"+repoName, filename, revision).Return(&content, nil, nil)
 
 	scm := NewMockSCM(scmName)
 	scm.client.Contents = contents
 
-	repo := Repository{Namespace: orgName, Name: repoName, Link: repoURL}
+	repo := Repository{ID: 1215, Namespace: orgName, Name: repoName, Link: repoURL}
 
 	cov := Coverage{
-		RepoURL:   repo.Link,
+		RepoID:    repo.ID,
 		Revision:  revision,
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -373,10 +396,10 @@ func Test_CoverageService_File(t *testing.T) {
 		},
 	}
 
-	p := NewMoraCoverageProvider(nil)
-	p.coverages = []*Coverage{&cov}
+	covStore := &MockCoverageStore{}
+	covStore.Put(&cov)
 
-	s := NewCoverageService(p)
+	s := NewCoverageHandler(nil, covStore)
 
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
@@ -409,13 +432,131 @@ func Test_CoverageService_File(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestCoverageServiceProcessUploadRequest(t *testing.T) {
-	p := NewMoraCoverageProvider(nil)
-	s := NewCoverageService(p)
+func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
+	covStore := MockCoverageStore{}
+	m := MockRepoStore{}
+	repo := Repository{
+		ID:        1215,
+		Namespace: "mockowner",
+		Name:      "mockrepo",
+		Link:      "http://mock.scm/mockowner/mockrepo",
+	}
+	m.repos = []Repository{repo}
+	s := NewCoverageHandler(m, &covStore)
 
-	req, want := makeCoverageUploadRequest()
+	req, want := makeCoverageUploadRequest(repo)
 	err := s.processUploadRequest(req)
 	require.NoError(t, err)
 
-	assert.Equal(t, []*Coverage{want}, p.Coverages())
+	assert.Equal(t, []*Coverage{want}, covStore.coverages)
+}
+
+func TestCoverageHandler_AddCoverage(t *testing.T) {
+	cov := &Coverage{
+		RepoID:    1215,
+		Revision:  "012345",
+		Timestamp: time.Now(),
+		Entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 20,
+				Profiles: map[string]*profile.Profile{
+					"test.go": {
+						FileName: "test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+				},
+			},
+		},
+	}
+
+	store := &MockCoverageStore{}
+	handler := NewCoverageHandler(nil, store)
+	err := handler.AddCoverage(cov)
+
+	require.NoError(t, err)
+	assert.Equal(t, []*Coverage{cov}, store.coverages)
+}
+
+func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
+	existing := &Coverage{
+		RepoID:    1215,
+		Revision:  "012345",
+		Timestamp: time.Now(),
+		Entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 17,
+				Profiles: map[string]*profile.Profile{
+					"test.go": {
+						FileName: "test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+				},
+			},
+		},
+	}
+
+	added := Coverage{
+		RepoID:    1215,
+		Revision:  "012345",
+		Timestamp: time.Now(),
+		Entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  0,
+				Lines: 3,
+				Profiles: map[string]*profile.Profile{
+					"test2.go": {
+						FileName: "test2.go",
+						Hits:     0,
+						Lines:    3,
+						Blocks:   [][]int{{1, 3, 0}},
+					},
+				},
+			},
+		},
+	}
+
+	want := &Coverage{
+		RepoID:    1215,
+		Revision:  "012345",
+		Timestamp: existing.Timestamp,
+		Entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 20,
+				Profiles: map[string]*profile.Profile{
+					"test.go": {
+						FileName: "test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+					"test2.go": {
+						FileName: "test2.go",
+						Hits:     0,
+						Lines:    3,
+						Blocks:   [][]int{{1, 3, 0}},
+					},
+				},
+			},
+		},
+	}
+
+	store := &MockCoverageStore{}
+	store.Put(existing)
+
+	handler := NewCoverageHandler(nil, store)
+	err := handler.AddCoverage(&added)
+
+	require.NoError(t, err)
+	assert.Equal(t, []*Coverage{want}, store.coverages)
 }
