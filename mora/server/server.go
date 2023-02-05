@@ -56,6 +56,12 @@ type (
 		Logined bool   `json:"logined"`
 	}
 
+	SCMStore interface {
+		Init() error
+		FindByURL(string) (int64, string, error)
+		Insert(string, string) (int64, error)
+	}
+
 	RepositoryStore interface {
 		Init() error
 		Scan() ([]Repository, error)
@@ -366,17 +372,32 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 	return s, nil
 }
 
-func createSCMs(config MoraConfig) []SCM {
+func createSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
 	scms := []SCM{}
 	for _, scmConfig := range config.SCMs {
 		log.Print(scmConfig.Type)
 		var scm SCM
 		var err error
+
+		id, _, err := store.FindByURL(scmConfig.URL)
+		if err != nil {
+			return nil, err
+		}
+
+		if id < 0 {
+			id, err = store.Insert(scmConfig.Type, scmConfig.URL)
+			log.Info().Msgf("New scm is inserted. ID=%d", id)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		if scmConfig.Type == "gitea" {
 			if scmConfig.Name == "" {
 				scmConfig.Name = "gitea"
 			}
 			scm, err = NewGiteaFromFile(
+				id,
 				scmConfig.Name,
 				scmConfig.SecretFilename,
 				scmConfig.URL,
@@ -386,6 +407,7 @@ func createSCMs(config MoraConfig) []SCM {
 				scmConfig.Name = "github"
 			}
 			scm, err = NewGithubFromFile(
+				id,
 				scmConfig.Name,
 				scmConfig.SecretFilename)
 		} else {
@@ -400,30 +422,45 @@ func createSCMs(config MoraConfig) []SCM {
 		}
 	}
 
-	return scms
+	return scms, nil
 }
 
-func initStore(filename string) (RepositoryStore, CoverageStore, error) {
+func initStore(filename string) (SCMStore, RepositoryStore, CoverageStore, error) {
 	db, err := sqlx.Connect("sqlite3", filename)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	scmStore := NewSCMStore(db)
+	if err := scmStore.Init(); err != nil {
+		return nil, nil, nil, err
 	}
 
 	repoStore := NewRepositoryStore(db)
 	if err := repoStore.Init(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	covStore := NewCoverageStore(db)
 	if err := covStore.Init(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return repoStore, covStore, nil
+	return scmStore, repoStore, covStore, nil
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
-	scms := createSCMs(config)
+	scmStore, repoStore, covStore, err := initStore("mora.db")
+	if err != nil {
+		log.Err(err).Msg("initStore")
+		return nil, err
+	}
+
+	scms, err := createSCMs(config, scmStore)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(scms) == 0 {
 		return nil, errors.New("no SCM is configured")
 	}
@@ -434,11 +471,6 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	repoStore, covStore, err := initStore("mora.db")
-	if err != nil {
-		log.Err(err).Msg("initStore")
-		return nil, err
-	}
 	coverage := NewCoverageHandler(repoStore, covStore)
 
 	s.coverage = coverage

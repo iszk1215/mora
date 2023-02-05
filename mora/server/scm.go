@@ -12,14 +12,16 @@ import (
 )
 
 type BaseSCM struct {
+	id              int64
 	name            string
 	client          *scm.Client
 	url             *url.URL
 	loginMiddleware login.Middleware
 }
 
-func (s *BaseSCM) Init(name string, url *url.URL, client *scm.Client,
+func (s *BaseSCM) Init(id int64, name string, url *url.URL, client *scm.Client,
 	loginMiddleware login.Middleware) {
+	s.id = id
 	s.name = name
 	s.url = url
 	s.client = client
