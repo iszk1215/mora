@@ -375,11 +375,10 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 	scms := []SCM{}
 	for _, scmConfig := range config.SCMs {
-		log.Print(scmConfig.Type)
 		var scm SCM
 		var err error
 
-		if scmConfig.Type == "github" && scmConfig.URL == "" {
+		if scmConfig.Driver == "github" && scmConfig.URL == "" {
 			scmConfig.URL = "https://api.github.com"
 		}
 
@@ -389,16 +388,18 @@ func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 		}
 
 		if id < 0 {
-			id, err = store.Insert(scmConfig.Type, scmConfig.URL)
-			log.Info().Msgf("New scm is configured. ID=%d URL=%s", id, scmConfig.URL)
+			id, err = store.Insert(scmConfig.Driver, scmConfig.URL)
 			if err != nil {
 				return nil, err
 			}
+			log.Info().Msgf("New scm is configured. ID=%d Driver=%s URL=%s",
+				id, scmConfig.Driver, scmConfig.URL)
 		} else {
-			log.Info().Msgf("scm enabled. ID=%d URL=%s", id, scmConfig.URL)
+			log.Info().Msgf("scm enabled. ID=%d Driver=%s URL=%s",
+				id, scmConfig.Driver, scmConfig.URL)
 		}
 
-		if scmConfig.Type == "gitea" {
+		if scmConfig.Driver == "gitea" {
 			if scmConfig.Name == "" {
 				scmConfig.Name = "gitea"
 			}
@@ -408,7 +409,7 @@ func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 				scmConfig.SecretFilename,
 				scmConfig.URL,
 				config.Server.URL+"/login/"+scmConfig.Name)
-		} else if scmConfig.Type == "github" {
+		} else if scmConfig.Driver == "github" {
 			if scmConfig.Name == "" {
 				scmConfig.Name = "github"
 			}
@@ -417,7 +418,7 @@ func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 				scmConfig.Name,
 				scmConfig.SecretFilename)
 		} else {
-			err = fmt.Errorf("unknown scm: %s", scmConfig.Type)
+			err = fmt.Errorf("unknown scm: %s", scmConfig.Driver)
 		}
 
 		if err != nil {
