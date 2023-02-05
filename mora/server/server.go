@@ -379,6 +379,10 @@ func createSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
 		var scm SCM
 		var err error
 
+		if scmConfig.Type == "github" && scmConfig.URL == "" {
+			scmConfig.URL = "https://api.github.com"
+		}
+
 		id, _, err := store.FindByURL(scmConfig.URL)
 		if err != nil {
 			return nil, err
@@ -390,6 +394,8 @@ func createSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
 			if err != nil {
 				return nil, err
 			}
+		} else {
+			log.Info().Msgf("scm enabled. id=%d url=%s", id, scmConfig.URL)
 		}
 
 		if scmConfig.Type == "gitea" {
