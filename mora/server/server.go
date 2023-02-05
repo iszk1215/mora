@@ -372,7 +372,7 @@ func NewMoraServer(scms []SCM, debug bool) (*MoraServer, error) {
 	return s, nil
 }
 
-func createSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
+func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 	scms := []SCM{}
 	for _, scmConfig := range config.SCMs {
 		log.Print(scmConfig.Type)
@@ -390,12 +390,12 @@ func createSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
 
 		if id < 0 {
 			id, err = store.Insert(scmConfig.Type, scmConfig.URL)
-			log.Info().Msgf("New scm is inserted. ID=%d", id)
+			log.Info().Msgf("New scm is configured. ID=%d URL=%s", id, scmConfig.URL)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			log.Info().Msgf("scm enabled. id=%d url=%s", id, scmConfig.URL)
+			log.Info().Msgf("scm enabled. ID=%d URL=%s", id, scmConfig.URL)
 		}
 
 		if scmConfig.Type == "gitea" {
@@ -462,7 +462,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	scms, err := createSCMs(config, scmStore)
+	scms, err := initSCM(config, scmStore)
 	if err != nil {
 		return nil, err
 	}
