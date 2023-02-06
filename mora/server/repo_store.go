@@ -10,9 +10,11 @@ import (
 var schema_repo = `
 CREATE TABLE IF NOT EXISTS repository (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scm INTEGER NOT NULL,
     namespace TEXT NOT NULL,
     name TEXT NOT NULL,
-    url TEXT NOT NULL
+    url TEXT NOT NULL UNIQUE,
+    UNIQUE(scm, namespace, name)
 )`
 
 type (

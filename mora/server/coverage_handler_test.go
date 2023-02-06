@@ -235,7 +235,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 		},
 	}
 
-	data := makeCoverageResponseList(scm, repo, []*Coverage{&cov})
+	data := makeCoverageListResponse(scm, repo, []*Coverage{&cov})
 
 	require.Equal(t, 1, len(data))
 	assertEqualCoverageAndResponse(t, cov, data[0])

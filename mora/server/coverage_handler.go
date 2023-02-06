@@ -232,7 +232,7 @@ func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	return resp
 }
 
-func makeCoverageResponseList(scm SCM, repo Repository, coverages []*Coverage) []CoverageResponse {
+func makeCoverageListResponse(scm SCM, repo Repository, coverages []*Coverage) []CoverageResponse {
 	var ret []CoverageResponse
 	for _, cov := range coverages {
 		revURL := scm.RevisionURL(repo.Link, cov.Revision)
@@ -266,7 +266,7 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 		return coverages[i].Timestamp.Before(coverages[j].Timestamp)
 	})
 
-	resp := makeCoverageResponseList(scm, repo, coverages)
+	resp := makeCoverageListResponse(scm, repo, coverages)
 	render.JSON(w, resp, http.StatusOK)
 }
 

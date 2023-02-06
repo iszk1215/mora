@@ -15,15 +15,15 @@ func (g *Github) RevisionURL(baseURL string, revision string) string {
 	return baseURL + "/tree/" + revision
 }
 
-func NewGithub(name string, config login.Config) *Github {
+func NewGithub(id int64, name string, config login.Config) *Github {
 	url, _ := url.Parse("https://github.com")
 	github := new(Github)
-	github.Init(name, url, driver.NewDefault(), &config)
+	github.Init(id, name, url, driver.NewDefault(), &config)
 
 	return github
 }
 
-func NewGithubFromFile(name string, filename string) (*Github, error) {
+func NewGithubFromFile(id int64, name string, filename string) (*Github, error) {
 	secret, err := readSecret(filename)
 	if err != nil {
 		return nil, err
@@ -35,5 +35,5 @@ func NewGithubFromFile(name string, filename string) (*Github, error) {
 		Scope:        []string{"repo"},
 	}
 
-	return NewGithub(name, config), nil
+	return NewGithub(id, name, config), nil
 }
