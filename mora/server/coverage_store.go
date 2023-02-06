@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"sync"
 	"time"
 
@@ -18,7 +17,8 @@ CREATE TABLE IF NOT EXISTS coverage (
     repo_id INTEGER NOT NULL,
     revision TEXT NOT NULL,
     time DATETIME NOT NULL,
-    contents TEXT NOT NULL
+    contents TEXT NOT NULL,
+    UNIQUE(repo_id, revision)
 )`
 
 type (
@@ -73,11 +73,13 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		return err
 	}
 
-	if len(rows) > 1 {
-		return fmt.Errorf(
-			"multiple records in store found for repo_id=%d and revision=%s",
-			cov.RepoID, cov.Revision)
-	}
+	/*
+		if len(rows) > 1 {
+			return fmt.Errorf(
+				"multiple records in store found for repo_id=%d and revision=%s",
+				cov.RepoID, cov.Revision)
+		}
+	*/
 
 	if len(rows) == 0 { // insert
 		log.Print("Insert")
@@ -89,6 +91,7 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		}
 
 		cov.ID, err = res.LastInsertId()
+		// log.Print("Assing id=", cov.ID)
 		return err
 	} else { // update
 		log.Print("Update")
