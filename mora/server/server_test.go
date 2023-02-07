@@ -153,8 +153,8 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 
 func doInjectRepo(sess *MoraSession, server *MoraServer, path string, handler http.HandlerFunc) *http.Response {
 	r := chi.NewRouter()
-	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(server.injectRepo)
+	r.Route("/{repo_id}", func(r chi.Router) {
+		r.Use(server.injectRepoByID)
 		r.Get("/", handler.ServeHTTP)
 	})
 
@@ -170,13 +170,14 @@ func Test_injectRepo_OK(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
-	scm := NewMockSCM("mock")
 	repo := Repository{
 		ID:        1215,
 		Namespace: "owner",
 		Name:      "repo",
 		Link:      "http://mock.com/owner/repo",
 	}
+
+	scm := NewMockSCM("mock")
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
 	sess := NewMoraSessionWithTokenFor(scm.Name())
 
@@ -195,24 +196,28 @@ func Test_injectRepo_OK(t *testing.T) {
 		called = true
 	}
 
-	res := doInjectRepo(sess, server, "/mock/owner/repo", handler)
+	res := doInjectRepo(sess, server, "/1215", handler)
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	require.True(t, called)
 }
 
 func Test_injectRepo_NoLogin(t *testing.T) {
-	controller := gomock.NewController(t)
-	defer controller.Finish()
 	scm := NewMockSCM("mock")
 
+	repo := Repository{
+		ID:        1215,
+		Namespace: "owner",
+		Name:      "repo",
+		Link:      "http://mock.com/owner/repo",
+	}
 	server, err := NewMoraServer([]SCM{scm}, false)
+	server.repos = MockRepoStore{[]Repository{repo}}
 	require.NoError(t, err)
 
 	sess := NewMoraSession() // without token
-	res := doInjectRepo(sess, server, "/mock/owner/repo", nil)
+	res := doInjectRepo(sess, server, "/1215", nil)
 
 	require.Equal(t, http.StatusForbidden, res.StatusCode)
-	//requireLocation(t, "/scms", res)
 }
 
 func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {

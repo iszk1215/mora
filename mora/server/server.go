@@ -48,7 +48,6 @@ type (
 
 	RepoResponse struct {
 		ID        int64  `json:"id"`
-		SCM       string `json:"scm"`
 		Namespace string `json:"namespace"`
 		Name      string `json:"name"`
 		Link      string `json:"link"`
@@ -171,7 +170,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			log.Print("repo.ID=", repo.ID)
 			resp = append(resp, RepoResponse{
-				repo.ID, scm.Name(), repo.Namespace, repo.Name, repo.Link})
+				repo.ID, repo.Namespace, repo.Name, repo.Link})
 		}
 	}
 
@@ -203,10 +202,6 @@ func findSCM(list []SCM, f func(scm SCM) bool) SCM {
 		}
 	}
 	return nil
-}
-
-func findSCMFromName(scms []SCM, name string) SCM {
-	return findSCM(scms, func(scm SCM) bool { return scm.Name() == name })
 }
 
 func findSCMFromURL(scms []SCM, url string) SCM {
@@ -262,42 +257,6 @@ func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (Repository
 	sess.setReposCache(scm.Name(), cache)
 
 	return repo, err
-}
-
-func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		scmName := chi.URLParam(r, "scm")
-		owner := chi.URLParam(r, "owner")
-		repoName := chi.URLParam(r, "repo")
-
-		log.Print("injectRepo: scmName=", scmName)
-
-		scm := findSCMFromName(s.scms, scmName)
-		if scm == nil {
-			log.Error().Msgf("repoChecker: unknown scm: %s", scmName)
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
-		sess, _ := MoraSessionFrom(r.Context())
-		scmRepo, err := checkRepoAccess(sess, scm, owner, repoName)
-		if err == errorTokenNotFound {
-			render.Forbidden(w, render.ErrForbidden)
-			return
-		} else if err != nil {
-			log.Err(err).Msg("injectRepo")
-			render.NotFound(w, render.ErrNotFound)
-			return
-		}
-
-		// TODO: move to checkRepoAccess
-		repository, _ := s.repos.FindByURL(scmRepo.Link)
-
-		ctx := r.Context()
-		ctx = WithSCM(ctx, scm)
-		ctx = WithRepo(ctx, repository)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
 
 func (s *MoraServer) injectRepoByID(next http.Handler) http.Handler {
