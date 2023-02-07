@@ -17,10 +17,15 @@ import (
 )
 
 type MockSCM struct {
+	id           int64
 	name         string
 	url          *url.URL
 	loginHandler func(http.Handler) http.Handler
 	client       *scm.Client
+}
+
+func (m *MockSCM) ID() int64 {
+	return m.id
 }
 
 func (m *MockSCM) Name() string {
@@ -44,6 +49,12 @@ func (m *MockSCM) LoginHandler(next http.Handler) http.Handler {
 	return m.loginHandler(next)
 }
 
+func NewMockSCMWithID(id int64, name string) *MockSCM {
+	m := NewMockSCM(name)
+	m.id = id
+	return m
+}
+
 func NewMockSCM(name string) *MockSCM {
 	m := &MockSCM{}
 	m.name = name
@@ -63,12 +74,12 @@ func NewMockSCM(name string) *MockSCM {
 	return m
 }
 
-func NewMoraSessionWithTokenFor(names ...string) *MoraSession {
-	s := NewMoraSession()
-	for _, name := range names {
-		s.setToken(name, scm.Token{})
+func NewMoraSessionWithTokenFor(scms ...SCM) *MoraSession {
+	sess := NewMoraSession()
+	for _, s := range scms {
+		sess.setToken(s.ID(), scm.Token{})
 	}
-	return s
+	return sess
 }
 
 func TestMain(m *testing.M) {

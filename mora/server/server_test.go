@@ -24,6 +24,15 @@ type MockRepoStore struct {
 	repos []Repository
 }
 
+func (m MockRepoStore) Find(id int64) (Repository, error) {
+	for _, r := range m.repos {
+		if r.ID == id {
+			return r, nil
+		}
+	}
+	return Repository{}, errors.New("no repo")
+}
+
 func (m MockRepoStore) FindByURL(url string) (Repository, error) {
 	for _, r := range m.repos {
 		if r.Link == url {
@@ -101,9 +110,9 @@ func Test_checkRepoAccess(t *testing.T) {
 	defer controller.Finish()
 	scm.client.Repositories = createMockRepoService(controller, mockRepos)
 
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
-	cache := sess.getReposCache(scm.Name())
+	cache := sess.getReposCache(scm.ID())
 	require.Equal(t, 0, len(cache))
 
 	got, err := checkRepoAccess(sess, scm, "owner", "repo0")
@@ -111,7 +120,7 @@ func Test_checkRepoAccess(t *testing.T) {
 	require.Equal(t, repo0, got)
 
 	// cache has repo0
-	cache = sess.getReposCache(scm.Name())
+	cache = sess.getReposCache(scm.ID())
 	require.NotNil(t, cache)
 	require.Equal(t, map[string]Repository{"owner/repo0": repo0}, cache)
 }
@@ -126,9 +135,9 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	defer controller.Finish()
 	scm.client.Repositories = createMockRepoService(controller, mockRepos)
 
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
-	cache := sess.getReposCache(scm.Name())
+	cache := sess.getReposCache(scm.ID())
 	require.Equal(t, 0, len(cache))
 
 	repo, err := checkRepoAccess(sess, scm, "owner", "repo1")
@@ -136,7 +145,7 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	require.Equal(t, Repository{}, repo)
 
 	// cache has nil
-	cache = sess.getReposCache(scm.Name())
+	cache = sess.getReposCache(scm.ID())
 	require.Nil(t, cache)
 	//require.False(t, ok)
 	// require.Equal(t, map[string]Repository{"owner/repo1": Repository{}}, cache)
@@ -144,8 +153,8 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 
 func doInjectRepo(sess *MoraSession, server *MoraServer, path string, handler http.HandlerFunc) *http.Response {
 	r := chi.NewRouter()
-	r.Route("/{scm}/{owner}/{repo}", func(r chi.Router) {
-		r.Use(server.injectRepo)
+	r.Route("/{repo_id}", func(r chi.Router) {
+		r.Use(server.injectRepoByID)
 		r.Get("/", handler.ServeHTTP)
 	})
 
@@ -161,15 +170,16 @@ func Test_injectRepo_OK(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
-	scm := NewMockSCM("mock")
 	repo := Repository{
 		ID:        1215,
 		Namespace: "owner",
 		Name:      "repo",
 		Link:      "http://mock.com/owner/repo",
 	}
+
+	scm := NewMockSCM("mock")
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	require.NoError(t, err)
@@ -186,24 +196,28 @@ func Test_injectRepo_OK(t *testing.T) {
 		called = true
 	}
 
-	res := doInjectRepo(sess, server, "/mock/owner/repo", handler)
+	res := doInjectRepo(sess, server, "/1215", handler)
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	require.True(t, called)
 }
 
 func Test_injectRepo_NoLogin(t *testing.T) {
-	controller := gomock.NewController(t)
-	defer controller.Finish()
 	scm := NewMockSCM("mock")
 
+	repo := Repository{
+		ID:        1215,
+		Namespace: "owner",
+		Name:      "repo",
+		Link:      "http://mock.com/owner/repo",
+	}
 	server, err := NewMoraServer([]SCM{scm}, false)
+	server.repos = MockRepoStore{[]Repository{repo}}
 	require.NoError(t, err)
 
 	sess := NewMoraSession() // without token
-	res := doInjectRepo(sess, server, "/mock/owner/repo", nil)
+	res := doInjectRepo(sess, server, "/1215", nil)
 
 	require.Equal(t, http.StatusForbidden, res.StatusCode)
-	//requireLocation(t, "/scms", res)
 }
 
 func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
@@ -212,7 +226,7 @@ func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
 
 	scm := NewMockSCM("mock")
 	scm.client.Repositories = createMockRepoService(controller, []Repository{})
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	require.NoError(t, err)

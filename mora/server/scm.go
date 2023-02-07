@@ -35,6 +35,10 @@ func (s *BaseSCM) Init(id int64, name string, url *url.URL, client *scm.Client,
 	}
 }
 
+func (s *BaseSCM) ID() int64 {
+	return s.id
+}
+
 func (s *BaseSCM) Name() string {
 	return s.name
 }

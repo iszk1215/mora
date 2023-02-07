@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS repository (
 type (
 	storableRepository struct {
 		ID        int64  `db:"id"`
+		SCM       int64  `db:"scm"`
 		Namespace string `db:"namespace"`
 		Name      string `db:"name"`
 		URL       string `db:"url"`
@@ -46,15 +47,16 @@ func (s *repositoryStoreImpl) Init() error {
 func toRepo(from storableRepository) Repository {
 	return Repository{
 		ID:        from.ID,
+		SCM:       from.SCM,
 		Namespace: from.Namespace,
 		Name:      from.Name,
 		Link:      from.URL,
 	}
 }
 
-func (s *repositoryStoreImpl) FindByURL(url string) (Repository, error) {
+func (s *repositoryStoreImpl) findOne(query string, params ...interface{}) (Repository, error) {
 	rows := []storableRepository{}
-	err := s.db.Select(&rows, "SELECT id, name, namespace, url FROM repository WHERE url = ?", url)
+	err := s.db.Select(&rows, query, params...)
 	if err != nil {
 		return Repository{}, err
 	}
@@ -64,6 +66,29 @@ func (s *repositoryStoreImpl) FindByURL(url string) (Repository, error) {
 	}
 
 	return toRepo(rows[0]), nil
+}
+
+func (s *repositoryStoreImpl) Find(id int64) (Repository, error) {
+	query := "SELECT id, scm, namespace, name, url FROM repository WHERE id = ?"
+	return s.findOne(query, id)
+}
+
+func (s *repositoryStoreImpl) FindByURL(url string) (Repository, error) {
+	query := "SELECT id, scm, namespace, name, url FROM repository WHERE url = ?"
+	return s.findOne(query, url)
+	/*
+		rows := []storableRepository{}
+		err := s.db.Select(&rows, "SELECT id, name, namespace, url FROM repository WHERE url = ?", url)
+		if err != nil {
+			return Repository{}, err
+		}
+
+		if len(rows) == 0 {
+			return Repository{}, errors.New("no repo")
+		}
+
+		return toRepo(rows[0]), nil
+	*/
 }
 
 func (s *repositoryStoreImpl) Scan() ([]Repository, error) {

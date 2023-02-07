@@ -24,7 +24,7 @@ type (
 		Revision    string           `json:"revision"`
 		Timestamp   time.Time        `json:"time"`
 		Entries     []*CoverageEntry `json:"entries"`
-		// profiles are emptry
+		// profiles in entry are emptry
 	}
 
 	// hanldleFileList
@@ -313,7 +313,7 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 		return nil, errors.New("MoraSession not found in a context")
 	}
 
-	ctx, err := sess.WithToken(context.Background(), scm.Name())
+	ctx, err := sess.WithToken(context.Background(), scm.ID())
 	if err != nil {
 		return nil, err
 	}
