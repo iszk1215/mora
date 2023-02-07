@@ -24,6 +24,15 @@ type MockRepoStore struct {
 	repos []Repository
 }
 
+func (m MockRepoStore) Find(id int64) (Repository, error) {
+	for _, r := range m.repos {
+		if r.ID == id {
+			return r, nil
+		}
+	}
+	return Repository{}, errors.New("no repo")
+}
+
 func (m MockRepoStore) FindByURL(url string) (Repository, error) {
 	for _, r := range m.repos {
 		if r.Link == url {

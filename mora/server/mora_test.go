@@ -17,10 +17,15 @@ import (
 )
 
 type MockSCM struct {
+	id           int64
 	name         string
 	url          *url.URL
 	loginHandler func(http.Handler) http.Handler
 	client       *scm.Client
+}
+
+func (m *MockSCM) ID() int64 {
+	return m.id
 }
 
 func (m *MockSCM) Name() string {
