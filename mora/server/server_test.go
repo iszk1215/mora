@@ -110,9 +110,9 @@ func Test_checkRepoAccess(t *testing.T) {
 	defer controller.Finish()
 	scm.client.Repositories = createMockRepoService(controller, mockRepos)
 
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
-	cache := sess.getReposCache(scm.Name())
+	cache := sess.getReposCache(scm.ID())
 	require.Equal(t, 0, len(cache))
 
 	got, err := checkRepoAccess(sess, scm, "owner", "repo0")
@@ -120,7 +120,7 @@ func Test_checkRepoAccess(t *testing.T) {
 	require.Equal(t, repo0, got)
 
 	// cache has repo0
-	cache = sess.getReposCache(scm.Name())
+	cache = sess.getReposCache(scm.ID())
 	require.NotNil(t, cache)
 	require.Equal(t, map[string]Repository{"owner/repo0": repo0}, cache)
 }
@@ -135,9 +135,9 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	defer controller.Finish()
 	scm.client.Repositories = createMockRepoService(controller, mockRepos)
 
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
-	cache := sess.getReposCache(scm.Name())
+	cache := sess.getReposCache(scm.ID())
 	require.Equal(t, 0, len(cache))
 
 	repo, err := checkRepoAccess(sess, scm, "owner", "repo1")
@@ -145,7 +145,7 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	require.Equal(t, Repository{}, repo)
 
 	// cache has nil
-	cache = sess.getReposCache(scm.Name())
+	cache = sess.getReposCache(scm.ID())
 	require.Nil(t, cache)
 	//require.False(t, ok)
 	// require.Equal(t, map[string]Repository{"owner/repo1": Repository{}}, cache)
@@ -179,7 +179,7 @@ func Test_injectRepo_OK(t *testing.T) {
 
 	scm := NewMockSCM("mock")
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	require.NoError(t, err)
@@ -226,7 +226,7 @@ func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
 
 	scm := NewMockSCM("mock")
 	scm.client.Repositories = createMockRepoService(controller, []Repository{})
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	require.NoError(t, err)

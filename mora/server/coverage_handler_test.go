@@ -307,7 +307,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	covStore.Put(&cov)
 
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
 	req := httptest.NewRequest(http.MethodGet, "/123/go/files", strings.NewReader(""))
 	ctx := req.Context()
@@ -401,7 +401,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 
 	s := NewCoverageHandler(nil, covStore)
 
-	sess := NewMoraSessionWithTokenFor(scm.Name())
+	sess := NewMoraSessionWithTokenFor(scm)
 
 	req := httptest.NewRequest(http.MethodGet, "/0/"+entryName+"/files/"+filename, strings.NewReader(""))
 	ctx := req.Context()

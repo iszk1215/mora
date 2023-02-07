@@ -72,7 +72,7 @@ func TestLoginSuccess(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
-	token, ok := sess.getToken(scm.Name())
+	token, ok := sess.getToken(scm.ID())
 	require.True(t, ok)
 	assert.Equal(t, "MockAccessToken", token.Token)
 }
@@ -102,8 +102,8 @@ func TestLoginErrorOnUnknownSCM(t *testing.T) {
 }
 
 func testLogout(t *testing.T, logoutAll bool) {
-	scm0 := NewMockSCM("scm0")
-	scm1 := NewMockSCM("scm1")
+	scm0 := NewMockSCMWithID(0, "scm0")
+	scm1 := NewMockSCMWithID(1, "scm1")
 
 	path := "/"
 	if !logoutAll {
@@ -112,8 +112,8 @@ func testLogout(t *testing.T, logoutAll bool) {
 	got := httptest.NewRecorder()
 
 	sess := NewMoraSession()
-	sess.setToken(scm0.Name(), scm.Token{})
-	sess.setToken(scm1.Name(), scm.Token{})
+	sess.setToken(scm0.ID(), scm.Token{})
+	sess.setToken(scm1.ID(), scm.Token{})
 	req := NewGetRequestWithMoraSession(path, sess)
 
 	next := func(w http.ResponseWriter, r *http.Request) {}
@@ -122,8 +122,8 @@ func testLogout(t *testing.T, logoutAll bool) {
 
 	r.ServeHTTP(got, req)
 
-	_, hasToken0 := sess.getToken(scm0.Name())
-	_, hasToken1 := sess.getToken(scm1.Name())
+	_, hasToken0 := sess.getToken(scm0.ID())
+	_, hasToken1 := sess.getToken(scm1.ID())
 
 	if logoutAll {
 		assert.False(t, hasToken0)

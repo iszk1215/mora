@@ -27,11 +27,11 @@ func createLoginHandler(scm SCM, next http.Handler) http.Handler {
 			return
 		}
 
-		log.Print("Set token to session: ", scm.Name())
+		log.Print("Set token to session: id=", scm.ID(), "url=", scm.URL())
 		token := convertToken(login.TokenFrom(r.Context()))
 
 		sess, _ := MoraSessionFrom(r.Context())
-		sess.setToken(scm.Name(), token)
+		sess.setToken(scm.ID(), token)
 
 		next.ServeHTTP(w, r)
 	}
@@ -67,15 +67,21 @@ func LogoutHandler(scms []SCM, next http.Handler) http.Handler {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		s, _ := MoraSessionFrom(r.Context())
 		for _, scm := range scms {
-			s.Remove(scm.Name())
+			s.Remove(scm.ID())
 		}
 		next.ServeHTTP(w, r)
 	})
 
 	r.Get("/{scm}", func(w http.ResponseWriter, r *http.Request) {
-		scm := chi.URLParam(r, "scm")
+		name := chi.URLParam(r, "scm")
 		s, _ := MoraSessionFrom(r.Context())
-		s.Remove(scm)
+		// TODO
+		for _, scm := range scms {
+			if scm.Name() == name {
+				s.Remove(scm.ID())
+				break
+			}
+		}
 		next.ServeHTTP(w, r)
 	})
 

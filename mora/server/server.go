@@ -46,6 +46,8 @@ type (
 
 	contextKey int
 
+	// Protocols
+
 	RepoResponse struct {
 		ID        int64  `json:"id"`
 		Namespace string `json:"namespace"`
@@ -182,7 +184,7 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 	sess, _ := MoraSessionFrom(r.Context())
 
 	for _, scm := range s.scms {
-		_, ok := sess.getToken(scm.Name())
+		_, ok := sess.getToken(scm.ID())
 		resp = append(resp, SCMResponse{
 			URL:     scm.URL().String(),
 			Name:    scm.Name(),
@@ -213,7 +215,7 @@ func findSCMFromURL(scms []SCM, url string) SCM {
 }
 
 func findRepoFromSCM(session *MoraSession, scm SCM, owner, name string) (Repository, error) {
-	ctx, err := session.WithToken(context.Background(), scm.Name())
+	ctx, err := session.WithToken(context.Background(), scm.ID())
 	if err != nil {
 		return Repository{}, err
 	}
@@ -233,7 +235,7 @@ func findRepoFromSCM(session *MoraSession, scm SCM, owner, name string) (Reposit
 
 // checkRepoAccess checks if token in session can access a repo 'owner/name'
 func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (Repository, error) {
-	cache := sess.getReposCache(scm.Name())
+	cache := sess.getReposCache(scm.ID())
 	key := owner + "/" + name
 	repo, ok := cache[key]
 	if ok {
@@ -254,7 +256,7 @@ func checkRepoAccess(sess *MoraSession, scm SCM, owner, name string) (Repository
 		cache = map[string]Repository{}
 	}
 	cache[key] = repo
-	sess.setReposCache(scm.Name(), cache)
+	sess.setReposCache(scm.ID(), cache)
 
 	return repo, err
 }
