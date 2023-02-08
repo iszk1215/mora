@@ -58,7 +58,6 @@ type (
 	SCMResponse struct {
 		ID      int64  `json:"id"`
 		URL     string `json:"url"`
-		Name    string `json:"name"`
 		Logined bool   `json:"logined"`
 	}
 
@@ -189,7 +188,6 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 		resp = append(resp, SCMResponse{
 			ID:      scm.ID(),
 			URL:     scm.URL().String(),
-			Name:    scm.Name(),
 			Logined: ok,
 		})
 	}
@@ -439,7 +437,7 @@ func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 				scmConfig.Name,
 				scmConfig.SecretFilename,
 				scmConfig.URL,
-				config.Server.URL+"/login/"+scmConfig.Name)
+				config.Server.URL+"/login")
 		} else if scmConfig.Driver == "github" {
 			if scmConfig.Name == "" {
 				scmConfig.Name = "github"

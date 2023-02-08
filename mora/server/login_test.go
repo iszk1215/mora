@@ -47,13 +47,15 @@ func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request 
 
 func TestLoginSuccess(t *testing.T) {
 	scm := NewMockSCM("scm")
-	path := "/" + scm.Name()
-	scm.loginHandler = MockLoginMiddleware{path}.Handler
+	scm.id = 12
+	path := "/" + strconv.FormatInt(scm.ID(), 10)
+	scm.loginHandler = MockLoginMiddleware{"/"}.Handler
 	handler := createTestLoginHandler(scm)
 
 	// First request
 
-	req := httptest.NewRequest(http.MethodGet, path, strings.NewReader(""))
+	sess := NewMoraSession()
+	req := NewGetRequestWithMoraSession(path, sess)
 	got := httptest.NewRecorder()
 	handler.ServeHTTP(got, req)
 	res := got.Result()
@@ -62,10 +64,11 @@ func TestLoginSuccess(t *testing.T) {
 
 	loc, err := res.Location()
 	require.NoError(t, err)
+	t.Log("loc=", loc)
 
 	// Second request
 
-	sess := NewMoraSession()
+	//sess := NewMoraSession()
 	req = NewGetRequestWithMoraSession(loc.String(), sess)
 	got = httptest.NewRecorder()
 	handler.ServeHTTP(got, req)
