@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -46,13 +47,15 @@ func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request 
 
 func TestLoginSuccess(t *testing.T) {
 	scm := NewMockSCM("scm")
-	path := "/" + scm.Name()
-	scm.loginHandler = MockLoginMiddleware{path}.Handler
+	scm.id = 12
+	path := "/" + strconv.FormatInt(scm.ID(), 10)
+	scm.loginHandler = MockLoginMiddleware{"/"}.Handler
 	handler := createTestLoginHandler(scm)
 
 	// First request
 
-	req := httptest.NewRequest(http.MethodGet, path, strings.NewReader(""))
+	sess := NewMoraSession()
+	req := NewGetRequestWithMoraSession(path, sess)
 	got := httptest.NewRecorder()
 	handler.ServeHTTP(got, req)
 	res := got.Result()
@@ -61,10 +64,11 @@ func TestLoginSuccess(t *testing.T) {
 
 	loc, err := res.Location()
 	require.NoError(t, err)
+	t.Log("loc=", loc)
 
 	// Second request
 
-	sess := NewMoraSession()
+	//sess := NewMoraSession()
 	req = NewGetRequestWithMoraSession(loc.String(), sess)
 	got = httptest.NewRecorder()
 	handler.ServeHTTP(got, req)
@@ -107,9 +111,9 @@ func testLogout(t *testing.T, logoutAll bool) {
 
 	path := "/"
 	if !logoutAll {
-		path = "/" + scm0.Name()
+		path = "/" + strconv.FormatInt(scm0.ID(), 10)
 	}
-	got := httptest.NewRecorder()
+	w := httptest.NewRecorder()
 
 	sess := NewMoraSession()
 	sess.setToken(scm0.ID(), scm.Token{})
@@ -120,7 +124,10 @@ func testLogout(t *testing.T, logoutAll bool) {
 	scms := []SCM{scm0, scm1}
 	r := LogoutHandler(scms, http.HandlerFunc(next))
 
-	r.ServeHTTP(got, req)
+	r.ServeHTTP(w, req)
+
+	result := w.Result()
+	require.Equal(t, http.StatusOK, result.StatusCode)
 
 	_, hasToken0 := sess.getToken(scm0.ID())
 	_, hasToken1 := sess.getToken(scm1.ID())

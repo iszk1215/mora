@@ -37,7 +37,6 @@ type (
 	// Source Code Management System
 	SCM interface {
 		ID() int64
-		Name() string // unique name in mora
 		URL() *url.URL
 		Client() *scm.Client
 		RevisionURL(baseURL string, revision string) string
@@ -56,8 +55,8 @@ type (
 	}
 
 	SCMResponse struct {
+		ID      int64  `json:"id"`
 		URL     string `json:"url"`
-		Name    string `json:"name"`
 		Logined bool   `json:"logined"`
 	}
 
@@ -186,8 +185,8 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 	for _, scm := range s.scms {
 		_, ok := sess.getToken(scm.ID())
 		resp = append(resp, SCMResponse{
+			ID:      scm.ID(),
 			URL:     scm.URL().String(),
-			Name:    scm.Name(),
 			Logined: ok,
 		})
 	}
@@ -429,22 +428,14 @@ func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 		}
 
 		if scmConfig.Driver == "gitea" {
-			if scmConfig.Name == "" {
-				scmConfig.Name = "gitea"
-			}
 			scm, err = NewGiteaFromFile(
 				id,
-				scmConfig.Name,
 				scmConfig.SecretFilename,
 				scmConfig.URL,
-				config.Server.URL+"/login/"+scmConfig.Name)
+				config.Server.URL+"/login")
 		} else if scmConfig.Driver == "github" {
-			if scmConfig.Name == "" {
-				scmConfig.Name = "github"
-			}
 			scm, err = NewGithubFromFile(
 				id,
-				scmConfig.Name,
 				scmConfig.SecretFilename)
 		} else {
 			err = fmt.Errorf("unknown scm: %s", scmConfig.Driver)
@@ -452,7 +443,7 @@ func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 
 		if err != nil {
 			log.Warn().Err(err).Msgf(
-				"ignore error during %s initialization", scmConfig.Name)
+				"ignore error during %s initialization", scmConfig.URL)
 		} else {
 			scms = append(scms, scm)
 		}

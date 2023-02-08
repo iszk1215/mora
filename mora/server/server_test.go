@@ -249,9 +249,10 @@ func TestRepoCheckerUnknownRepo(t *testing.T) {
 
 // API Test with ServerHandler
 
-func requireLogin(t *testing.T, handler http.Handler, scm string) *http.Cookie {
+func requireLogin(t *testing.T, handler http.Handler, scmID int64) *http.Cookie {
 	// 1st request to get code
-	req := httptest.NewRequest(http.MethodGet, "/login/"+scm, strings.NewReader(""))
+	path := fmt.Sprintf("/login/%d", scmID)
+	req := httptest.NewRequest(http.MethodGet, path, strings.NewReader(""))
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	res := w.Result()
@@ -300,13 +301,14 @@ func TestServerSCMList(t *testing.T) {
 	defer controller.Finish()
 
 	scm := NewMockSCM("scm")
-	scm.loginHandler = MockLoginMiddleware{"/login/" + scm.Name()}.Handler
+	scm.id = 15
+	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 
 	server, err := NewMoraServer([]SCM{scm}, false)
 	require.NoError(t, err)
 	handler := server.Handler()
 
-	cookie := requireLogin(t, handler, scm.Name())
+	cookie := requireLogin(t, handler, scm.ID())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/scms", strings.NewReader(""))
 	req.AddCookie(cookie)
@@ -317,16 +319,18 @@ func TestServerSCMList(t *testing.T) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var scms []SCMResponse
-	err = json.Unmarshal(body, &scms)
+	var got []SCMResponse
+	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
 
-	require.Equal(t, 1, len(scms))
-	expected := SCMResponse{
-		URL:     scm.URL().String(),
-		Name:    scm.Name(),
-		Logined: true}
-	require.Equal(t, expected, scms[0])
+	expected := []SCMResponse{
+		{
+			ID:      scm.ID(),
+			URL:     scm.URL().String(),
+			Logined: true,
+		},
+	}
+	require.Equal(t, expected, got)
 }
 
 func TestServerRepoList(t *testing.T) {
@@ -339,14 +343,14 @@ func TestServerRepoList(t *testing.T) {
 		Link:      "https://scm.com/owner/repo"}
 
 	scm := NewMockSCM("scm")
-	scm.loginHandler = MockLoginMiddleware{"/login/" + scm.Name()}.Handler
+	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
 	server, err := setupServer(scm, []Repository{repo})
 	require.NoError(t, err)
 
 	handler := server.Handler()
 
-	cookie := requireLogin(t, handler, scm.Name())
+	cookie := requireLogin(t, handler, scm.ID())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/repos", strings.NewReader(""))
 	req.AddCookie(cookie)
@@ -375,14 +379,14 @@ func TestServerRepoList2(t *testing.T) {
 		Link:      "https://scm.com/owner/repo1"}
 
 	scm := NewMockSCM("scm")
-	scm.loginHandler = MockLoginMiddleware{"/login/" + scm.Name()}.Handler
+	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo1})
 
 	server, err := setupServer(scm, []Repository{repo0, repo1})
 	require.NoError(t, err)
 	handler := server.Handler()
 
-	cookie := requireLogin(t, handler, scm.Name())
+	cookie := requireLogin(t, handler, scm.ID())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/repos", strings.NewReader(""))
 	req.AddCookie(cookie)
