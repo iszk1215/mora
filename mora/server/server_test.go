@@ -103,7 +103,7 @@ func createMockRepoService(controller *gomock.Controller, repos []Repository) sc
 func Test_checkRepoAccess(t *testing.T) {
 	scm := NewMockSCM("mock")
 
-	repo0 := Repository{Namespace: "owner", Name: "repo0"}
+	repo0 := Repository{ID: 3, Namespace: "owner", Name: "repo0"}
 	mockRepos := []Repository{repo0}
 
 	controller := gomock.NewController(t)
@@ -115,20 +115,20 @@ func Test_checkRepoAccess(t *testing.T) {
 	cache := sess.getReposCache(scm.ID())
 	require.Equal(t, 0, len(cache))
 
-	got, err := checkRepoAccess(sess, scm, "owner", "repo0")
+	err := checkRepoAccess(sess, scm, repo0)
 	require.NoError(t, err)
-	require.Equal(t, repo0, got)
 
 	// cache has repo0
 	cache = sess.getReposCache(scm.ID())
 	require.NotNil(t, cache)
-	require.Equal(t, map[string]Repository{"owner/repo0": repo0}, cache)
+	require.Equal(t, map[int64]bool{repo0.ID: true}, cache)
 }
 
 func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	scm := NewMockSCM("mock")
 
-	repo0 := Repository{Namespace: "owner", Name: "repo0"}
+	repo0 := Repository{ID: 12, Namespace: "owner", Name: "repo0"}
+	repo1 := Repository{ID: 13, Namespace: "owner", Name: "repo1"}
 	mockRepos := []Repository{repo0}
 
 	controller := gomock.NewController(t)
@@ -140,9 +140,8 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	cache := sess.getReposCache(scm.ID())
 	require.Equal(t, 0, len(cache))
 
-	repo, err := checkRepoAccess(sess, scm, "owner", "repo1")
+	err := checkRepoAccess(sess, scm, repo1)
 	require.Error(t, err)
-	require.Equal(t, Repository{}, repo)
 
 	// cache has nil
 	cache = sess.getReposCache(scm.ID())
@@ -338,11 +337,13 @@ func TestServerRepoList(t *testing.T) {
 	defer controller.Finish()
 
 	repo := Repository{
+		SCM:       1215,
 		Namespace: "owner",
 		Name:      "repo",
 		Link:      "https://scm.com/owner/repo"}
 
 	scm := NewMockSCM("scm")
+	scm.id = 1215
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
 	server, err := setupServer(scm, []Repository{repo})
