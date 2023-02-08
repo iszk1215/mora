@@ -13,7 +13,6 @@ type ServerConfig struct {
 
 type SCMConfig struct {
 	Driver         string `toml:"scm"`
-	Name           string
 	URL            string
 	SecretFilename string `toml:"secret_file"`
 }

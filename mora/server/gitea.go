@@ -28,14 +28,14 @@ func defaultTransport(skipverify bool) http.RoundTripper {
 	}
 }
 
-func NewGitea(id int64, name string, url string, config login.Config) (*Gitea, error) {
+func NewGitea(id int64, url string, config login.Config) (*Gitea, error) {
 	client, err := driver.New(url)
 	if err != nil {
 		return nil, err
 	}
 
 	gitea := new(Gitea)
-	gitea.Init(id, name, client.BaseURL, client, &config)
+	gitea.Init(id, client.BaseURL, client, &config)
 
 	gitea.client.Client = &http.Client{
 		Transport: &oauth2.Transport{
@@ -52,7 +52,7 @@ func NewGitea(id int64, name string, url string, config login.Config) (*Gitea, e
 	return gitea, nil
 }
 
-func NewGiteaFromFile(id int64, name string, filename string, url string, redirect_url string) (*Gitea, error) {
+func NewGiteaFromFile(id int64, filename string, url string, redirect_url string) (*Gitea, error) {
 	secret, err := readSecret(filename)
 	if err != nil {
 		return nil, err
@@ -65,5 +65,5 @@ func NewGiteaFromFile(id int64, name string, filename string, url string, redire
 		RedirectURL:  redirect_url,
 	}
 
-	return NewGitea(id, name, url, config)
+	return NewGitea(id, url, config)
 }
