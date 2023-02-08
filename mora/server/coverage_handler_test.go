@@ -212,7 +212,7 @@ func Test_injectCoverage_malformed_index(t *testing.T) {
 }
 
 func TestMakeCoverageResponseList(t *testing.T) {
-	scm := NewMockSCM("scm")
+	scm := NewMockSCM(1)
 	repo := Repository{Namespace: "owner", Name: "repo"} // FIXME
 
 	cov := Coverage{
@@ -243,7 +243,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 
 func getResultFromCoverageListHandler(handler http.Handler, repo Repository) *http.Response {
 	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
-	scm := NewMockSCM("scm")
+	scm := NewMockSCM(1)
 	r = r.WithContext(WithRepo(WithSCM(r.Context(), scm), repo))
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
@@ -273,7 +273,7 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 }
 
 func Test_CoverageHandler_FileList(t *testing.T) {
-	scm := NewMockSCM("mock")
+	scm := NewMockSCM(1)
 	covStore := &MockCoverageStore{}
 	s := NewCoverageHandler(nil, covStore)
 
@@ -352,7 +352,6 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 }
 
 func Test_CoverageHandler_File(t *testing.T) {
-	scmName := "mockscm"
 	repoName := "repo"
 	orgName := "org"
 	repoURL := "link"
@@ -375,7 +374,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 	content := scm.Content{Data: []byte(code)}
 	contents.EXPECT().Find( /*ctx*/ gomock.Any(), orgName+"/"+repoName, filename, revision).Return(&content, nil, nil)
 
-	scm := NewMockSCM(scmName)
+	scm := NewMockSCM(1)
 	scm.client.Contents = contents
 
 	repo := Repository{ID: 1215, Namespace: orgName, Name: repoName, Link: repoURL}

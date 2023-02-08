@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -46,8 +47,7 @@ func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request 
 }
 
 func TestLoginSuccess(t *testing.T) {
-	scm := NewMockSCM("scm")
-	scm.id = 12
+	scm := NewMockSCM(12)
 	path := "/" + strconv.FormatInt(scm.ID(), 10)
 	scm.loginHandler = MockLoginMiddleware{"/"}.Handler
 	handler := createTestLoginHandler(scm)
@@ -82,10 +82,10 @@ func TestLoginSuccess(t *testing.T) {
 }
 
 func TestLoginError(t *testing.T) {
-	scm := NewMockSCM("scm")
+	scm := NewMockSCM(1)
 	r := createTestLoginHandler(scm)
 
-	req := NewGetRequestWithMoraSession("/"+scm.Name(), NewMoraSession())
+	req := NewGetRequestWithMoraSession(fmt.Sprintf("/%d", scm.ID()), NewMoraSession())
 	got := httptest.NewRecorder()
 	r.ServeHTTP(got, req)
 	res := got.Result()
@@ -94,7 +94,7 @@ func TestLoginError(t *testing.T) {
 }
 
 func TestLoginErrorOnUnknownSCM(t *testing.T) {
-	scm := NewMockSCM("scm")
+	scm := NewMockSCM(1)
 	r := createTestLoginHandler(scm)
 
 	req := NewGetRequestWithMoraSession("/unknown_scm", NewMoraSession())
@@ -106,8 +106,8 @@ func TestLoginErrorOnUnknownSCM(t *testing.T) {
 }
 
 func testLogout(t *testing.T, logoutAll bool) {
-	scm0 := NewMockSCMWithID(0, "scm0")
-	scm1 := NewMockSCMWithID(1, "scm1")
+	scm0 := NewMockSCM(0)
+	scm1 := NewMockSCM(1)
 
 	path := "/"
 	if !logoutAll {

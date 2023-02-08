@@ -101,7 +101,7 @@ func createMockRepoService(controller *gomock.Controller, repos []Repository) sc
 }
 
 func Test_checkRepoAccess(t *testing.T) {
-	scm := NewMockSCM("mock")
+	scm := NewMockSCM(1)
 
 	repo0 := Repository{ID: 3, Namespace: "owner", Name: "repo0"}
 	mockRepos := []Repository{repo0}
@@ -125,7 +125,7 @@ func Test_checkRepoAccess(t *testing.T) {
 }
 
 func Test_checkRepoAccess_NoAccess(t *testing.T) {
-	scm := NewMockSCM("mock")
+	scm := NewMockSCM(1)
 
 	repo0 := Repository{ID: 12, Namespace: "owner", Name: "repo0"}
 	repo1 := Repository{ID: 13, Namespace: "owner", Name: "repo1"}
@@ -171,12 +171,13 @@ func Test_injectRepo_OK(t *testing.T) {
 
 	repo := Repository{
 		ID:        1215,
+		SCM:       1,
 		Namespace: "owner",
 		Name:      "repo",
 		Link:      "http://mock.com/owner/repo",
 	}
 
-	scm := NewMockSCM("mock")
+	scm := NewMockSCM(1)
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
 	sess := NewMoraSessionWithTokenFor(scm)
 
@@ -201,10 +202,11 @@ func Test_injectRepo_OK(t *testing.T) {
 }
 
 func Test_injectRepo_NoLogin(t *testing.T) {
-	scm := NewMockSCM("mock")
+	scm := NewMockSCM(1)
 
 	repo := Repository{
 		ID:        1215,
+		SCM:       1,
 		Namespace: "owner",
 		Name:      "repo",
 		Link:      "http://mock.com/owner/repo",
@@ -223,7 +225,7 @@ func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
-	scm := NewMockSCM("mock")
+	scm := NewMockSCM(1)
 	scm.client.Repositories = createMockRepoService(controller, []Repository{})
 	sess := NewMoraSessionWithTokenFor(scm)
 
@@ -234,8 +236,8 @@ func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
 	require.Equal(t, expectedCode, res.StatusCode)
 }
 
-func Test_injectRepo_UnknownSCM(t *testing.T) {
-	test_injectRepo_Error(t, "/err/owner/repo", http.StatusNotFound)
+func Test_injectRepo_InvalidRepoID(t *testing.T) {
+	test_injectRepo_Error(t, "/abc", http.StatusNotFound)
 }
 
 func TestRepoCheckerUnknownOwner(t *testing.T) {
@@ -299,7 +301,7 @@ func TestServerSCMList(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
-	scm := NewMockSCM("scm")
+	scm := NewMockSCM(1)
 	scm.id = 15
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 
@@ -342,7 +344,7 @@ func TestServerRepoList(t *testing.T) {
 		Name:      "repo",
 		Link:      "https://scm.com/owner/repo"}
 
-	scm := NewMockSCM("scm")
+	scm := NewMockSCM(1)
 	scm.id = 1215
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
@@ -369,17 +371,19 @@ func TestServerRepoList2(t *testing.T) {
 
 	repo0 := Repository{
 		ID:        1215,
+		SCM:       1,
 		Namespace: "owner",
 		Name:      "repo0",
 		Link:      "https://scm.com/owner/repo0"}
 
 	repo1 := Repository{
 		ID:        1976,
+		SCM:       1,
 		Namespace: "owner",
 		Name:      "repo1",
 		Link:      "https://scm.com/owner/repo1"}
 
-	scm := NewMockSCM("scm")
+	scm := NewMockSCM(1)
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo1})
 
