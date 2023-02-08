@@ -56,6 +56,7 @@ type (
 	}
 
 	SCMResponse struct {
+		ID      int64  `json:"id"`
 		URL     string `json:"url"`
 		Name    string `json:"name"`
 		Logined bool   `json:"logined"`
@@ -186,6 +187,7 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 	for _, scm := range s.scms {
 		_, ok := sess.getToken(scm.ID())
 		resp = append(resp, SCMResponse{
+			ID:      scm.ID(),
 			URL:     scm.URL().String(),
 			Name:    scm.Name(),
 			Logined: ok,

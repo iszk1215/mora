@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -107,9 +108,9 @@ func testLogout(t *testing.T, logoutAll bool) {
 
 	path := "/"
 	if !logoutAll {
-		path = "/" + scm0.Name()
+		path = "/" + strconv.FormatInt(scm0.ID(), 10)
 	}
-	got := httptest.NewRecorder()
+	w := httptest.NewRecorder()
 
 	sess := NewMoraSession()
 	sess.setToken(scm0.ID(), scm.Token{})
@@ -120,7 +121,10 @@ func testLogout(t *testing.T, logoutAll bool) {
 	scms := []SCM{scm0, scm1}
 	r := LogoutHandler(scms, http.HandlerFunc(next))
 
-	r.ServeHTTP(got, req)
+	r.ServeHTTP(w, req)
+
+	result := w.Result()
+	require.Equal(t, http.StatusOK, result.StatusCode)
 
 	_, hasToken0 := sess.getToken(scm0.ID())
 	_, hasToken1 := sess.getToken(scm1.ID())

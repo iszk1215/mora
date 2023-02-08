@@ -21,13 +21,19 @@ const (
 )
 
 type MoraSession struct {
-	reposMap  map[int64]map[string]Repository // [scm][owner/repo]
-	tokenMap  map[int64]scm.Token
-	timestamp time.Time
+	reposMap     map[int64]map[string]Repository // [scm][owner/repo]
+	tokenMap     map[int64]scm.Token
+	timestamp    time.Time
+	currentSCMID int64
 }
 
 func NewMoraSession() *MoraSession {
-	return &MoraSession{map[int64]map[string]Repository{}, map[int64]scm.Token{}, time.Now()}
+	return &MoraSession{
+		reposMap:     map[int64]map[string]Repository{},
+		tokenMap:     map[int64]scm.Token{},
+		timestamp:    time.Now(),
+		currentSCMID: -1,
+	}
 }
 
 func (s *MoraSession) getReposCache(scmID int64) map[string]Repository {

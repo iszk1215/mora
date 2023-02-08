@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/drone/drone/handler/api/render"
 	"github.com/drone/go-login/login"
@@ -27,7 +28,7 @@ func createLoginHandler(scm SCM, next http.Handler) http.Handler {
 			return
 		}
 
-		log.Print("Set token to session: id=", scm.ID(), "url=", scm.URL())
+		log.Print("Set token to session: id=", scm.ID(), " url=", scm.URL())
 		token := convertToken(login.TokenFrom(r.Context()))
 
 		sess, _ := MoraSessionFrom(r.Context())
@@ -42,15 +43,37 @@ func createLoginHandler(scm SCM, next http.Handler) http.Handler {
 func LoginHandler(scms []SCM, next http.Handler) http.Handler {
 	r := chi.NewRouter()
 
-	handlers := map[string]http.Handler{}
+	handlers := map[int64]http.Handler{}
 
 	for _, scm := range scms {
-		handlers[scm.Name()] = createLoginHandler(scm, next)
+		handlers[scm.ID()] = createLoginHandler(scm, next)
 	}
 
-	r.Get("/{scm}", func(w http.ResponseWriter, r *http.Request) {
-		scm := chi.URLParam(r, "scm")
-		handler, ok := handlers[scm]
+	r.Get("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
+		scm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
+		if err != nil { // name?
+			name := chi.URLParam(r, "scm_id")
+			for _, s := range scms {
+				if s.Name() == name {
+					scm_id = s.ID()
+					break
+				}
+			}
+		}
+
+		sess, _ := MoraSessionFrom(r.Context())
+		if sess != nil {
+			log.Print("LoginHandler: sess.currentSCMID=", sess.currentSCMID)
+			if sess.currentSCMID < 0 {
+				sess.currentSCMID = scm_id
+			} else {
+				log.Print("Redirected back from scm. scm_id=", sess.currentSCMID)
+				scm_id = sess.currentSCMID
+				sess.currentSCMID = -1
+			}
+		}
+
+		handler, ok := handlers[scm_id]
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
 			return
@@ -72,16 +95,15 @@ func LogoutHandler(scms []SCM, next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 
-	r.Get("/{scm}", func(w http.ResponseWriter, r *http.Request) {
-		name := chi.URLParam(r, "scm")
-		s, _ := MoraSessionFrom(r.Context())
-		// TODO
-		for _, scm := range scms {
-			if scm.Name() == name {
-				s.Remove(scm.ID())
-				break
-			}
+	r.Get("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
+		scm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
+		if err != nil {
+			log.Err(err).Msg("")
+			render.NotFound(w, render.ErrNotFound)
+			return
 		}
+		s, _ := MoraSessionFrom(r.Context())
+		s.Remove(scm_id)
 		next.ServeHTTP(w, r)
 	})
 
