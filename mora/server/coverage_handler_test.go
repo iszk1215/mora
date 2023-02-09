@@ -104,7 +104,7 @@ func Test_injectCoverage(t *testing.T) {
 	s := NewCoverageHandler(nil, covStore)
 
 	r := chi.NewRouter()
-	r.Route("/{index}", func(r chi.Router) {
+	r.Route("/{id}", func(r chi.Router) {
 		r.Use(s.injectCoverage)
 		r.Get("/", handler)
 	})
@@ -118,7 +118,7 @@ func Test_injectCoverage(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func Test_injectCoverage_malformed_index(t *testing.T) {
+func Test_injectCoverage_malformed_id(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
 	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
 	w := httptest.NewRecorder()
