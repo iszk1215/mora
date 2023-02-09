@@ -18,7 +18,6 @@ import (
 
 type MockSCM struct {
 	id           int64
-	name         string
 	url          *url.URL
 	loginHandler func(http.Handler) http.Handler
 	client       *scm.Client
@@ -26,10 +25,6 @@ type MockSCM struct {
 
 func (m *MockSCM) ID() int64 {
 	return m.id
-}
-
-func (m *MockSCM) Name() string {
-	return m.name
 }
 
 func (m *MockSCM) Client() *scm.Client {
@@ -49,16 +44,9 @@ func (m *MockSCM) LoginHandler(next http.Handler) http.Handler {
 	return m.loginHandler(next)
 }
 
-func NewMockSCMWithID(id int64, name string) *MockSCM {
-	m := NewMockSCM(name)
-	m.id = id
-	return m
-}
-
-func NewMockSCM(name string) *MockSCM {
-	m := &MockSCM{}
-	m.name = name
-	m.url, _ = url.Parse(strings.Join([]string{"https://", name, ".com"}, ""))
+func NewMockSCM(id int64) *MockSCM {
+	m := &MockSCM{id: id}
+	m.url, _ = url.Parse(strings.Join([]string{"https://mock.scm"}, ""))
 
 	m.client = &scm.Client{}
 

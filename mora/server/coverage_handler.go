@@ -19,7 +19,7 @@ import (
 type (
 	// handleCoverageList
 	CoverageResponse struct {
-		Index       int64            `json:"index"`
+		ID          int64            `json:"index"`
 		RevisionURL string           `json:"revision_url"`
 		Revision    string           `json:"revision"`
 		Timestamp   time.Time        `json:"time"`
@@ -186,16 +186,16 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 
 func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		index, err := strconv.ParseInt(chi.URLParam(r, "index"), 10, 64)
+		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
-		log.Print("injectCoverage: index=", index)
+		log.Print("injectCoverage: id=", id)
 
-		cov, err := s.coverages.Find(index)
+		cov, err := s.coverages.Find(id)
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			render.NotFound(w, render.ErrNotFound)
@@ -213,7 +213,7 @@ func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 
 func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	resp := CoverageResponse{
-		Index:       cov.ID,
+		ID:          cov.ID,
 		Timestamp:   cov.Timestamp,
 		Revision:    cov.Revision,
 		RevisionURL: revisionURL,
@@ -364,7 +364,7 @@ func (s *CoverageHandler) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", s.handleCoverageList)
 
-	r.Route("/{index}", func(r chi.Router) {
+	r.Route("/{id}", func(r chi.Router) {
 		r.Use(s.injectCoverage)
 		r.Route("/{entry}", func(r chi.Router) {
 			r.Use(injectCoverageEntry)

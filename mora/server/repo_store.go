@@ -76,24 +76,24 @@ func (s *repositoryStoreImpl) Find(id int64) (Repository, error) {
 func (s *repositoryStoreImpl) FindByURL(url string) (Repository, error) {
 	query := "SELECT id, scm, namespace, name, url FROM repository WHERE url = ?"
 	return s.findOne(query, url)
-	/*
-		rows := []storableRepository{}
-		err := s.db.Select(&rows, "SELECT id, name, namespace, url FROM repository WHERE url = ?", url)
-		if err != nil {
-			return Repository{}, err
-		}
+}
 
-		if len(rows) == 0 {
-			return Repository{}, errors.New("no repo")
-		}
+func (s *repositoryStoreImpl) Put(repo *Repository) error {
+	res, err := s.db.Exec(
+		"INSERT INTO repository (scm, namespace, name, url) VALUES ($1, $2, $3, $4)",
+		repo.SCM, repo.Namespace, repo.Name, repo.Link)
+	if err != nil {
+		return err
+	}
 
-		return toRepo(rows[0]), nil
-	*/
+	repo.ID, err = res.LastInsertId()
+	// log.Print("Assing id=", cov.ID)
+	return err
 }
 
 func (s *repositoryStoreImpl) Scan() ([]Repository, error) {
 	rows := []storableRepository{}
-	err := s.db.Select(&rows, "SELECT id, name, namespace, url FROM repository")
+	err := s.db.Select(&rows, "SELECT id, scm, name, namespace, url FROM repository")
 
 	if err != nil {
 		return nil, err
@@ -103,6 +103,7 @@ func (s *repositoryStoreImpl) Scan() ([]Repository, error) {
 	for _, record := range rows {
 		repo := Repository{
 			ID:        record.ID,
+			SCM:       record.SCM,
 			Namespace: record.Namespace,
 			Name:      record.Name,
 			Link:      record.URL,

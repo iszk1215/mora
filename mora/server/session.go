@@ -21,7 +21,7 @@ const (
 )
 
 type MoraSession struct {
-	reposMap    map[int64]map[string]Repository // [scm][owner/repo]
+	reposMap    map[int64]map[int64]bool // [scm][owner/repo]
 	tokenMap    map[int64]scm.Token
 	timestamp   time.Time
 	loggingInto int64
@@ -29,18 +29,18 @@ type MoraSession struct {
 
 func NewMoraSession() *MoraSession {
 	return &MoraSession{
-		reposMap:    map[int64]map[string]Repository{},
+		reposMap:    map[int64]map[int64]bool{},
 		tokenMap:    map[int64]scm.Token{},
 		timestamp:   time.Now(),
 		loggingInto: -1,
 	}
 }
 
-func (s *MoraSession) getReposCache(scmID int64) map[string]Repository {
+func (s *MoraSession) getReposCache(scmID int64) map[int64]bool {
 	return s.reposMap[scmID]
 }
 
-func (s *MoraSession) setReposCache(scmID int64, repos map[string]Repository) {
+func (s *MoraSession) setReposCache(scmID int64, repos map[int64]bool) {
 	s.reposMap[scmID] = repos
 }
 
