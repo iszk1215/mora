@@ -20,37 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func assertEqualCoverageAndResponse(t *testing.T, want Coverage, got CoverageResponse) bool {
-	ok := assert.True(t, want.Timestamp.Equal(got.Timestamp))
-	ok = ok && assert.Equal(t, want.Revision, got.Revision)
-
-	ok = ok && assert.Equal(t, len(want.Entries), len(got.Entries))
-	if len(want.Entries) != len(got.Entries) {
-		return false
-	}
-	for i, a := range want.Entries {
-		b := got.Entries[i]
-		ok = ok && assert.Equal(t, a.Name, b.Name)
-		ok = ok && assert.Equal(t, a.Lines, b.Lines)
-		ok = ok && assert.Equal(t, a.Hits, b.Hits)
-	}
-
-	return ok
-}
-
-func assertEqualCoverageList(t *testing.T, want []Coverage, got []CoverageResponse) bool {
-	ok := assert.Equal(t, len(want), len(got))
-	if !ok {
-		return false
-	}
-
-	for i := range want {
-		ok = ok && assertEqualCoverageAndResponse(t, want[i], got[i])
-	}
-
-	return ok
-}
-
 func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
@@ -115,19 +84,6 @@ func makeCoverageUploadRequest(repo Repository) (*CoverageUploadRequest, *Covera
 
 // Test Cases
 
-func testCoverageListResponse(t *testing.T, want []Coverage, res *http.Response) {
-	require.Equal(t, http.StatusOK, res.StatusCode)
-
-	body, err := io.ReadAll(res.Body)
-	require.NoError(t, err)
-
-	var data []CoverageResponse
-	err = json.Unmarshal(body, &data)
-	require.NoError(t, err)
-
-	assertEqualCoverageList(t, want, data)
-}
-
 func Test_injectCoverage(t *testing.T) {
 	var got *Coverage = nil
 
@@ -175,18 +131,30 @@ func Test_injectCoverage_malformed_index(t *testing.T) {
 
 func TestMakeCoverageResponseList(t *testing.T) {
 	scm := NewMockSCM(1)
-	repo := Repository{Namespace: "owner", Name: "repo"} // FIXME
+	repo := Repository{
+		ID:        1215,
+		Namespace: "owner",
+		Name:      "repo",
+		Link:      fmt.Sprintf("%s/owner/repo", scm.URL()),
+	}
 
-	cov := Coverage{
-		RepoID:    1215,
+	cov := &Coverage{
+		RepoID:    repo.ID,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
 			{
-				Name:     "cc",
-				Hits:     20,
-				Lines:    100,
-				Profiles: nil,
+				Name:  "cc",
+				Hits:  20,
+				Lines: 100,
+				Profiles: map[string]*profile.Profile{
+					"test.cc": {
+						FileName: "test.cc",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+				},
 			},
 			{
 				Name:     "py",
@@ -197,24 +165,35 @@ func TestMakeCoverageResponseList(t *testing.T) {
 		},
 	}
 
-	data := makeCoverageListResponse(scm, repo, []*Coverage{&cov})
+	want := []CoverageResponse{
+		{
+			ID:          cov.ID,
+			Timestamp:   cov.Timestamp,
+			Revision:    cov.Revision,
+			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
+			Entries: []*CoverageEntry{
+				{
+					Name:  "cc",
+					Hits:  20,
+					Lines: 100,
+				},
+				{
+					Name:  "py",
+					Hits:  280,
+					Lines: 300,
+				},
+			},
+		},
+	}
 
-	require.Equal(t, 1, len(data))
-	assertEqualCoverageAndResponse(t, cov, data[0])
-}
-
-func getResultFromCoverageListHandler(handler http.Handler, repo Repository) *http.Response {
-	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
-	scm := NewMockSCM(1)
-	r = r.WithContext(WithRepo(WithSCM(r.Context(), scm), repo))
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, r)
-	return w.Result()
+	got := makeCoverageListResponse(scm, repo, []*Coverage{cov})
+	require.Equal(t, want, got)
 }
 
 // API Test
 
 func Test_CoverageHandler_CoverageList(t *testing.T) {
+	scm := NewMockSCM(1)
 	repo := Repository{ID: 1215, Namespace: "owner", Name: "repo", Link: "url"}
 
 	time0 := time.Now().Round(0)
@@ -226,9 +205,24 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 
 	s := NewCoverageHandler(nil, covStore)
 
-	res := getResultFromCoverageListHandler(s.Handler(), repo)
+	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
+	r = r.WithContext(WithRepo(WithSCM(r.Context(), scm), repo))
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, r)
+	res := w.Result()
 
-	testCoverageListResponse(t, []Coverage{*cov1, *cov0}, res)
+	want := makeCoverageListResponse(scm, repo, []*Coverage{cov1, cov0})
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	var data []CoverageResponse
+	err = json.Unmarshal(body, &data)
+	require.NoError(t, err)
+
+	require.Equal(t, want, data)
 }
 
 func Test_CoverageHandler_FileList(t *testing.T) {

@@ -36,8 +36,8 @@ func setupRepositoryStore(t *testing.T, repos ...*Repository) RepositoryStore {
 }
 
 func assertEqualRepoResponse(t *testing.T, expected Repository, got RepoResponse) bool {
-	// mora uses these three members
-	ok := assert.Equal(t, expected.Namespace, got.Namespace)
+	ok := assert.Equal(t, expected.ID, got.ID)
+	ok = ok && assert.Equal(t, expected.Namespace, got.Namespace)
 	ok = ok && assert.Equal(t, expected.Name, got.Name)
 	ok = ok && assert.Equal(t, expected.Link, got.Link)
 	return ok

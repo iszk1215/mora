@@ -19,7 +19,7 @@ import (
 type (
 	// handleCoverageList
 	CoverageResponse struct {
-		Index       int64            `json:"index"`
+		ID          int64            `json:"index"`
 		RevisionURL string           `json:"revision_url"`
 		Revision    string           `json:"revision"`
 		Timestamp   time.Time        `json:"time"`
@@ -213,7 +213,7 @@ func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 
 func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	resp := CoverageResponse{
-		Index:       cov.ID,
+		ID:          cov.ID,
 		Timestamp:   cov.Timestamp,
 		Revision:    cov.Revision,
 		RevisionURL: revisionURL,
