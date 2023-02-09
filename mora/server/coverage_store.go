@@ -33,73 +33,19 @@ type (
 	coverageStoreImpl struct {
 		db *sqlx.DB
 		sync.Mutex
+
+		selectQuery string
 	}
 )
 
 func NewCoverageStore(db *sqlx.DB) *coverageStoreImpl {
-	return &coverageStoreImpl{db: db}
+	query := "SELECT id, repo_id, revision, time, contents FROM coverage"
+	return &coverageStoreImpl{db: db, selectQuery: query}
 }
 
 func (s *coverageStoreImpl) Init() error {
 	_, err := s.db.Exec(schema)
 	return err
-}
-
-func (s *coverageStoreImpl) Put(cov *Coverage) error {
-	var requests []*CoverageEntryUploadRequest
-	for _, e := range cov.Entries {
-		requests = append(requests,
-			&CoverageEntryUploadRequest{
-				Name:     e.Name,
-				Hits:     e.Hits,
-				Lines:    e.Lines,
-				Profiles: pie.Values(e.Profiles),
-			})
-	}
-
-	contents, err := json.Marshal(requests)
-	if err != nil {
-		return err
-	}
-
-	s.Lock()
-	defer s.Unlock()
-
-	rows := []int{}
-	err = s.db.Select(&rows,
-		"SELECT id FROM coverage WHERE repo_id = $1 and revision = $2",
-		cov.RepoID, cov.Revision)
-	if err != nil {
-		return err
-	}
-
-	/*
-		if len(rows) > 1 {
-			return fmt.Errorf(
-				"multiple records in store found for repo_id=%d and revision=%s",
-				cov.RepoID, cov.Revision)
-		}
-	*/
-
-	if len(rows) == 0 { // insert
-		log.Print("Insert")
-		res, err := s.db.Exec(
-			"INSERT INTO coverage (repo_id, revision, time, contents) VALUES ($1, $2, $3, $4)",
-			cov.RepoID, cov.Revision, cov.Timestamp, contents)
-		if err != nil {
-			return err
-		}
-
-		cov.ID, err = res.LastInsertId()
-		// log.Print("Assing id=", cov.ID)
-		return err
-	} else { // update
-		log.Print("Update")
-		_, err = s.db.Exec(
-			"UPDATE coverage SET contents = $1 WHERE repo_id = $2 and revision = $3",
-			contents, cov.RepoID, cov.Revision)
-		return err
-	}
 }
 
 // contents is serialized []CoverageEntryUploadRequest
@@ -136,9 +82,10 @@ func toCoverage(record storableCoverage) (*Coverage, error) {
 }
 
 func (s *coverageStoreImpl) scan(query string, params ...interface{}) ([]*Coverage, error) {
+	log.Print("query=", query)
+
 	rows := []storableCoverage{}
 	err := s.db.Select(&rows, query, params...)
-
 	if err != nil {
 		return nil, err
 	}
@@ -168,21 +115,67 @@ func (s *coverageStoreImpl) findOne(query string, params ...interface{}) (*Cover
 }
 
 func (s *coverageStoreImpl) Find(id int64) (*Coverage, error) {
-	query := "SELECT id, repo_id, revision, time, contents FROM coverage WHERE id = ?"
-	return s.findOne(query, id)
+	return s.findOne(s.selectQuery+" WHERE id = ?", id)
 }
 
 func (s *coverageStoreImpl) FindRevision(repoID int64, revision string) (*Coverage, error) {
-	query := "SELECT id, repo_id, revision, time, contents FROM coverage WHERE repo_id = ? and revision = ?"
-	return s.findOne(query, repoID, revision)
+	return s.findOne(
+		s.selectQuery+" WHERE repo_id = ? and revision = ?", repoID, revision)
 }
 
 func (s *coverageStoreImpl) List(repo_id int64) ([]*Coverage, error) {
-	query := "SELECT id, repo_id, revision, time, contents FROM coverage WHERE repo_id = ?"
-	return s.scan(query, repo_id)
+	return s.scan(s.selectQuery+" WHERE repo_id = ?", repo_id)
 }
 
 func (s *coverageStoreImpl) ListAll() ([]*Coverage, error) {
-	query := "SELECT id, repo_id, revision, time, contents FROM coverage"
-	return s.scan(query)
+	return s.scan(s.selectQuery)
+}
+
+func (s *coverageStoreImpl) Put(cov *Coverage) error {
+	var requests []*CoverageEntryUploadRequest
+	for _, e := range cov.Entries {
+		requests = append(requests,
+			&CoverageEntryUploadRequest{
+				Name:     e.Name,
+				Hits:     e.Hits,
+				Lines:    e.Lines,
+				Profiles: pie.Values(e.Profiles),
+			})
+	}
+
+	contents, err := json.Marshal(requests)
+	if err != nil {
+		return err
+	}
+
+	s.Lock()
+	defer s.Unlock()
+
+	rows := []int{}
+	err = s.db.Select(&rows,
+		"SELECT id FROM coverage WHERE repo_id = $1 and revision = $2",
+		cov.RepoID, cov.Revision)
+	if err != nil {
+		return err
+	}
+
+	if len(rows) == 0 { // insert
+		log.Print("Insert")
+		res, err := s.db.Exec(
+			"INSERT INTO coverage (repo_id, revision, time, contents) VALUES ($1, $2, $3, $4)",
+			cov.RepoID, cov.Revision, cov.Timestamp, contents)
+		if err != nil {
+			return err
+		}
+
+		cov.ID, err = res.LastInsertId()
+		// log.Print("Assing id=", cov.ID)
+		return err
+	} else { // update
+		log.Print("Update")
+		_, err = s.db.Exec(
+			"UPDATE coverage SET contents = $1 WHERE repo_id = $2 and revision = $3",
+			contents, cov.RepoID, cov.Revision)
+		return err
+	}
 }

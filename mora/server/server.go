@@ -67,9 +67,10 @@ type (
 
 	RepositoryStore interface {
 		Init() error
-		Scan() ([]Repository, error)
 		Find(id int64) (Repository, error)
 		FindByURL(url string) (Repository, error)
+		Put(repo *Repository) error
+		Scan() ([]Repository, error)
 	}
 
 	CoverageStore interface {
@@ -134,7 +135,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	sess, _ := MoraSessionFrom(r.Context())
 
 	for _, repo := range repositories {
-		log.Print("SCM=", repo.SCM)
+		log.Print("handleRepoList: repo.SCM=", repo.SCM)
 		scm := findSCM(
 			s.scms, func(scm SCM) bool { return scm.ID() == repo.SCM })
 		if scm == nil {
@@ -145,7 +146,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 
 		err = checkRepoAccess(sess, scm, repo)
 		if err == nil {
-			log.Print("repo.ID=", repo.ID)
+			log.Print("handleRepoList: return repo.ID=", repo.ID)
 			resp = append(resp, RepoResponse{
 				ID:        repo.ID,
 				Namespace: repo.Namespace,
@@ -191,9 +192,9 @@ func testRepoFromSCM(session *MoraSession, scm SCM, owner, name string) error {
 		return err
 	}
 
-	_, meta, err := scm.Client().Repositories.Find(ctx, owner+"/"+name)
+	_, _, err = scm.Client().Repositories.Find(ctx, owner+"/"+name)
 	if err != nil {
-		log.Print(meta)
+		// log.Print(meta)
 		return err
 	}
 
@@ -211,7 +212,7 @@ func checkRepoAccess(sess *MoraSession, scm SCM, repo Repository) error {
 
 	err := testRepoFromSCM(sess, scm, repo.Namespace, repo.Name)
 	if err != nil {
-		log.Print("checkRepoAccess: no repo or no access")
+		log.Print("checkRepoAccess: no repo or no access at SCM")
 		return err
 	}
 	log.Print("checkRepoAccess: found in SCM")

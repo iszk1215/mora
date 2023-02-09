@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,48 +14,26 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
-	"github.com/rs/zerolog/log"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type MockRepoStore struct {
-	repos []Repository
-}
-
-func (m MockRepoStore) Find(id int64) (Repository, error) {
-	for _, r := range m.repos {
-		if r.ID == id {
-			return r, nil
-		}
-	}
-	return Repository{}, errors.New("no repo")
-}
-
-func (m MockRepoStore) FindByURL(url string) (Repository, error) {
-	for _, r := range m.repos {
-		if r.Link == url {
-			return r, nil
-		}
-	}
-	return Repository{}, errors.New("no repo")
-}
-
-func (m MockRepoStore) Init() error {
-	return nil
-}
-
-func (m MockRepoStore) Scan() ([]Repository, error) {
-	return m.repos, nil
-}
-
-/*
-func requireLocation(t *testing.T, expected string, r *http.Response) {
-	loc, err := r.Location()
+func setupRepositoryStore(t *testing.T, repos ...*Repository) RepositoryStore {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
-	require.Equal(t, expected, loc.String())
+
+	store := NewRepositoryStore(db)
+	err = store.Init()
+	require.NoError(t, err)
+
+	for _, repo := range repos {
+		err = store.Put(repo)
+		require.NoError(t, err)
+	}
+
+	return store
 }
-*/
 
 func assertEqualRepoResponse(t *testing.T, expected Repository, got RepoResponse) bool {
 	// mora uses these three members
@@ -170,7 +147,6 @@ func Test_injectRepo_OK(t *testing.T) {
 	defer controller.Finish()
 
 	repo := Repository{
-		ID:        1215,
 		SCM:       1,
 		Namespace: "owner",
 		Name:      "repo",
@@ -184,9 +160,7 @@ func Test_injectRepo_OK(t *testing.T) {
 	server, err := NewMoraServer([]SCM{scm}, false)
 	require.NoError(t, err)
 
-	repoStore := MockRepoStore{}
-	repoStore.repos = []Repository{repo}
-	server.repos = repoStore
+	server.repos = setupRepositoryStore(t, &repo)
 
 	called := false
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -196,7 +170,7 @@ func Test_injectRepo_OK(t *testing.T) {
 		called = true
 	}
 
-	res := doInjectRepo(sess, server, "/1215", handler)
+	res := doInjectRepo(sess, server, fmt.Sprintf("/%d", repo.ID), handler)
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	require.True(t, called)
 }
@@ -205,18 +179,17 @@ func Test_injectRepo_NoLogin(t *testing.T) {
 	scm := NewMockSCM(1)
 
 	repo := Repository{
-		ID:        1215,
 		SCM:       1,
 		Namespace: "owner",
 		Name:      "repo",
 		Link:      "http://mock.com/owner/repo",
 	}
 	server, err := NewMoraServer([]SCM{scm}, false)
-	server.repos = MockRepoStore{[]Repository{repo}}
+	server.repos = setupRepositoryStore(t, &repo)
 	require.NoError(t, err)
 
 	sess := NewMoraSession() // without token
-	res := doInjectRepo(sess, server, "/1215", nil)
+	res := doInjectRepo(sess, server, fmt.Sprintf("/%d", repo.ID), nil)
 
 	require.Equal(t, http.StatusForbidden, res.StatusCode)
 }
@@ -274,27 +247,23 @@ func requireLogin(t *testing.T, handler http.Handler, scmID int64) *http.Cookie 
 	return cookie
 }
 
-func setupServer(scm SCM, repos []Repository) (*MoraServer, error) {
-	covStore := &MockCoverageStore{}
+func setupServer(t *testing.T, scm SCM, repos []*Repository) *MoraServer {
+	covStore := setupCoverageStore(t)
 	for _, repo := range repos {
-		cov := &Coverage{RepoID: repo.ID}
-		covStore.Put(cov)
+		covStore.Put(&Coverage{RepoID: repo.ID})
 	}
 
-	repoStore := MockRepoStore{}
-	repoStore.repos = repos
+	repoStore := setupRepositoryStore(t, repos...)
 
 	coverage := NewCoverageHandler(repoStore, covStore)
 
 	server, err := NewMoraServer([]SCM{scm}, false)
-	log.Print(err)
-	if err == nil {
-		server.coverage = coverage
-	}
+	require.NoError(t, err)
 
+	server.coverage = coverage
 	server.repos = repoStore
 
-	return server, err
+	return server
 }
 
 func TestServerSCMList(t *testing.T) {
@@ -344,12 +313,11 @@ func TestServerRepoList(t *testing.T) {
 		Name:      "repo",
 		Link:      "https://scm.com/owner/repo"}
 
-	scm := NewMockSCM(1)
-	scm.id = 1215
+	scm := NewMockSCM(1215)
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
-	server, err := setupServer(scm, []Repository{repo})
-	require.NoError(t, err)
+
+	server := setupServer(t, scm, []*Repository{&repo})
 
 	handler := server.Handler()
 
@@ -370,14 +338,12 @@ func TestServerRepoList2(t *testing.T) {
 	defer controller.Finish()
 
 	repo0 := Repository{
-		ID:        1215,
 		SCM:       1,
 		Namespace: "owner",
 		Name:      "repo0",
 		Link:      "https://scm.com/owner/repo0"}
 
 	repo1 := Repository{
-		ID:        1976,
 		SCM:       1,
 		Namespace: "owner",
 		Name:      "repo1",
@@ -387,8 +353,7 @@ func TestServerRepoList2(t *testing.T) {
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo1})
 
-	server, err := setupServer(scm, []Repository{repo0, repo1})
-	require.NoError(t, err)
+	server := setupServer(t, scm, []*Repository{&repo0, &repo1})
 	handler := server.Handler()
 
 	cookie := requireLogin(t, handler, scm.ID())

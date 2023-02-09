@@ -78,6 +78,19 @@ func (s *repositoryStoreImpl) FindByURL(url string) (Repository, error) {
 	return s.findOne(query, url)
 }
 
+func (s *repositoryStoreImpl) Put(repo *Repository) error {
+	res, err := s.db.Exec(
+		"INSERT INTO repository (scm, namespace, name, url) VALUES ($1, $2, $3, $4)",
+		repo.SCM, repo.Namespace, repo.Name, repo.Link)
+	if err != nil {
+		return err
+	}
+
+	repo.ID, err = res.LastInsertId()
+	// log.Print("Assing id=", cov.ID)
+	return err
+}
+
 func (s *repositoryStoreImpl) Scan() ([]Repository, error) {
 	rows := []storableRepository{}
 	err := s.db.Select(&rows, "SELECT id, scm, name, namespace, url FROM repository")
