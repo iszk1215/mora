@@ -109,7 +109,8 @@ func Test_injectCoverage(t *testing.T) {
 		r.Get("/", handler)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d", want.ID), strings.NewReader(""))
+	req := httptest.NewRequest(
+		http.MethodGet, fmt.Sprintf("/%d", want.ID), strings.NewReader(""))
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -328,7 +329,9 @@ func Test_CoverageHandler_File(t *testing.T) {
 
 	contents := mockscm.NewMockContentService(mockCtrl)
 	content := scm.Content{Data: []byte(code)}
-	contents.EXPECT().Find( /*ctx*/ gomock.Any(), orgName+"/"+repoName, filename, revision).Return(&content, nil, nil)
+	contents.EXPECT().
+		Find( /*ctx*/ gomock.Any(), orgName+"/"+repoName, filename, revision).
+		Return(&content, nil, nil)
 
 	scm := NewMockSCM(1)
 	scm.client.Contents = contents
