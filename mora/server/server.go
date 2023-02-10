@@ -61,14 +61,14 @@ type (
 
 	SCMStore interface {
 		Init() error
-		FindByURL(string) (int64, string, error)
+		FindURL(string) (int64, string, error)
 		Insert(string, string) (int64, error)
 	}
 
 	RepositoryStore interface {
 		Init() error
 		Find(id int64) (Repository, error)
-		FindByURL(url string) (Repository, error)
+		FindURL(url string) (Repository, error)
 		Put(repo *Repository) error
 		Scan() ([]Repository, error)
 	}
@@ -119,6 +119,16 @@ func RepoFrom(ctx context.Context) (Repository, bool) {
 	return repo, ok
 }
 
+func (s *MoraServer) findSCM(id int64) SCM {
+	for _, scm := range s.scms {
+		if scm.ID() == id {
+			return scm
+		}
+	}
+
+	return nil
+}
+
 // API Handler
 
 func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
@@ -136,8 +146,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 
 	for _, repo := range repositories {
 		log.Print("handleRepoList: repo.SCM=", repo.SCM)
-		scm := findSCM(
-			s.scms, func(scm SCM) bool { return scm.ID() == repo.SCM })
+		scm := s.findSCM(repo.SCM)
 		if scm == nil {
 			log.Print("scm not found for repository: repo.ID=", repo.ID,
 				" scmID=", repo.SCM, " (skipped)")
@@ -177,24 +186,14 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 
 // ----------------------------------------------------------------------
 
-func findSCM(list []SCM, f func(scm SCM) bool) SCM {
-	for _, scm := range list {
-		if f(scm) {
-			return scm
-		}
-	}
-	return nil
-}
-
 func testRepoFromSCM(session *MoraSession, scm SCM, owner, name string) error {
 	ctx, err := session.WithToken(context.Background(), scm.ID())
 	if err != nil {
-		return err
+		return err // errorTokenNotFound
 	}
 
 	_, _, err = scm.Client().Repositories.Find(ctx, owner+"/"+name)
 	if err != nil {
-		// log.Print(meta)
 		return err
 	}
 
@@ -245,7 +244,7 @@ func (s *MoraServer) injectRepoByID(next http.Handler) http.Handler {
 			return
 		}
 
-		scm := findSCM(s.scms, func(s SCM) bool { return s.ID() == repo.SCM })
+		scm := s.findSCM(repo.SCM)
 		if scm == nil {
 			log.Error().Msgf("scm not found: id=%d", repo.SCM)
 			render.NotFound(w, render.ErrNotFound)
@@ -360,7 +359,7 @@ func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 			scmConfig.URL = "https://api.github.com"
 		}
 
-		id, _, err := store.FindByURL(scmConfig.URL)
+		id, _, err := store.FindURL(scmConfig.URL)
 		if err != nil {
 			return nil, err
 		}

@@ -37,7 +37,7 @@ func (s *scmStoreImpl) Init() error {
 	return nil
 }
 
-func (s *scmStoreImpl) FindByURL(url string) (int64, string, error) {
+func (s *scmStoreImpl) FindURL(url string) (int64, string, error) {
 	rows := []storableSCM{}
 	err := s.db.Select(&rows, "SELECT id, driver FROM scm WHERE url = ?", url)
 	if err != nil {

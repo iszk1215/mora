@@ -73,7 +73,7 @@ func (s *repositoryStoreImpl) Find(id int64) (Repository, error) {
 	return s.findOne(query, id)
 }
 
-func (s *repositoryStoreImpl) FindByURL(url string) (Repository, error) {
+func (s *repositoryStoreImpl) FindURL(url string) (Repository, error) {
 	query := "SELECT id, scm, namespace, name, url FROM repository WHERE url = ?"
 	return s.findOne(query, url)
 }
@@ -87,7 +87,6 @@ func (s *repositoryStoreImpl) Put(repo *Repository) error {
 	}
 
 	repo.ID, err = res.LastInsertId()
-	// log.Print("Assing id=", cov.ID)
 	return err
 }
 
