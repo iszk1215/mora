@@ -166,22 +166,30 @@ func TestMakeCoverageResponseList(t *testing.T) {
 		},
 	}
 
-	want := []CoverageResponse{
-		{
-			ID:          cov.ID,
-			Timestamp:   cov.Timestamp,
-			Revision:    cov.Revision,
-			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
-			Entries: []*CoverageEntry{
-				{
-					Name:  "cc",
-					Hits:  20,
-					Lines: 100,
-				},
-				{
-					Name:  "py",
-					Hits:  280,
-					Lines: 300,
+	want := CoverageListResponse{
+		Repo: RepoResponse{
+			ID:        repo.ID,
+			Namespace: repo.Namespace,
+			Name:      repo.Name,
+			Link:      repo.Link,
+		},
+		Coverages: []CoverageResponse{
+			{
+				ID:          cov.ID,
+				Timestamp:   cov.Timestamp,
+				Revision:    cov.Revision,
+				RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
+				Entries: []*CoverageEntry{
+					{
+						Name:  "cc",
+						Hits:  20,
+						Lines: 100,
+					},
+					{
+						Name:  "py",
+						Hits:  280,
+						Lines: 300,
+					},
 				},
 			},
 		},
@@ -219,7 +227,7 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var data []CoverageResponse
+	var data CoverageListResponse
 	err = json.Unmarshal(body, &data)
 	require.NoError(t, err)
 
