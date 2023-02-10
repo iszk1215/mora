@@ -27,6 +27,11 @@ type (
 		// profiles in entry are emptry
 	}
 
+	CoverageListResponse struct {
+		Repo      RepoResponse       `json:"repository"`
+		Coverages []CoverageResponse `json:"coverages"`
+	}
+
 	// hanldleFileList
 	FileResponse struct {
 		FileName string `json:"filename"`
@@ -232,14 +237,26 @@ func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	return resp
 }
 
-func makeCoverageListResponse(scm SCM, repo Repository, coverages []*Coverage) []CoverageResponse {
-	var ret []CoverageResponse
+func makeCoverageListResponse(
+	scm SCM, repo Repository, coverages []*Coverage) CoverageListResponse {
+
+	var covs []CoverageResponse
 	for _, cov := range coverages {
 		revURL := scm.RevisionURL(repo.Link, cov.Revision)
-		ret = append(ret, makeCoverageResponse(revURL, cov))
+		covs = append(covs, makeCoverageResponse(revURL, cov))
 	}
 
-	return ret
+	resp := CoverageListResponse{
+		Repo: RepoResponse{
+			ID:        repo.ID,
+			Namespace: repo.Namespace,
+			Name:      repo.Name,
+			Link:      repo.Link,
+		},
+		Coverages: covs,
+	}
+
+	return resp
 }
 
 func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Request) {
