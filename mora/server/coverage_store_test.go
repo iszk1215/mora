@@ -25,6 +25,29 @@ func TestCoverageStore_New(t *testing.T) {
 	initCoverageStore(t)
 }
 
+func TestCoverageStore_Find(t *testing.T) {
+	s := initCoverageStore(t)
+	want := &Coverage{
+		RepoID:    1215,
+		Revision:  "123abc",
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 17,
+			},
+		},
+	}
+
+	err := s.Put(want)
+	require.NoError(t, err)
+
+	got, err := s.Find(want.ID)
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+}
+
 func TestCoverageStore_Find_Nil(t *testing.T) {
 	s := initCoverageStore(t)
 
@@ -76,7 +99,32 @@ func TestCoverageStore_Put_Insert(t *testing.T) {
 	require.Equal(t, want, got)
 }
 
-func TestCoverageStore_Find_Update(t *testing.T) {
+func TestCoverageStore_Put_InsertWithEntry(t *testing.T) {
+	want := &Coverage{
+		RepoID:    1215,
+		Revision:  "abcde",
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  10,
+				Lines: 17,
+			},
+		},
+	}
+
+	s := initCoverageStore(t)
+
+	err := s.Put(want)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), want.ID)
+
+	got, err := s.Find(want.ID)
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+}
+
+func TestCoverageStore_Put_Update(t *testing.T) {
 	cov := &Coverage{
 		RepoID:    1215,
 		Revision:  "abcde",
@@ -93,11 +141,11 @@ func TestCoverageStore_Find_Update(t *testing.T) {
 
 	s := initCoverageStore(t)
 
-	err := s.Put(cov)
+	err := s.Put(cov) // Insert
 	require.NoError(t, err)
 	require.Equal(t, int64(1), cov.ID)
 
-	err = s.Put(want)
+	err = s.Put(want) // Update
 	require.NoError(t, err)
 	require.Equal(t, int64(0), want.ID)
 }
