@@ -63,7 +63,7 @@ type (
 		Find(id int64) (Repository, error)
 		FindURL(url string) (Repository, error)
 		Put(repo *Repository) error
-		Scan() ([]Repository, error)
+		ListAll() ([]Repository, error)
 	}
 
 	CoverageStore interface {
@@ -127,7 +127,7 @@ func (s *MoraServer) findSCM(id int64) SCM {
 func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleRepoList")
 
-	repositories, err := s.repos.Scan()
+	repositories, err := s.repos.ListAll()
 	if err != nil {
 		log.Err(err).Msg("")
 		render.NotFound(w, render.ErrNotFound)
