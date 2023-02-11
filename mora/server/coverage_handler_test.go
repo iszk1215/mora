@@ -167,12 +167,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	}
 
 	want := CoverageListResponse{
-		Repo: RepoResponse{
-			ID:        repo.ID,
-			Namespace: repo.Namespace,
-			Name:      repo.Name,
-			Link:      repo.Link,
-		},
+		Repo: repo,
 		Coverages: []CoverageResponse{
 			{
 				ID:          cov.ID,
@@ -310,6 +305,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	want := FileListResponse{
 		Files:    []*FileResponse{&fileRes},
+		Repo:     repo,
 		Metadata: metaRes,
 	}
 
@@ -391,6 +387,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 	require.NoError(t, err)
 
 	want := CodeResponse{
+		Repo:     repo,
 		FileName: prof.FileName,
 		Code:     code,
 		Blocks:   prof.Blocks,

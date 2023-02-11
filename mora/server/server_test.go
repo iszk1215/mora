@@ -15,7 +15,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/jmoiron/sqlx"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,26 +34,14 @@ func setupRepositoryStore(t *testing.T, repos ...*Repository) RepositoryStore {
 	return store
 }
 
-func assertEqualRepoResponse(t *testing.T, expected Repository, got RepoResponse) bool {
-	ok := assert.Equal(t, expected.ID, got.ID)
-	ok = ok && assert.Equal(t, expected.Namespace, got.Namespace)
-	ok = ok && assert.Equal(t, expected.Name, got.Name)
-	ok = ok && assert.Equal(t, expected.Link, got.Link)
-	return ok
-}
-
-func requireEqualRepoList(t *testing.T, expected []Repository, res *http.Response) {
+func requireEqualRepoList(t *testing.T, want []Repository, res *http.Response) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var data []RepoResponse
-	err = json.Unmarshal(body, &data)
+	var got []Repository
+	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
-
-	require.Equal(t, len(expected), len(data))
-	for i, exp := range expected {
-		assertEqualRepoResponse(t, exp, data[i])
-	}
+	require.Equal(t, want, got)
 }
 
 func createMockRepoService(controller *gomock.Controller, repos []Repository) scm.RepositoryService {
