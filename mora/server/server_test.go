@@ -127,6 +127,12 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	// require.Equal(t, map[string]Repository{"owner/repo1": Repository{}}, cache)
 }
 
+func setupMoraServer(t *testing.T, scms []SCM) *MoraServer {
+	s := &MoraServer{}
+	s.scms = scms
+	return s
+}
+
 func doInjectRepo(sess *MoraSession, server *MoraServer, path string, handler http.HandlerFunc) *http.Response {
 	r := chi.NewRouter()
 	r.Route("/{repo_id}", func(r chi.Router) {
@@ -157,9 +163,7 @@ func Test_injectRepo_OK(t *testing.T) {
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
 	sess := NewMoraSessionWithTokenFor(scm)
 
-	server, err := NewMoraServer([]SCM{scm}, false)
-	require.NoError(t, err)
-
+	server := setupMoraServer(t, []SCM{scm})
 	server.repos = setupRepositoryStore(t, &repo)
 
 	called := false
@@ -184,9 +188,8 @@ func Test_injectRepo_NoLogin(t *testing.T) {
 		Name:      "repo",
 		Link:      "http://mock.com/owner/repo",
 	}
-	server, err := NewMoraServer([]SCM{scm}, false)
+	server := setupMoraServer(t, []SCM{scm})
 	server.repos = setupRepositoryStore(t, &repo)
-	require.NoError(t, err)
 
 	sess := NewMoraSession() // without token
 	res := doInjectRepo(sess, server, fmt.Sprintf("/%d", repo.ID), nil)
@@ -202,8 +205,7 @@ func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
 	scm.client.Repositories = createMockRepoService(controller, []Repository{})
 	sess := NewMoraSessionWithTokenFor(scm)
 
-	server, err := NewMoraServer([]SCM{scm}, false)
-	require.NoError(t, err)
+	server := setupMoraServer(t, []SCM{scm})
 
 	res := doInjectRepo(sess, server, path, nil)
 	require.Equal(t, expectedCode, res.StatusCode)
@@ -257,9 +259,9 @@ func setupServer(t *testing.T, scm SCM, repos []*Repository) *MoraServer {
 
 	coverage := NewCoverageHandler(repoStore, covStore)
 
-	server, err := NewMoraServer([]SCM{scm}, false)
-	require.NoError(t, err)
-
+	server := &MoraServer{}
+	server.sessionManager = NewMoraSessionManager()
+	server.scms = []SCM{scm}
 	server.coverage = coverage
 	server.repos = repoStore
 
@@ -274,8 +276,8 @@ func TestServerSCMList(t *testing.T) {
 	scm.id = 15
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 
-	server, err := NewMoraServer([]SCM{scm}, false)
-	require.NoError(t, err)
+	server := setupMoraServer(t, []SCM{scm})
+	server.sessionManager = NewMoraSessionManager()
 	handler := server.Handler()
 
 	cookie := requireLogin(t, handler, scm.ID())
