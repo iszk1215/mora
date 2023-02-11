@@ -127,19 +127,32 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	// require.Equal(t, map[string]Repository{"owner/repo1": Repository{}}, cache)
 }
 
-func setupMoraServer(t *testing.T, scms []SCM) *MoraServer {
-	s := &MoraServer{}
-	s.scms = scms
+type MoraServerBuilder struct {
+	t      *testing.T
+	Server *MoraServer
+}
+
+func NewMoraServerBuilder(t *testing.T) *MoraServerBuilder {
+	return &MoraServerBuilder{t: t, Server: &MoraServer{}}
+}
+
+func (s *MoraServerBuilder) WithSCM(scm ...SCM) *MoraServerBuilder {
+	s.Server.scms = append(s.Server.scms, scm...)
 	return s
 }
 
-func setupMoraServerWithRepos(t *testing.T, scm SCM, repos []*Repository) *MoraServer {
-	server := &MoraServer{}
-	server.sessionManager = NewMoraSessionManager()
-	server.scms = []SCM{scm}
-	server.repos = setupRepositoryStore(t, repos...)
+func (s *MoraServerBuilder) WithRepo(repos ...*Repository) *MoraServerBuilder {
+	s.Server.repos = setupRepositoryStore(s.t, repos...)
+	return s
+}
 
-	return server
+func (s *MoraServerBuilder) WithSessionManager() *MoraServerBuilder {
+	s.Server.sessionManager = NewMoraSessionManager()
+	return s
+}
+
+func (s *MoraServerBuilder) Finish() *MoraServer {
+	return s.Server
 }
 
 func doInjectRepo(sess *MoraSession, server *MoraServer, path string, handler http.HandlerFunc) *http.Response {
@@ -172,8 +185,7 @@ func Test_injectRepo_OK(t *testing.T) {
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
 	sess := NewMoraSessionWithTokenFor(scm)
 
-	server := setupMoraServer(t, []SCM{scm})
-	server.repos = setupRepositoryStore(t, &repo)
+	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo).Finish()
 
 	called := false
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -197,8 +209,8 @@ func Test_injectRepo_NoLogin(t *testing.T) {
 		Name:      "repo",
 		Link:      "http://mock.com/owner/repo",
 	}
-	server := setupMoraServer(t, []SCM{scm})
-	server.repos = setupRepositoryStore(t, &repo)
+
+	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo).Finish()
 
 	sess := NewMoraSession() // without token
 	res := doInjectRepo(sess, server, fmt.Sprintf("/%d", repo.ID), nil)
@@ -214,7 +226,7 @@ func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
 	scm.client.Repositories = createMockRepoService(controller, []Repository{})
 	sess := NewMoraSessionWithTokenFor(scm)
 
-	server := setupMoraServer(t, []SCM{scm})
+	server := NewMoraServerBuilder(t).WithSCM(scm).Finish()
 
 	res := doInjectRepo(sess, server, path, nil)
 	require.Equal(t, expectedCode, res.StatusCode)
@@ -266,8 +278,7 @@ func TestServerSCMList(t *testing.T) {
 	scm.id = 15
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 
-	server := setupMoraServer(t, []SCM{scm})
-	server.sessionManager = NewMoraSessionManager()
+	server := NewMoraServerBuilder(t).WithSCM(scm).WithSessionManager().Finish()
 	handler := server.Handler()
 
 	cookie := requireLogin(t, handler, scm.ID())
@@ -309,7 +320,8 @@ func TestServerRepoList(t *testing.T) {
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
 
-	server := setupMoraServerWithRepos(t, scm, []*Repository{&repo})
+	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo).
+		WithSessionManager().Finish()
 
 	handler := server.Handler()
 
@@ -345,7 +357,8 @@ func TestServerRepoList2(t *testing.T) {
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo1})
 
-	server := setupMoraServerWithRepos(t, scm, []*Repository{&repo0, &repo1})
+	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo0, &repo1).
+		WithSessionManager().Finish()
 	handler := server.Handler()
 
 	cookie := requireLogin(t, handler, scm.ID())
