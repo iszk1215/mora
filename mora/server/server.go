@@ -396,6 +396,16 @@ func initStore(filename string) (SCMStore, RepositoryStore, CoverageStore, error
 	return scmStore, repoStore, covStore, nil
 }
 
+func initFrontendFileServer(config MoraConfig) (http.Handler, error) {
+	staticDir := "mora/server/static"
+	frontendFS, err := getStaticFS(staticDir, "public", config.Debug)
+	if err != nil {
+		return nil, err
+	}
+
+	return http.FileServer(http.FS(frontendFS)), err
+}
+
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	log.Print("config.Debug=", config.Debug)
 
@@ -414,8 +424,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, errors.New("no SCM is configured")
 	}
 
-	staticDir := "mora/server/static"
-	frontendFS, err := getStaticFS(staticDir, "public", config.Debug)
+	frontendFileServer, err := initFrontendFileServer(config)
 	if err != nil {
 		return nil, err
 	}
@@ -425,11 +434,9 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	s := &MoraServer{}
 	s.sessionManager = NewMoraSessionManager()
 	s.scms = scms
-	s.frontendFileServer = http.FileServer(http.FS(frontendFS))
-
-	s.scms = scms
-	s.coverage = coverage
 	s.repos = repoStore
+	s.frontendFileServer = frontendFileServer
+	s.coverage = coverage
 
 	return s, err
 }
