@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/elliotchance/pie/v2"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog/log"
@@ -48,6 +47,7 @@ func (s *coverageStoreImpl) Init() error {
 	return err
 }
 
+/*
 // contents is serialized []CoverageEntryUploadRequest
 func parseStorableCoverageContents(contents string) ([]*CoverageEntry, error) {
 	var req []*CoverageEntryUploadRequest
@@ -64,9 +64,17 @@ func parseStorableCoverageContents(contents string) ([]*CoverageEntry, error) {
 
 	return entries, nil
 }
+*/
 
 func toCoverage(record storableCoverage) (*Coverage, error) {
-	entries, err := parseStorableCoverageContents(record.Contents)
+	/*
+		entries, err := parseStorableCoverageContents(record.Contents)
+		if err != nil {
+			return nil, err
+		}
+	*/
+	var entries []*CoverageEntry
+	err := json.Unmarshal([]byte(record.Contents), &entries)
 	if err != nil {
 		return nil, err
 	}
@@ -132,21 +140,24 @@ func (s *coverageStoreImpl) ListAll() ([]*Coverage, error) {
 }
 
 func (s *coverageStoreImpl) Put(cov *Coverage) error {
-	var requests []*CoverageEntryUploadRequest
-	for _, e := range cov.Entries {
-		requests = append(requests,
-			&CoverageEntryUploadRequest{
-				Name:     e.Name,
-				Hits:     e.Hits,
-				Lines:    e.Lines,
-				Profiles: pie.Values(e.Profiles),
-			})
-	}
+	/*
+		var requests []*CoverageEntryUploadRequest
+		for _, e := range cov.Entries {
+			requests = append(requests,
+				&CoverageEntryUploadRequest{
+					Name:     e.Name,
+					Hits:     e.Hits,
+					Lines:    e.Lines,
+					Profiles: pie.Values(e.Profiles),
+				})
+		}
+	*/
 
-	contents, err := json.Marshal(requests)
+	contents, err := json.Marshal(cov.Entries)
 	if err != nil {
 		return err
 	}
+	log.Print(string(contents))
 
 	s.Lock()
 	defer s.Unlock()
