@@ -133,6 +133,15 @@ func setupMoraServer(t *testing.T, scms []SCM) *MoraServer {
 	return s
 }
 
+func setupMoraServerWithRepos(t *testing.T, scm SCM, repos []*Repository) *MoraServer {
+	server := &MoraServer{}
+	server.sessionManager = NewMoraSessionManager()
+	server.scms = []SCM{scm}
+	server.repos = setupRepositoryStore(t, repos...)
+
+	return server
+}
+
 func doInjectRepo(sess *MoraSession, server *MoraServer, path string, handler http.HandlerFunc) *http.Response {
 	r := chi.NewRouter()
 	r.Route("/{repo_id}", func(r chi.Router) {
@@ -249,25 +258,6 @@ func requireLogin(t *testing.T, handler http.Handler, scmID int64) *http.Cookie 
 	return cookie
 }
 
-func setupServer(t *testing.T, scm SCM, repos []*Repository) *MoraServer {
-	covStore := setupCoverageStore(t)
-	for _, repo := range repos {
-		covStore.Put(&Coverage{RepoID: repo.ID})
-	}
-
-	repoStore := setupRepositoryStore(t, repos...)
-
-	coverage := NewCoverageHandler(repoStore, covStore)
-
-	server := &MoraServer{}
-	server.sessionManager = NewMoraSessionManager()
-	server.scms = []SCM{scm}
-	server.coverage = coverage
-	server.repos = repoStore
-
-	return server
-}
-
 func TestServerSCMList(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
@@ -319,7 +309,7 @@ func TestServerRepoList(t *testing.T) {
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
 
-	server := setupServer(t, scm, []*Repository{&repo})
+	server := setupMoraServerWithRepos(t, scm, []*Repository{&repo})
 
 	handler := server.Handler()
 
@@ -355,7 +345,7 @@ func TestServerRepoList2(t *testing.T) {
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 	scm.client.Repositories = createMockRepoService(controller, []Repository{repo1})
 
-	server := setupServer(t, scm, []*Repository{&repo0, &repo1})
+	server := setupMoraServerWithRepos(t, scm, []*Repository{&repo0, &repo1})
 	handler := server.Handler()
 
 	cookie := requireLogin(t, handler, scm.ID())
