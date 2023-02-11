@@ -28,7 +28,7 @@ type (
 	}
 
 	CoverageListResponse struct {
-		Repo      RepoResponse       `json:"repo"`
+		Repo      Repository         `json:"repo"`
 		Coverages []CoverageResponse `json:"coverages"`
 	}
 
@@ -49,16 +49,16 @@ type (
 
 	FileListResponse struct {
 		Metadata MetaResonse     `json:"meta"`
-		Repo     RepoResponse    `json:"repo"`
+		Repo     Repository      `json:"repo"`
 		Files    []*FileResponse `json:"files"`
 	}
 
 	// handleFile
 	CodeResponse struct {
-		Repo     RepoResponse `json:"repo"`
-		FileName string       `json:"filename"`
-		Code     string       `json:"code"`
-		Blocks   [][]int      `json:"blocks"`
+		Repo     Repository `json:"repo"`
+		FileName string     `json:"filename"`
+		Code     string     `json:"code"`
+		Blocks   [][]int    `json:"blocks"`
 	}
 
 	// Upload
@@ -249,12 +249,7 @@ func makeCoverageListResponse(
 	}
 
 	resp := CoverageListResponse{
-		Repo: RepoResponse{
-			ID:        repo.ID,
-			Namespace: repo.Namespace,
-			Name:      repo.Name,
-			Link:      repo.Link,
-		},
+		Repo:      repo,
 		Coverages: covs,
 	}
 
@@ -302,12 +297,7 @@ func makeFileListResponse(scm SCM, repo Repository, cov *Coverage, entry *Covera
 
 	return FileListResponse{
 		Files: files,
-		Repo: RepoResponse{
-			ID:        repo.ID,
-			Namespace: repo.Namespace,
-			Name:      repo.Name,
-			Link:      repo.Link,
-		},
+		Repo:  repo,
 		Metadata: MetaResonse{
 			Revision:    cov.Revision,
 			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
@@ -378,12 +368,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := CodeResponse{
-		Repo: RepoResponse{
-			ID:        repo.ID,
-			Namespace: repo.Namespace,
-			Name:      repo.Name,
-			Link:      repo.Link,
-		},
+		Repo:     repo,
 		FileName: profile.FileName,
 		Code:     string(code),
 		Blocks:   profile.Blocks,

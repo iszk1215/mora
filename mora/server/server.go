@@ -26,11 +26,11 @@ var (
 
 type (
 	Repository struct {
-		ID        int64
-		SCM       int64
-		Namespace string
-		Name      string
-		Link      string
+		ID        int64  `json:"id"`
+		SCM       int64  `json:"scm_id"`
+		Namespace string `json:"namespace"`
+		Name      string `json:"name"`
+		Link      string `json:"url"`
 	}
 
 	// Source Code Management System
@@ -45,13 +45,6 @@ type (
 	contextKey int
 
 	// Protocols
-
-	RepoResponse struct {
-		ID        int64  `json:"id"`
-		Namespace string `json:"namespace"`
-		Name      string `json:"name"`
-		Link      string `json:"link"`
-	}
 
 	SCMResponse struct {
 		ID      int64  `json:"id"`
@@ -141,7 +134,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := []RepoResponse{}
+	resp := []Repository{}
 	sess, _ := MoraSessionFrom(r.Context())
 
 	for _, repo := range repositories {
@@ -156,12 +149,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 		err = checkRepoAccess(sess, scm, repo)
 		if err == nil {
 			log.Print("handleRepoList: return repo.ID=", repo.ID)
-			resp = append(resp, RepoResponse{
-				ID:        repo.ID,
-				Namespace: repo.Namespace,
-				Name:      repo.Name,
-				Link:      repo.Link,
-			})
+			resp = append(resp, repo)
 		}
 	}
 
