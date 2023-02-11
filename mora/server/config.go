@@ -18,9 +18,10 @@ type SCMConfig struct {
 }
 
 type MoraConfig struct {
-	Server ServerConfig
-	SCMs   []SCMConfig `toml:"scm"`
-	Debug  bool
+	Server           ServerConfig
+	SCMs             []SCMConfig `toml:"scm"`
+	Debug            bool
+	DatabaseFilename string
 }
 
 func ReadMoraConfig(filename string) (MoraConfig, error) {
@@ -33,6 +34,8 @@ func ReadMoraConfig(filename string) (MoraConfig, error) {
 	if err := toml.Unmarshal(b, &config); err != nil {
 		return MoraConfig{}, err
 	}
+
+	config.DatabaseFilename = "mora.db"
 
 	return config, nil
 }
