@@ -141,11 +141,11 @@ func TestCoverageStore_Put_Update(t *testing.T) {
 
 	s := initCoverageStore(t)
 
-	err := s.Put(cov)
+	err := s.Put(cov) // Insert
 	require.NoError(t, err)
 	require.Equal(t, int64(1), cov.ID)
 
-	err = s.Put(want)
+	err = s.Put(want) // Update
 	require.NoError(t, err)
 	require.Equal(t, int64(0), want.ID)
 }

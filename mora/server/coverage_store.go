@@ -42,11 +42,6 @@ func NewCoverageStore(db *sqlx.DB) *coverageStoreImpl {
 	return &coverageStoreImpl{db: db, selectQuery: query}
 }
 
-func (s *coverageStoreImpl) Init() error {
-	_, err := s.db.Exec(schema)
-	return err
-}
-
 /*
 // contents is serialized []CoverageEntryUploadRequest
 func parseStorableCoverageContents(contents string) ([]*CoverageEntry, error) {
@@ -64,15 +59,50 @@ func parseStorableCoverageContents(contents string) ([]*CoverageEntry, error) {
 
 	return entries, nil
 }
+
+func (s *coverageStoreImpl) Migrate() error {
+	query := "SELECT id, contents FROM coverage"
+	rows := []storableCoverage{}
+	err := s.db.Select(&rows, query)
+	if err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		log.Print(row)
+		entries, err := parseStorableCoverageContents(row.Contents)
+		if err != nil {
+			return err
+		}
+
+		contents, err := json.Marshal(entries)
+		if err != nil {
+			return err
+		}
+		log.Print(contents)
+
+		query = "UPDATE coverage SET contents = $1 WHERE id = $2"
+		_, err = s.db.Exec(query, contents, row.ID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 */
 
-func toCoverage(record storableCoverage) (*Coverage, error) {
+func (s *coverageStoreImpl) Init() error {
+	_, err := s.db.Exec(schema)
 	/*
-		entries, err := parseStorableCoverageContents(record.Contents)
 		if err != nil {
-			return nil, err
+			return err
 		}
+		err = s.Migrate()
 	*/
+	return err
+}
+
+func toCoverage(record storableCoverage) (*Coverage, error) {
 	var entries []*CoverageEntry
 	err := json.Unmarshal([]byte(record.Contents), &entries)
 	if err != nil {
@@ -140,29 +170,15 @@ func (s *coverageStoreImpl) ListAll() ([]*Coverage, error) {
 }
 
 func (s *coverageStoreImpl) Put(cov *Coverage) error {
-	/*
-		var requests []*CoverageEntryUploadRequest
-		for _, e := range cov.Entries {
-			requests = append(requests,
-				&CoverageEntryUploadRequest{
-					Name:     e.Name,
-					Hits:     e.Hits,
-					Lines:    e.Lines,
-					Profiles: pie.Values(e.Profiles),
-				})
-		}
-	*/
-
 	contents, err := json.Marshal(cov.Entries)
 	if err != nil {
 		return err
 	}
-	log.Print(string(contents))
 
-	s.Lock()
-	defer s.Unlock()
+	// s.Lock()
+	// defer s.Unlock()
 
-	rows := []int{}
+	rows := []int64{}
 	err = s.db.Select(&rows,
 		"SELECT id FROM coverage WHERE repo_id = $1 and revision = $2",
 		cov.RepoID, cov.Revision)
@@ -185,8 +201,7 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 	} else { // update
 		log.Print("Update")
 		_, err = s.db.Exec(
-			"UPDATE coverage SET contents = $1 WHERE repo_id = $2 and revision = $3",
-			contents, cov.RepoID, cov.Revision)
+			"UPDATE coverage SET contents = $1 WHERE id = $2", contents, rows[0])
 		return err
 	}
 }
