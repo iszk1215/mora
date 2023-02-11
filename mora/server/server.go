@@ -62,16 +62,17 @@ type (
 		Init() error
 		Find(id int64) (Repository, error)
 		FindURL(url string) (Repository, error)
-		Put(repo *Repository) error
 		ListAll() ([]Repository, error)
+		Put(repo *Repository) error
 	}
 
 	CoverageStore interface {
-		Put(*Coverage) error
+		Init() error
 		Find(id int64) (*Coverage, error)
 		FindRevision(id int64, revision string) (*Coverage, error)
 		List(id int64) ([]*Coverage, error)
 		ListAll() ([]*Coverage, error)
+		Put(*Coverage) error
 	}
 
 	ResourceHandler interface {
