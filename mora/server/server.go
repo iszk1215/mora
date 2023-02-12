@@ -139,17 +139,16 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	sess, _ := MoraSessionFrom(r.Context())
 
 	for _, repo := range repositories {
-		log.Print("handleRepoList: repo.SCM=", repo.SCM)
 		scm := s.findSCM(repo.SCM)
 		if scm == nil {
-			log.Print("scm not found for repository: repo.ID=", repo.ID,
-				" scmID=", repo.SCM, " (skipped)")
+			log.Warn().Msgf(
+				"scm not found for repository: repo.ID=%d scm.ID=%d (skipped)",
+				repo.ID, repo.SCM)
 			continue
 		}
 
 		err = checkRepoAccess(sess, scm, repo)
 		if err == nil {
-			log.Print("handleRepoList: return repo.ID=", repo.ID)
 			resp = append(resp, repo)
 		}
 	}
@@ -213,7 +212,7 @@ func checkRepoAccess(sess *MoraSession, scm SCM, repo Repository) error {
 	return err
 }
 
-func (s *MoraServer) injectRepoByID(next http.Handler) http.Handler {
+func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		repo_id, err := strconv.ParseInt(chi.URLParam(r, "repo_id"), 10, 64)
 		if err != nil {
@@ -222,7 +221,7 @@ func (s *MoraServer) injectRepoByID(next http.Handler) http.Handler {
 			return
 		}
 
-		log.Print("injectRepoByID: repo_id=", repo_id)
+		log.Print("injectRepo: repo_id=", repo_id)
 
 		repo, err := s.repos.Find(repo_id)
 		if err != nil {
@@ -244,7 +243,7 @@ func (s *MoraServer) injectRepoByID(next http.Handler) http.Handler {
 			render.Forbidden(w, render.ErrForbidden)
 			return
 		} else if err != nil {
-			log.Err(err).Msg("injectRepoByID")
+			log.Err(err).Msg("injectRepo")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
@@ -272,7 +271,7 @@ func (s *MoraServer) Handler() http.Handler {
 	r.Route("/api/repos", func(r chi.Router) {
 		r.Get("/", s.handleRepoList)
 		r.Route("/{repo_id}", func(r chi.Router) {
-			r.Use(s.injectRepoByID)
+			r.Use(s.injectRepo)
 			if s.coverage != nil {
 				r.Mount("/coverages", s.coverage.Handler())
 			}
@@ -307,47 +306,51 @@ func (s *MoraServer) Handler() http.Handler {
 	return r
 }
 
-func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
-	scms := []SCM{}
-	for _, scmConfig := range config.SCMs {
-		var scm SCM
-		var err error
+func initSCM(config SCMConfig, baseURL string, store SCMStore) (SCM, error) {
+	if config.Driver == "github" && config.URL == "" {
+		config.URL = "https://api.github.com"
+	}
 
-		if scmConfig.Driver == "github" && scmConfig.URL == "" {
-			scmConfig.URL = "https://api.github.com"
-		}
+	if config.URL == "" {
+		return nil, errors.New("scm url is empty")
+	}
 
-		id, _, err := store.FindURL(scmConfig.URL)
+	id, _, err := store.FindURL(config.URL)
+	if err != nil {
+		return nil, err
+	}
+
+	if id < 0 {
+		id, err = store.Insert(config.Driver, config.URL)
 		if err != nil {
 			return nil, err
 		}
+		log.Info().Msgf("New scm is configured. ID=%d Driver=%s URL=%s",
+			id, config.Driver, config.URL)
+	} else {
+		log.Info().Msgf("scm enabled. ID=%d Driver=%s URL=%s",
+			id, config.Driver, config.URL)
+	}
 
-		if id < 0 {
-			id, err = store.Insert(scmConfig.Driver, scmConfig.URL)
-			if err != nil {
-				return nil, err
-			}
-			log.Info().Msgf("New scm is configured. ID=%d Driver=%s URL=%s",
-				id, scmConfig.Driver, scmConfig.URL)
-		} else {
-			log.Info().Msgf("scm enabled. ID=%d Driver=%s URL=%s",
-				id, scmConfig.Driver, scmConfig.URL)
-		}
+	if config.Driver == "gitea" {
+		return NewGiteaFromFile(
+			id,
+			config.SecretFilename,
+			config.URL,
+			baseURL+"/login")
+	} else if config.Driver == "github" {
+		return NewGithubFromFile(
+			id,
+			config.SecretFilename)
+	}
 
-		if scmConfig.Driver == "gitea" {
-			scm, err = NewGiteaFromFile(
-				id,
-				scmConfig.SecretFilename,
-				scmConfig.URL,
-				config.Server.URL+"/login")
-		} else if scmConfig.Driver == "github" {
-			scm, err = NewGithubFromFile(
-				id,
-				scmConfig.SecretFilename)
-		} else {
-			err = fmt.Errorf("unknown scm: %s", scmConfig.Driver)
-		}
+	return nil, fmt.Errorf("unknown scm: %s", config.Driver)
+}
 
+func initSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
+	scms := []SCM{}
+	for _, scmConfig := range config.SCMs {
+		scm, err := initSCM(scmConfig, config.Server.URL, store)
 		if err != nil {
 			log.Warn().Err(err).Msgf(
 				"ignore error during %s initialization", scmConfig.URL)
@@ -413,7 +416,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	scms, err := initSCM(config, scmStore)
+	scms, err := initSCMs(config, scmStore)
 	if err != nil {
 		return nil, err
 	}

@@ -145,7 +145,7 @@ func (s *MoraServerBuilder) Finish() *MoraServer {
 func doInjectRepo(sess *MoraSession, server *MoraServer, path string, handler http.HandlerFunc) *http.Response {
 	r := chi.NewRouter()
 	r.Route("/{repo_id}", func(r chi.Router) {
-		r.Use(server.injectRepoByID)
+		r.Use(server.injectRepo)
 		r.Get("/", handler.ServeHTTP)
 	})
 
