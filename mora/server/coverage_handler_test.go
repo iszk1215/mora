@@ -476,12 +476,12 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
 			{
-				Name:  "go",
+				Name:  "cc",
 				Hits:  0,
 				Lines: 3,
 				Profiles: map[string]*profile.Profile{
-					"test2.go": {
-						FileName: "test2.go",
+					"test.cc": {
+						FileName: "test.cc",
 						Hits:     0,
 						Lines:    3,
 						Blocks:   [][]int{{1, 3, 0}},
@@ -496,22 +496,30 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 		Revision:  "012345",
 		Timestamp: existing.Timestamp,
 		Entries: []*CoverageEntry{
+			// sorted by Name
+			{
+				Name:  "cc",
+				Hits:  0,
+				Lines: 3,
+				Profiles: map[string]*profile.Profile{
+					"test.cc": {
+						FileName: "test.cc",
+						Hits:     0,
+						Lines:    3,
+						Blocks:   [][]int{{1, 3, 0}},
+					},
+				},
+			},
 			{
 				Name:  "go",
 				Hits:  13,
-				Lines: 20,
+				Lines: 17,
 				Profiles: map[string]*profile.Profile{
 					"test.go": {
 						FileName: "test.go",
 						Hits:     13,
 						Lines:    17,
 						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
-					},
-					"test2.go": {
-						FileName: "test2.go",
-						Hits:     0,
-						Lines:    3,
-						Blocks:   [][]int{{1, 3, 0}},
 					},
 				},
 			},

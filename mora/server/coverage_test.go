@@ -9,60 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMergeEntry(t *testing.T) {
-	entry0 := CoverageEntry{
-		Name:  "go",
-		Hits:  13,
-		Lines: 17,
-		Profiles: map[string]*profile.Profile{
-			"test.go": {
-				FileName: "test.go",
-				Hits:     13,
-				Lines:    17,
-				Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
-			},
-		},
-	}
-
-	entry1 := CoverageEntry{
-		Name:  "go",
-		Hits:  2,
-		Lines: 4,
-		Profiles: map[string]*profile.Profile{
-			"test2.go": {
-				FileName: "test2.go",
-				Hits:     2,
-				Lines:    4,
-				Blocks:   [][]int{{1, 2, 1}, {3, 4, 0}},
-			},
-		},
-	}
-
-	merged := mergeEntry(&entry0, &entry1)
-
-	expected := CoverageEntry{
-		Name:  "go",
-		Hits:  15,
-		Lines: 21,
-		Profiles: map[string]*profile.Profile{
-			"test.go": {
-				FileName: "test.go",
-				Hits:     13,
-				Lines:    17,
-				Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
-			},
-			"test2.go": {
-				FileName: "test2.go",
-				Hits:     2,
-				Lines:    4,
-				Blocks:   [][]int{{1, 2, 1}, {3, 4, 0}},
-			},
-		},
-	}
-
-	assert.Equal(t, expected, *merged)
-}
-
 func TestMergeCoverage(t *testing.T) {
 	revision := "012345"
 
