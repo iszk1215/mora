@@ -352,11 +352,9 @@ func initSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
 	for _, scmConfig := range config.SCMs {
 		scm, err := initSCM(scmConfig, config.Server.URL, store)
 		if err != nil {
-			log.Warn().Err(err).Msgf(
-				"ignore error during %s initialization", scmConfig.URL)
-		} else {
-			scms = append(scms, scm)
+			return nil, err
 		}
+		scms = append(scms, scm)
 	}
 
 	return scms, nil
