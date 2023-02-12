@@ -21,8 +21,8 @@ const (
 )
 
 type MoraSession struct {
-	reposMap    map[int64]map[int64]bool // [scm][owner/repo]
-	tokenMap    map[int64]scm.Token
+	reposMap    map[int64]map[int64]bool // [scmID][repoID]
+	tokenMap    map[int64]scm.Token      // [scmID]
 	timestamp   time.Time
 	loggingInto int64
 }
