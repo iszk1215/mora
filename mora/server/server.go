@@ -312,7 +312,11 @@ func initSCM(config SCMConfig, baseURL string, store SCMStore) (SCM, error) {
 	}
 
 	if config.URL == "" {
-		return nil, errors.New("scm url is empty")
+		return nil, errors.New("ConfigError: scm.url is empty")
+	}
+
+	if config.SecretFilename == "" {
+		return nil, errors.New("ConfigError: scm.secret_url is empty")
 	}
 
 	id, _, err := store.FindURL(config.URL)
@@ -339,12 +343,10 @@ func initSCM(config SCMConfig, baseURL string, store SCMStore) (SCM, error) {
 			config.URL,
 			baseURL+"/login")
 	} else if config.Driver == "github" {
-		return NewGithubFromFile(
-			id,
-			config.SecretFilename)
+		return NewGithubFromFile(id, config.SecretFilename)
 	}
 
-	return nil, fmt.Errorf("unknown scm: %s", config.Driver)
+	return nil, fmt.Errorf("ConfigError: unknown scm: %s", config.Driver)
 }
 
 func initSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
@@ -361,6 +363,8 @@ func initSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
 }
 
 func initStore(filename string) (SCMStore, RepositoryStore, CoverageStore, error) {
+	log.Info().Msgf("Initialize store: filename=%s", filename)
+
 	db, err := sqlx.Connect("sqlite3", filename)
 	if err != nil {
 		return nil, nil, nil, err
@@ -430,12 +434,13 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 
 	coverage := NewCoverageHandler(repoStore, covStore)
 
-	s := &MoraServer{}
-	s.sessionManager = NewMoraSessionManager()
-	s.scms = scms
-	s.repos = repoStore
-	s.frontendFileServer = frontendFileServer
-	s.coverage = coverage
+	s := &MoraServer{
+		sessionManager:     NewMoraSessionManager(),
+		scms:               scms,
+		repos:              repoStore,
+		frontendFileServer: frontendFileServer,
+		coverage:           coverage,
+	}
 
 	return s, err
 }
