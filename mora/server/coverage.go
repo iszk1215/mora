@@ -36,28 +36,6 @@ func (c *Coverage) FindEntry(name string) *CoverageEntry {
 	return nil
 }
 
-// Profile is not deep-copied because it is read-only
-func mergeEntry(a, b *CoverageEntry) *CoverageEntry {
-	c := &CoverageEntry{Name: a.Name, Profiles: map[string]*profile.Profile{}}
-
-	for file, p := range a.Profiles {
-		c.Profiles[file] = p
-	}
-
-	for file, p := range b.Profiles {
-		c.Profiles[file] = p
-	}
-
-	c.Hits = 0
-	c.Lines = 0
-	for _, p := range c.Profiles {
-		c.Hits += p.Hits
-		c.Lines += p.Lines
-	}
-
-	return c
-}
-
 func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 	if a.RepoID != b.RepoID || a.Revision != b.Revision {
 		return nil, fmt.Errorf("can not merge two coverages with different URLs and/or revisions")
@@ -70,12 +48,13 @@ func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 	}
 
 	for _, e := range b.Entries {
-		ea, ok := entries[e.Name]
+		_, ok := entries[e.Name]
 		if ok {
-			entries[e.Name] = mergeEntry(ea, e)
-		} else {
-			entries[e.Name] = e
+			// want to replace?
+			return nil, fmt.Errorf(
+				"mergeCoverage: both coverage has the same entry: %s", e.Name)
 		}
+		entries[e.Name] = e
 	}
 
 	tmp := pie.Values(entries)
