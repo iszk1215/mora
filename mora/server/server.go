@@ -173,9 +173,7 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, 200)
 }
 
-// ----------------------------------------------------------------------
-
-func testRepoFromSCM(session *MoraSession, scm SCM, owner, name string) error {
+func checkRepoAccessBySCM(session *MoraSession, scm SCM, owner, name string) error {
 	ctx, err := session.WithToken(context.Background(), scm.ID())
 	if err != nil {
 		return err // errorTokenNotFound
@@ -198,7 +196,7 @@ func checkRepoAccess(sess *MoraSession, scm SCM, repo Repository) error {
 		return nil
 	}
 
-	err := testRepoFromSCM(sess, scm, repo.Namespace, repo.Name)
+	err := checkRepoAccessBySCM(sess, scm, repo.Namespace, repo.Name)
 	if err != nil {
 		log.Print("checkRepoAccess: no repo or no access at SCM")
 		return err
@@ -309,17 +307,6 @@ func (s *MoraServer) Handler() http.Handler {
 	return r
 }
 
-//go:embed static
-var embedded embed.FS
-
-func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
-	if debug {
-		return os.DirFS(filepath.Join(staticDir, path)), nil
-	}
-
-	return fs.Sub(embedded, filepath.Join("static", path))
-}
-
 func initSCM(config MoraConfig, store SCMStore) ([]SCM, error) {
 	scms := []SCM{}
 	for _, scmConfig := range config.SCMs {
@@ -394,6 +381,17 @@ func initStore(filename string) (SCMStore, RepositoryStore, CoverageStore, error
 	}
 
 	return scmStore, repoStore, covStore, nil
+}
+
+//go:embed static
+var embedded embed.FS
+
+func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
+	if debug {
+		return os.DirFS(filepath.Join(staticDir, path)), nil
+	}
+
+	return fs.Sub(embedded, filepath.Join("static", path))
 }
 
 func initFrontendFileServer(config MoraConfig) (http.Handler, error) {
