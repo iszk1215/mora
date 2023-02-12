@@ -37,7 +37,7 @@ type (
 	}
 )
 
-func NewCoverageStore(db *sqlx.DB) *coverageStoreImpl {
+func NewCoverageStore(db *sqlx.DB) CoverageStore {
 	query := "SELECT id, repo_id, revision, time, contents FROM coverage"
 	return &coverageStoreImpl{db: db, selectQuery: query}
 }

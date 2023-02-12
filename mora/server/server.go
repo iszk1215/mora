@@ -62,16 +62,17 @@ type (
 		Init() error
 		Find(id int64) (Repository, error)
 		FindURL(url string) (Repository, error)
+		ListAll() ([]Repository, error)
 		Put(repo *Repository) error
-		Scan() ([]Repository, error)
 	}
 
 	CoverageStore interface {
-		Put(*Coverage) error
+		Init() error
 		Find(id int64) (*Coverage, error)
 		FindRevision(id int64, revision string) (*Coverage, error)
 		List(id int64) ([]*Coverage, error)
 		ListAll() ([]*Coverage, error)
+		Put(*Coverage) error
 	}
 
 	ResourceHandler interface {
@@ -127,7 +128,7 @@ func (s *MoraServer) findSCM(id int64) SCM {
 func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	log.Print("HandleRepoList")
 
-	repositories, err := s.repos.Scan()
+	repositories, err := s.repos.ListAll()
 	if err != nil {
 		log.Err(err).Msg("")
 		render.NotFound(w, render.ErrNotFound)
@@ -395,6 +396,16 @@ func initStore(filename string) (SCMStore, RepositoryStore, CoverageStore, error
 	return scmStore, repoStore, covStore, nil
 }
 
+func initFrontendFileServer(config MoraConfig) (http.Handler, error) {
+	staticDir := "mora/server/static"
+	frontendFS, err := getStaticFS(staticDir, "public", config.Debug)
+	if err != nil {
+		return nil, err
+	}
+
+	return http.FileServer(http.FS(frontendFS)), err
+}
+
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	log.Print("config.Debug=", config.Debug)
 
@@ -413,8 +424,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, errors.New("no SCM is configured")
 	}
 
-	staticDir := "mora/server/static"
-	frontendFS, err := getStaticFS(staticDir, "public", config.Debug)
+	frontendFileServer, err := initFrontendFileServer(config)
 	if err != nil {
 		return nil, err
 	}
@@ -424,11 +434,9 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	s := &MoraServer{}
 	s.sessionManager = NewMoraSessionManager()
 	s.scms = scms
-	s.frontendFileServer = http.FileServer(http.FS(frontendFS))
-
-	s.scms = scms
-	s.coverage = coverage
 	s.repos = repoStore
+	s.frontendFileServer = frontendFileServer
+	s.coverage = coverage
 
 	return s, err
 }

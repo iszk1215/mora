@@ -90,7 +90,7 @@ func (s *repositoryStoreImpl) Put(repo *Repository) error {
 	return err
 }
 
-func (s *repositoryStoreImpl) Scan() ([]Repository, error) {
+func (s *repositoryStoreImpl) ListAll() ([]Repository, error) {
 	rows := []storableRepository{}
 	err := s.db.Select(&rows, "SELECT id, scm, name, namespace, url FROM repository")
 
