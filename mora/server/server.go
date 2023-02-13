@@ -308,7 +308,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 func initSCM(config SCMConfig, baseURL string, store SCMStore) (SCM, error) {
 	if config.Driver == "github" && config.URL == "" {
-		config.URL = "https://api.github.com"
+		config.URL = "https://github.com"
 	}
 
 	if config.URL == "" {
@@ -343,7 +343,7 @@ func initSCM(config SCMConfig, baseURL string, store SCMStore) (SCM, error) {
 			config.URL,
 			baseURL+"/login")
 	} else if config.Driver == "github" {
-		return NewGithubFromFile(id, config.SecretFilename)
+		return NewGithubFromFile(id, config.URL, config.SecretFilename)
 	}
 
 	return nil, fmt.Errorf("ConfigError: unknown scm: %s", config.Driver)
@@ -422,7 +422,6 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if len(scms) == 0 {
 		return nil, errors.New("no SCM is configured")
 	}

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -362,4 +364,61 @@ func Test_NewMoraServerFromConfig_EmptySecret(t *testing.T) {
 	}
 	_, err := NewMoraServerFromConfig(config)
 	require.Error(t, err)
+}
+
+func Test_NewMoraServerFromConfig_Github(t *testing.T) {
+	tmp, err := os.CreateTemp("", "github.conf")
+	require.NoError(t, err)
+	defer os.Remove(tmp.Name())
+
+	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
+	require.NoError(t, err)
+
+	config := MoraConfig{}
+	config.SCMs = []SCMConfig{
+		{
+			Driver:         "github",
+			SecretFilename: tmp.Name(),
+		},
+	}
+
+	server, err := NewMoraServerFromConfig(config)
+	require.NoError(t, err)
+
+	// want, err := NewGithubFromFile(1, tmp.Name())
+	// require.NoError(t, err)
+	require.Equal(t, 1, len(server.scms))
+
+	got := server.scms[0]
+	assert.Equal(t, int64(1), got.ID())
+	assert.Equal(t, "https://github.com", got.URL().String())
+}
+
+func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
+	tmp, err := os.CreateTemp("", "gitea.conf")
+	require.NoError(t, err)
+	defer os.Remove(tmp.Name())
+
+	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
+	require.NoError(t, err)
+
+	config := MoraConfig{}
+	config.Server.URL = "http://localhost:4000"
+	config.SCMs = []SCMConfig{
+		{
+			Driver:         "gitea",
+			URL:            "https://gitea.dayo/",
+			SecretFilename: tmp.Name(),
+		},
+	}
+
+	server, err := NewMoraServerFromConfig(config)
+	require.NoError(t, err)
+
+	_, err = NewGiteaFromFile(
+		1, tmp.Name(), config.SCMs[0].URL, config.Server.URL+"/login")
+	require.NoError(t, err)
+	got := server.scms[0]
+	assert.Equal(t, int64(1), got.ID())
+	assert.Equal(t, config.SCMs[0].URL, got.URL().String())
 }
