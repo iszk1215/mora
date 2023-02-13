@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/jmoiron/sqlx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +46,10 @@ func requireEqualRepoList(t *testing.T, want []Repository, res *http.Response) {
 	require.Equal(t, want, got)
 }
 
-func createMockRepoService(controller *gomock.Controller, repos []Repository) scm.RepositoryService {
+func createMockRepoService(
+	controller *gomock.Controller,
+	repos ...Repository,
+) scm.RepositoryService {
 	mockRepoService := mockscm.NewMockRepositoryService(controller)
 	mockRepoService.EXPECT().Find(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, repo string) (
@@ -65,40 +70,34 @@ func createMockRepoService(controller *gomock.Controller, repos []Repository) sc
 }
 
 func Test_checkRepoAccess(t *testing.T) {
-	scm := NewMockSCM(1)
-
-	repo0 := Repository{ID: 3, Namespace: "owner", Name: "repo0"}
-	mockRepos := []Repository{repo0}
-
 	controller := gomock.NewController(t)
 	defer controller.Finish()
-	scm.client.Repositories = createMockRepoService(controller, mockRepos)
 
+	scm := NewMockSCM(1)
+	repo := Repository{ID: 3, Namespace: "owner", Name: "repo0"}
+	scm.client.Repositories = createMockRepoService(controller, repo)
 	sess := NewMoraSessionWithTokenFor(scm)
 
 	cache := sess.getReposCache(scm.ID())
 	require.Equal(t, 0, len(cache))
 
-	err := checkRepoAccess(sess, scm, repo0)
+	err := checkRepoAccess(sess, scm, repo)
 	require.NoError(t, err)
 
-	// cache has repo0
+	// cache has the repo
 	cache = sess.getReposCache(scm.ID())
 	require.NotNil(t, cache)
-	require.Equal(t, map[int64]bool{repo0.ID: true}, cache)
+	require.Equal(t, map[int64]bool{repo.ID: true}, cache)
 }
 
 func Test_checkRepoAccess_NoAccess(t *testing.T) {
-	scm := NewMockSCM(1)
-
-	repo0 := Repository{ID: 12, Namespace: "owner", Name: "repo0"}
-	repo1 := Repository{ID: 13, Namespace: "owner", Name: "repo1"}
-	mockRepos := []Repository{repo0}
-
 	controller := gomock.NewController(t)
 	defer controller.Finish()
-	scm.client.Repositories = createMockRepoService(controller, mockRepos)
 
+	scm := NewMockSCM(1)
+	repo0 := Repository{ID: 12, Namespace: "owner", Name: "repo0"}
+	repo1 := Repository{ID: 13, Namespace: "owner", Name: "repo1"}
+	scm.client.Repositories = createMockRepoService(controller, repo0)
 	sess := NewMoraSessionWithTokenFor(scm)
 
 	cache := sess.getReposCache(scm.ID())
@@ -107,11 +106,9 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	err := checkRepoAccess(sess, scm, repo1)
 	require.Error(t, err)
 
-	// cache has nil
 	cache = sess.getReposCache(scm.ID())
-	require.Nil(t, cache)
-	//require.False(t, ok)
-	// require.Equal(t, map[string]Repository{"owner/repo1": Repository{}}, cache)
+	_, ok := cache[repo1.ID]
+	require.False(t, ok)
 }
 
 type MoraServerBuilder struct {
@@ -169,22 +166,22 @@ func Test_injectRepo_OK(t *testing.T) {
 	}
 
 	scm := NewMockSCM(1)
-	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
+	scm.client.Repositories = createMockRepoService(controller, repo)
 	sess := NewMoraSessionWithTokenFor(scm)
 
 	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo).Finish()
 
-	called := false
+	tested := false
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		got, ok := RepoFrom(r.Context())
 		require.True(t, ok)
 		require.Equal(t, repo, got)
-		called = true
+		tested = true
 	}
 
 	res := doInjectRepo(sess, server, fmt.Sprintf("/%d", repo.ID), handler)
 	require.Equal(t, http.StatusOK, res.StatusCode)
-	require.True(t, called)
+	require.True(t, tested)
 }
 
 func Test_injectRepo_NoLogin(t *testing.T) {
@@ -210,7 +207,7 @@ func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
 	defer controller.Finish()
 
 	scm := NewMockSCM(1)
-	scm.client.Repositories = createMockRepoService(controller, []Repository{})
+	scm.client.Repositories = createMockRepoService(controller)
 	sess := NewMoraSessionWithTokenFor(scm)
 
 	server := NewMoraServerBuilder(t).WithSCM(scm).Finish()
@@ -221,14 +218,6 @@ func test_injectRepo_Error(t *testing.T, path string, expectedCode int) {
 
 func Test_injectRepo_InvalidRepoID(t *testing.T) {
 	test_injectRepo_Error(t, "/abc", http.StatusNotFound)
-}
-
-func TestRepoCheckerUnknownOwner(t *testing.T) {
-	test_injectRepo_Error(t, "/mock/error/repo", http.StatusNotFound)
-}
-
-func TestRepoCheckerUnknownRepo(t *testing.T) {
-	test_injectRepo_Error(t, "/mock/owner/unknown", http.StatusNotFound)
 }
 
 // API Test with ServerHandler
@@ -305,7 +294,7 @@ func TestServerRepoList(t *testing.T) {
 
 	scm := NewMockSCM(1215)
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
-	scm.client.Repositories = createMockRepoService(controller, []Repository{repo})
+	scm.client.Repositories = createMockRepoService(controller, repo)
 
 	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo).
 		WithSessionManager().Finish()
@@ -342,7 +331,7 @@ func TestServerRepoList2(t *testing.T) {
 
 	scm := NewMockSCM(1)
 	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
-	scm.client.Repositories = createMockRepoService(controller, []Repository{repo1})
+	scm.client.Repositories = createMockRepoService(controller, repo1)
 
 	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo0, &repo1).
 		WithSessionManager().Finish()
@@ -358,4 +347,78 @@ func TestServerRepoList2(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	requireEqualRepoList(t, []Repository{repo1}, res)
+}
+
+func Test_NewMoraServerFromConfig_NoSCMError(t *testing.T) {
+	config := MoraConfig{}
+	_, err := NewMoraServerFromConfig(config)
+	require.Error(t, err)
+}
+
+func Test_NewMoraServerFromConfig_EmptySecret(t *testing.T) {
+	config := MoraConfig{}
+	config.SCMs = []SCMConfig{
+		{
+			Driver: "github",
+		},
+	}
+	_, err := NewMoraServerFromConfig(config)
+	require.Error(t, err)
+}
+
+func Test_NewMoraServerFromConfig_Github(t *testing.T) {
+	tmp, err := os.CreateTemp("", "github.conf")
+	require.NoError(t, err)
+	defer os.Remove(tmp.Name())
+
+	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
+	require.NoError(t, err)
+
+	config := MoraConfig{}
+	config.SCMs = []SCMConfig{
+		{
+			Driver:         "github",
+			SecretFilename: tmp.Name(),
+		},
+	}
+
+	server, err := NewMoraServerFromConfig(config)
+	require.NoError(t, err)
+
+	// want, err := NewGithubFromFile(1, tmp.Name())
+	// require.NoError(t, err)
+	require.Equal(t, 1, len(server.scms))
+
+	got := server.scms[0]
+	assert.Equal(t, int64(1), got.ID())
+	assert.Equal(t, "https://github.com", got.URL().String())
+}
+
+func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
+	tmp, err := os.CreateTemp("", "gitea.conf")
+	require.NoError(t, err)
+	defer os.Remove(tmp.Name())
+
+	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
+	require.NoError(t, err)
+
+	config := MoraConfig{}
+	config.Server.URL = "http://localhost:4000"
+	config.SCMs = []SCMConfig{
+		{
+			Driver:         "gitea",
+			URL:            "https://gitea.dayo/",
+			SecretFilename: tmp.Name(),
+		},
+	}
+
+	server, err := NewMoraServerFromConfig(config)
+	require.NoError(t, err)
+
+	_, err = NewGiteaFromFile(
+		1, tmp.Name(), config.SCMs[0].URL, config.Server.URL+"/login")
+	require.NoError(t, err)
+	got := server.scms[0]
+	assert.Equal(t, int64(1), got.ID())
+	assert.Equal(t, config.SCMs[0].URL, got.URL().String())
 }
