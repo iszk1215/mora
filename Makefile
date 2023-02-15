@@ -5,6 +5,7 @@ all: $(EXE) coverage.html check
 SOURCES = $(shell find . -name '*.go')
 
 bin/mora: $(SOURCES)
+	go build ./...
 	go build -o $@ main.go
 
 check: $(SOURCES)
