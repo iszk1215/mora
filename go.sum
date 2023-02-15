@@ -60,8 +60,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dchest/authcookie v0.0.0-20120917135355-fbdef6e99866/go.mod h1:x7AK2h2QzaXVEFi1tbMYMDuvHcCEr1QdMDrg3hkW24Q=
 github.com/dchest/uniuri v0.0.0-20160212164326-8902c56451e9/go.mod h1:GgB8SF9nRG+GqaDtLcwJZsQFhcogVCJ79j4EdT0c2V4=
-github.com/deckarep/golang-set/v2 v2.1.0 h1:g47V4Or+DUdzbs8FxCCmgb6VYd+ptPAngjM6dtGktsI=
-github.com/deckarep/golang-set/v2 v2.1.0/go.mod h1:VAky9rY/yGXJOLEDv3OMci+7wtDpOF4IN+y82NBOac4=
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
 github.com/docker/distribution v2.7.1+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
@@ -81,8 +79,6 @@ github.com/drone/go-login v1.0.4-0.20190311170324-2a4df4f242a2/go.mod h1:FLxy9vR
 github.com/drone/go-login v1.1.0 h1:anQFRh2Z5ketEJ/LvL6SJ6rIwDdfysGXK5bSXkFLInI=
 github.com/drone/go-login v1.1.0/go.mod h1:FLxy9vRzLbyBxoCJYxGbG9R0WGn6OyuvBmAtYNt43uw=
 github.com/drone/go-scm v1.8.0/go.mod h1:lXwfbyrIJwFFME5TpzavkwO2T5X8yBK6t6cve7g91x0=
-github.com/drone/go-scm v1.23.0 h1:lWDPRkl+4Ot2u+SSAfZxv0Et/+H80IkpOK4Hqd2hJzA=
-github.com/drone/go-scm v1.23.0/go.mod h1:DFIJJjhMj0TSXPz+0ni4nyZ9gtTtC40Vh/TGRugtyWw=
 github.com/drone/go-scm v1.28.0 h1:Y5SCf01Iw7/VO8hhjNgAX0eGIXZ225ctw7DlGQHh5g4=
 github.com/drone/go-scm v1.28.0/go.mod h1:DFIJJjhMj0TSXPz+0ni4nyZ9gtTtC40Vh/TGRugtyWw=
 github.com/drone/signal v1.0.0/go.mod h1:S8t92eFT0g4WUgEc/LxG+LCuiskpMNsG0ajAMGnyZpc=
