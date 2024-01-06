@@ -278,6 +278,22 @@ func (mr *MockRepositoryServiceMockRecorder) ListStatus(arg0, arg1, arg2, arg3 i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListStatus", reflect.TypeOf((*MockRepositoryService)(nil).ListStatus), arg0, arg1, arg2, arg3)
 }
 
+// ListV2 mocks base method.
+func (m *MockRepositoryService) ListV2(arg0 context.Context, arg1 scm.RepoListOptions) ([]*scm.Repository, *scm.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListV2", arg0, arg1)
+	ret0, _ := ret[0].([]*scm.Repository)
+	ret1, _ := ret[1].(*scm.Response)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ListV2 indicates an expected call of ListV2.
+func (mr *MockRepositoryServiceMockRecorder) ListV2(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListV2", reflect.TypeOf((*MockRepositoryService)(nil).ListV2), arg0, arg1)
+}
+
 // UpdateHook mocks base method.
 func (m *MockRepositoryService) UpdateHook(arg0 context.Context, arg1, arg2 string, arg3 *scm.HookInput) (*scm.Hook, *scm.Response, error) {
 	m.ctrl.T.Helper()
