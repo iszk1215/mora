@@ -185,7 +185,7 @@ func makeCoverageListResponse(
 
 	var covs []CoverageResponse
 	for _, cov := range coverages {
-		revURL := scm.RevisionURL(repo.Link, cov.Revision)
+		revURL := scm.RevisionURL(repo.Url, cov.Revision)
 		covs = append(covs, makeCoverageResponse(revURL, cov))
 	}
 
@@ -201,7 +201,7 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	scm, _ := SCMFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
-	coverages, err := s.coverages.List(repo.ID)
+	coverages, err := s.coverages.List(repo.Id)
 	if err != nil {
 		log.Warn().Err(err).Msg("")
 		render.NotFound(w, render.ErrNotFound)
@@ -209,7 +209,7 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	}
 
 	if len(coverages) == 0 {
-		log.Warn().Msgf("Unknown coverage not found for repo.ID=%d", repo.ID)
+		log.Warn().Msgf("Unknown coverage not found for repo.Id=%d", repo.Id)
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
@@ -238,7 +238,7 @@ func makeFileListResponse(scm SCM, repo Repository, cov *Coverage, entry *Covera
 		Repo:  repo,
 		Metadata: MetaResonse{
 			Revision:    cov.Revision,
-			RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
+			RevisionURL: scm.RevisionURL(repo.Url, cov.Revision),
 			Time:        cov.Timestamp,
 			Hits:        entry.Hits,
 			Lines:       entry.Lines,
@@ -414,7 +414,7 @@ func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest)
 	}
 
 	cov := &Coverage{}
-	cov.RepoID = repo.ID
+	cov.RepoID = repo.Id
 	cov.Revision = req.Revision
 	cov.Entries = entries
 	cov.Timestamp = req.Timestamp
