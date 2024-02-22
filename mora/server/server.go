@@ -11,11 +11,14 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/drone/drone/handler/api/render"
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/iszk1215/mora/mora/model"
+	"github.com/iszk1215/mora/mora/udm"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 )
@@ -25,13 +28,17 @@ var (
 )
 
 type (
-	Repository struct {
-		ID        int64  `json:"id"`
-		SCM       int64  `json:"scm_id"`
-		Namespace string `json:"namespace"`
-		Name      string `json:"name"`
-		Link      string `json:"url"`
-	}
+	/*
+		Repository struct {
+			ID        int64  `json:"id"`
+			SCM       int64  `json:"scm_id"`
+			Namespace string `json:"namespace"`
+			Name      string `json:"name"`
+			Link      string `json:"url"`
+		}
+	*/
+
+	Repository = model.Repository
 
 	// Source Code Management System
 	SCM interface {
@@ -42,7 +49,7 @@ type (
 		LoginHandler(next http.Handler) http.Handler
 	}
 
-	contextKey int
+	// contextKey int
 
 	// Protocols
 
@@ -60,7 +67,7 @@ type (
 
 	RepositoryStore interface {
 		Init() error
-		Find(id int64) (Repository, error)
+		Find(id int64) (model.Repository, error)
 		FindURL(url string) (Repository, error)
 		ListAll() ([]Repository, error)
 		Put(repo *Repository) error
@@ -84,15 +91,24 @@ type (
 		scms     []SCM
 		repos    RepositoryStore
 		coverage ResourceHandler
+		udm      *udm.Service
+		apiKey   string
 
 		sessionManager     *MoraSessionManager
 		frontendFileServer http.Handler
 	}
 )
 
+/*
 const (
 	contextRepoKey contextKey = iota
 	contextSCMKey  contextKey = iota
+)
+*/
+
+const (
+	// contextRepoKey = model.ContextRepoKey
+	contextSCMKey = model.ContextSCMKey
 )
 
 func WithSCM(ctx context.Context, scm SCM) context.Context {
@@ -105,12 +121,16 @@ func SCMFrom(ctx context.Context) (SCM, bool) {
 }
 
 func WithRepo(ctx context.Context, repo Repository) context.Context {
-	return context.WithValue(ctx, contextRepoKey, repo)
+	return model.WithRepo(ctx, repo)
+	// return context.WithValue(ctx, contextRepoKey, repo)
 }
 
 func RepoFrom(ctx context.Context) (Repository, bool) {
-	repo, ok := ctx.Value(contextRepoKey).(Repository)
-	return repo, ok
+	return model.RepoFrom(ctx)
+	/*
+		repo, ok := ctx.Value(contextRepoKey).(Repository)
+		return repo, ok
+	*/
 }
 
 func (s *MoraServer) findSCM(id int64) SCM {
@@ -135,6 +155,9 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	log.Print("HandleRepoList: token=", token)
+
 	resp := []Repository{}
 	sess, _ := MoraSessionFrom(r.Context())
 
@@ -143,7 +166,12 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 		if scm == nil {
 			log.Warn().Msgf(
 				"scm not found for repository: repo.ID=%d scm.ID=%d (skipped)",
-				repo.ID, repo.SCM)
+				repo.Id, repo.SCM)
+			continue
+		}
+
+		if s.apiKey != "" && s.apiKey == token {
+			resp = append(resp, repo)
 			continue
 		}
 
@@ -189,7 +217,7 @@ func checkRepoAccessBySCM(session *MoraSession, scm SCM, owner, name string) err
 // checkRepoAccess checks if token in session can access a repo 'owner/name'
 func checkRepoAccess(sess *MoraSession, scm SCM, repo Repository) error {
 	cache := sess.getReposCache(scm.ID())
-	_, ok := cache[repo.ID]
+	_, ok := cache[repo.Id]
 	if ok {
 		log.Print("checkRepoAccess: found in cache")
 		return nil
@@ -200,13 +228,13 @@ func checkRepoAccess(sess *MoraSession, scm SCM, repo Repository) error {
 		log.Print("checkRepoAccess: no repo or no access at SCM")
 		return err
 	}
-	log.Print("checkRepoAccess: found in SCM")
+	log.Print("checkRepoAccess: found in SCM: ", repo.Url)
 
 	// store cache
 	if cache == nil {
 		cache = map[int64]bool{}
 	}
-	cache[repo.ID] = true
+	cache[repo.Id] = true
 	sess.setReposCache(scm.ID(), cache)
 
 	return err
@@ -217,7 +245,7 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		repo_id, err := strconv.ParseInt(chi.URLParam(r, "repo_id"), 10, 64)
 		if err != nil {
 			log.Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
+			render.BadRequest(w, errors.New("invalid repository id"))
 			return
 		}
 
@@ -226,26 +254,32 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		repo, err := s.repos.Find(repo_id)
 		if err != nil {
 			log.Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
+			render.BadRequest(w, errors.New("invalid repository id"))
 			return
 		}
 
 		scm := s.findSCM(repo.SCM)
 		if scm == nil {
 			log.Error().Msgf("scm not found: id=%d", repo.SCM)
-			render.NotFound(w, render.ErrNotFound)
+			render.InternalError(w, errors.New("internal error"))
 			return
 		}
 
-		sess, _ := MoraSessionFrom(r.Context())
-		err = checkRepoAccess(sess, scm, repo)
-		if err == errorTokenNotFound {
-			render.Forbidden(w, render.ErrForbidden)
-			return
-		} else if err != nil {
-			log.Err(err).Msg("injectRepo")
-			render.NotFound(w, render.ErrNotFound)
-			return
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+
+		if s.apiKey == "" || s.apiKey != token  {
+			sess, _ := MoraSessionFrom(r.Context())
+			err = checkRepoAccess(sess, scm, repo)
+			if err == errorTokenNotFound {
+				render.Forbidden(w, render.ErrForbidden)
+				return
+			} else if err != nil {
+				log.Err(err).Msg("injectRepo")
+				render.InternalError(w, errors.New("internal error"))
+				return
+			}
+		} else {
+			log.Print("injectRepo: skip checking repo access")
 		}
 
 		ctx := r.Context()
@@ -274,6 +308,10 @@ func (s *MoraServer) Handler() http.Handler {
 			r.Use(s.injectRepo)
 			if s.coverage != nil {
 				r.Mount("/coverages", s.coverage.Handler())
+			}
+
+			if s.udm != nil {
+				r.Mount("/udm", s.udm.Handler())
 			}
 		})
 	})
@@ -362,30 +400,30 @@ func initSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
 	return scms, nil
 }
 
-func initStore(filename string) (SCMStore, RepositoryStore, CoverageStore, error) {
+func initStore(filename string) (*sqlx.DB, SCMStore, RepositoryStore, CoverageStore, error) {
 	log.Info().Msgf("Initialize store: filename=%s", filename)
 
 	db, err := sqlx.Connect("sqlite3", filename)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	scmStore := NewSCMStore(db)
 	if err := scmStore.Init(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	repoStore := NewRepositoryStore(db)
 	if err := repoStore.Init(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	covStore := NewCoverageStore(db)
 	if err := covStore.Init(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return scmStore, repoStore, covStore, nil
+	return db, scmStore, repoStore, covStore, nil
 }
 
 //go:embed static
@@ -412,7 +450,7 @@ func initFrontendFileServer(config MoraConfig) (http.Handler, error) {
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	log.Print("config.Debug=", config.Debug)
 
-	scmStore, repoStore, covStore, err := initStore(config.DatabaseFilename)
+	db, scmStore, repoStore, covStore, err := initStore(config.DatabaseFilename)
 	if err != nil {
 		log.Err(err).Msg("initStore")
 		return nil, err
@@ -433,12 +471,19 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 
 	coverage := NewCoverageHandler(repoStore, covStore)
 
+	udm, err := udm.NewService(db)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &MoraServer{
 		sessionManager:     NewMoraSessionManager(),
 		scms:               scms,
 		repos:              repoStore,
 		frontendFileServer: frontendFileServer,
 		coverage:           coverage,
+		udm:                udm,
+		apiKey:             os.Getenv("MORA_API_KEY"),
 	}
 
 	return s, err

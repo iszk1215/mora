@@ -50,7 +50,7 @@ func makeCoverageUploadRequest(repo Repository) (*CoverageUploadRequest, *Covera
 	}
 
 	req := CoverageUploadRequest{
-		RepoURL:   repo.Link,
+		RepoURL:   repo.Url,
 		Revision:  revision,
 		Timestamp: now,
 		Entries: []*CoverageEntryUploadRequest{
@@ -64,7 +64,7 @@ func makeCoverageUploadRequest(repo Repository) (*CoverageUploadRequest, *Covera
 	}
 
 	want := Coverage{
-		RepoID:    repo.ID,
+		RepoID:    repo.Id,
 		Revision:  revision,
 		Timestamp: now,
 		Entries: []*CoverageEntry{
@@ -121,7 +121,7 @@ func Test_injectCoverage(t *testing.T) {
 
 func Test_injectCoverage_malformed_id(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
-	req = req.WithContext(WithRepo(req.Context(), Repository{Link: "link"}))
+	req = req.WithContext(WithRepo(req.Context(), Repository{Url: "link"}))
 	w := httptest.NewRecorder()
 
 	s := NewCoverageHandler(nil, nil)
@@ -133,14 +133,14 @@ func Test_injectCoverage_malformed_id(t *testing.T) {
 func TestMakeCoverageResponseList(t *testing.T) {
 	scm := NewMockSCM(1)
 	repo := Repository{
-		ID:        1215,
+		Id:        1215,
 		Namespace: "owner",
 		Name:      "repo",
-		Link:      fmt.Sprintf("%s/owner/repo", scm.URL()),
+		Url:       fmt.Sprintf("%s/owner/repo", scm.URL()),
 	}
 
 	cov := &Coverage{
-		RepoID:    repo.ID,
+		RepoID:    repo.Id,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -173,7 +173,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 				ID:          cov.ID,
 				Timestamp:   cov.Timestamp,
 				Revision:    cov.Revision,
-				RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
+				RevisionURL: scm.RevisionURL(repo.Url, cov.Revision),
 				Entries: []*CoverageEntry{
 					{
 						Name:  "cc",
@@ -198,12 +198,12 @@ func TestMakeCoverageResponseList(t *testing.T) {
 
 func Test_CoverageHandler_CoverageList(t *testing.T) {
 	scm := NewMockSCM(1)
-	repo := Repository{ID: 1215, Namespace: "owner", Name: "repo", Link: "url"}
+	repo := Repository{Id: 1215, Namespace: "owner", Name: "repo", Url: "url"}
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := &Coverage{ID: 0, RepoID: repo.ID, Timestamp: time0, Revision: "abc123"}
-	cov1 := &Coverage{ID: 1, RepoID: repo.ID, Timestamp: time1, Revision: "abc124"}
+	cov0 := &Coverage{ID: 0, RepoID: repo.Id, Timestamp: time0, Revision: "abc123"}
+	cov1 := &Coverage{ID: 1, RepoID: repo.Id, Timestamp: time1, Revision: "abc124"}
 
 	covStore := setupCoverageStore(t, cov0, cov1)
 
@@ -237,13 +237,13 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 	timestamp := time.Now().Round(0)
 
 	repo := Repository{
-		ID:   1215,
-		Link: "http://mock.scm/org/name",
+		Id:  1215,
+		Url: "http://mock.scm/org/name",
 	}
 
 	cov := &Coverage{
 		ID:        -1,
-		RepoID:    repo.ID,
+		RepoID:    repo.Id,
 		Revision:  revision,
 		Timestamp: timestamp,
 		Entries: []*CoverageEntry{
@@ -297,7 +297,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	metaRes := MetaResonse{
 		Revision:    revision,
-		RevisionURL: scm.RevisionURL(repo.Link, cov.Revision),
+		RevisionURL: scm.RevisionURL(repo.Url, cov.Revision),
 		Time:        cov.Timestamp,
 		Hits:        13,
 		Lines:       17,
@@ -340,10 +340,10 @@ func Test_CoverageHandler_File(t *testing.T) {
 	scm := NewMockSCM(1)
 	scm.client.Contents = contents
 
-	repo := Repository{ID: 1215, Namespace: orgName, Name: repoName, Link: repoURL}
+	repo := Repository{Id: 1215, Namespace: orgName, Name: repoName, Url: repoURL}
 
 	cov := &Coverage{
-		RepoID:    repo.ID,
+		RepoID:    repo.Id,
 		Revision:  revision,
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -401,7 +401,7 @@ func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	repo := Repository{
 		Namespace: "mockowner",
 		Name:      "mockrepo",
-		Link:      "http://mock.scm/mockowner/mockrepo",
+		Url:       "http://mock.scm/mockowner/mockrepo",
 	}
 	repoStore := setupRepositoryStore(t, &repo)
 	s := NewCoverageHandler(repoStore, covStore)

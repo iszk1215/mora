@@ -46,11 +46,11 @@ func (s *repositoryStoreImpl) Init() error {
 
 func toRepo(from storableRepository) Repository {
 	return Repository{
-		ID:        from.ID,
+		Id:        from.ID,
 		SCM:       from.SCM,
 		Namespace: from.Namespace,
 		Name:      from.Name,
-		Link:      from.URL,
+		Url:       from.URL,
 	}
 }
 
@@ -81,12 +81,12 @@ func (s *repositoryStoreImpl) FindURL(url string) (Repository, error) {
 func (s *repositoryStoreImpl) Put(repo *Repository) error {
 	res, err := s.db.Exec(
 		"INSERT INTO repository (scm, namespace, name, url) VALUES ($1, $2, $3, $4)",
-		repo.SCM, repo.Namespace, repo.Name, repo.Link)
+		repo.SCM, repo.Namespace, repo.Name, repo.Url)
 	if err != nil {
 		return err
 	}
 
-	repo.ID, err = res.LastInsertId()
+	repo.Id, err = res.LastInsertId()
 	return err
 }
 
@@ -101,11 +101,11 @@ func (s *repositoryStoreImpl) ListAll() ([]Repository, error) {
 	repos := []Repository{}
 	for _, record := range rows {
 		repo := Repository{
-			ID:        record.ID,
+			Id:        record.ID,
 			SCM:       record.SCM,
 			Namespace: record.Namespace,
 			Name:      record.Name,
-			Link:      record.URL,
+			Url:       record.URL,
 		}
 		repos = append(repos, repo)
 	}

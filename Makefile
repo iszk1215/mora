@@ -9,7 +9,8 @@ bin/mora: $(SOURCES)
 	go build -o $@ main.go
 
 check: $(SOURCES)
-	staticcheck ./...
+	golangci-lint run
+	# staticcheck ./...
 
 test: $(SOURCES)
 	go test -v ./...
