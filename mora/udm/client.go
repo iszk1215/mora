@@ -23,6 +23,8 @@ type (
 		deleteItem(repoId, metricId, itemId int64) error
 
 		addValue(repoId, metricId int64, value *valueModel) error
+		listValues(repoId, metridId, itemId int64) ([]valueModel, error)
+		deleteValues(repoId, metridId, itemId int64) error
 	}
 
 	udmClientImpl struct {
@@ -49,7 +51,7 @@ func (c *udmClientImpl) do(method, path string, in any, out any) error {
 		return err
 	}
 
-	req.Header.Set("Authorization", "Bearer " + c.token)
+	req.Header.Set("Authorization", "Bearer "+c.token)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -61,7 +63,7 @@ func (c *udmClientImpl) do(method, path string, in any, out any) error {
 		return err
 	}
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode >= 400 {
 		log.Print(string(msg))
 		log.Print("URL=", req.URL)
 		type Error struct {
@@ -147,4 +149,21 @@ func (c *udmClientImpl) addValue(repoId, metricId int64, value *valueModel) erro
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items/%d/values",
 		repoId, metricId, value.ItemId)
 	return c.do(http.MethodPost, path, value, value)
+}
+
+func (c *udmClientImpl) listValues(repoId, metricId, itemId int64) ([]valueModel, error) {
+	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items/%d/values",
+		repoId, metricId, itemId)
+	var resp listValuesResponse
+	err := c.do(http.MethodGet, path, nil, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Values, nil
+}
+
+func (c *udmClientImpl) deleteValues(repoId, metricId, itemId int64) error {
+	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items/%d/values",
+		repoId, metricId, itemId)
+	return c.do(http.MethodDelete, path, nil, nil)
 }

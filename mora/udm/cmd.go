@@ -8,14 +8,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
 type (
-	cli struct {
+	udmCommand struct {
 		client udmClient
+	}
+
+	udmCommandConfig struct {
+		ServerAddr string `toml:"server"`
+		RepoURL    string `toml:"repo"`
+		Token      string `toml:"token"`
 	}
 )
 
@@ -28,11 +35,72 @@ func unpackMetricName(name string) (string, string, error) {
 	return a[0], a[1], nil
 }
 
-// ----------------------------------------------------------------------
-// cli
+func readConfigFile(filename string) (udmCommandConfig, error) {
+	log.Print("readConfigFile")
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return udmCommandConfig{}, err
+	}
 
-func (cli *cli) getRepoId(repoUrl string) (int64, error) {
-	repos, err := cli.client.listRepositories()
+	var config udmCommandConfig
+	if err := toml.Unmarshal(b, &config); err != nil {
+		return udmCommandConfig{}, err
+	}
+
+	return config, nil
+}
+
+// ----------------------------------------------------------------------
+// udmCommand: utils
+
+func (c *udmCommand) resolveMetricByName(repoId int64, name string) (*metricModel, error) {
+	metrics, err := c.client.listMetrics(repoId)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, m := range metrics {
+		if m.Name == name {
+			return &m, nil
+		}
+	}
+
+	return nil, errorMetricNotFound
+}
+
+func (c *udmCommand) resolveItemByName(repoId int64, metricId int64, name string) (*itemModel, error) {
+	items, err := c.client.listItems(repoId, metricId)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range items {
+		if item.Name == name {
+			return &item, nil
+		}
+	}
+
+	return nil, errorItemNotFound
+}
+
+func (c *udmCommand) resolveMetric(repoId int64, name string) (*metricModel, *itemModel, error) {
+	metricName, itemName, err := unpackMetricName(name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	metric, err := c.resolveMetricByName(repoId, metricName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	item, err := c.resolveItemByName(repoId, metric.Id, itemName)
+
+	return metric, item, err
+}
+
+func (c *udmCommand) getRepoId(repoUrl string) (int64, error) {
+	repos, err := c.client.listRepositories()
 	if err != nil {
 		return 0, err
 	}
@@ -44,64 +112,29 @@ func (cli *cli) getRepoId(repoUrl string) (int64, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("repository not found: %s", repoUrl)
+	return 0, errorRepositoryNotFound
 }
 
-func (cli *cli) findMetric(repoId int64, name string) (*metricModel, error) {
-	metrics, err := cli.client.listMetrics(repoId)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Print("cli.findMetric: len(metrics)=", len(metrics))
-
-	for _, m := range metrics {
-		if m.Name == name {
-			return &m, nil
-		}
-	}
-
-	return nil, nil
-}
-
-func (cli *cli) findItem(repoId int64, metricId int64, name string) (*itemModel, error) {
-	items, err := cli.client.listItems(repoId, metricId)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, item := range items {
-		if item.Name == name {
-			return &item, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no item: %s", name)
-}
-
-func (cli *cli) createMetric(repoId int64, name string, typ int) error {
-	log.Print("cli.createMetric: name=", name, " type=", typ)
+func (c *udmCommand) createMetric(repoId int64, name string, typ int) error {
+	log.Print("udmCommand.createMetric: name=", name, " type=", typ)
 
 	metricName, itemName, err := unpackMetricName(name)
 	if err != nil {
 		return err
 	}
 
-	metric, err := cli.findMetric(repoId, metricName)
-	if err != nil {
+	metric, err := c.resolveMetricByName(repoId, metricName)
+	if err == errorMetricNotFound {
+		log.Print("udmCommand.createMetric: creating metric: ", metricName)
+		metric = &metricModel{Name: metricName}
+		if err = c.client.addMetric(repoId, metric); err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
 	}
 
-	if metric == nil {
-		log.Print("cli.createMetric: creating mttric: ", metricName)
-		metric = &metricModel{Name: metricName}
-		err = cli.client.addMetric(repoId, metric)
-		if err != nil {
-			return err
-		}
-	}
-
-	log.Print("cli.createMetric: metric.Id=", metric.Id)
+	log.Print("udmCommand.createMetric: metric.Id=", metric.Id)
 
 	item := itemModel{
 		MetricId:  metric.Id,
@@ -109,41 +142,27 @@ func (cli *cli) createMetric(repoId int64, name string, typ int) error {
 		ValueType: typ,
 	}
 
-	return cli.client.addItem(repoId, &item)
+	return c.client.addItem(repoId, &item)
 }
 
-func (cli *cli) deleteMetric(repoId int64, name string) error {
-	log.Print("cli.deleteMetric: name=", name)
-	metricName, itemName, err := unpackMetricName(name)
+func (c *udmCommand) deleteMetric(repoId int64, name string) error {
+	log.Print("udmCommand.deleteMetric: name=", name)
+	metric, item, err := c.resolveMetric(repoId, name)
 	if err != nil {
 		return err
 	}
 
-	metric, err := cli.findMetric(repoId, metricName)
-	if err != nil {
-		return err
-	}
-
-	if metric == nil {
-		return errors.New("no metric found")
-	}
-
-	item, err := cli.findItem(repoId, metric.Id, itemName)
-	if err != nil {
-		return err
-	}
-
-	return cli.client.deleteItem(repoId, metric.Id, item.Id)
+	return c.client.deleteItem(repoId, metric.Id, item.Id)
 }
 
-func (cli *cli) listMetrics(repoId int64) error {
-	metrics, err := cli.client.listMetrics(repoId)
+func (c *udmCommand) listMetrics(repoId int64) error {
+	metrics, err := c.client.listMetrics(repoId)
 	if err != nil {
 		return err
 	}
 
 	for _, m := range metrics {
-		items, err := cli.client.listItems(repoId, m.Id)
+		items, err := c.client.listItems(repoId, m.Id)
 		if err != nil {
 			return err
 		}
@@ -156,30 +175,15 @@ func (cli *cli) listMetrics(repoId int64) error {
 	return nil
 }
 
-func (cli *cli) pushValue(
+// ----------------------------------------------------------------------
+// Value
+
+func (c *udmCommand) addValue(
 	repoId int64, name string, timestamp time.Time, value string) error {
 
-	metricName, itemName, err := unpackMetricName(name)
+	metric, item, err := c.resolveMetric(repoId, name)
 	if err != nil {
 		return err
-	}
-
-	metric, err := cli.findMetric(repoId, metricName)
-	if err != nil {
-		return err
-	}
-
-	if metric == nil {
-		return errors.New("no metric found")
-	}
-
-	item, err := cli.findItem(repoId, metric.Id, itemName)
-	if err != nil {
-		return err
-	}
-
-	if item == nil {
-		return errors.New("no item found")
 	}
 
 	revision := "" // FIXME
@@ -191,49 +195,93 @@ func (cli *cli) pushValue(
 		Value:     value,
 	}
 
-	return cli.client.addValue(repoId, metric.Id, val)
+	return c.client.addValue(repoId, metric.Id, val)
 }
 
-// ----------------------------------------------------------------------
-// value
-
-type (
-	Args struct {
-		serverAddr string
-		repoUrl    string
-		token      string
+func (c *udmCommand) listValues(repoId int64, name string) error {
+	metric, item, err := c.resolveMetric(repoId, name)
+	if err != nil {
+		return err
 	}
-)
 
-func parseArgs(cmd *cobra.Command) Args {
-	server, _ := cmd.Flags().GetString("server")
-	repo, _ := cmd.Flags().GetString("repo")
-	token, _ := cmd.Flags().GetString("token")
+	values, err := c.client.listValues(repoId, metric.Id, item.Id)
+	if err != nil {
+		return err
+	}
 
+	for _, v := range values {
+		fmt.Printf("%s %s", v.Timestamp, v.Value)
+	}
+
+	return nil
+}
+
+func (c *udmCommand) deleteValues(repoId int64, name string) error {
+	metric, item, err := c.resolveMetric(repoId, name)
+	if err != nil {
+		return err
+	}
+
+	return c.client.deleteValues(repoId, metric.Id, item.Id)
+}
+
+func processDebugOption(cmd *cobra.Command) {
 	debug, _ := cmd.Flags().GetBool("debug")
 	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
-
-	return Args{
-		serverAddr: server,
-		repoUrl:    repo,
-		token:      token,
-	}
 }
 
-func (cli *cli) runMetricCommand(cmd *cobra.Command, args []string) error {
-	log.Print("runMetricCommand")
-	log.Print("client=", cli.client)
+func (c *udmCommand) init(cmd *cobra.Command) (udmCommandConfig, error) {
+	processDebugOption(cmd)
 
-	parsedArgs := parseArgs(cmd)
+	filename, _ := cmd.Flags().GetString("config")
+	var config udmCommandConfig
+	if filename != "" {
+		log.Print("filename=", filename)
+		if _, err := os.Stat(filename); err == nil {
+			config, err = readConfigFile(filename)
+			if err != nil {
+				return udmCommandConfig{}, err
+			}
+		}
+	}
 
-	cli.client.init(parsedArgs.serverAddr, parsedArgs.token)
-	repoId, err := cli.getRepoId(parsedArgs.repoUrl)
+	// parse global flags
+
+	if v, _ := cmd.Flags().GetString("server"); v != "" {
+		config.ServerAddr = v
+	}
+
+	if v, _ := cmd.Flags().GetString("repo"); v != "" {
+		config.ServerAddr = v
+	}
+
+	if v, _ := cmd.Flags().GetString("token"); v != "" {
+		config.Token = v
+	}
+
+	key := os.Getenv("MORA_API_KEY")
+	if key != "" {
+		config.Token = key
+	}
+
+	c.client.init(config.ServerAddr, config.Token)
+
+	return config, nil
+}
+
+func (c *udmCommand) runMetricCommand(cmd *cobra.Command, args []string) error {
+	config, err := c.init(cmd)
 	if err != nil {
 		return err
 	}
-	log.Print("cli.runMetricCommand: repoId=", repoId)
+
+	repoId, err := c.getRepoId(config.RepoURL)
+	if err != nil {
+		return err
+	}
+	log.Print("udmCommand.runMetricCommand: repoId=", repoId)
 
 	createCmd, _ := cmd.Flags().GetBool("create")
 	deleteCmd, _ := cmd.Flags().GetBool("delete")
@@ -248,57 +296,106 @@ func (cli *cli) runMetricCommand(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("unknown type: %s", typ)
 		}
 		cmd.SilenceUsage = true
-		return cli.createMetric(repoId, args[0], 1)
+		return c.createMetric(repoId, args[0], 1)
 	} else if deleteCmd {
 		if len(args) != 1 {
 			return errors.New("no metric name given")
 		}
 		cmd.SilenceUsage = true
-		return cli.deleteMetric(repoId, args[0])
+		return c.deleteMetric(repoId, args[0])
 	} else if listCmd {
 		if len(args) != 0 {
 			return errors.New("unexpected args")
 		}
 		cmd.SilenceUsage = true
-		return cli.listMetrics(repoId)
+		return c.listMetrics(repoId)
 	}
 
 	return nil
 }
 
-func (cli *cli) runPushCommand(cmd *cobra.Command, args []string) error {
-	log.Print("runMetricCommand")
-
-	parsedArgs := parseArgs(cmd)
-	metric, _ := cmd.Flags().GetString("metric")
-
-	var timestamp time.Time
-	timestamp_str, _ := cmd.Flags().GetString("time")
-	if timestamp_str == "" {
-		timestamp = time.Now()
-	} else {
-		var err error
-		timestamp, err = time.Parse("2006-01-02", timestamp_str)
-		if err != nil {
-			return err
-		}
-	}
-
-	cli.client.init(parsedArgs.serverAddr, parsedArgs.token)
-	repoId, err := cli.getRepoId(parsedArgs.repoUrl)
+func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
+	config, err := c.init(cmd)
 	if err != nil {
 		return err
 	}
-	log.Print("cli.runPushCommand: repoId=", repoId)
 
-	if len(args) != 1 {
-		return errors.New("no value given")
+	repoId, err := c.getRepoId(config.RepoURL)
+	if err != nil {
+		return err
 	}
 
-	return cli.pushValue(repoId, metric, timestamp, args[0])
+	clearFlag, _ := cmd.Flags().GetBool("clear")
+	addFlag, _ := cmd.Flags().GetBool("add")
+	listFlag, _ := cmd.Flags().GetBool("list")
+
+	if clearFlag {
+		if len(args) != 1 {
+			return errors.New("no metric name give")
+		}
+		return c.deleteValues(repoId, args[0])
+	} else if addFlag {
+		if len(args) != 2 {
+			return errors.New("no required args")
+		}
+
+		var timestamp time.Time
+		timestamp_str, _ := cmd.Flags().GetString("time")
+		log.Print("timestamp_str=", timestamp_str)
+		if timestamp_str == "" {
+			timestamp = time.Now()
+		} else {
+			var err error
+			timestamp, err = time.Parse("2006-01-02", timestamp_str)
+			if err != nil {
+				return err
+			}
+			log.Print(timestamp)
+		}
+
+		return c.addValue(repoId, args[0], timestamp, args[1])
+	} else if listFlag {
+		if len(args) != 1 {
+			return errors.New("no metric name give")
+		}
+		return c.listValues(repoId, args[0])
+	}
+
+	return nil
 }
 
-func (cli *cli) newCommand() *cobra.Command {
+func (c *udmCommand) newMetricCommand() *cobra.Command {
+	metricCmd := &cobra.Command{
+		Use:   "metric [--create|-c]",
+		Short: "metrict operations",
+		Long:  "long",
+		RunE:  c.runMetricCommand,
+	}
+
+	metricCmd.Flags().BoolP("create", "c", false, "create new metric")
+	metricCmd.Flags().BoolP("delete", "d", false, "delete metric")
+	metricCmd.Flags().BoolP("list", "l", false, "list metrics")
+	metricCmd.Flags().String("type", "int", "metric type")
+
+	return metricCmd
+}
+
+func (c *udmCommand) newValueCommand() *cobra.Command {
+	valueCmd := &cobra.Command{
+		Use:   "value [-clear | -create] [flags] metric [value]",
+		Short: "value operations",
+		RunE:  c.runValueCommand,
+	}
+
+	valueCmd.Flags().BoolP("add", "a", false, "add value")
+	valueCmd.Flags().BoolP("list", "l", false, "list values")
+	valueCmd.Flags().BoolP("clear", "c", false, "clear value")
+	valueCmd.Flags().StringP("time", "t", "", "timestamp")
+
+	return valueCmd
+}
+
+func (c *udmCommand) newCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "udm",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -306,35 +403,14 @@ func (cli *cli) newCommand() *cobra.Command {
 		},
 	}
 
-	metricCmd := &cobra.Command{
-		Use:   "metric",
-		Short: "metrict operations",
-		RunE:  cli.runMetricCommand,
-	}
-
-	pushCmd := &cobra.Command{
-		Use:   "push",
-		Short: "push value",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cli.runPushCommand(cmd, args)
-		},
-	}
-
+	cmd.PersistentFlags().String("config", "", "config")
 	cmd.PersistentFlags().StringP("server", "s", "", "server")
 	cmd.PersistentFlags().StringP("repo", "r", "", "Url of repo")
-	cmd.PersistentFlags().StringP("token", "t", "token", "token")
+	cmd.PersistentFlags().String("token", "", "token")
 	cmd.PersistentFlags().Bool("debug", false, "debug log")
 
-	metricCmd.Flags().BoolP("create", "c", false, "Create new metric")
-	metricCmd.Flags().BoolP("delete", "d", false, "Delete metric")
-	metricCmd.Flags().BoolP("list", "l", false, "List metrics")
-	metricCmd.Flags().String("type", "int", "Metric type")
-
-	pushCmd.Flags().StringP("metric", "m", "", "metric")
-	pushCmd.Flags().String("time", "", "timestamp")
-
-	cmd.AddCommand(metricCmd)
-	cmd.AddCommand(pushCmd)
+	cmd.AddCommand(c.newMetricCommand())
+	cmd.AddCommand(c.newValueCommand())
 
 	return cmd
 }
@@ -344,6 +420,6 @@ func NewCommand() *cobra.Command {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
-	cli := cli{client: &udmClientImpl{client: &http.Client{}}}
-	return cli.newCommand()
+	c := udmCommand{client: &udmClientImpl{client: &http.Client{}}}
+	return c.newCommand()
 }

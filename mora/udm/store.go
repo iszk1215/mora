@@ -8,10 +8,11 @@ import (
 )
 
 var (
-	errorMetricInUse    = errors.New("metric in use")
-	errorMetricNotFound = errors.New("no metric found")
-	errorItemInUse      = errors.New("item in use")
-	errorItemNotFound   = errors.New("no item found")
+	errorRepositoryNotFound = errors.New("no repository found")
+	errorMetricInUse        = errors.New("metric in use")
+	errorMetricNotFound     = errors.New("no metric found")
+	errorItemInUse          = errors.New("item in use")
+	errorItemNotFound       = errors.New("no item found")
 )
 
 var schema_metric = `
