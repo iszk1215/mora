@@ -73,19 +73,19 @@ func Test_checkRepoAccess(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
-	scm := NewMockSCM(1)
+	rm := NewMockRepositoryManager(1)
 	repo := Repository{Id: 3, Namespace: "owner", Name: "repo0"}
-	scm.client.Repositories = createMockRepoService(controller, repo)
-	sess := NewMoraSessionWithTokenFor(scm)
+	rm.client.Repositories = createMockRepoService(controller, repo)
+	sess := NewMoraSessionWithTokenFor(rm)
 
-	cache := sess.getReposCache(scm.ID())
+	cache := sess.getReposCache(rm.ID())
 	require.Equal(t, 0, len(cache))
 
-	err := checkRepoAccess(sess, scm, repo)
+	err := checkRepoAccess(sess, rm, repo)
 	require.NoError(t, err)
 
 	// cache has the repo
-	cache = sess.getReposCache(scm.ID())
+	cache = sess.getReposCache(rm.ID())
 	require.NotNil(t, cache)
 	require.Equal(t, map[int64]bool{repo.Id: true}, cache)
 }
@@ -94,19 +94,19 @@ func Test_checkRepoAccess_NoAccess(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
-	scm := NewMockSCM(1)
+	rm := NewMockRepositoryManager(1)
 	repo0 := Repository{Id: 12, Namespace: "owner", Name: "repo0"}
 	repo1 := Repository{Id: 13, Namespace: "owner", Name: "repo1"}
-	scm.client.Repositories = createMockRepoService(controller, repo0)
-	sess := NewMoraSessionWithTokenFor(scm)
+	rm.client.Repositories = createMockRepoService(controller, repo0)
+	sess := NewMoraSessionWithTokenFor(rm)
 
-	cache := sess.getReposCache(scm.ID())
+	cache := sess.getReposCache(rm.ID())
 	require.Equal(t, 0, len(cache))
 
-	err := checkRepoAccess(sess, scm, repo1)
+	err := checkRepoAccess(sess, rm, repo1)
 	require.Error(t, err)
 
-	cache = sess.getReposCache(scm.ID())
+	cache = sess.getReposCache(rm.ID())
 	_, ok := cache[repo1.Id]
 	require.False(t, ok)
 }
@@ -125,8 +125,8 @@ func (b *MoraServerBuilder) WithAPIKey(key string) *MoraServerBuilder {
 	return b
 }
 
-func (b *MoraServerBuilder) WithSCM(scm ...SCM) *MoraServerBuilder {
-	b.Server.scms = append(b.Server.scms, scm...)
+func (b *MoraServerBuilder) WithRepositoryManager(rm ...RepositoryManager) *MoraServerBuilder {
+	b.Server.repositoryManagers = append(b.Server.repositoryManagers, rm...)
 	return b
 }
 
@@ -149,16 +149,16 @@ func Test_injectRepo(t *testing.T) {
 	defer controller.Finish()
 
 	repo := Repository{
-		SCM:       1,
-		Namespace: "owner",
-		Name:      "repo",
-		Url:       "http://mock.com/owner/repo",
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "repo",
+		Url:               "http://mock.com/owner/repo",
 	}
 
-	scm := NewMockSCM(1)
-	scm.client.Repositories = createMockRepoService(controller, repo)
+	rm := NewMockRepositoryManager(1)
+	rm.client.Repositories = createMockRepoService(controller, repo)
 
-	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo).Finish()
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithRepo(&repo).Finish()
 
 	valid_path := fmt.Sprintf("/%d", repo.Id)
 
@@ -181,7 +181,7 @@ func Test_injectRepo(t *testing.T) {
 
 	t.Run("login", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, valid_path, nil)
-		sess := NewMoraSessionWithTokenFor(scm)
+		sess := NewMoraSessionWithTokenFor(rm)
 		req = req.WithContext(WithMoraSession(req.Context(), sess))
 
 		status, got := callInjectRepo(req)
@@ -192,7 +192,7 @@ func Test_injectRepo(t *testing.T) {
 	t.Run("invalid repo id", func(t *testing.T) {
 		path := fmt.Sprintf("/%d", repo.Id+1)
 		req := httptest.NewRequest(http.MethodGet, path, nil)
-		sess := NewMoraSessionWithTokenFor(scm)
+		sess := NewMoraSessionWithTokenFor(rm)
 		req = req.WithContext(WithMoraSession(req.Context(), sess))
 
 		status, _ := callInjectRepo(req)
@@ -210,7 +210,7 @@ func Test_injectRepo(t *testing.T) {
 
 	t.Run("invalid path", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/abc", nil)
-		sess := NewMoraSessionWithTokenFor(scm)
+		sess := NewMoraSessionWithTokenFor(rm)
 		req = req.WithContext(WithMoraSession(req.Context(), sess))
 
 		status, _ := callInjectRepo(req)
@@ -267,18 +267,18 @@ func requireLogin(t *testing.T, handler http.Handler, scmID int64) *http.Cookie 
 	return cookie
 }
 
-func TestServerSCMList(t *testing.T) {
+func TestServerRepositoryManagerList(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
-	scm := NewMockSCM(1)
-	scm.id = 15
-	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
+	rm := NewMockRepositoryManager(1)
+	rm.id = 15
+	rm.loginHandler = MockLoginMiddleware{"/login"}.Handler
 
-	server := NewMoraServerBuilder(t).WithSCM(scm).WithSessionManager().Finish()
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithSessionManager().Finish()
 	handler := server.Handler()
 
-	cookie := requireLogin(t, handler, scm.ID())
+	cookie := requireLogin(t, handler, rm.ID())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/scms", strings.NewReader(""))
 	req.AddCookie(cookie)
@@ -289,14 +289,14 @@ func TestServerSCMList(t *testing.T) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var got []SCMResponse
+	var got []RepositoryManagerResponse
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
 
-	expected := []SCMResponse{
+	expected := []RepositoryManagerResponse{
 		{
-			ID:      scm.ID(),
-			URL:     scm.URL().String(),
+			ID:      rm.ID(),
+			URL:     rm.URL().String(),
 			Logined: true,
 		},
 	}
@@ -308,18 +308,18 @@ func TestServerRepoList(t *testing.T) {
 	defer controller.Finish()
 
 	repo := Repository{
-		SCM:       1215,
-		Namespace: "owner",
-		Name:      "repo",
-		Url:       "https://scm.com/owner/repo"}
+		RepositoryManager: 1215,
+		Namespace:         "owner",
+		Name:              "repo",
+		Url:               "https://scm.com/owner/repo"}
 
-	scm := NewMockSCM(1215)
-	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
-	scm.client.Repositories = createMockRepoService(controller, repo)
+	rm := NewMockRepositoryManager(1215)
+	rm.loginHandler = MockLoginMiddleware{"/login"}.Handler
+	rm.client.Repositories = createMockRepoService(controller, repo)
 
 	key := "valid_api_key"
 
-	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo).
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithRepo(&repo).
 		WithSessionManager().WithAPIKey(key).Finish()
 
 	handler := server.Handler()
@@ -328,7 +328,7 @@ func TestServerRepoList(t *testing.T) {
 
 	t.Run("repo list after login", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, url, nil)
-		cookie := requireLogin(t, handler, scm.ID())
+		cookie := requireLogin(t, handler, rm.ID())
 		req.AddCookie(cookie)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -373,26 +373,26 @@ func TestServerRepoList2(t *testing.T) {
 	defer controller.Finish()
 
 	repo0 := Repository{
-		SCM:       1,
-		Namespace: "owner",
-		Name:      "repo0",
-		Url:       "https://scm.com/owner/repo0"}
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "repo0",
+		Url:               "https://scm.com/owner/repo0"}
 
 	repo1 := Repository{
-		SCM:       1,
-		Namespace: "owner",
-		Name:      "repo1",
-		Url:       "https://scm.com/owner/repo1"}
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "repo1",
+		Url:               "https://scm.com/owner/repo1"}
 
-	scm := NewMockSCM(1)
-	scm.loginHandler = MockLoginMiddleware{"/login"}.Handler
-	scm.client.Repositories = createMockRepoService(controller, repo1)
+	rm := NewMockRepositoryManager(1)
+	rm.loginHandler = MockLoginMiddleware{"/login"}.Handler
+	rm.client.Repositories = createMockRepoService(controller, repo1)
 
-	server := NewMoraServerBuilder(t).WithSCM(scm).WithRepo(&repo0, &repo1).
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithRepo(&repo0, &repo1).
 		WithSessionManager().Finish()
 	handler := server.Handler()
 
-	cookie := requireLogin(t, handler, scm.ID())
+	cookie := requireLogin(t, handler, rm.ID())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/repos", nil)
 	req.AddCookie(cookie)
@@ -404,7 +404,7 @@ func TestServerRepoList2(t *testing.T) {
 	requireEqualRepoList(t, []Repository{repo1}, res)
 }
 
-func Test_NewMoraServerFromConfig_NoSCMError(t *testing.T) {
+func Test_NewMoraServerFromConfig_NoRepositoryManagerError(t *testing.T) {
 	config := MoraConfig{}
 	_, err := NewMoraServerFromConfig(config)
 	require.Error(t, err)
@@ -412,7 +412,7 @@ func Test_NewMoraServerFromConfig_NoSCMError(t *testing.T) {
 
 func Test_NewMoraServerFromConfig_EmptySecret(t *testing.T) {
 	config := MoraConfig{}
-	config.SCMs = []SCMConfig{
+	config.RepositoryManagers = []RepositoryManagerConfig{
 		{
 			Driver: "github",
 		},
@@ -430,7 +430,7 @@ func Test_NewMoraServerFromConfig_Github(t *testing.T) {
 	require.NoError(t, err)
 
 	config := MoraConfig{}
-	config.SCMs = []SCMConfig{
+	config.RepositoryManagers = []RepositoryManagerConfig{
 		{
 			Driver:         "github",
 			SecretFilename: tmp.Name(),
@@ -442,9 +442,9 @@ func Test_NewMoraServerFromConfig_Github(t *testing.T) {
 
 	// want, err := NewGithubFromFile(1, tmp.Name())
 	// require.NoError(t, err)
-	require.Equal(t, 1, len(server.scms))
+	require.Equal(t, 1, len(server.repositoryManagers))
 
-	got := server.scms[0]
+	got := server.repositoryManagers[0]
 	assert.Equal(t, int64(1), got.ID())
 	assert.Equal(t, "https://github.com", got.URL().String())
 }
@@ -459,7 +459,7 @@ func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 
 	config := MoraConfig{}
 	config.Server.URL = "http://localhost:4000"
-	config.SCMs = []SCMConfig{
+	config.RepositoryManagers = []RepositoryManagerConfig{
 		{
 			Driver:         "gitea",
 			URL:            "https://gitea.dayo/",
@@ -471,9 +471,9 @@ func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = NewGiteaFromFile(
-		1, tmp.Name(), config.SCMs[0].URL, config.Server.URL+"/login")
+		1, tmp.Name(), config.RepositoryManagers[0].URL, config.Server.URL+"/login")
 	require.NoError(t, err)
-	got := server.scms[0]
+	got := server.repositoryManagers[0]
 	assert.Equal(t, int64(1), got.ID())
-	assert.Equal(t, config.SCMs[0].URL, got.URL().String())
+	assert.Equal(t, config.RepositoryManagers[0].URL, got.URL().String())
 }

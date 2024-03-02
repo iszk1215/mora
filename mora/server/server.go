@@ -28,20 +28,10 @@ var (
 )
 
 type (
-	/*
-		Repository struct {
-			ID        int64  `json:"id"`
-			SCM       int64  `json:"scm_id"`
-			Namespace string `json:"namespace"`
-			Name      string `json:"name"`
-			Link      string `json:"url"`
-		}
-	*/
-
 	Repository = model.Repository
 
 	// Source Code Management System
-	SCM interface {
+	RepositoryManager interface {
 		ID() int64
 		URL() *url.URL
 		Client() *scm.Client
@@ -53,13 +43,13 @@ type (
 
 	// Protocols
 
-	SCMResponse struct {
+	RepositoryManagerResponse struct {
 		ID      int64  `json:"id"`
 		URL     string `json:"url"`
 		Logined bool   `json:"logined"`
 	}
 
-	SCMStore interface {
+	RepositoryManagerStore interface {
 		Init() error
 		FindURL(string) (int64, string, error)
 		Insert(driver string, url string) (int64, error)
@@ -88,36 +78,28 @@ type (
 	}
 
 	MoraServer struct {
-		scms     []SCM
-		repos    RepositoryStore
-		coverage ResourceHandler
-		udm      *udm.Service
-		apiKey   string
+		repositoryManagers []RepositoryManager
+		repos              RepositoryStore
+		coverage           ResourceHandler
+		udm                *udm.Service
+		apiKey             string
 
 		sessionManager     *MoraSessionManager
 		frontendFileServer http.Handler
 	}
 )
 
-/*
 const (
-	contextRepoKey contextKey = iota
-	contextSCMKey  contextKey = iota
-)
-*/
-
-const (
-	// contextRepoKey = model.ContextRepoKey
-	contextSCMKey = model.ContextSCMKey
+	contextRepositoryManagerKey = model.ContextRepositoryManagerKey
 )
 
-func WithSCM(ctx context.Context, scm SCM) context.Context {
-	return context.WithValue(ctx, contextSCMKey, scm)
+func WithRepostioryManager(ctx context.Context, rm RepositoryManager) context.Context {
+	return context.WithValue(ctx, contextRepositoryManagerKey, rm)
 }
 
-func SCMFrom(ctx context.Context) (SCM, bool) {
-	scm, ok := ctx.Value(contextSCMKey).(SCM)
-	return scm, ok
+func RepositoryManagerFrom(ctx context.Context) (RepositoryManager, bool) {
+	rm, ok := ctx.Value(contextRepositoryManagerKey).(RepositoryManager)
+	return rm, ok
 }
 
 func WithRepo(ctx context.Context, repo Repository) context.Context {
@@ -133,10 +115,10 @@ func RepoFrom(ctx context.Context) (Repository, bool) {
 	*/
 }
 
-func (s *MoraServer) findSCM(id int64) SCM {
-	for _, scm := range s.scms {
-		if scm.ID() == id {
-			return scm
+func (s *MoraServer) findRepositoryManager(id int64) RepositoryManager {
+	for _, rm := range s.repositoryManagers {
+		if rm.ID() == id {
+			return rm
 		}
 	}
 
@@ -162,11 +144,11 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	sess, _ := MoraSessionFrom(r.Context())
 
 	for _, repo := range repositories {
-		scm := s.findSCM(repo.SCM)
-		if scm == nil {
+		rm := s.findRepositoryManager(repo.RepositoryManager)
+		if rm == nil {
 			log.Warn().Msgf(
-				"scm not found for repository: repo.ID=%d scm.ID=%d (skipped)",
-				repo.Id, repo.SCM)
+				"rm not found for repository: repo.ID=%d rm.ID=%d (skipped)",
+				repo.Id, repo.RepositoryManager)
 			continue
 		}
 
@@ -175,7 +157,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		err = checkRepoAccess(sess, scm, repo)
+		err = checkRepoAccess(sess, rm, repo)
 		if err == nil {
 			resp = append(resp, repo)
 		}
@@ -184,15 +166,15 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
-	resp := []SCMResponse{}
+func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.Request) {
+	resp := []RepositoryManagerResponse{}
 	sess, _ := MoraSessionFrom(r.Context())
 
-	for _, scm := range s.scms {
-		_, ok := sess.getToken(scm.ID())
-		resp = append(resp, SCMResponse{
-			ID:      scm.ID(),
-			URL:     scm.URL().String(),
+	for _, rm := range s.repositoryManagers {
+		_, ok := sess.getToken(rm.ID())
+		resp = append(resp, RepositoryManagerResponse{
+			ID:      rm.ID(),
+			URL:     rm.URL().String(),
 			Logined: ok,
 		})
 	}
@@ -200,13 +182,13 @@ func (s *MoraServer) handleSCMList(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, 200)
 }
 
-func checkRepoAccessBySCM(session *MoraSession, scm SCM, owner, name string) error {
-	ctx, err := session.WithToken(context.Background(), scm.ID())
+func checkRepoAccessByRepositoryManager(session *MoraSession, rm RepositoryManager, owner, name string) error {
+	ctx, err := session.WithToken(context.Background(), rm.ID())
 	if err != nil {
 		return err // errorTokenNotFound
 	}
 
-	_, _, err = scm.Client().Repositories.Find(ctx, owner+"/"+name)
+	_, _, err = rm.Client().Repositories.Find(ctx, owner+"/"+name)
 	if err != nil {
 		return err
 	}
@@ -215,27 +197,27 @@ func checkRepoAccessBySCM(session *MoraSession, scm SCM, owner, name string) err
 }
 
 // checkRepoAccess checks if token in session can access a repo 'owner/name'
-func checkRepoAccess(sess *MoraSession, scm SCM, repo Repository) error {
-	cache := sess.getReposCache(scm.ID())
+func checkRepoAccess(sess *MoraSession, rm RepositoryManager, repo Repository) error {
+	cache := sess.getReposCache(rm.ID())
 	_, ok := cache[repo.Id]
 	if ok {
 		log.Print("checkRepoAccess: found in cache")
 		return nil
 	}
 
-	err := checkRepoAccessBySCM(sess, scm, repo.Namespace, repo.Name)
+	err := checkRepoAccessByRepositoryManager(sess, rm, repo.Namespace, repo.Name)
 	if err != nil {
-		log.Print("checkRepoAccess: no repo or no access at SCM")
+		log.Print("checkRepoAccess: no repo or no access at RepositoryManager")
 		return err
 	}
-	log.Print("checkRepoAccess: found in SCM: ", repo.Url)
+	log.Print("checkRepoAccess: found in RepositoryManager: ", repo.Url)
 
 	// store cache
 	if cache == nil {
 		cache = map[int64]bool{}
 	}
 	cache[repo.Id] = true
-	sess.setReposCache(scm.ID(), cache)
+	sess.setReposCache(rm.ID(), cache)
 
 	return err
 }
@@ -258,18 +240,18 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 			return
 		}
 
-		scm := s.findSCM(repo.SCM)
-		if scm == nil {
-			log.Error().Msgf("scm not found: id=%d", repo.SCM)
+		rm := s.findRepositoryManager(repo.RepositoryManager)
+		if rm == nil {
+			log.Error().Msgf("rm not found: id=%d", repo.RepositoryManager)
 			render.InternalError(w, errors.New("internal error"))
 			return
 		}
 
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 
-		if s.apiKey == "" || s.apiKey != token  {
+		if s.apiKey == "" || s.apiKey != token {
 			sess, _ := MoraSessionFrom(r.Context())
-			err = checkRepoAccess(sess, scm, repo)
+			err = checkRepoAccess(sess, rm, repo)
 			if err == errorTokenNotFound {
 				render.Forbidden(w, render.ErrForbidden)
 				return
@@ -283,7 +265,7 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		}
 
 		ctx := r.Context()
-		ctx = WithSCM(ctx, scm)
+		ctx = WithRepostioryManager(ctx, rm)
 		ctx = WithRepo(ctx, repo)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -300,7 +282,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	// api
 
-	r.Get("/api/scms", s.handleSCMList)
+	r.Get("/api/scms", s.handleRepositoryManagerList)
 
 	r.Route("/api/repos", func(r chi.Router) {
 		r.Get("/", s.handleRepoList)
@@ -325,8 +307,8 @@ func (s *MoraServer) Handler() http.Handler {
 			http.Redirect(w, r, "/scms", http.StatusSeeOther)
 		})
 
-	r.Mount("/login", LoginHandler(s.scms, redirectHandler))
-	r.Mount("/logout", LogoutHandler(s.scms, redirectHandler))
+	r.Mount("/login", LoginHandler(s.repositoryManagers, redirectHandler))
+	r.Mount("/logout", LogoutHandler(s.repositoryManagers, redirectHandler))
 
 	// frontend
 
@@ -344,17 +326,17 @@ func (s *MoraServer) Handler() http.Handler {
 	return r
 }
 
-func initSCM(config SCMConfig, baseURL string, store SCMStore) (SCM, error) {
+func initRepositoryManager(config RepositoryManagerConfig, baseURL string, store RepositoryManagerStore) (RepositoryManager, error) {
 	if config.Driver == "github" && config.URL == "" {
 		config.URL = "https://github.com"
 	}
 
 	if config.URL == "" {
-		return nil, errors.New("ConfigError: scm.url is empty")
+		return nil, errors.New("ConfigError: rm.url is empty")
 	}
 
 	if config.SecretFilename == "" {
-		return nil, errors.New("ConfigError: scm.secret_url is empty")
+		return nil, errors.New("ConfigError: rm.secret_url is empty")
 	}
 
 	id, _, err := store.FindURL(config.URL)
@@ -367,10 +349,10 @@ func initSCM(config SCMConfig, baseURL string, store SCMStore) (SCM, error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Info().Msgf("New scm is configured. ID=%d Driver=%s URL=%s",
+		log.Info().Msgf("New repository manager is configured. ID=%d Driver=%s URL=%s",
 			id, config.Driver, config.URL)
 	} else {
-		log.Info().Msgf("scm enabled. ID=%d Driver=%s URL=%s",
+		log.Info().Msgf("repository manager enabled. ID=%d Driver=%s URL=%s",
 			id, config.Driver, config.URL)
 	}
 
@@ -384,23 +366,23 @@ func initSCM(config SCMConfig, baseURL string, store SCMStore) (SCM, error) {
 		return NewGithubFromFile(id, config.URL, config.SecretFilename)
 	}
 
-	return nil, fmt.Errorf("ConfigError: unknown scm: %s", config.Driver)
+	return nil, fmt.Errorf("ConfigError: unknown repository manager: %s", config.Driver)
 }
 
-func initSCMs(config MoraConfig, store SCMStore) ([]SCM, error) {
-	scms := []SCM{}
-	for _, scmConfig := range config.SCMs {
-		scm, err := initSCM(scmConfig, config.Server.URL, store)
+func initRepositoryManagers(config MoraConfig, store RepositoryManagerStore) ([]RepositoryManager, error) {
+	repositoryManagers := []RepositoryManager{}
+	for _, rmConfig := range config.RepositoryManagers {
+		rm, err := initRepositoryManager(rmConfig, config.Server.URL, store)
 		if err != nil {
 			return nil, err
 		}
-		scms = append(scms, scm)
+		repositoryManagers = append(repositoryManagers, rm)
 	}
 
-	return scms, nil
+	return repositoryManagers, nil
 }
 
-func initStore(filename string) (*sqlx.DB, SCMStore, RepositoryStore, CoverageStore, error) {
+func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, CoverageStore, error) {
 	log.Info().Msgf("Initialize store: filename=%s", filename)
 
 	db, err := sqlx.Connect("sqlite3", filename)
@@ -408,8 +390,8 @@ func initStore(filename string) (*sqlx.DB, SCMStore, RepositoryStore, CoverageSt
 		return nil, nil, nil, nil, err
 	}
 
-	scmStore := NewSCMStore(db)
-	if err := scmStore.Init(); err != nil {
+	rmStore := NewRepositoryManagerStore(db)
+	if err := rmStore.Init(); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
@@ -423,7 +405,7 @@ func initStore(filename string) (*sqlx.DB, SCMStore, RepositoryStore, CoverageSt
 		return nil, nil, nil, nil, err
 	}
 
-	return db, scmStore, repoStore, covStore, nil
+	return db, rmStore, repoStore, covStore, nil
 }
 
 //go:embed static
@@ -450,18 +432,18 @@ func initFrontendFileServer(config MoraConfig) (http.Handler, error) {
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	log.Print("config.Debug=", config.Debug)
 
-	db, scmStore, repoStore, covStore, err := initStore(config.DatabaseFilename)
+	db, rmStore, repoStore, covStore, err := initStore(config.DatabaseFilename)
 	if err != nil {
 		log.Err(err).Msg("initStore")
 		return nil, err
 	}
 
-	scms, err := initSCMs(config, scmStore)
+	repositoryManagers, err := initRepositoryManagers(config, rmStore)
 	if err != nil {
 		return nil, err
 	}
-	if len(scms) == 0 {
-		return nil, errors.New("no SCM is configured")
+	if len(repositoryManagers) == 0 {
+		return nil, errors.New("no RepositoryManager is configured")
 	}
 
 	frontendFileServer, err := initFrontendFileServer(config)
@@ -478,7 +460,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 
 	s := &MoraServer{
 		sessionManager:     NewMoraSessionManager(),
-		scms:               scms,
+		repositoryManagers: repositoryManagers,
 		repos:              repoStore,
 		frontendFileServer: frontendFileServer,
 		coverage:           coverage,

@@ -4,21 +4,21 @@ import "context"
 
 type (
 	Repository struct {
-		Id        int64  `json:"id"`
-		SCM       int64  `json:"scm_id"`
-		Namespace string `json:"namespace"`
-		Name      string `json:"name"`
-		Url       string `json:"url"`
+		Id                int64  `json:"id"`
+		RepositoryManager int64  `json:"scm_id"`
+		Namespace         string `json:"namespace"`
+		Name              string `json:"name"`
+		Url               string `json:"url"`
 	}
 )
 
 type (
-    contextKey int
+	contextKey int
 )
 
 const (
-	contextRepoKey contextKey = iota
-	ContextSCMKey  contextKey = iota
+	contextRepoKey              contextKey = iota
+	ContextRepositoryManagerKey contextKey = iota
 )
 
 func WithRepo(ctx context.Context, repo Repository) context.Context {
@@ -29,4 +29,3 @@ func RepoFrom(ctx context.Context) (Repository, bool) {
 	repo, ok := ctx.Value(contextRepoKey).(Repository)
 	return repo, ok
 }
-

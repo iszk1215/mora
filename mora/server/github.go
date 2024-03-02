@@ -8,7 +8,7 @@ import (
 )
 
 type Github struct {
-	BaseSCM
+	BaseRepositoryManager
 }
 
 func (g *Github) RevisionURL(baseURL string, revision string) string {
