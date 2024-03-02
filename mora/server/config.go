@@ -11,17 +11,17 @@ type ServerConfig struct {
 	Port int
 }
 
-type SCMConfig struct {
+type RepositoryManagerConfig struct {
 	Driver         string `toml:"scm"`
 	URL            string
 	SecretFilename string `toml:"secret_file"`
 }
 
 type MoraConfig struct {
-	Server           ServerConfig
-	SCMs             []SCMConfig `toml:"scm"`
-	Debug            bool
-	DatabaseFilename string
+	Server             ServerConfig
+	RepositoryManagers []RepositoryManagerConfig `toml:"scm"`
+	Debug              bool
+	DatabaseFilename   string
 }
 
 func ReadMoraConfig(filename string) (MoraConfig, error) {

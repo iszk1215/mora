@@ -181,11 +181,11 @@ func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 }
 
 func makeCoverageListResponse(
-	scm SCM, repo Repository, coverages []*Coverage) CoverageListResponse {
+	rm RepositoryManager, repo Repository, coverages []*Coverage) CoverageListResponse {
 
 	var covs []CoverageResponse
 	for _, cov := range coverages {
-		revURL := scm.RevisionURL(repo.Url, cov.Revision)
+		revURL := rm.RevisionURL(repo.Url, cov.Revision)
 		covs = append(covs, makeCoverageResponse(revURL, cov))
 	}
 
@@ -198,7 +198,7 @@ func makeCoverageListResponse(
 }
 
 func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Request) {
-	scm, _ := SCMFrom(r.Context())
+	rm, _ := RepositoryManagerFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 
 	coverages, err := s.coverages.List(repo.Id)
@@ -218,11 +218,11 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 		return coverages[i].Timestamp.Before(coverages[j].Timestamp)
 	})
 
-	resp := makeCoverageListResponse(scm, repo, coverages)
+	resp := makeCoverageListResponse(rm, repo, coverages)
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func makeFileListResponse(scm SCM, repo Repository, cov *Coverage, entry *CoverageEntry) FileListResponse {
+func makeFileListResponse(rm RepositoryManager, repo Repository, cov *Coverage, entry *CoverageEntry) FileListResponse {
 	files := []*FileResponse{}
 	for _, pr := range entry.Profiles {
 		files = append(files, &FileResponse{
@@ -238,7 +238,7 @@ func makeFileListResponse(scm SCM, repo Repository, cov *Coverage, entry *Covera
 		Repo:  repo,
 		Metadata: MetaResonse{
 			Revision:    cov.Revision,
-			RevisionURL: scm.RevisionURL(repo.Url, cov.Revision),
+			RevisionURL: rm.RevisionURL(repo.Url, cov.Revision),
 			Time:        cov.Timestamp,
 			Hits:        entry.Hits,
 			Lines:       entry.Lines,
@@ -248,17 +248,17 @@ func makeFileListResponse(scm SCM, repo Repository, cov *Coverage, entry *Covera
 
 func handleFileList(w http.ResponseWriter, r *http.Request) {
 	log.Print("handleFileList")
-	scm, _ := SCMFrom(r.Context())
+	rm, _ := RepositoryManagerFrom(r.Context())
 	repo, _ := RepoFrom(r.Context())
 	cov, _ := CoverageFrom(r.Context())
 	entry, _ := CoverageEntryFrom(r.Context())
 
-	resp := makeFileListResponse(scm, repo, cov, entry)
+	resp := makeFileListResponse(rm, repo, cov, entry)
 	render.JSON(w, resp, http.StatusOK)
 }
 
 func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
-	scm, _ := SCMFrom(ctx)
+	rm, _ := RepositoryManagerFrom(ctx)
 	repo, _ := RepoFrom(ctx)
 
 	sess, ok := MoraSessionFrom(ctx)
@@ -266,12 +266,12 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 		return nil, errors.New("MoraSession not found in a context")
 	}
 
-	ctx, err := sess.WithToken(context.Background(), scm.ID())
+	ctx, err := sess.WithToken(context.Background(), rm.ID())
 	if err != nil {
 		return nil, err
 	}
 
-	client := scm.Client()
+	client := rm.Client()
 	repoPath := repo.Namespace + "/" + repo.Name
 	content, meta, err := client.Contents.Find(ctx, repoPath, path, revision)
 	if err != nil {

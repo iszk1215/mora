@@ -21,8 +21,8 @@ const (
 )
 
 type MoraSession struct {
-	reposMap    map[int64]map[int64]bool // [scmID][repoID]
-	tokenMap    map[int64]scm.Token      // [scmID]
+	reposMap    map[int64]map[int64]bool // [rmID][repoID]
+	tokenMap    map[int64]scm.Token      // [rmID]
 	timestamp   time.Time
 	loggingInto int64
 }
@@ -36,30 +36,30 @@ func NewMoraSession() *MoraSession {
 	}
 }
 
-func (s *MoraSession) getReposCache(scmID int64) map[int64]bool {
-	return s.reposMap[scmID]
+func (s *MoraSession) getReposCache(rmID int64) map[int64]bool {
+	return s.reposMap[rmID]
 }
 
-func (s *MoraSession) setReposCache(scmID int64, repos map[int64]bool) {
-	s.reposMap[scmID] = repos
+func (s *MoraSession) setReposCache(rumID int64, repos map[int64]bool) {
+	s.reposMap[rumID] = repos
 }
 
-func (s *MoraSession) getToken(scmID int64) (scm.Token, bool) {
-	token, ok := s.tokenMap[scmID]
+func (s *MoraSession) getToken(rmID int64) (scm.Token, bool) {
+	token, ok := s.tokenMap[rmID]
 	return token, ok
 }
 
-func (s *MoraSession) setToken(scmID int64, token scm.Token) {
-	s.tokenMap[scmID] = token
+func (s *MoraSession) setToken(rmID int64, token scm.Token) {
+	s.tokenMap[rmID] = token
 }
 
-func (s *MoraSession) Remove(scmID int64) {
-	delete(s.tokenMap, scmID)
-	delete(s.reposMap, scmID)
+func (s *MoraSession) Remove(rmID int64) {
+	delete(s.tokenMap, rmID)
+	delete(s.reposMap, rmID)
 }
 
-func (s *MoraSession) WithToken(ctx context.Context, scmID int64) (context.Context, error) {
-	token, ok := s.getToken(scmID)
+func (s *MoraSession) WithToken(ctx context.Context, rmID int64) (context.Context, error) {
+	token, ok := s.getToken(rmID)
 	if !ok {
 		return nil, errorTokenNotFound
 	}

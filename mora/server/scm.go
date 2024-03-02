@@ -11,14 +11,14 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-type BaseSCM struct {
+type BaseRepositoryManager struct {
 	id              int64
 	client          *scm.Client
 	url             *url.URL
 	loginMiddleware login.Middleware
 }
 
-func (s *BaseSCM) Init(id int64, url *url.URL, client *scm.Client,
+func (s *BaseRepositoryManager) Init(id int64, url *url.URL, client *scm.Client,
 	loginMiddleware login.Middleware) {
 	s.id = id
 	s.url = url
@@ -33,19 +33,19 @@ func (s *BaseSCM) Init(id int64, url *url.URL, client *scm.Client,
 	}
 }
 
-func (s *BaseSCM) ID() int64 {
+func (s *BaseRepositoryManager) ID() int64 {
 	return s.id
 }
 
-func (s *BaseSCM) Client() *scm.Client {
+func (s *BaseRepositoryManager) Client() *scm.Client {
 	return s.client
 }
 
-func (s *BaseSCM) URL() *url.URL {
+func (s *BaseRepositoryManager) URL() *url.URL {
 	return s.url
 }
 
-func (s *BaseSCM) LoginHandler(next http.Handler) http.Handler {
+func (s *BaseRepositoryManager) LoginHandler(next http.Handler) http.Handler {
 	return s.loginMiddleware.Handler(next)
 }
 

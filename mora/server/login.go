@@ -19,7 +19,7 @@ func convertToken(token *login.Token) scm.Token {
 	}
 }
 
-func createLoginHandler(scm SCM, next http.Handler) http.Handler {
+func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 	h := func(w http.ResponseWriter, r *http.Request) {
 		err := login.ErrorFrom(r.Context())
 		if err != nil {
@@ -28,25 +28,25 @@ func createLoginHandler(scm SCM, next http.Handler) http.Handler {
 			return
 		}
 
-		log.Print("Set token to session for SCM: id=", scm.ID(), " url=", scm.URL())
+		log.Print("Set token to session for RepositoryManager: id=", rm.ID(), " url=", rm.URL())
 		token := convertToken(login.TokenFrom(r.Context()))
 
 		sess, _ := MoraSessionFrom(r.Context())
-		sess.setToken(scm.ID(), token)
+		sess.setToken(rm.ID(), token)
 
 		next.ServeHTTP(w, r)
 	}
 
-	return scm.LoginHandler(http.HandlerFunc(h))
+	return rm.LoginHandler(http.HandlerFunc(h))
 }
 
-func LoginHandler(scms []SCM, next http.Handler) http.Handler {
+func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) http.Handler {
 	r := chi.NewRouter()
 
 	handlers := map[int64]http.Handler{}
 
-	for _, scm := range scms {
-		handlers[scm.ID()] = createLoginHandler(scm, next)
+	for _, rm := range repositoryManagers {
+		handlers[rm.ID()] = createLoginHandler(rm, next)
 	}
 
 	// redirect from scm
@@ -65,10 +65,10 @@ func LoginHandler(scms []SCM, next http.Handler) http.Handler {
 			return
 		}
 
-		scm_id := sess.loggingInto
+		rm_id := sess.loggingInto
 		sess.loggingInto = -1 // reset
 
-		handler, ok := handlers[scm_id]
+		handler, ok := handlers[rm_id]
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
 			return
@@ -77,21 +77,21 @@ func LoginHandler(scms []SCM, next http.Handler) http.Handler {
 	})
 
 	r.Get("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
-		scm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
+		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
 		if err != nil {
 			log.Err(err).Msg("")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-		log.Print("login: scm_id=", scm_id)
+		log.Print("login: rm_id=", rm_id)
 
 		sess, _ := MoraSessionFrom(r.Context())
 		if sess != nil {
 			log.Print("LoginHandler: sess.loggingInto=", sess.loggingInto)
-			sess.loggingInto = scm_id
+			sess.loggingInto = rm_id
 		}
 
-		handler, ok := handlers[scm_id]
+		handler, ok := handlers[rm_id]
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
 			return
@@ -102,26 +102,26 @@ func LoginHandler(scms []SCM, next http.Handler) http.Handler {
 	return r
 }
 
-func LogoutHandler(scms []SCM, next http.Handler) http.Handler {
+func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		s, _ := MoraSessionFrom(r.Context())
-		for _, scm := range scms {
-			s.Remove(scm.ID())
+		for _, rm := range repositoryManagers {
+			s.Remove(rm.ID())
 		}
 		next.ServeHTTP(w, r)
 	})
 
 	r.Get("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
-		scm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
+		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
 		if err != nil {
 			log.Err(err).Msg("")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 		s, _ := MoraSessionFrom(r.Context())
-		s.Remove(scm_id)
+		s.Remove(rm_id)
 		next.ServeHTTP(w, r)
 	})
 

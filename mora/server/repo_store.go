@@ -19,11 +19,11 @@ CREATE TABLE IF NOT EXISTS repository (
 
 type (
 	storableRepository struct {
-		ID        int64  `db:"id"`
-		SCM       int64  `db:"scm"`
-		Namespace string `db:"namespace"`
-		Name      string `db:"name"`
-		URL       string `db:"url"`
+		ID                int64  `db:"id"`
+		RepositoryManager int64  `db:"scm"`
+		Namespace         string `db:"namespace"`
+		Name              string `db:"name"`
+		URL               string `db:"url"`
 	}
 
 	repositoryStoreImpl struct {
@@ -46,11 +46,11 @@ func (s *repositoryStoreImpl) Init() error {
 
 func toRepo(from storableRepository) Repository {
 	return Repository{
-		Id:        from.ID,
-		SCM:       from.SCM,
-		Namespace: from.Namespace,
-		Name:      from.Name,
-		Url:       from.URL,
+		Id:                from.ID,
+		RepositoryManager: from.RepositoryManager,
+		Namespace:         from.Namespace,
+		Name:              from.Name,
+		Url:               from.URL,
 	}
 }
 
@@ -81,7 +81,7 @@ func (s *repositoryStoreImpl) FindURL(url string) (Repository, error) {
 func (s *repositoryStoreImpl) Put(repo *Repository) error {
 	res, err := s.db.Exec(
 		"INSERT INTO repository (scm, namespace, name, url) VALUES ($1, $2, $3, $4)",
-		repo.SCM, repo.Namespace, repo.Name, repo.Url)
+		repo.RepositoryManager, repo.Namespace, repo.Name, repo.Url)
 	if err != nil {
 		return err
 	}
@@ -101,11 +101,11 @@ func (s *repositoryStoreImpl) ListAll() ([]Repository, error) {
 	repos := []Repository{}
 	for _, record := range rows {
 		repo := Repository{
-			Id:        record.ID,
-			SCM:       record.SCM,
-			Namespace: record.Namespace,
-			Name:      record.Name,
-			Url:       record.URL,
+			Id:                record.ID,
+			RepositoryManager: record.RepositoryManager,
+			Namespace:         record.Namespace,
+			Name:              record.Name,
+			Url:               record.URL,
 		}
 		repos = append(repos, repo)
 	}

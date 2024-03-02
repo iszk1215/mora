@@ -131,12 +131,12 @@ func Test_injectCoverage_malformed_id(t *testing.T) {
 }
 
 func TestMakeCoverageResponseList(t *testing.T) {
-	scm := NewMockSCM(1)
+	rm := NewMockRepositoryManager(1)
 	repo := Repository{
 		Id:        1215,
 		Namespace: "owner",
 		Name:      "repo",
-		Url:       fmt.Sprintf("%s/owner/repo", scm.URL()),
+		Url:       fmt.Sprintf("%s/owner/repo", rm.URL()),
 	}
 
 	cov := &Coverage{
@@ -173,7 +173,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 				ID:          cov.ID,
 				Timestamp:   cov.Timestamp,
 				Revision:    cov.Revision,
-				RevisionURL: scm.RevisionURL(repo.Url, cov.Revision),
+				RevisionURL: rm.RevisionURL(repo.Url, cov.Revision),
 				Entries: []*CoverageEntry{
 					{
 						Name:  "cc",
@@ -190,14 +190,14 @@ func TestMakeCoverageResponseList(t *testing.T) {
 		},
 	}
 
-	got := makeCoverageListResponse(scm, repo, []*Coverage{cov})
+	got := makeCoverageListResponse(rm, repo, []*Coverage{cov})
 	require.Equal(t, want, got)
 }
 
 // API Test
 
 func Test_CoverageHandler_CoverageList(t *testing.T) {
-	scm := NewMockSCM(1)
+	rm := NewMockRepositoryManager(1)
 	repo := Repository{Id: 1215, Namespace: "owner", Name: "repo", Url: "url"}
 
 	time0 := time.Now().Round(0)
@@ -210,12 +210,12 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 	s := NewCoverageHandler(nil, covStore)
 
 	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
-	r = r.WithContext(WithRepo(WithSCM(r.Context(), scm), repo))
+	r = r.WithContext(WithRepo(WithRepostioryManager(r.Context(), rm), repo))
 	w := httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, r)
 	res := w.Result()
 
-	want := makeCoverageListResponse(scm, repo, []*Coverage{cov1, cov0})
+	want := makeCoverageListResponse(rm, repo, []*Coverage{cov1, cov0})
 
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -230,7 +230,7 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 }
 
 func Test_CoverageHandler_FileList(t *testing.T) {
-	scm := NewMockSCM(1)
+	rm := NewMockRepositoryManager(1)
 
 	filename := "test.go"
 	revision := "abcde"
@@ -266,13 +266,13 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 	covStore := setupCoverageStore(t, cov)
 	s := NewCoverageHandler(nil, covStore)
 
-	sess := NewMoraSessionWithTokenFor(scm)
+	sess := NewMoraSessionWithTokenFor(rm)
 
 	req := httptest.NewRequest(
 		http.MethodGet, fmt.Sprintf("/%d/go/files", cov.ID), strings.NewReader(""))
 	ctx := req.Context()
 	ctx = WithMoraSession(ctx, sess)
-	ctx = WithSCM(ctx, scm)
+	ctx = WithRepostioryManager(ctx, rm)
 	ctx = WithRepo(ctx, repo)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
@@ -297,7 +297,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	metaRes := MetaResonse{
 		Revision:    revision,
-		RevisionURL: scm.RevisionURL(repo.Url, cov.Revision),
+		RevisionURL: rm.RevisionURL(repo.Url, cov.Revision),
 		Time:        cov.Timestamp,
 		Hits:        13,
 		Lines:       17,
@@ -337,8 +337,8 @@ func Test_CoverageHandler_File(t *testing.T) {
 		Find( /*ctx*/ gomock.Any(), orgName+"/"+repoName, filename, revision).
 		Return(&content, nil, nil)
 
-	scm := NewMockSCM(1)
-	scm.client.Contents = contents
+	rm := NewMockRepositoryManager(1)
+	rm.client.Contents = contents
 
 	repo := Repository{Id: 1215, Namespace: orgName, Name: repoName, Url: repoURL}
 
@@ -361,7 +361,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 	covStore := setupCoverageStore(t, cov)
 	s := NewCoverageHandler(nil, covStore)
 
-	sess := NewMoraSessionWithTokenFor(scm)
+	sess := NewMoraSessionWithTokenFor(rm)
 
 	req := httptest.NewRequest(
 		http.MethodGet,
@@ -369,7 +369,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 		strings.NewReader(""))
 	ctx := req.Context()
 	ctx = WithMoraSession(ctx, sess)
-	ctx = WithSCM(ctx, scm)
+	ctx = WithRepostioryManager(ctx, rm)
 	ctx = WithRepo(ctx, repo)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()

@@ -5,7 +5,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var schema_scm = `
+var schema_repository_manager = `
 CREATE TABLE IF NOT EXISTS scm (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     driver TEXT NOT NULL,
@@ -13,23 +13,23 @@ CREATE TABLE IF NOT EXISTS scm (
 )`
 
 type (
-	storableSCM struct {
+	storableRepositoryManager struct {
 		ID     int64  `db:"id"`
 		Driver string `db:"driver"`
 		URL    string `db:"url"`
 	}
 
-	scmStoreImpl struct {
+	repositoryManagerStoreImpl struct {
 		db *sqlx.DB
 	}
 )
 
-func NewSCMStore(db *sqlx.DB) SCMStore {
-	return &scmStoreImpl{db}
+func NewRepositoryManagerStore(db *sqlx.DB) RepositoryManagerStore {
+	return &repositoryManagerStoreImpl{db}
 }
 
-func (s *scmStoreImpl) Init() error {
-	_, err := s.db.Exec(schema_scm)
+func (s *repositoryManagerStoreImpl) Init() error {
+	_, err := s.db.Exec(schema_repository_manager)
 	if err != nil {
 		log.Err(err).Msg("")
 		return err
@@ -37,8 +37,8 @@ func (s *scmStoreImpl) Init() error {
 	return nil
 }
 
-func (s *scmStoreImpl) FindURL(url string) (int64, string, error) {
-	rows := []storableSCM{}
+func (s *repositoryManagerStoreImpl) FindURL(url string) (int64, string, error) {
+	rows := []storableRepositoryManager{}
 	err := s.db.Select(&rows, "SELECT id, driver FROM scm WHERE url = ?", url)
 	if err != nil {
 		return 0, "", err
@@ -51,7 +51,7 @@ func (s *scmStoreImpl) FindURL(url string) (int64, string, error) {
 	return rows[0].ID, rows[0].Driver, nil
 }
 
-func (s *scmStoreImpl) Insert(driver string, url string) (int64, error) {
+func (s *repositoryManagerStoreImpl) Insert(driver string, url string) (int64, error) {
 	query := "INSERT INTO scm (driver, url) values($1, $2)"
 	res, err := s.db.Exec(query, driver, url)
 	if err != nil {

@@ -16,36 +16,36 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type MockSCM struct {
+type MockRepositoryManager struct {
 	id           int64
 	url          *url.URL
 	loginHandler func(http.Handler) http.Handler
 	client       *scm.Client
 }
 
-func (m *MockSCM) ID() int64 {
+func (m *MockRepositoryManager) ID() int64 {
 	return m.id
 }
 
-func (m *MockSCM) Client() *scm.Client {
+func (m *MockRepositoryManager) Client() *scm.Client {
 	return m.client
 }
 
-func (m *MockSCM) URL() *url.URL {
+func (m *MockRepositoryManager) URL() *url.URL {
 	return m.url
 }
 
-func (m *MockSCM) RevisionURL(baseURL string, revision string) string {
+func (m *MockRepositoryManager) RevisionURL(baseURL string, revision string) string {
 	joined, _ := url.JoinPath(baseURL, "revision", revision)
 	return joined
 }
 
-func (m *MockSCM) LoginHandler(next http.Handler) http.Handler {
+func (m *MockRepositoryManager) LoginHandler(next http.Handler) http.Handler {
 	return m.loginHandler(next)
 }
 
-func NewMockSCM(id int64) *MockSCM {
-	m := &MockSCM{id: id}
+func NewMockRepositoryManager(id int64) *MockRepositoryManager {
+	m := &MockRepositoryManager{id: id}
 	m.url, _ = url.Parse(strings.Join([]string{"https://mock.scm"}, ""))
 
 	m.client = &scm.Client{}
@@ -62,10 +62,10 @@ func NewMockSCM(id int64) *MockSCM {
 	return m
 }
 
-func NewMoraSessionWithTokenFor(scms ...SCM) *MoraSession {
+func NewMoraSessionWithTokenFor(repositoryManagers ...RepositoryManager) *MoraSession {
 	sess := NewMoraSession()
-	for _, s := range scms {
-		sess.setToken(s.ID(), scm.Token{})
+	for _, m := range repositoryManagers {
+		sess.setToken(m.ID(), scm.Token{})
 	}
 	return sess
 }

@@ -11,7 +11,7 @@ import (
 )
 
 type Gitea struct {
-	BaseSCM
+	BaseRepositoryManager
 }
 
 func (g *Gitea) RevisionURL(baseURL string, revision string) string {
