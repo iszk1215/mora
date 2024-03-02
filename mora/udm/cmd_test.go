@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iszk1215/mora/mora/model"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,9 +23,9 @@ func (c *mockUdmClient) init(serverAddr, token string) {
 	c.initialized = true
 }
 
-func (c *mockUdmClient) listRepositories() ([]model.Repository, error) {
+func (c *mockUdmClient) listRepositories() ([]base.Repository, error) {
 	// c.t.Log("mockUdmClient.listRepositories")
-	return []model.Repository{{Id: 1}}, nil
+	return []base.Repository{{Id: 1}}, nil
 }
 
 func (c *mockUdmClient) addMetric(repoId int64, metric *metricModel) error {

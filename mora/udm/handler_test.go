@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iszk1215/mora/mora/model"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
@@ -49,8 +49,8 @@ func newRequestWithJSON(t *testing.T, method, path string, data any) *http.Reque
 	return httptest.NewRequest(method, path, bytes.NewBuffer(body))
 }
 
-func getReponseWithRepo(t *testing.T, expectedStatus int, h http.Handler, r *http.Request, repo model.Repository) *http.Response {
-	r = r.WithContext(model.WithRepo(r.Context(), repo))
+func getReponseWithRepo(t *testing.T, expectedStatus int, h http.Handler, r *http.Request, repo base.Repository) *http.Response {
+	r = r.WithContext(base.WithRepo(r.Context(), repo))
 	w := httptest.NewRecorder()
 
 	h.ServeHTTP(w, r)
@@ -72,7 +72,7 @@ func getReponseWithRepo(t *testing.T, expectedStatus int, h http.Handler, r *htt
 // Metric
 
 func TestHandlerCreateMetric(t *testing.T) {
-	repo := model.Repository{
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -124,7 +124,7 @@ func TestHandlerCreateMetric(t *testing.T) {
 }
 
 func TestHandlerDeleteMetric(t *testing.T) {
-	repo := model.Repository{
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -160,7 +160,7 @@ func TestHandlerDeleteMetric(t *testing.T) {
 }
 
 func TestHandlerListMetric(t *testing.T) {
-	repo := model.Repository{
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -200,7 +200,7 @@ func TestHandlerListMetric(t *testing.T) {
 // Item
 
 func TestHandlerCreateItem(t *testing.T) {
-	repo := model.Repository{
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -288,7 +288,7 @@ func TestHandlerCreateItem(t *testing.T) {
 }
 
 func TestHandlerListItems(t *testing.T) {
-	repo := model.Repository{
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -333,7 +333,7 @@ func TestHandlerListItems(t *testing.T) {
 }
 
 func TestHandlerListItemsInvalidMetric(t *testing.T) {
-	repo := model.Repository{
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -346,7 +346,7 @@ func TestHandlerListItemsInvalidMetric(t *testing.T) {
 }
 
 func TestHandlerListItemsInvalidMetricString(t *testing.T) {
-	repo := model.Repository{
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -359,7 +359,7 @@ func TestHandlerListItemsInvalidMetricString(t *testing.T) {
 }
 
 func TestDeleteItem(t *testing.T) {
-	repo := model.Repository{
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -419,8 +419,8 @@ func TestDeleteItem(t *testing.T) {
 // ----------------------------------------------------------------------
 // Value
 
-func setupTestItem(t *testing.T, store *udmStore) (model.Repository, metricModel, itemModel) {
-	repo := model.Repository{
+func setupTestItem(t *testing.T, store *udmStore) (base.Repository, metricModel, itemModel) {
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -469,8 +469,8 @@ func TestHandlerCreateValue(t *testing.T) {
 	require.Equal(t, int64(1), got.Id)
 }
 
-func setupTestValues(t *testing.T, store *udmStore) (model.Repository, metricModel, itemModel, []valueModel) {
-	repo := model.Repository{
+func setupTestValues(t *testing.T, store *udmStore) (base.Repository, metricModel, itemModel, []valueModel) {
+	repo := base.Repository{
 		Id: 1215,
 	}
 
@@ -527,7 +527,7 @@ func TestHandlerListValues(t *testing.T) {
 }
 
 func TestHandlerDeleteValues(t *testing.T) {
-	repo := model.Repository{Id: 1}
+	repo := base.Repository{Id: 1}
 	metric := metricModel{Name: "metric1"}
 	item := itemModel{Name: "item1"}
 

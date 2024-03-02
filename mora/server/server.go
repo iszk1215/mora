@@ -17,7 +17,7 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/iszk1215/mora/mora/model"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/iszk1215/mora/mora/udm"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
@@ -28,7 +28,7 @@ var (
 )
 
 type (
-	Repository = model.Repository
+	Repository = base.Repository
 
 	// Source Code Management System
 	RepositoryManager interface {
@@ -38,8 +38,6 @@ type (
 		RevisionURL(baseURL string, revision string) string
 		LoginHandler(next http.Handler) http.Handler
 	}
-
-	// contextKey int
 
 	// Protocols
 
@@ -57,30 +55,16 @@ type (
 
 	RepositoryStore interface {
 		Init() error
-		Find(id int64) (model.Repository, error)
+		Find(id int64) (base.Repository, error)
 		FindURL(url string) (Repository, error)
 		ListAll() ([]Repository, error)
 		Put(repo *Repository) error
 	}
 
-	CoverageStore interface {
-		Init() error
-		Find(id int64) (*Coverage, error)
-		FindRevision(id int64, revision string) (*Coverage, error)
-		List(id int64) ([]*Coverage, error)
-		ListAll() ([]*Coverage, error)
-		Put(*Coverage) error
-	}
-
-	ResourceHandler interface {
-		Handler() http.Handler
-		HandleUpload(w http.ResponseWriter, r *http.Request)
-	}
-
 	MoraServer struct {
 		repositoryManagers []RepositoryManager
 		repos              RepositoryStore
-		coverage           ResourceHandler
+		coverage           *CoverageService
 		udm                *udm.Service
 		apiKey             string
 
@@ -88,32 +72,6 @@ type (
 		frontendFileServer http.Handler
 	}
 )
-
-const (
-	contextRepositoryManagerKey = model.ContextRepositoryManagerKey
-)
-
-func WithRepostioryManager(ctx context.Context, rm RepositoryManager) context.Context {
-	return context.WithValue(ctx, contextRepositoryManagerKey, rm)
-}
-
-func RepositoryManagerFrom(ctx context.Context) (RepositoryManager, bool) {
-	rm, ok := ctx.Value(contextRepositoryManagerKey).(RepositoryManager)
-	return rm, ok
-}
-
-func WithRepo(ctx context.Context, repo Repository) context.Context {
-	return model.WithRepo(ctx, repo)
-	// return context.WithValue(ctx, contextRepoKey, repo)
-}
-
-func RepoFrom(ctx context.Context) (Repository, bool) {
-	return model.RepoFrom(ctx)
-	/*
-		repo, ok := ctx.Value(contextRepoKey).(Repository)
-		return repo, ok
-	*/
-}
 
 func (s *MoraServer) findRepositoryManager(id int64) RepositoryManager {
 	for _, rm := range s.repositoryManagers {
@@ -249,6 +207,8 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 
+		ctx := r.Context()
+
 		if s.apiKey == "" || s.apiKey != token {
 			sess, _ := MoraSessionFrom(r.Context())
 			err = checkRepoAccess(sess, rm, repo)
@@ -259,20 +219,20 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 				log.Err(err).Msg("injectRepo")
 				render.InternalError(w, errors.New("internal error"))
 				return
+			} else {
+				ctx, _ = sess.WithToken(ctx, rm.ID())
+				log.Print(ctx)
 			}
 		} else {
 			log.Print("injectRepo: skip checking repo access")
 		}
 
-		ctx := r.Context()
-		ctx = WithRepostioryManager(ctx, rm)
-		ctx = WithRepo(ctx, repo)
+		// ctx := r.Context()
+		// ctx = base.WithRepostioryManager(ctx, rm)
+		ctx = base.WithRepositoryClient(ctx, rm)
+		ctx = base.WithRepo(ctx, repo)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
-}
-
-func (s *MoraServer) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	s.coverage.HandleUpload(w, r)
 }
 
 func (s *MoraServer) Handler() http.Handler {
@@ -297,8 +257,6 @@ func (s *MoraServer) Handler() http.Handler {
 			}
 		})
 	})
-
-	r.Post("/api/upload", s.HandleUpload)
 
 	// login/logout
 
@@ -382,30 +340,25 @@ func initRepositoryManagers(config MoraConfig, store RepositoryManagerStore) ([]
 	return repositoryManagers, nil
 }
 
-func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, CoverageStore, error) {
+func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, error) {
 	log.Info().Msgf("Initialize store: filename=%s", filename)
 
 	db, err := sqlx.Connect("sqlite3", filename)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	rmStore := NewRepositoryManagerStore(db)
 	if err := rmStore.Init(); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	repoStore := NewRepositoryStore(db)
 	if err := repoStore.Init(); err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	covStore := NewCoverageStore(db)
-	if err := covStore.Init(); err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	return db, rmStore, repoStore, covStore, nil
+	return db, rmStore, repoStore, nil
 }
 
 //go:embed static
@@ -432,7 +385,7 @@ func initFrontendFileServer(config MoraConfig) (http.Handler, error) {
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	log.Print("config.Debug=", config.Debug)
 
-	db, rmStore, repoStore, covStore, err := initStore(config.DatabaseFilename)
+	db, rmStore, repoStore, err := initStore(config.DatabaseFilename)
 	if err != nil {
 		log.Err(err).Msg("initStore")
 		return nil, err
@@ -451,7 +404,10 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	coverage := NewCoverageHandler(repoStore, covStore)
+	coverage, err := NewCoverageService(db)
+	if err != nil {
+		return nil, err
+	}
 
 	udm, err := udm.NewService(db)
 	if err != nil {

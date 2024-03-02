@@ -1,11 +1,15 @@
 package server
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -13,12 +17,34 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/iszk1215/mora/mora/mockscm"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type MockRepositoryClient struct {
+	url    *url.URL
+	client *scm.Client
+}
+
+func (m *MockRepositoryClient) Client() *scm.Client {
+	return m.client
+}
+
+func NewMockRepositoryClient() *MockRepositoryClient {
+	m := &MockRepositoryClient{}
+	m.url, _ = url.Parse(strings.Join([]string{"https://mock.scm"}, ""))
+	m.client = &scm.Client{}
+	return m
+}
+
+func (m *MockRepositoryClient) RevisionURL(baseURL string, revision string) string {
+	joined, _ := url.JoinPath(baseURL, "revision", revision)
+	return joined
+}
 
 func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
@@ -38,6 +64,7 @@ func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 
 // Test Data
 
+/*
 func makeCoverageUploadRequest(repo Repository) (*CoverageUploadRequest, *Coverage) {
 	revision := "12345"
 	now := time.Now().Round(0)
@@ -81,6 +108,7 @@ func makeCoverageUploadRequest(repo Repository) (*CoverageUploadRequest, *Covera
 
 	return &req, &want
 }
+*/
 
 // Test Cases
 
@@ -100,8 +128,8 @@ func Test_injectCoverage(t *testing.T) {
 		Entries:   []*CoverageEntry{},
 	}
 
-	covStore := setupCoverageStore(t, want)
-	s := NewCoverageHandler(nil, covStore)
+	store := setupCoverageStore(t, want)
+	s := newCoverageHandler(store)
 
 	r := chi.NewRouter()
 	r.Route("/{id}", func(r chi.Router) {
@@ -109,8 +137,7 @@ func Test_injectCoverage(t *testing.T) {
 		r.Get("/", handler)
 	})
 
-	req := httptest.NewRequest(
-		http.MethodGet, fmt.Sprintf("/%d", want.ID), strings.NewReader(""))
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d", want.ID), nil)
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -120,23 +147,23 @@ func Test_injectCoverage(t *testing.T) {
 }
 
 func Test_injectCoverage_malformed_id(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/foo", strings.NewReader(""))
-	req = req.WithContext(WithRepo(req.Context(), Repository{Url: "link"}))
+	req := httptest.NewRequest(http.MethodGet, "/foo", nil)
+	req = req.WithContext(base.WithRepo(req.Context(), Repository{Url: "link"}))
 	w := httptest.NewRecorder()
 
-	s := NewCoverageHandler(nil, nil)
+	s := newCoverageHandler(nil)
 	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 }
 
 func TestMakeCoverageResponseList(t *testing.T) {
-	rm := NewMockRepositoryManager(1)
+	rm := NewMockRepositoryClient()
 	repo := Repository{
 		Id:        1215,
 		Namespace: "owner",
 		Name:      "repo",
-		Url:       fmt.Sprintf("%s/owner/repo", rm.URL()),
+		Url:       "repoUrl",
 	}
 
 	cov := &Coverage{
@@ -197,7 +224,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 // API Test
 
 func Test_CoverageHandler_CoverageList(t *testing.T) {
-	rm := NewMockRepositoryManager(1)
+	rm := NewMockRepositoryClient()
 	repo := Repository{Id: 1215, Namespace: "owner", Name: "repo", Url: "url"}
 
 	time0 := time.Now().Round(0)
@@ -205,12 +232,11 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 	cov0 := &Coverage{ID: 0, RepoID: repo.Id, Timestamp: time0, Revision: "abc123"}
 	cov1 := &Coverage{ID: 1, RepoID: repo.Id, Timestamp: time1, Revision: "abc124"}
 
-	covStore := setupCoverageStore(t, cov0, cov1)
+	store := setupCoverageStore(t, cov0, cov1)
+	s := newCoverageHandler(store)
 
-	s := NewCoverageHandler(nil, covStore)
-
-	r := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
-	r = r.WithContext(WithRepo(WithRepostioryManager(r.Context(), rm), repo))
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r = r.WithContext(base.WithRepo(base.WithRepositoryClient(r.Context(), rm), repo))
 	w := httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, r)
 	res := w.Result()
@@ -230,7 +256,7 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 }
 
 func Test_CoverageHandler_FileList(t *testing.T) {
-	rm := NewMockRepositoryManager(1)
+	rm := NewMockRepositoryClient()
 
 	filename := "test.go"
 	revision := "abcde"
@@ -263,17 +289,14 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 		},
 	}
 
-	covStore := setupCoverageStore(t, cov)
-	s := NewCoverageHandler(nil, covStore)
-
-	sess := NewMoraSessionWithTokenFor(rm)
+	store := setupCoverageStore(t, cov)
+	s := newCoverageHandler(store)
 
 	req := httptest.NewRequest(
-		http.MethodGet, fmt.Sprintf("/%d/go/files", cov.ID), strings.NewReader(""))
+		http.MethodGet, fmt.Sprintf("/%d/go/files", cov.ID), nil)
 	ctx := req.Context()
-	ctx = WithMoraSession(ctx, sess)
-	ctx = WithRepostioryManager(ctx, rm)
-	ctx = WithRepo(ctx, repo)
+	ctx = base.WithRepositoryClient(ctx, rm)
+	ctx = base.WithRepo(ctx, repo)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 
@@ -333,11 +356,20 @@ func Test_CoverageHandler_File(t *testing.T) {
 
 	contents := mockscm.NewMockContentService(mockCtrl)
 	content := scm.Content{Data: []byte(code)}
+	//	contents.EXPECT().
+	//		Find( /*ctx*/ gomock.Any(), orgName+"/"+repoName, filename, revision).
+	//		Return(&content, nil, nil)
 	contents.EXPECT().
 		Find( /*ctx*/ gomock.Any(), orgName+"/"+repoName, filename, revision).
-		Return(&content, nil, nil)
+		DoAndReturn(func(ctx context.Context, repo, filename, revision string) (*scm.Content, *scm.Response, error) {
+			token, ok := ctx.Value(scm.TokenKey{}).(*scm.Token)
+			if !ok || token.Token != "valid_token" {
+				return nil, nil, errors.New("no token or invalid token")
+			}
+			return &content, nil, nil
+		}).AnyTimes()
 
-	rm := NewMockRepositoryManager(1)
+	rm := NewMockRepositoryClient()
 	rm.client.Contents = contents
 
 	repo := Repository{Id: 1215, Namespace: orgName, Name: repoName, Url: repoURL}
@@ -358,44 +390,73 @@ func Test_CoverageHandler_File(t *testing.T) {
 		},
 	}
 
-	covStore := setupCoverageStore(t, cov)
-	s := NewCoverageHandler(nil, covStore)
+	store := setupCoverageStore(t, cov)
+	s := newCoverageHandler(store)
 
-	sess := NewMoraSessionWithTokenFor(rm)
+	path := fmt.Sprintf("/%d/%s/files/%s", cov.ID, entryName, filename)
 
-	req := httptest.NewRequest(
-		http.MethodGet,
-		fmt.Sprintf("/%d/%s/files/%s", cov.ID, entryName, filename),
-		strings.NewReader(""))
-	ctx := req.Context()
-	ctx = WithMoraSession(ctx, sess)
-	ctx = WithRepostioryManager(ctx, rm)
-	ctx = WithRepo(ctx, repo)
-	req = req.WithContext(ctx)
-	w := httptest.NewRecorder()
+	t.Run("with valid token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		ctx := req.Context()
+		ctx = scm.WithContext(ctx, &scm.Token{Token: "valid_token"})
+		ctx = base.WithRepositoryClient(ctx, rm)
+		ctx = base.WithRepo(ctx, repo)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
 
-	s.Handler().ServeHTTP(w, req)
+		s.Handler().ServeHTTP(w, req)
 
-	result := w.Result()
-	require.Equal(t, http.StatusOK, result.StatusCode)
+		result := w.Result()
+		require.Equal(t, http.StatusOK, result.StatusCode)
 
-	body, err := io.ReadAll(result.Body)
-	require.NoError(t, err)
+		body, err := io.ReadAll(result.Body)
+		require.NoError(t, err)
 
-	var got CodeResponse
-	err = json.Unmarshal(body, &got)
-	require.NoError(t, err)
+		var got CodeResponse
+		err = json.Unmarshal(body, &got)
+		require.NoError(t, err)
 
-	want := CodeResponse{
-		Repo:     repo,
-		FileName: prof.FileName,
-		Code:     code,
-		Blocks:   prof.Blocks,
-	}
+		want := CodeResponse{
+			Repo:     repo,
+			FileName: prof.FileName,
+			Code:     code,
+			Blocks:   prof.Blocks,
+		}
 
-	assert.Equal(t, want, got)
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("with invalid token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		ctx := req.Context()
+		ctx = scm.WithContext(ctx, &scm.Token{Token: "invalid_token"})
+		ctx = base.WithRepositoryClient(ctx, rm)
+		ctx = base.WithRepo(ctx, repo)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		s.Handler().ServeHTTP(w, req)
+
+		result := w.Result()
+		require.Equal(t, http.StatusNotFound, result.StatusCode)
+	})
+
+	t.Run("without token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		ctx := req.Context()
+		ctx = base.WithRepositoryClient(ctx, rm)
+		ctx = base.WithRepo(ctx, repo)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		s.Handler().ServeHTTP(w, req)
+
+		result := w.Result()
+		require.Equal(t, http.StatusNotFound, result.StatusCode)
+	})
 }
 
+/*
 func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	covStore := setupCoverageStore(t)
 	repo := Repository{
@@ -404,7 +465,7 @@ func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 		Url:       "http://mock.scm/mockowner/mockrepo",
 	}
 	repoStore := setupRepositoryStore(t, &repo)
-	s := NewCoverageHandler(repoStore, covStore)
+	s := newCoverageHandler(repoStore, covStore)
 
 	req, want := makeCoverageUploadRequest(repo)
 	err := s.processUploadRequest(req)
@@ -415,6 +476,7 @@ func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	want.ID = 1
 	assert.Equal(t, []*Coverage{want}, got)
 }
+*/
 
 func TestCoverageHandler_AddCoverage(t *testing.T) {
 	cov := &Coverage{
@@ -439,7 +501,7 @@ func TestCoverageHandler_AddCoverage(t *testing.T) {
 	}
 
 	store := setupCoverageStore(t)
-	handler := NewCoverageHandler(nil, store)
+	handler := newCoverageHandler(store)
 	err := handler.AddCoverage(cov)
 
 	require.NoError(t, err)
@@ -528,7 +590,7 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 
 	store := setupCoverageStore(t, existing)
 
-	handler := NewCoverageHandler(nil, store)
+	handler := newCoverageHandler(store)
 	err := handler.AddCoverage(&added)
 
 	require.NoError(t, err)
@@ -537,4 +599,58 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	require.NoError(t, err)
 	want.ID = 1
 	assert.Equal(t, []*Coverage{want}, got)
+}
+
+func TestCoverageHandler_HandleUpload(t *testing.T) {
+	cov := &Coverage{
+		RepoID:    1215,
+		Revision:  "012345",
+		Timestamp: time.Now().Round(0),
+		Entries: []*CoverageEntry{
+			{
+				Name:  "go",
+				Hits:  13,
+				Lines: 20,
+				Profiles: map[string]*profile.Profile{
+					"test.go": {
+						FileName: "test.go",
+						Hits:     13,
+						Lines:    17,
+						Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}, {13, 20, 1}},
+					},
+				},
+			},
+		},
+	}
+
+	request := &CoverageUploadRequest{
+		RepoURL:   "hoge", // FIXME
+		Revision:  cov.Revision,
+		Timestamp: cov.Timestamp,
+		Entries: []*CoverageEntryUploadRequest{
+			{
+				Name:     cov.Entries[0].Name,
+				Profiles: []*profile.Profile{cov.Entries[0].Profiles["test.go"]},
+				Hits:     cov.Entries[0].Hits,
+				Lines:    cov.Entries[0].Lines,
+			},
+		},
+	}
+	body, err := json.Marshal(request)
+	require.NoError(t, err)
+
+	store := setupCoverageStore(t)
+	s := newCoverageHandler(store)
+
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req = req.WithContext(base.WithRepo(req.Context(), Repository{Id: cov.RepoID}))
+	w := httptest.NewRecorder()
+
+	s.Handler().ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusCreated, w.Result().StatusCode)
+	got, err := store.ListAll()
+	require.NoError(t, err)
+	cov.ID = 1 // 1 will be assigned by the server
+	assert.Equal(t, []*Coverage{cov}, got)
 }

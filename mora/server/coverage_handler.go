@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/drone/drone/handler/api/render"
 	"github.com/go-chi/chi/v5"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/rs/zerolog/log"
 )
@@ -28,7 +28,7 @@ type (
 	}
 
 	CoverageListResponse struct {
-		Repo      Repository         `json:"repo"`
+		Repo      base.Repository    `json:"repo"`
 		Coverages []CoverageResponse `json:"coverages"`
 	}
 
@@ -49,16 +49,16 @@ type (
 
 	FileListResponse struct {
 		Metadata MetaResonse     `json:"meta"`
-		Repo     Repository      `json:"repo"`
+		Repo     base.Repository `json:"repo"`
 		Files    []*FileResponse `json:"files"`
 	}
 
 	// handleFile
 	CodeResponse struct {
-		Repo     Repository `json:"repo"`
-		FileName string     `json:"filename"`
-		Code     string     `json:"code"`
-		Blocks   [][]int    `json:"blocks"`
+		Repo     base.Repository `json:"repo"`
+		FileName string          `json:"filename"`
+		Code     string          `json:"code"`
+		Blocks   [][]int         `json:"blocks"`
 	}
 
 	// Upload
@@ -69,6 +69,7 @@ type (
 		Profiles []*profile.Profile `json:"profiles"`
 	}
 
+	// FIXME: Remove RepoURL
 	CoverageUploadRequest struct {
 		RepoURL   string                        `json:"repo"`
 		Revision  string                        `json:"revision"`
@@ -77,7 +78,6 @@ type (
 	}
 
 	CoverageHandler struct {
-		repos     RepositoryStore
 		coverages CoverageStore
 	}
 
@@ -88,11 +88,6 @@ const (
 	coverageKey      coverageContextKey = iota
 	coverageEntryKey coverageContextKey = iota
 )
-
-func NewCoverageHandler(repos RepositoryStore, coverages CoverageStore) *CoverageHandler {
-	s := &CoverageHandler{repos: repos, coverages: coverages}
-	return s
-}
 
 func withCoverage(ctx context.Context, cov *Coverage) context.Context {
 	return context.WithValue(ctx, coverageKey, cov)
@@ -181,7 +176,7 @@ func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 }
 
 func makeCoverageListResponse(
-	rm RepositoryManager, repo Repository, coverages []*Coverage) CoverageListResponse {
+	rm base.RepositoryClient, repo base.Repository, coverages []*Coverage) CoverageListResponse {
 
 	var covs []CoverageResponse
 	for _, cov := range coverages {
@@ -198,8 +193,8 @@ func makeCoverageListResponse(
 }
 
 func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Request) {
-	rm, _ := RepositoryManagerFrom(r.Context())
-	repo, _ := RepoFrom(r.Context())
+	rm, _ := base.RepositoryClientFrom(r.Context())
+	repo, _ := base.RepoFrom(r.Context())
 
 	coverages, err := s.coverages.List(repo.Id)
 	if err != nil {
@@ -222,7 +217,7 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func makeFileListResponse(rm RepositoryManager, repo Repository, cov *Coverage, entry *CoverageEntry) FileListResponse {
+func makeFileListResponse(rm base.RepositoryClient, repo base.Repository, cov *Coverage, entry *CoverageEntry) FileListResponse {
 	files := []*FileResponse{}
 	for _, pr := range entry.Profiles {
 		files = append(files, &FileResponse{
@@ -248,8 +243,8 @@ func makeFileListResponse(rm RepositoryManager, repo Repository, cov *Coverage, 
 
 func handleFileList(w http.ResponseWriter, r *http.Request) {
 	log.Print("handleFileList")
-	rm, _ := RepositoryManagerFrom(r.Context())
-	repo, _ := RepoFrom(r.Context())
+	rm, _ := base.RepositoryClientFrom(r.Context())
+	repo, _ := base.RepoFrom(r.Context())
 	cov, _ := CoverageFrom(r.Context())
 	entry, _ := CoverageEntryFrom(r.Context())
 
@@ -258,18 +253,8 @@ func handleFileList(w http.ResponseWriter, r *http.Request) {
 }
 
 func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
-	rm, _ := RepositoryManagerFrom(ctx)
-	repo, _ := RepoFrom(ctx)
-
-	sess, ok := MoraSessionFrom(ctx)
-	if !ok {
-		return nil, errors.New("MoraSession not found in a context")
-	}
-
-	ctx, err := sess.WithToken(context.Background(), rm.ID())
-	if err != nil {
-		return nil, err
-	}
+	rm, _ := base.RepositoryClientFrom(ctx)
+	repo, _ := base.RepoFrom(ctx)
 
 	client := rm.Client()
 	repoPath := repo.Namespace + "/" + repo.Name
@@ -284,7 +269,7 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 
 func handleFile(w http.ResponseWriter, r *http.Request) {
 	log.Print("handleFile")
-	repo, _ := RepoFrom(r.Context())
+	repo, _ := base.RepoFrom(r.Context())
 	cov, _ := CoverageFrom(r.Context())
 	entry, _ := CoverageEntryFrom(r.Context())
 
@@ -315,22 +300,6 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func (s *CoverageHandler) Handler() http.Handler {
-	r := chi.NewRouter()
-	r.Get("/", s.handleCoverageList)
-
-	r.Route("/{id}", func(r chi.Router) {
-		r.Use(s.injectCoverage)
-		r.Route("/{entry}", func(r chi.Router) {
-			r.Use(injectCoverageEntry)
-			r.Get("/files", handleFileList)
-			r.Get("/files/*", handleFile)
-		})
-	})
-
-	return r
-}
-
 func (s *CoverageHandler) AddCoverage(cov *Coverage) error {
 	log.Print("AddCoverage: Add coverage to CoverageStore")
 	found, err := s.coverages.FindRevision(cov.RepoID, cov.Revision)
@@ -349,21 +318,6 @@ func (s *CoverageHandler) AddCoverage(cov *Coverage) error {
 
 	log.Print("AddCoverage: Put: cov.ID=", cov.ID)
 	return s.coverages.Put(cov)
-}
-
-func readUploadRequest(reader io.Reader) (*CoverageUploadRequest, error) {
-	b, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	var req *CoverageUploadRequest
-	err = json.Unmarshal(b, &req)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
 }
 
 func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
@@ -398,49 +352,56 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 	return entries, nil
 }
 
-func (s *CoverageHandler) parseCoverageUploadRequest(req *CoverageUploadRequest) (*Coverage, error) {
-	if req.RepoURL == "" {
-		return nil, errors.New("repo url is empty")
+func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var request CoverageUploadRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		render.BadRequest(w, err)
+		return
 	}
 
-	repo, err := s.repos.FindURL(req.RepoURL)
-	if err != nil {
-		return nil, errors.New("repo is not found")
-	}
+	repo, _ := base.RepoFrom(r.Context())
 
-	entries, err := parseCoverageEntryUploadRequests(req.Entries)
+	entries, err := parseCoverageEntryUploadRequests(request.Entries)
 	if err != nil {
-		return nil, err
+		render.BadRequest(w, err)
+		return
 	}
 
 	cov := &Coverage{}
 	cov.RepoID = repo.Id
-	cov.Revision = req.Revision
+	cov.Revision = request.Revision
 	cov.Entries = entries
-	cov.Timestamp = req.Timestamp
+	cov.Timestamp = request.Timestamp
 
-	return cov, nil
-}
-
-func (s *CoverageHandler) processUploadRequest(req *CoverageUploadRequest) error {
-	cov, err := s.parseCoverageUploadRequest(req)
+	err = s.AddCoverage(cov)
 	if err != nil {
-		return err
-	}
-
-	return s.AddCoverage(cov)
-}
-
-func (s *CoverageHandler) HandleUpload(w http.ResponseWriter, r *http.Request) {
-	req, err := readUploadRequest(r.Body)
-
-	if err == nil {
-		err = s.processUploadRequest(req)
-	}
-
-	if err != nil {
-		log.Err(err).Msg("HandleUpload")
-		render.NotFound(w, render.ErrNotFound)
+		log.Error().Err(err).Msg("HandleCoverageUpload")
+		render.InternalError(w, err)
 		return
 	}
+
+	render.JSON(w, cov, http.StatusCreated)
+}
+
+func (s *CoverageHandler) Handler() http.Handler {
+	r := chi.NewRouter()
+	r.Get("/", s.handleCoverageList)
+	r.Post("/", s.HandleCoverageUpload)
+
+	r.Route("/{id}", func(r chi.Router) {
+		r.Use(s.injectCoverage)
+		r.Route("/{entry}", func(r chi.Router) {
+			r.Use(injectCoverageEntry)
+			r.Get("/files", handleFileList)
+			r.Get("/files/*", handleFile)
+		})
+	})
+
+	return r
+}
+
+func newCoverageHandler(store CoverageStore) *CoverageHandler {
+	return &CoverageHandler{coverages: store}
 }

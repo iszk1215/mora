@@ -16,9 +16,56 @@ import (
 	"unicode"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/iszk1215/mora/mora/server"
 )
+
+func listRepositories(baseURL string, token string) ([]base.Repository, error) {
+	log.Print("listRepositories")
+
+	url := fmt.Sprintf("%s%s", baseURL, "/api/repos")
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var repos []base.Repository
+	if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
+		return nil, err
+	}
+
+	return repos, nil
+}
+
+func findRepositoryByURL(baseURL, repoURL string) (*base.Repository, error) {
+	token := os.Getenv("MORA_API_KEY")
+
+	repos, err := listRepositories(baseURL, token)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range repos {
+		if r.Url == repoURL {
+			return &r, nil
+		}
+	}
+
+	return nil, errors.New("no repository found")
+}
+
+// ----------------------------------------------------------------------
 
 func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 	reader, err := os.Open(filename)
@@ -79,17 +126,24 @@ func parseFile(filename, entryName string, root fs.FS) (*server.CoverageEntryUpl
 	return e, nil
 }
 
-func upload(serverURL string, req *server.CoverageUploadRequest) error {
+func upload(serverURL, repoURL string, req *server.CoverageUploadRequest) error {
+	repo, err := findRepositoryByURL(serverURL, repoURL)
+	if err != nil {
+		return err
+	}
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return err
 	}
 
-	url := serverURL + "/api/upload"
+	url := fmt.Sprintf("%s/api/repos/%d/coverages", serverURL, repo.Id)
 	r, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
+
+	r.Header.Set("Authorization", "Bearer "+os.Getenv("MORA_API_KEY"))
 
 	client := http.Client{}
 	resp, err := client.Do(r)
@@ -102,9 +156,9 @@ func upload(serverURL string, req *server.CoverageUploadRequest) error {
 		return err
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		log.Print(msg)
-		return errors.New("returned status is not StatusOK")
+		return errors.New("returned status is not StatusCreated")
 	}
 
 	return nil
@@ -270,7 +324,7 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 			os.Exit(1)
 		}
 
-		err = upload(server, req)
+		err = upload(server, repoURL, req)
 		if err != nil {
 			return err
 		}
