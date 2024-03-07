@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/iszk1215/mora/mora/base"
+	"github.com/iszk1215/mora/mora/coverage"
 	"github.com/iszk1215/mora/mora/udm"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
@@ -64,7 +65,7 @@ type (
 	MoraServer struct {
 		repositoryManagers []RepositoryManager
 		repos              RepositoryStore
-		coverage           *CoverageService
+		coverage           *coverage.CoverageService
 		udm                *udm.Service
 		apiKey             string
 
@@ -404,7 +405,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	coverage, err := NewCoverageService(db)
+	coverage, err := coverage.NewCoverageService(db)
 	if err != nil {
 		return nil, err
 	}

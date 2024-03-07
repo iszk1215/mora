@@ -1,4 +1,4 @@
-package server
+package coverage
 
 import (
 	"fmt"

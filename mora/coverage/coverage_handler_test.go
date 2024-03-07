@@ -1,4 +1,4 @@
-package server
+package coverage
 
 import (
 	"bytes"
@@ -65,7 +65,7 @@ func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 // Test Data
 
 /*
-func makeCoverageUploadRequest(repo Repository) (*CoverageUploadRequest, *Coverage) {
+func makeCoverageUploadRequest(repo base.Repository) (*CoverageUploadRequest, *Coverage) {
 	revision := "12345"
 	now := time.Now().Round(0)
 
@@ -148,7 +148,7 @@ func Test_injectCoverage(t *testing.T) {
 
 func Test_injectCoverage_malformed_id(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/foo", nil)
-	req = req.WithContext(base.WithRepo(req.Context(), Repository{Url: "link"}))
+	req = req.WithContext(base.WithRepo(req.Context(), base.Repository{Url: "link"}))
 	w := httptest.NewRecorder()
 
 	s := newCoverageHandler(nil)
@@ -159,7 +159,7 @@ func Test_injectCoverage_malformed_id(t *testing.T) {
 
 func TestMakeCoverageResponseList(t *testing.T) {
 	rm := NewMockRepositoryClient()
-	repo := Repository{
+	repo := base.Repository{
 		Id:        1215,
 		Namespace: "owner",
 		Name:      "repo",
@@ -225,7 +225,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 
 func Test_CoverageHandler_CoverageList(t *testing.T) {
 	rm := NewMockRepositoryClient()
-	repo := Repository{Id: 1215, Namespace: "owner", Name: "repo", Url: "url"}
+	repo := base.Repository{Id: 1215, Namespace: "owner", Name: "repo", Url: "url"}
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
@@ -262,7 +262,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 	revision := "abcde"
 	timestamp := time.Now().Round(0)
 
-	repo := Repository{
+	repo := base.Repository{
 		Id:  1215,
 		Url: "http://mock.scm/org/name",
 	}
@@ -372,7 +372,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 	rm := NewMockRepositoryClient()
 	rm.client.Contents = contents
 
-	repo := Repository{Id: 1215, Namespace: orgName, Name: repoName, Url: repoURL}
+	repo := base.Repository{Id: 1215, Namespace: orgName, Name: repoName, Url: repoURL}
 
 	cov := &Coverage{
 		RepoID:    repo.Id,
@@ -459,7 +459,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 /*
 func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
 	covStore := setupCoverageStore(t)
-	repo := Repository{
+	repo := base.Repository{
 		Namespace: "mockowner",
 		Name:      "mockrepo",
 		Url:       "http://mock.scm/mockowner/mockrepo",
@@ -643,7 +643,7 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 	s := newCoverageHandler(store)
 
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
-	req = req.WithContext(base.WithRepo(req.Context(), Repository{Id: cov.RepoID}))
+	req = req.WithContext(base.WithRepo(req.Context(), base.Repository{Id: cov.RepoID}))
 	w := httptest.NewRecorder()
 
 	s.Handler().ServeHTTP(w, req)
