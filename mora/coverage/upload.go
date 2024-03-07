@@ -1,4 +1,4 @@
-package upload
+package coverage
 
 import (
 	"bufio"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/iszk1215/mora/mora/base"
-	"github.com/iszk1215/mora/mora/coverage"
 	"github.com/iszk1215/mora/mora/profile"
 )
 
@@ -98,7 +97,7 @@ func replaceFileName(profiles []*profile.Profile, root fs.FS) error {
 	return nil
 }
 
-func parseFile(filename, entryName string, root fs.FS) (*coverage.CoverageEntryUploadRequest, error) {
+func parseFile(filename, entryName string, root fs.FS) (*CoverageEntryUploadRequest, error) {
 	profiles, err := parseCoverageFromFile(filename)
 	if err != nil {
 		return nil, err
@@ -116,7 +115,7 @@ func parseFile(filename, entryName string, root fs.FS) (*coverage.CoverageEntryU
 		lines += p.Lines
 	}
 
-	e := &coverage.CoverageEntryUploadRequest{
+	e := &CoverageEntryUploadRequest{
 		Name:     entryName,
 		Profiles: profiles,
 		Hits:     hits,
@@ -126,7 +125,7 @@ func parseFile(filename, entryName string, root fs.FS) (*coverage.CoverageEntryU
 	return e, nil
 }
 
-func upload(serverURL, repoURL string, req *coverage.CoverageUploadRequest) error {
+func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
 	repo, err := findRepositoryByURL(serverURL, repoURL)
 	if err != nil {
 		return err
@@ -183,7 +182,7 @@ func isDirty(repo *git.Repository) (bool, error) {
 	return false, nil
 }
 
-func checkRequest(req *coverage.CoverageUploadRequest, repo *git.Repository) (bool, error) {
+func checkRequest(req *CoverageUploadRequest, repo *git.Repository) (bool, error) {
 	isDirty, err := isDirty(repo)
 	if err != nil {
 		return false, err
@@ -192,7 +191,7 @@ func checkRequest(req *coverage.CoverageUploadRequest, repo *git.Repository) (bo
 	return !isDirty, nil
 }
 
-func makeRequest(repo *git.Repository, url, entryName string, files ...string) (*coverage.CoverageUploadRequest, error) {
+func makeRequest(repo *git.Repository, url, entryName string, files ...string) (*CoverageUploadRequest, error) {
 	ref, err := repo.Head()
 	if err != nil {
 		return nil, err
@@ -209,7 +208,7 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 	}
 	root := os.DirFS(wt.Filesystem.Root())
 
-	entries := []*coverage.CoverageEntryUploadRequest{}
+	entries := []*CoverageEntryUploadRequest{}
 	for _, file := range files {
 		e, err := parseFile(file, entryName, root)
 		if err != nil {
@@ -229,7 +228,7 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 		url = strings.TrimSuffix(url, ".git")
 	}
 
-	req := &coverage.CoverageUploadRequest{
+	req := &CoverageUploadRequest{
 		RepoURL:   url,
 		Revision:  commit.Hash.String(),
 		Timestamp: commit.Committer.When,
@@ -253,7 +252,7 @@ func (s *stats) Add(hits, lines int) {
 	s.Lines += lines
 }
 
-func printRequest(req *coverage.CoverageUploadRequest) {
+func printRequest(req *CoverageUploadRequest) {
 	nfiles := 0
 	s := NewStats()
 	for _, e := range req.Entries {

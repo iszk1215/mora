@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/iszk1215/mora/mora/upload"
+	"github.com/iszk1215/mora/mora/coverage"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -41,7 +41,7 @@ to quickly create a Cobra application.`,
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		yes, _ := cmd.Flags().GetBool("yes")
 
-		return upload.Upload(server, repoURL, repoPath, entryName, dryRun, force, yes, args)
+		return coverage.Upload(server, repoURL, repoPath, entryName, dryRun, force, yes, args)
 	},
 }
 
