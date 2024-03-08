@@ -14,6 +14,7 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/iszk1215/mora/mora/mockscm"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -169,7 +170,7 @@ func Test_injectRepo(t *testing.T) {
 		r.Route("/{repo_id}", func(r chi.Router) {
 			r.Use(server.injectRepo)
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				repo, _ = RepoFrom(r.Context())
+				repo, _ = base.RepoFrom(r.Context())
 			})
 		})
 

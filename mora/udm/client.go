@@ -8,14 +8,14 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/iszk1215/mora/mora/model"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/rs/zerolog/log"
 )
 
 type (
 	udmClient interface {
 		init(serverAddr, token string)
-		listRepositories() ([]model.Repository, error)
+		listRepositories() ([]base.Repository, error)
 		listMetrics(repoId int64) ([]metricModel, error)
 		listItems(repoId int64, metricId int64) ([]itemModel, error)
 		addMetric(repoId int64, metric *metricModel) error
@@ -94,13 +94,13 @@ func (c *udmClientImpl) init(serverAddr, token string) {
 	c.token = token
 }
 
-func (c *udmClientImpl) listRepositories() ([]model.Repository, error) {
+func (c *udmClientImpl) listRepositories() ([]base.Repository, error) {
 	log.Print("udmClientImpl.listRepositories")
 
-	var repos []model.Repository
+	var repos []base.Repository
 	err := c.do(http.MethodGet, "/api/repos", nil, &repos)
 	if err != nil {
-		return []model.Repository{}, err
+		return []base.Repository{}, err
 	}
 
 	return repos, nil

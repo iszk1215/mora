@@ -1,4 +1,4 @@
-package upload
+package coverage
 
 import (
 	"bufio"
@@ -16,9 +16,55 @@ import (
 	"unicode"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/iszk1215/mora/mora/base"
 	"github.com/iszk1215/mora/mora/profile"
-	"github.com/iszk1215/mora/mora/server"
 )
+
+func listRepositories(baseURL string, token string) ([]base.Repository, error) {
+	log.Print("listRepositories")
+
+	url := fmt.Sprintf("%s%s", baseURL, "/api/repos")
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	var repos []base.Repository
+	if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
+		return nil, err
+	}
+
+	return repos, nil
+}
+
+func findRepositoryByURL(baseURL, repoURL string) (*base.Repository, error) {
+	token := os.Getenv("MORA_API_KEY")
+
+	repos, err := listRepositories(baseURL, token)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range repos {
+		if r.Url == repoURL {
+			return &r, nil
+		}
+	}
+
+	return nil, errors.New("no repository found")
+}
+
+// ----------------------------------------------------------------------
 
 func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 	reader, err := os.Open(filename)
@@ -51,7 +97,7 @@ func replaceFileName(profiles []*profile.Profile, root fs.FS) error {
 	return nil
 }
 
-func parseFile(filename, entryName string, root fs.FS) (*server.CoverageEntryUploadRequest, error) {
+func parseFile(filename, entryName string, root fs.FS) (*CoverageEntryUploadRequest, error) {
 	profiles, err := parseCoverageFromFile(filename)
 	if err != nil {
 		return nil, err
@@ -69,7 +115,7 @@ func parseFile(filename, entryName string, root fs.FS) (*server.CoverageEntryUpl
 		lines += p.Lines
 	}
 
-	e := &server.CoverageEntryUploadRequest{
+	e := &CoverageEntryUploadRequest{
 		Name:     entryName,
 		Profiles: profiles,
 		Hits:     hits,
@@ -79,17 +125,24 @@ func parseFile(filename, entryName string, root fs.FS) (*server.CoverageEntryUpl
 	return e, nil
 }
 
-func upload(serverURL string, req *server.CoverageUploadRequest) error {
+func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
+	repo, err := findRepositoryByURL(serverURL, repoURL)
+	if err != nil {
+		return err
+	}
+
 	body, err := json.Marshal(req)
 	if err != nil {
 		return err
 	}
 
-	url := serverURL + "/api/upload"
+	url := fmt.Sprintf("%s/api/repos/%d/coverages", serverURL, repo.Id)
 	r, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
+
+	r.Header.Set("Authorization", "Bearer "+os.Getenv("MORA_API_KEY"))
 
 	client := http.Client{}
 	resp, err := client.Do(r)
@@ -102,9 +155,9 @@ func upload(serverURL string, req *server.CoverageUploadRequest) error {
 		return err
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		log.Print(msg)
-		return errors.New("returned status is not StatusOK")
+		return errors.New("returned status is not StatusCreated")
 	}
 
 	return nil
@@ -129,7 +182,7 @@ func isDirty(repo *git.Repository) (bool, error) {
 	return false, nil
 }
 
-func checkRequest(req *server.CoverageUploadRequest, repo *git.Repository) (bool, error) {
+func checkRequest(req *CoverageUploadRequest, repo *git.Repository) (bool, error) {
 	isDirty, err := isDirty(repo)
 	if err != nil {
 		return false, err
@@ -138,7 +191,7 @@ func checkRequest(req *server.CoverageUploadRequest, repo *git.Repository) (bool
 	return !isDirty, nil
 }
 
-func makeRequest(repo *git.Repository, url, entryName string, files ...string) (*server.CoverageUploadRequest, error) {
+func makeRequest(repo *git.Repository, url, entryName string, files ...string) (*CoverageUploadRequest, error) {
 	ref, err := repo.Head()
 	if err != nil {
 		return nil, err
@@ -155,7 +208,7 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 	}
 	root := os.DirFS(wt.Filesystem.Root())
 
-	entries := []*server.CoverageEntryUploadRequest{}
+	entries := []*CoverageEntryUploadRequest{}
 	for _, file := range files {
 		e, err := parseFile(file, entryName, root)
 		if err != nil {
@@ -175,7 +228,7 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 		url = strings.TrimSuffix(url, ".git")
 	}
 
-	req := &server.CoverageUploadRequest{
+	req := &CoverageUploadRequest{
 		RepoURL:   url,
 		Revision:  commit.Hash.String(),
 		Timestamp: commit.Committer.When,
@@ -199,7 +252,7 @@ func (s *stats) Add(hits, lines int) {
 	s.Lines += lines
 }
 
-func printRequest(req *server.CoverageUploadRequest) {
+func printRequest(req *CoverageUploadRequest) {
 	nfiles := 0
 	s := NewStats()
 	for _, e := range req.Entries {
@@ -270,7 +323,7 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 			os.Exit(1)
 		}
 
-		err = upload(server, req)
+		err = upload(server, repoURL, req)
 		if err != nil {
 			return err
 		}

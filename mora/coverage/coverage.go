@@ -1,4 +1,4 @@
-package server
+package coverage
 
 import (
 	"fmt"
@@ -23,6 +23,15 @@ type (
 		Revision  string
 		Timestamp time.Time
 		Entries   []*CoverageEntry
+	}
+
+	CoverageStore interface {
+		Init() error
+		Find(id int64) (*Coverage, error)
+		FindRevision(id int64, revision string) (*Coverage, error)
+		List(id int64) ([]*Coverage, error)
+		ListAll() ([]*Coverage, error)
+		Put(*Coverage) error
 	}
 )
 
