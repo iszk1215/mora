@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/drone/drone/handler/api/render"
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/mora/base"
+	"github.com/iszk1215/mora/mora/render"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )

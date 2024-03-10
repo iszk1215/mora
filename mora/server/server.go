@@ -13,12 +13,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/drone/drone/handler/api/render"
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/iszk1215/mora/mora/base"
 	"github.com/iszk1215/mora/mora/coverage"
+	"github.com/iszk1215/mora/mora/render"
 	"github.com/iszk1215/mora/mora/udm"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"

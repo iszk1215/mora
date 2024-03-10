@@ -4,10 +4,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/drone/drone/handler/api/render"
 	"github.com/drone/go-login/login"
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
+	"github.com/iszk1215/mora/mora/render"
 	"github.com/rs/zerolog/log"
 )
 
