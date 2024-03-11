@@ -14,37 +14,45 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// uploadCmd represents the upload command
-var uploadCmd = &cobra.Command{
-	Use:   "upload",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+func NewCoverageCommand() *cobra.Command {
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		noColor := false
-		o, _ := os.Stderr.Stat()
-		if (o.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
-			noColor = true
-		}
+	var uploadCmd = &cobra.Command{
+		Use:   "upload",
+		Short: "Upload coverage",
 
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
+		RunE: func(cmd *cobra.Command, args []string) error {
+			noColor := false
+			o, _ := os.Stderr.Stat()
+			if (o.Mode() & os.ModeCharDevice) != os.ModeCharDevice {
+				noColor = true
+			}
 
-		server, _ := cmd.Flags().GetString("server")
-		repoURL, _ := cmd.Flags().GetString("repo")
-		repoPath, _ := cmd.Flags().GetString("repo-path")
-		force, _ := cmd.Flags().GetBool("force")
-		entryName, _ := cmd.Flags().GetString("entry")
-		dryRun, _ := cmd.Flags().GetBool("dry-run")
-		yes, _ := cmd.Flags().GetBool("yes")
+			log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
 
-		return coverage.Upload(server, repoURL, repoPath, entryName, dryRun, force, yes, args)
-	},
+			server, _ := cmd.Flags().GetString("server")
+			repoURL, _ := cmd.Flags().GetString("repo")
+			repoPath, _ := cmd.Flags().GetString("repo-path")
+			force, _ := cmd.Flags().GetBool("force")
+			entryName, _ := cmd.Flags().GetString("entry")
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
+			yes, _ := cmd.Flags().GetBool("yes")
+
+			return coverage.Upload(server, repoURL, repoPath, entryName, dryRun, force, yes, args)
+		},
+	}
+
+	uploadCmd.Flags().String("server", "", "server url")
+	uploadCmd.Flags().String("repo-path", "", "path of repositry")
+	uploadCmd.Flags().String("repo", "", "URL")
+	uploadCmd.Flags().String("entry", "_default", "entry name")
+	uploadCmd.Flags().BoolP("force", "f", false, "force upload even when working tree is dirty")
+	uploadCmd.Flags().Bool("dry-run", false, "test")
+	uploadCmd.Flags().BoolP("yes", "y", false, "yes")
+
+	return uploadCmd
 }
 
+/*
 func init() {
 	rootCmd.AddCommand(uploadCmd)
 
@@ -66,3 +74,4 @@ func init() {
 	uploadCmd.Flags().Bool("dry-run", false, "test")
 	uploadCmd.Flags().BoolP("yes", "y", false, "yes")
 }
+*/
