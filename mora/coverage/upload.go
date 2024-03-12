@@ -2,13 +2,9 @@ package coverage
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,41 +12,33 @@ import (
 	"unicode"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/iszk1215/mora/mora/base"
+	"github.com/iszk1215/mora/mora/core"
 	"github.com/iszk1215/mora/mora/profile"
+	"github.com/rs/zerolog/log"
 )
 
-func listRepositories(baseURL string, token string) ([]base.Repository, error) {
-	log.Print("listRepositories")
-
-	url := fmt.Sprintf("%s%s", baseURL, "/api/repos")
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+type (
+	coverageClient struct {
+		client *core.APIClient
 	}
+)
 
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	client := http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-
-	var repos []base.Repository
-	if err := json.NewDecoder(resp.Body).Decode(&repos); err != nil {
-		return nil, err
-	}
-
-	return repos, nil
+func (c *coverageClient) listRepositories() ([]core.Repository, error) {
+	return c.client.ListRepositories()
 }
 
-func findRepositoryByURL(baseURL, repoURL string) (*base.Repository, error) {
+func findRepositoryByURL(baseURL, repoURL string) (*core.Repository, error) {
 	token := os.Getenv("MORA_API_KEY")
 
-	repos, err := listRepositories(baseURL, token)
+	client := coverageClient{
+		client: &core.APIClient{
+			BaseURL: baseURL,
+			Token:   token,
+			Client:  &http.Client{},
+		},
+	}
+
+	repos, err := client.listRepositories()
 	if err != nil {
 		return nil, err
 	}
@@ -131,33 +119,18 @@ func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
 		return err
 	}
 
-	body, err := json.Marshal(req)
-	if err != nil {
-		return err
+	client := coverageClient{
+		client: &core.APIClient{
+			BaseURL: serverURL,
+			Token:   os.Getenv("MORA_API_KEY"),
+			Client:  &http.Client{},
+		},
 	}
 
-	url := fmt.Sprintf("%s/api/repos/%d/coverages", serverURL, repo.Id)
-	r, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
+	url := fmt.Sprintf("/api/repos/%d/coverages", repo.Id)
+	err = client.client.Do(http.MethodPost, url, &req, nil)
 	if err != nil {
 		return err
-	}
-
-	r.Header.Set("Authorization", "Bearer "+os.Getenv("MORA_API_KEY"))
-
-	client := http.Client{}
-	resp, err := client.Do(r)
-	if err != nil {
-		return err
-	}
-
-	msg, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusCreated {
-		log.Print(msg)
-		return errors.New("returned status is not StatusCreated")
 	}
 
 	return nil
