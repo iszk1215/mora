@@ -27,3 +27,7 @@ coverage.html: coverage.out
 
 clean:
 	rm -f coverage.out coverage.html ${EXE}
+
+generate:
+	go generate mora/mockscm/mock.go
+	go generate mora/udm/mock.go

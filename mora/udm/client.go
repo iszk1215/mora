@@ -1,117 +1,37 @@
 package udm
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 
-	"github.com/iszk1215/mora/mora/base"
+	"github.com/iszk1215/mora/mora/core"
 	"github.com/rs/zerolog/log"
 )
 
 type (
-	udmClient interface {
-		init(serverAddr, token string)
-		listRepositories() ([]base.Repository, error)
-		listMetrics(repoId int64) ([]metricModel, error)
-		listItems(repoId int64, metricId int64) ([]itemModel, error)
-		addMetric(repoId int64, metric *metricModel) error
-		addItem(repoId int64, metric *itemModel) error
-		deleteItem(repoId, metricId, itemId int64) error
-
-		addValue(repoId, metricId int64, value *valueModel) error
-		listValues(repoId, metridId, itemId int64) ([]valueModel, error)
-		deleteValues(repoId, metridId, itemId int64) error
-	}
-
-	udmClientImpl struct {
-		serverAddr string
-		// repoUrl    string
-		token  string
-		client *http.Client
+	udmClient struct {
+		client  core.APIClient
 	}
 )
 
-func (c *udmClientImpl) do(method, path string, in any, out any) error {
-	var body io.Reader
-	if in != nil {
-		data, err := json.Marshal(in)
-		if err != nil {
-			return err
-		}
-		body = bytes.NewBuffer(data)
-	}
-
-	url := fmt.Sprintf("http://%s%s", c.serverAddr, path)
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	msg, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode >= 400 {
-		log.Print(string(msg))
-		log.Print("URL=", req.URL)
-		type Error struct {
-			Message string `json:"message"`
-		}
-
-		var e Error
-		err = json.Unmarshal(msg, &e)
-		if err != nil {
-			return err
-		}
-
-		return errors.New(e.Message)
-	}
-
-	if out != nil {
-		return json.Unmarshal(msg, out)
-	}
-
-	return nil
+func (c *udmClient) do(method, path string, in any, out any) error {
+	return c.client.Do(method, path, in, out)
 }
 
 // ----------------------------------------------------------------------
 // udmClient
 
-func (c *udmClientImpl) init(serverAddr, token string) {
-	c.serverAddr = serverAddr
-	c.token = token
-}
-
-func (c *udmClientImpl) listRepositories() ([]base.Repository, error) {
+func (c *udmClient) listRepositories() ([]core.Repository, error) {
 	log.Print("udmClientImpl.listRepositories")
-
-	var repos []base.Repository
-	err := c.do(http.MethodGet, "/api/repos", nil, &repos)
-	if err != nil {
-		return []base.Repository{}, err
-	}
-
-	return repos, nil
+	return c.client.ListRepositories()
 }
 
-func (c *udmClientImpl) addMetric(repoId int64, metric *metricModel) error {
+func (c *udmClient) addMetric(repoId int64, metric *metricModel) error {
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics", repoId)
 	return c.do(http.MethodPost, path, metric, metric)
 }
 
-func (c *udmClientImpl) listMetrics(repoId int64) ([]metricModel, error) {
+func (c *udmClient) listMetrics(repoId int64) ([]metricModel, error) {
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics", repoId)
 	var resp listMetricsResponse
 	err := c.do(http.MethodGet, path, nil, &resp)
@@ -121,19 +41,19 @@ func (c *udmClientImpl) listMetrics(repoId int64) ([]metricModel, error) {
 	return resp.Metrics, nil
 }
 
-func (c *udmClientImpl) addItem(repoId int64, item *itemModel) error {
+func (c *udmClient) addItem(repoId int64, item *itemModel) error {
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items",
 		repoId, item.MetricId)
 	return c.do(http.MethodPost, path, item, item)
 }
 
-func (c *udmClientImpl) deleteItem(repoId int64, metricId int64, itemId int64) error {
+func (c *udmClient) deleteItem(repoId int64, metricId int64, itemId int64) error {
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items/%d",
 		repoId, metricId, itemId)
 	return c.do(http.MethodDelete, path, nil, nil)
 }
 
-func (c *udmClientImpl) listItems(repoId int64, metricId int64) ([]itemModel, error) {
+func (c *udmClient) listItems(repoId int64, metricId int64) ([]itemModel, error) {
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items", repoId, metricId)
 
 	var resp listItemsResponse
@@ -145,13 +65,13 @@ func (c *udmClientImpl) listItems(repoId int64, metricId int64) ([]itemModel, er
 	return resp.Items, nil
 }
 
-func (c *udmClientImpl) addValue(repoId, metricId int64, value *valueModel) error {
+func (c *udmClient) addValue(repoId, metricId int64, value *valueModel) error {
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items/%d/values",
 		repoId, metricId, value.ItemId)
 	return c.do(http.MethodPost, path, value, value)
 }
 
-func (c *udmClientImpl) listValues(repoId, metricId, itemId int64) ([]valueModel, error) {
+func (c *udmClient) listValues(repoId, metricId, itemId int64) ([]valueModel, error) {
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items/%d/values",
 		repoId, metricId, itemId)
 	var resp listValuesResponse
@@ -162,8 +82,17 @@ func (c *udmClientImpl) listValues(repoId, metricId, itemId int64) ([]valueModel
 	return resp.Values, nil
 }
 
-func (c *udmClientImpl) deleteValues(repoId, metricId, itemId int64) error {
+func (c *udmClient) deleteValues(repoId, metricId, itemId int64) error {
 	path := fmt.Sprintf("/api/repos/%d/udm/metrics/%d/items/%d/values",
 		repoId, metricId, itemId)
 	return c.do(http.MethodDelete, path, nil, nil)
+}
+
+func newUdmClient(baseURL, token string) *udmClient {
+	return &udmClient{
+		client: &core.APIClientImpl{
+			BaseURL: baseURL,
+			Token:   token,
+		},
+	}
 }
