@@ -16,7 +16,7 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/iszk1215/mora/mora/base"
+	"github.com/iszk1215/mora/mora/core"
 	"github.com/iszk1215/mora/mora/coverage"
 	"github.com/iszk1215/mora/mora/render"
 	"github.com/iszk1215/mora/mora/udm"
@@ -29,7 +29,7 @@ var (
 )
 
 type (
-	Repository = base.Repository
+	Repository = core.Repository
 
 	// Source Code Management System
 	RepositoryManager interface {
@@ -56,7 +56,7 @@ type (
 
 	RepositoryStore interface {
 		Init() error
-		Find(id int64) (base.Repository, error)
+		Find(id int64) (core.Repository, error)
 		FindURL(url string) (Repository, error)
 		ListAll() ([]Repository, error)
 		Put(repo *Repository) error
@@ -229,9 +229,9 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		}
 
 		// ctx := r.Context()
-		// ctx = base.WithRepostioryManager(ctx, rm)
-		ctx = base.WithRepositoryClient(ctx, rm)
-		ctx = base.WithRepo(ctx, repo)
+		// ctx = core.WithRepostioryManager(ctx, rm)
+		ctx = core.WithRepositoryClient(ctx, rm)
+		ctx = core.WithRepo(ctx, repo)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

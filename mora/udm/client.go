@@ -1,21 +1,18 @@
 package udm
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"os"
 
-	"github.com/iszk1215/mora/mora/base"
+	"github.com/iszk1215/mora/mora/core"
 	"github.com/rs/zerolog/log"
 )
 
 type (
 	udmClient interface {
 		init(serverAddr, token string)
-		listRepositories() ([]base.Repository, error)
+		listRepositories() ([]core.Repository, error)
 		listMetrics(repoId int64) ([]metricModel, error)
 		listItems(repoId int64, metricId int64) ([]itemModel, error)
 		addMetric(repoId int64, metric *metricModel) error
@@ -29,62 +26,21 @@ type (
 
 	udmClientImpl struct {
 		serverAddr string
-		// repoUrl    string
-		token  string
-		client *http.Client
+		token string
 	}
 )
 
-func (c *udmClientImpl) do(method, path string, in any, out any) error {
-	var body io.Reader
-	if in != nil {
-		data, err := json.Marshal(in)
-		if err != nil {
-			return err
-		}
-		body = bytes.NewBuffer(data)
+func (c *udmClientImpl) newClient() *core.APIClient {
+	return &core.APIClient{
+		BaseURL: c.serverAddr,
+		Token:   os.Getenv("MORA_API_KEY"),
 	}
-
-	url := fmt.Sprintf("http://%s%s", c.serverAddr, path)
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.token)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	msg, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode >= 400 {
-		log.Print(string(msg))
-		log.Print("URL=", req.URL)
-		type Error struct {
-			Message string `json:"message"`
-		}
-
-		var e Error
-		err = json.Unmarshal(msg, &e)
-		if err != nil {
-			return err
-		}
-
-		return errors.New(e.Message)
-	}
-
-	if out != nil {
-		return json.Unmarshal(msg, out)
-	}
-
-	return nil
 }
+
+func (c *udmClientImpl) do(method, path string, in any, out any) error {
+	return c.newClient().Do(method, path, in, out)
+}
+
 
 // ----------------------------------------------------------------------
 // udmClient
@@ -94,16 +50,9 @@ func (c *udmClientImpl) init(serverAddr, token string) {
 	c.token = token
 }
 
-func (c *udmClientImpl) listRepositories() ([]base.Repository, error) {
+func (c *udmClientImpl) listRepositories() ([]core.Repository, error) {
 	log.Print("udmClientImpl.listRepositories")
-
-	var repos []base.Repository
-	err := c.do(http.MethodGet, "/api/repos", nil, &repos)
-	if err != nil {
-		return []base.Repository{}, err
-	}
-
-	return repos, nil
+	return c.newClient().ListRepositories();
 }
 
 func (c *udmClientImpl) addMetric(repoId int64, metric *metricModel) error {

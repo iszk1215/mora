@@ -3,12 +3,11 @@ package udm
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/pelletier/go-toml/v2"
+	"github.com/iszk1215/mora/mora/core"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -17,12 +16,6 @@ import (
 type (
 	udmCommand struct {
 		client udmClient
-	}
-
-	udmCommandConfig struct {
-		ServerAddr string `toml:"server"`
-		RepoURL    string `toml:"repo"`
-		Token      string `toml:"token"`
 	}
 )
 
@@ -33,21 +26,6 @@ func unpackMetricName(name string) (string, string, error) {
 	}
 
 	return a[0], a[1], nil
-}
-
-func readConfigFile(filename string) (udmCommandConfig, error) {
-	log.Print("readConfigFile")
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return udmCommandConfig{}, err
-	}
-
-	var config udmCommandConfig
-	if err := toml.Unmarshal(b, &config); err != nil {
-		return udmCommandConfig{}, err
-	}
-
-	return config, nil
 }
 
 // ----------------------------------------------------------------------
@@ -161,10 +139,18 @@ func (c *udmCommand) listMetrics(repoId int64) error {
 		return err
 	}
 
+	if len(metrics) == 0 {
+		fmt.Print("No metric defined for this repository\n")
+	}
+
 	for _, m := range metrics {
 		items, err := c.client.listItems(repoId, m.Id)
 		if err != nil {
 			return err
+		}
+
+		if len(items) == 0 {
+			fmt.Printf("%4d %s\n", m.Id, m.Name)
 		}
 
 		for _, item := range items {
@@ -232,17 +218,17 @@ func processDebugOption(cmd *cobra.Command) {
 	}
 }
 
-func (c *udmCommand) init(cmd *cobra.Command) (udmCommandConfig, error) {
+func (c *udmCommand) init(cmd *cobra.Command) (core.ClientConfig, error) {
 	processDebugOption(cmd)
 
 	filename, _ := cmd.Flags().GetString("config")
-	var config udmCommandConfig
+	var config core.ClientConfig
 	if filename != "" {
 		log.Print("filename=", filename)
 		if _, err := os.Stat(filename); err == nil {
-			config, err = readConfigFile(filename)
+			config, err = core.ReadClientConfig(filename)
 			if err != nil {
-				return udmCommandConfig{}, err
+				return core.ClientConfig{}, err
 			}
 		}
 	}
@@ -250,11 +236,11 @@ func (c *udmCommand) init(cmd *cobra.Command) (udmCommandConfig, error) {
 	// parse global flags
 
 	if v, _ := cmd.Flags().GetString("server"); v != "" {
-		config.ServerAddr = v
+		config.ServerURL = v
 	}
 
 	if v, _ := cmd.Flags().GetString("repo"); v != "" {
-		config.ServerAddr = v
+		config.RepositoryURL = v
 	}
 
 	if v, _ := cmd.Flags().GetString("token"); v != "" {
@@ -266,7 +252,7 @@ func (c *udmCommand) init(cmd *cobra.Command) (udmCommandConfig, error) {
 		config.Token = key
 	}
 
-	c.client.init(config.ServerAddr, config.Token)
+	c.client.init(config.ServerURL, config.Token)
 
 	return config, nil
 }
@@ -277,8 +263,9 @@ func (c *udmCommand) runMetricCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repoId, err := c.getRepoId(config.RepoURL)
+	repoId, err := c.getRepoId(config.RepositoryURL)
 	if err != nil {
+		cmd.SilenceUsage = true
 		return err
 	}
 	log.Print("udmCommand.runMetricCommand: repoId=", repoId)
@@ -320,7 +307,7 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	repoId, err := c.getRepoId(config.RepoURL)
+	repoId, err := c.getRepoId(config.RepositoryURL)
 	if err != nil {
 		return err
 	}
@@ -420,6 +407,6 @@ func NewCommand() *cobra.Command {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
-	c := udmCommand{client: &udmClientImpl{client: &http.Client{}}}
+	c := udmCommand{client: &udmClientImpl{}}
 	return c.newCommand()
 }
