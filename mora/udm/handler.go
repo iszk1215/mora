@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/iszk1215/mora/mora/base"
+	"github.com/iszk1215/mora/mora/core"
 	"github.com/iszk1215/mora/mora/render"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -41,18 +41,18 @@ type (
 	}
 
 	listMetricsResponse struct {
-		Repo    base.Repository `json:"repo"`
+		Repo    core.Repository `json:"repo"`
 		Metrics []metricModel    `json:"metrics"`
 	}
 
 	listItemsResponse struct {
-		Repo   base.Repository `json:"repo"`
+		Repo   core.Repository `json:"repo"`
 		Metric metricModel      `json:"metric"`
 		Items  []itemModel      `json:"items"`
 	}
 
 	listValuesResponse struct {
-		Repo   base.Repository `json:"repo"`
+		Repo   core.Repository `json:"repo"`
 		Item   itemModel        `json:"items"`
 		Values []valueModel     `json:"values"`
 	}
@@ -100,7 +100,7 @@ func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repo, _ := base.RepoFrom(r.Context())
+	repo, _ := core.RepoFrom(r.Context())
 	if metric.RepoId == 0 {
 		metric.RepoId = repo.Id
 	} else if repo.Id != metric.RepoId {
@@ -119,7 +119,7 @@ func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *udmHandler) listMetrics(w http.ResponseWriter, r *http.Request) {
-	repo, _ := base.RepoFrom(r.Context())
+	repo, _ := core.RepoFrom(r.Context())
 	metrics, err := h.store.listMetrics(repo.Id)
 	if err != nil {
 		log.Error().Err(err).Msg("udm.handler.listMetrics")
@@ -185,7 +185,7 @@ func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
 func (h *udmHandler) listItems(w http.ResponseWriter, r *http.Request) {
 	log.Print("udmHandler.listItems")
 
-	repo, _ := base.RepoFrom(r.Context())
+	repo, _ := core.RepoFrom(r.Context())
 	metric, _ := metricFrom(r.Context())
 
 	items, err := h.store.listItems(metric.Id)
@@ -252,7 +252,7 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *udmHandler) listValues(w http.ResponseWriter, r *http.Request) {
-	repo, _ := base.RepoFrom(r.Context())
+	repo, _ := core.RepoFrom(r.Context())
 	item, _ := itemFrom(r.Context())
 
 	values, err := h.store.listValues(item.Id)
@@ -330,7 +330,7 @@ func (h *udmHandler) injectItem(next http.Handler) http.Handler {
 
 func assertRepo(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, ok := base.RepoFrom(r.Context())
+		_, ok := core.RepoFrom(r.Context())
 		if !ok {
 			log.Panic().Msg("no repository in a context")
 		}
