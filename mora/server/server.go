@@ -97,7 +97,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	log.Print("HandleRepoList: token=", token)
+	// log.Print("HandleRepoList: token=", token)
 
 	resp := []Repository{}
 	sess, _ := MoraSessionFrom(r.Context())
