@@ -42,19 +42,19 @@ type (
 
 	listMetricsResponse struct {
 		Repo    core.Repository `json:"repo"`
-		Metrics []metricModel    `json:"metrics"`
+		Metrics []metricModel   `json:"metrics"`
 	}
 
 	listItemsResponse struct {
 		Repo   core.Repository `json:"repo"`
-		Metric metricModel      `json:"metric"`
-		Items  []itemModel      `json:"items"`
+		Metric metricModel     `json:"metric"`
+		Items  []itemModel     `json:"items"`
 	}
 
 	listValuesResponse struct {
 		Repo   core.Repository `json:"repo"`
-		Item   itemModel        `json:"items"`
-		Values []valueModel     `json:"values"`
+		Item   itemModel       `json:"items"`
+		Values []valueModel    `json:"values"`
 	}
 
 	ContextKey int
@@ -91,7 +91,11 @@ func renderNoContent(w http.ResponseWriter) {
 // Metric
 
 func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			log.Error().Err(err).Msg("Body.Close")
+		}
+	}()
 
 	var metric metricModel
 	err := json.NewDecoder(r.Body).Decode(&metric)
@@ -150,7 +154,11 @@ func (h *udmHandler) deleteMetric(w http.ResponseWriter, r *http.Request) {
 // item
 
 func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			log.Error().Err(err).Msg("Body.Close")
+		}
+	}()
 
 	var item itemModel
 	err := json.NewDecoder(r.Body).Decode(&item)
@@ -183,7 +191,7 @@ func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *udmHandler) listItems(w http.ResponseWriter, r *http.Request) {
-	log.Print("udmHandler.listItems")
+	log.Info().Msg("udmHandler.listItems")
 
 	repo, _ := core.RepoFrom(r.Context())
 	metric, _ := metricFrom(r.Context())
@@ -224,7 +232,11 @@ func (h *udmHandler) deleteItem(w http.ResponseWriter, r *http.Request) {
 // value
 
 func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			log.Error().Err(err).Msg("Body.Close")
+		}
+	}()
 
 	var value valueModel
 	err := json.NewDecoder(r.Body).Decode(&value)

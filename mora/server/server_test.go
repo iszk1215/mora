@@ -425,7 +425,9 @@ func Test_NewMoraServerFromConfig_EmptySecret(t *testing.T) {
 func Test_NewMoraServerFromConfig_Github(t *testing.T) {
 	tmp, err := os.CreateTemp("", "github.conf")
 	require.NoError(t, err)
-	defer os.Remove(tmp.Name())
+	defer func() {
+		_ = os.Remove(tmp.Name())
+	}()
 
 	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
 	require.NoError(t, err)
@@ -453,7 +455,9 @@ func Test_NewMoraServerFromConfig_Github(t *testing.T) {
 func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 	tmp, err := os.CreateTemp("", "gitea.conf")
 	require.NoError(t, err)
-	defer os.Remove(tmp.Name())
+	defer func() {
+		_ = os.Remove(tmp.Name())
+	}()
 
 	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
 	require.NoError(t, err)

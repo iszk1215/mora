@@ -138,7 +138,7 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 		})
 	}
 
-	render.JSON(w, resp, 200)
+	render.JSON(w, resp, http.StatusOK)
 }
 
 func checkRepoAccessByRepositoryManager(session *MoraSession, rm RepositoryManager, owner, name string) error {
@@ -315,17 +315,19 @@ func initRepositoryManager(config RepositoryManagerConfig, baseURL string, store
 			id, config.Driver, config.URL)
 	}
 
-	if config.Driver == "gitea" {
+	switch config.Driver {
+	case "gitea":
 		return NewGiteaFromFile(
 			id,
 			config.SecretFilename,
 			config.URL,
 			baseURL+"/login")
-	} else if config.Driver == "github" {
+	case "github":
 		return NewGithubFromFile(id, config.URL, config.SecretFilename)
+	default:
+		return nil, fmt.Errorf("ConfigError: unknown repository manager: %s", config.Driver)
 	}
 
-	return nil, fmt.Errorf("ConfigError: unknown repository manager: %s", config.Driver)
 }
 
 func initRepositoryManagers(config MoraConfig, store RepositoryManagerStore) ([]RepositoryManager, error) {

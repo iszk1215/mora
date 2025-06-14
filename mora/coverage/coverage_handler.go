@@ -353,7 +353,9 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 }
 
 func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	var request CoverageUploadRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
