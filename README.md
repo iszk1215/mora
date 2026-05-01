@@ -26,12 +26,27 @@ Options:
 ```bash
 mora web              # Start web server
 mora coverage         # Coverage related commands
-mora udm              # User/channel management
+mora udm              # User Defined Metrics commands
 ```
 
 ## Configuration
 
 Create a `mora.conf` file (TOML format) to configure the server and SCM integrations.
+
+## UDM (User Defined Metrics)
+
+Track custom metrics with a three-level structure:
+- **Metric** - Define a metric (e.g., "performance")
+- **Item** - Add items to a metric (e.g., "response-time")
+- **Value** - Record values over time (revision, timestamp, value)
+
+CLI usage:
+```bash
+mora udm metric --create metricName/itemName --type int
+mora udm metric --list
+mora udm value --add metricName/itemName "123"
+mora udm value --list metricName/itemName
+```
 
 ## Development
 

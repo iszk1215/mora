@@ -15,7 +15,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
 - `main.go` → `mora/cmd` (cobra CLI)
 - `mora/server` - web server (chi router, sqlite3 via sqlx)
 - `mora/core` - client/interfaces
-- `mora/udm` - user/channel management
+- `mora/udm` - user defined metrics (UDM)
 - `mora/mockscm` - SCM mocks (build tag `//go:build !oss`)
 
 ## Notes
@@ -26,3 +26,9 @@ Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
 - Tests use in-memory sqlite3 (`sqlite3`, `:memory:?_loc=auto`)
 - Static files embedded in `mora/server/static`
 - Coverage: `make coverage.html` (requires `coverage.out` from `go test -coverprofile`)
+
+## UDM (User Defined Metrics)
+
+Tracks custom metrics beyond code coverage. Data model: Metric → Item → Value (stored in `udm_metric`, `udm_item`, `udm_value` tables).
+
+CLI: `mora udm metric [--create|--delete|--list]` / `mora udm value [--add|--list|--clear]`
