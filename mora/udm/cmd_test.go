@@ -151,7 +151,7 @@ func TestCmdCreateMetric(t *testing.T) {
 		h := newMockHelper(ctrl, repo)
 
 		metric := metricModel{Id: 0, Name: "foo"}
-		item := itemModel{Id: 0, Name: "bar", MetricId: 1976, ValueType: 1}
+		item := itemModel{Id: 0, Name: "bar", MetricId: 1976, ValueType: ValueTypeInt}
 
 		gomock.InOrder(
 			h.expectListRepositories2().Return([]core.Repository{h.repo}, nil),
@@ -171,7 +171,7 @@ func TestCmdCreateMetric(t *testing.T) {
 		defer ctrl.Finish()
 		h := newMockHelper(ctrl, repo)
 
-		item := itemModel{Id: 0, Name: "bar", MetricId: 1976, ValueType: 1}
+		item := itemModel{Id: 0, Name: "bar", MetricId: 1976, ValueType: ValueTypeInt}
 
 		gomock.InOrder(
 			h.expectListRepositories(),

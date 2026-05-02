@@ -233,7 +233,7 @@ func TestHandlerCreateItem(t *testing.T) {
 		item := itemModel{
 			MetricId:  metrics[0].Id,
 			Name:      "item1",
-			ValueType: 1, // FIXME
+			ValueType: ValueTypeInt,
 		}
 
 		r := newRequest(metrics[0].Id, item)
@@ -249,7 +249,7 @@ func TestHandlerCreateItem(t *testing.T) {
 		item := itemModel{
 			MetricId:  1976, // Invalid
 			Name:      "item1",
-			ValueType: 1, // FIXME
+			ValueType: ValueTypeInt,
 		}
 
 		r := newRequest(metrics[0].Id, item)
@@ -261,7 +261,7 @@ func TestHandlerCreateItem(t *testing.T) {
 		item := itemModel{
 			MetricId:  0,
 			Name:      "item1",
-			ValueType: 1, // FIXME
+			ValueType: ValueTypeInt,
 		}
 
 		r := newRequest(metrics[1].Id, item)
@@ -278,7 +278,7 @@ func TestHandlerCreateItem(t *testing.T) {
 		item := itemModel{
 			MetricId:  metrics[0].Id,
 			Name:      "item1",
-			ValueType: 1, // FIXME
+			ValueType: ValueTypeInt,
 		}
 
 		r := newRequest(metrics[1].Id, item)
@@ -305,12 +305,12 @@ func TestHandlerListItems(t *testing.T) {
 		{
 			MetricId:  metric.Id,
 			Name:      "item1",
-			ValueType: 1, // FIXME
+			ValueType: ValueTypeInt,
 		},
 		{
 			MetricId:  metric.Id,
 			Name:      "metric2",
-			ValueType: 1, // FIXME
+			ValueType: ValueTypeInt,
 		},
 	}
 
@@ -375,7 +375,7 @@ func TestDeleteItem(t *testing.T) {
 	item := itemModel{
 		MetricId:  metric.Id,
 		Name:      "item1",
-		ValueType: 1, // FIXME
+		ValueType: ValueTypeInt,
 	}
 
 	err = store.addItem(&item)
@@ -435,7 +435,7 @@ func setupTestItem(t *testing.T, store *udmStore) (core.Repository, metricModel,
 	item := itemModel{
 		MetricId:  metric.Id,
 		Name:      "item1",
-		ValueType: 1, // FIXME
+		ValueType: ValueTypeInt,
 	}
 
 	err = store.addItem(&item)
@@ -485,7 +485,7 @@ func setupTestValues(t *testing.T, store *udmStore) (core.Repository, metricMode
 	item := itemModel{
 		MetricId:  metric.Id,
 		Name:      "item1",
-		ValueType: 1, // FIXME
+		ValueType: ValueTypeInt,
 	}
 
 	err = store.addItem(&item)

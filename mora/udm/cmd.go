@@ -105,7 +105,7 @@ func (c *udmCommand) getRepoId(repoUrl string) (int64, error) {
 	return 0, errorRepositoryNotFound
 }
 
-func (c *udmCommand) createMetric(repoId int64, metricName, itemName string, typ int) error {
+func (c *udmCommand) createMetric(repoId int64, metricName, itemName string, typ ValueType) error {
 	metric, err := c.resolveMetricByName(repoId, metricName)
 	if err == errorMetricNotFound {
 		log.Print("udmCommand.createMetric: creating metric: ", metricName)
@@ -305,7 +305,7 @@ func (c *udmCommand) runMetricCommand(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		return c.createMetric(repoId, metricName, itemName, 1)
+		return c.createMetric(repoId, metricName, itemName, ValueTypeInt)
 	} else if deleteCmd {
 		if len(args) != 1 {
 			return errors.New("no metric name given")
