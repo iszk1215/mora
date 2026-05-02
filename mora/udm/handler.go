@@ -26,10 +26,10 @@ type (
 	}
 
 	itemModel struct {
-		Id        int64  `json:"id"        db:"id"`
-		MetricId  int64  `json:"metric_id" db:"metric_id"`
-		Name      string `json:"name"      db:"name"`
-		ValueType int    `json:"type"      db:"type"`
+		Id        int64    `json:"id"        db:"id"`
+		MetricId  int64    `json:"metric_id" db:"metric_id"`
+		Name      string   `json:"name"      db:"name"`
+		ValueType ValueType `json:"type"      db:"type"`
 	}
 
 	valueModel struct {

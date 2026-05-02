@@ -48,7 +48,11 @@ type (
 		sync.Mutex
 	}
 
-	MetricType int
+	ValueType int
+)
+
+const (
+	ValueTypeInt ValueType = 1
 )
 
 func newUdmStore(db *sqlx.DB) *udmStore {

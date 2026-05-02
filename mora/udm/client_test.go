@@ -175,7 +175,7 @@ func TestUdmClientAddItem(t *testing.T) {
 	api := newMockAPIClient(t)
 	c := &udmClient{client: api}
 
-	item := itemModel{MetricId: 1976, Name: "item_name", ValueType: 1}
+	item := itemModel{MetricId: 1976, Name: "item_name", ValueType: ValueTypeInt}
 
 	api.handleDo(func(method, path string, in any, out any) error {
 		require.Equal(t, method, http.MethodPost)
