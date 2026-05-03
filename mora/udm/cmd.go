@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/iszk1215/mora/mora/core"
+	moraerrors "github.com/iszk1215/mora/mora/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -44,7 +45,7 @@ func (c *udmCommand) resolveMetricByName(repoId int64, name string) (*metricMode
 		}
 	}
 
-	return nil, errorMetricNotFound
+	return nil, moraerrors.ErrMetricNotFound
 }
 
 func (c *udmCommand) resolveItemByName(repoId int64, metricId int64, name string) (*itemModel, error) {
@@ -59,7 +60,7 @@ func (c *udmCommand) resolveItemByName(repoId int64, metricId int64, name string
 		}
 	}
 
-	return nil, errorItemNotFound
+	return nil, moraerrors.ErrItemNotFound
 }
 
 func (c *udmCommand) resolveMetric(repoId int64, name string) (*metricModel, *itemModel, error) {
@@ -102,12 +103,12 @@ func (c *udmCommand) getRepoId(repoUrl string) (int64, error) {
 		}
 	}
 
-	return 0, errorRepositoryNotFound
+	return 0, moraerrors.ErrRepositoryNotFound
 }
 
 func (c *udmCommand) createMetric(repoId int64, metricName, itemName string, typ ValueType) error {
 	metric, err := c.resolveMetricByName(repoId, metricName)
-	if err == errorMetricNotFound {
+	if errors.Is(err, moraerrors.ErrMetricNotFound) {
 		log.Print("udmCommand.createMetric: creating metric: ", metricName)
 		metric = &metricModel{Name: metricName}
 		if err = c.client.addMetric(repoId, metric); err != nil {

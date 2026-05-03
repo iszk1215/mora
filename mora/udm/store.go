@@ -1,18 +1,10 @@
 package udm
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/jmoiron/sqlx"
-)
-
-var (
-	errorRepositoryNotFound = errors.New("no repository found")
-	errorMetricInUse        = errors.New("metric in use")
-	errorMetricNotFound     = errors.New("no metric found")
-	errorItemInUse          = errors.New("item in use")
-	errorItemNotFound       = errors.New("no item found")
+	"github.com/iszk1215/mora/mora/errors"
 )
 
 var schema_metric = `
@@ -100,7 +92,7 @@ func (s *udmStore) findMetricById(id int64) (*metricModel, error) {
 	}
 
 	if len(rows) == 0 {
-		return nil, errorMetricNotFound
+		return nil, errors.ErrMetricNotFound
 	}
 
 	return rows[0], nil
@@ -113,7 +105,7 @@ func (s *udmStore) deleteMetric(id int64) error {
 	}
 
 	if len(items) != 0 {
-		return errorMetricInUse
+		return errors.ErrMetricInUse
 	}
 
 	query := "DELETE FROM udm_metric WHERE id = $1"
@@ -153,7 +145,7 @@ func (s *udmStore) deleteItem(id int64) error {
 	}
 
 	if len(values) > 0 {
-		return errorItemInUse
+		return errors.ErrItemInUse
 	}
 
 	query := "DELETE FROM udm_item WHERE id = $1"
@@ -172,7 +164,7 @@ func (s *udmStore) findItemById(id int64) (*itemModel, error) {
 	}
 
 	if len(rows) == 0 {
-		return nil, errorItemNotFound
+		return nil, errors.ErrItemNotFound
 	}
 
 	return &rows[0], nil

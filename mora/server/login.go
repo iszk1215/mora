@@ -7,6 +7,7 @@ import (
 	"github.com/drone/go-login/login"
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
+	"github.com/iszk1215/mora/mora/errors"
 	"github.com/iszk1215/mora/mora/render"
 	"github.com/rs/zerolog/log"
 )
@@ -24,7 +25,7 @@ func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 		err := login.ErrorFrom(r.Context())
 		if err != nil {
 			log.Error().Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, errors.ErrNotFound)
 			return
 		}
 
@@ -54,14 +55,14 @@ func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) htt
 		sess, _ := MoraSessionFrom(r.Context())
 		if sess == nil {
 			log.Error().Msg("No session found in context")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, errors.ErrNotFound)
 			return
 		}
 
 		log.Print("LoginHandler: sess.loggingInto=", sess.loggingInto)
 		if sess.loggingInto < 0 {
 			log.Error().Msg("No current scm_id in session")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, errors.ErrNotFound)
 			return
 		}
 
@@ -70,7 +71,7 @@ func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) htt
 
 		handler, ok := handlers[rm_id]
 		if !ok {
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, errors.ErrNotFound)
 			return
 		}
 		handler.ServeHTTP(w, r)
@@ -80,7 +81,7 @@ func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) htt
 		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
 		if err != nil {
 			log.Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, errors.ErrNotFound)
 			return
 		}
 		log.Print("login: rm_id=", rm_id)
@@ -93,7 +94,7 @@ func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) htt
 
 		handler, ok := handlers[rm_id]
 		if !ok {
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, errors.ErrNotFound)
 			return
 		}
 		handler.ServeHTTP(w, r)
@@ -117,7 +118,7 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
 		if err != nil {
 			log.Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, errors.ErrNotFound)
 			return
 		}
 		s, _ := MoraSessionFrom(r.Context())

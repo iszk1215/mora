@@ -3,14 +3,16 @@ package udm
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/mora/core"
+	moraerrors "github.com/iszk1215/mora/mora/errors"
 	"github.com/iszk1215/mora/mora/render"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -177,7 +179,7 @@ func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = h.store.addItem(&item)
-	if errors.Is(err, errorMetricNotFound) {
+		if errors.Is(err, moraerrors.ErrMetricNotFound) {
 		log.Warn().Err(err).Msg("createItem")
 		render.NotFound(w, err)
 		return
@@ -199,7 +201,7 @@ func (h *udmHandler) listItems(w http.ResponseWriter, r *http.Request) {
 	items, err := h.store.listItems(metric.Id)
 	if err != nil {
 		log.Error().Err(err).Msg("listMetrics")
-		render.NotFound(w, render.ErrNotFound)
+		render.NotFound(w, moraerrors.ErrNotFound)
 		return
 	}
 
@@ -216,7 +218,7 @@ func (h *udmHandler) deleteItem(w http.ResponseWriter, r *http.Request) {
 	item, _ := itemFrom(r.Context())
 
 	err := h.store.deleteItem(item.Id)
-	if err == errorItemInUse {
+	if errors.Is(err, moraerrors.ErrItemInUse) {
 		render.BadRequest(w, err)
 		return
 	} else if err != nil {
@@ -248,7 +250,7 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	item, _ := itemFrom(r.Context())
 	if value.ItemId != item.Id {
 		render.BadRequest(w,
-			errors.Errorf("itemId mismatch: expected %d but %d",
+			fmt.Errorf("itemId mismatch: expected %d but %d",
 				item.Id, value.ItemId))
 		return
 	}
@@ -306,7 +308,7 @@ func (h *udmHandler) injectMetric(next http.Handler) http.Handler {
 		}
 
 		metric, err := h.store.findMetricById(id)
-		if err == errorMetricNotFound {
+	if errors.Is(err, moraerrors.ErrMetricNotFound) {
 			render.BadRequest(w, errors.New("metric not found"))
 			return
 		} else if err != nil {
@@ -324,7 +326,7 @@ func (h *udmHandler) injectItem(next http.Handler) http.Handler {
 		itemId, err := strconv.ParseInt(chi.URLParam(r, "itemId"), 10, 64)
 		if err != nil {
 			log.Warn().Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, moraerrors.ErrNotFound)
 			return
 		}
 

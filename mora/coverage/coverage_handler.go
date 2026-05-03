@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/mora/core"
+	moraerrors "github.com/iszk1215/mora/mora/errors"
 	"github.com/iszk1215/mora/mora/profile"
 	"github.com/iszk1215/mora/mora/render"
 	"github.com/rs/zerolog/log"
@@ -114,14 +115,14 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 		cov, ok := CoverageFrom(r.Context())
 		if !ok {
 			log.Error().Msg("unknown coverage")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, moraerrors.ErrNotFound)
 			return
 		}
 
 		entry := cov.FindEntry(entryName)
 		if entry == nil {
 			log.Warn().Msg("can not find entry")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, moraerrors.ErrNotFound)
 			return
 		}
 
@@ -134,19 +135,19 @@ func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
 			log.Warn().Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, moraerrors.ErrNotFound)
 			return
 		}
 
 		cov, err := s.coverages.Find(id)
 		if err != nil {
 			log.Warn().Err(err).Msg("")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, moraerrors.ErrNotFound)
 			return
 		}
 		if cov == nil {
 			log.Warn().Msg("injectCoverage: cov is nil")
-			render.NotFound(w, render.ErrNotFound)
+			render.NotFound(w, moraerrors.ErrNotFound)
 			return
 		}
 		r = r.WithContext(withCoverage(r.Context(), cov))
@@ -199,13 +200,13 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 	coverages, err := s.coverages.List(repo.Id)
 	if err != nil {
 		log.Warn().Err(err).Msg("")
-		render.NotFound(w, render.ErrNotFound)
+		render.NotFound(w, moraerrors.ErrNotFound)
 		return
 	}
 
 	if len(coverages) == 0 {
 		log.Warn().Msgf("Unknown coverage not found for repo.Id=%d", repo.Id)
-		render.NotFound(w, render.ErrNotFound)
+		render.NotFound(w, moraerrors.ErrNotFound)
 		return
 	}
 
@@ -279,14 +280,14 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	profile, ok := entry.Profiles[file]
 	if !ok {
 		log.Error().Msgf("No file found in a CoverageEntry: %s", file)
-		render.NotFound(w, render.ErrNotFound)
+		render.NotFound(w, moraerrors.ErrNotFound)
 		return
 	}
 
 	code, err := getSourceCode(r.Context(), cov.Revision, file)
 	if err != nil {
 		log.Error().Err(err).Msg("handleFile")
-		render.NotFound(w, render.ErrNotFound)
+		render.NotFound(w, moraerrors.ErrNotFound)
 		return
 	}
 

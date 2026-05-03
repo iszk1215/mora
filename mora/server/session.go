@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/drone/go-scm/scm"
+	moraerrors "github.com/iszk1215/mora/mora/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -61,7 +62,7 @@ func (s *MoraSession) Remove(rmID int64) {
 func (s *MoraSession) WithToken(ctx context.Context, rmID int64) (context.Context, error) {
 	token, ok := s.getToken(rmID)
 	if !ok {
-		return nil, errorTokenNotFound
+		return nil, moraerrors.ErrTokenNotFound
 	}
 
 	return scm.WithContext(ctx, &token), nil

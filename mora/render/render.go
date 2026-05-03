@@ -33,22 +33,8 @@ func init() {
 	)
 }
 
-var (
-	// ErrInvalidToken is returned when the api request token is invalid.
-	ErrInvalidToken = errors.New("Invalid or missing token")
-
-	// ErrUnauthorized is returned when the user is not authorized.
-	ErrUnauthorized = errors.New("Unauthorized")
-
-	// ErrForbidden is returned when user access is forbidden.
-	ErrForbidden = errors.New("Forbidden")
-
-	// ErrNotFound is returned when a resource is not found.
-	ErrNotFound = errors.New("Not Found")
-
-	// ErrNotImplemented is returned when an endpoint is not implemented.
-	ErrNotImplemented = errors.New("Not Implemented")
-)
+// Note: Error constants are now defined in the errors package.
+// Use errors.ErrInvalidToken, errors.ErrNotFound, etc.
 
 // ErrorCode writes the json-encoded error message to the response.
 func ErrorCode(w http.ResponseWriter, err error, status int) {

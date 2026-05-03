@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/jmoiron/sqlx"
+	"github.com/iszk1215/mora/mora/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -106,7 +107,7 @@ func TestStoreFindMetric(t *testing.T) {
 
 	t.Run("find by non existing id", func(t *testing.T) {
 		_, err := s.findMetricById( /* id= */ 1976)
-		require.ErrorIs(t, errorMetricNotFound, err)
+		require.ErrorIs(t, errors.ErrMetricNotFound, err)
 	})
 
 	t.Run("list by existing repo id", func(t *testing.T) {
@@ -160,7 +161,7 @@ func TestStoreDeleteMetric(t *testing.T) {
 
 	t.Run("delete metric with items", func(t *testing.T) {
 		err := s.deleteMetric(metrics[1].Id)
-		require.Error(t, errorMetricInUse, err)
+		require.ErrorIs(t, errors.ErrMetricInUse, err)
 	})
 }
 
@@ -192,7 +193,7 @@ func TestStoreAddItem(t *testing.T) {
 		}
 
 		err = s.addItem(item)
-		require.ErrorIs(t, errorMetricNotFound, err)
+		require.ErrorIs(t, errors.ErrMetricNotFound, err)
 	})
 }
 
@@ -224,7 +225,7 @@ func TestStoreFindItem(t *testing.T) {
 	t.Run("find non existing item by id", func(t *testing.T) {
 		// invalid id
 		_, err = s.findItemById( /* id=*/ 1215)
-		require.ErrorIs(t, errorItemNotFound, err)
+		require.ErrorIs(t, errors.ErrItemNotFound, err)
 	})
 
 	t.Run("list items by existing metric id", func(t *testing.T) {
@@ -287,7 +288,7 @@ func TestStoreDeleteItem(t *testing.T) {
 
 	t.Run("delete existing item with value", func(t *testing.T) {
 		err := s.deleteItem(items[0].Id)
-		require.ErrorIs(t, errorItemInUse, err)
+		require.ErrorIs(t, errors.ErrItemInUse, err)
 	})
 
 	t.Run("delete non existing item", func(t *testing.T) {

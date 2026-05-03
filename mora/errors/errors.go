@@ -26,6 +26,27 @@ var (
 
 	// ErrNotFound is returned when a resource is not found.
 	ErrNotFound = New("Not Found")
+
+	// ErrNotImplemented is returned when an endpoint is not implemented.
+	ErrNotImplemented = New("Not Implemented")
+
+	// ErrTokenNotFound is returned when a token is not found in a session.
+	ErrTokenNotFound = New("token not found in a session")
+
+	// ErrRepositoryNotFound is returned when a repository is not found.
+	ErrRepositoryNotFound = New("no repository found")
+
+	// ErrMetricNotFound is returned when a metric is not found.
+	ErrMetricNotFound = New("no metric found")
+
+	// ErrMetricInUse is returned when a metric is in use.
+	ErrMetricInUse = New("metric in use")
+
+	// ErrItemNotFound is returned when an item is not found.
+	ErrItemNotFound = New("no item found")
+
+	// ErrItemInUse is returned when an item is in use.
+	ErrItemInUse = New("item in use")
 )
 
 // Error represents a json-encoded API error.

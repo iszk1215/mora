@@ -18,15 +18,14 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/iszk1215/mora/mora/core"
 	"github.com/iszk1215/mora/mora/coverage"
+	moraerrors "github.com/iszk1215/mora/mora/errors"
 	"github.com/iszk1215/mora/mora/render"
 	"github.com/iszk1215/mora/mora/udm"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 )
 
-var (
-	errorTokenNotFound = errors.New("token not found in a session")
-)
+// errorTokenNotFound is defined in the errors package as errors.ErrTokenNotFound
 
 type (
 	Repository = core.Repository
@@ -92,7 +91,7 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	repositories, err := s.repos.ListAll()
 	if err != nil {
 		log.Err(err).Msg("")
-		render.NotFound(w, render.ErrNotFound)
+		render.NotFound(w, moraerrors.ErrNotFound)
 		return
 	}
 
@@ -213,8 +212,8 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		if s.apiKey == "" || s.apiKey != token {
 			sess, _ := MoraSessionFrom(r.Context())
 			err = checkRepoAccess(sess, rm, repo)
-			if err == errorTokenNotFound {
-				render.Forbidden(w, render.ErrForbidden)
+			if errors.Is(err, moraerrors.ErrTokenNotFound) {
+				render.Forbidden(w, moraerrors.ErrForbidden)
 				return
 			} else if err != nil {
 				log.Err(err).Msg("injectRepo")
