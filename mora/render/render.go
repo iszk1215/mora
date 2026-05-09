@@ -16,12 +16,13 @@ package render
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 
-	"github.com/iszk1215/mora/mora/errors"
+	"github.com/iszk1215/mora/mora/core"
 )
 
 // indent the json-encoded API responses
@@ -35,24 +36,24 @@ func init() {
 
 var (
 	// ErrInvalidToken is returned when the api request token is invalid.
-	ErrInvalidToken = errors.New("Invalid or missing token")
+	ErrInvalidToken = errors.New("invalid or missing token")
 
 	// ErrUnauthorized is returned when the user is not authorized.
-	ErrUnauthorized = errors.New("Unauthorized")
+	ErrUnauthorized = errors.New("unauthorized")
 
 	// ErrForbidden is returned when user access is forbidden.
-	ErrForbidden = errors.New("Forbidden")
+	ErrForbidden = errors.New("forbidden")
 
 	// ErrNotFound is returned when a resource is not found.
-	ErrNotFound = errors.New("Not Found")
+	ErrNotFound = errors.New("not found")
 
 	// ErrNotImplemented is returned when an endpoint is not implemented.
-	ErrNotImplemented = errors.New("Not Implemented")
+	ErrNotImplemented = errors.New("not implemented")
 )
 
 // ErrorCode writes the json-encoded error message to the response.
 func ErrorCode(w http.ResponseWriter, err error, status int) {
-	JSON(w, &errors.Error{Message: err.Error()}, status)
+	JSON(w, &core.ErrorResponse{Message: err.Error()}, status)
 }
 
 // InternalError writes the json-encoded error message to the response

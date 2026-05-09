@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/iszk1215/mora/mora/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +70,7 @@ func TestAPIClientDo(t *testing.T) {
 
 		fn := func(req *http.Request) (*http.Response, error) {
 			testRequest(t, http.MethodGet, "/", req)
-			return makeResponse(http.StatusNotFound, errors.New(errorMessage))
+			return makeResponse(http.StatusNotFound, &ErrorResponse{Message: errorMessage})
 		}
 
 		c := newMockAPIClient(fn)
