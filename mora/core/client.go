@@ -56,11 +56,7 @@ func (c *APIClientImpl) Do(method, path string, in any, out any) error {
 	}
 
 	if resp.StatusCode >= 400 {
-		type Error struct {
-			Message string `json:"message"`
-		}
-
-		var e Error
+		var e ErrorResponse
 		err = json.Unmarshal(msg, &e)
 		if err != nil {
 			return err
