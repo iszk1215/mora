@@ -32,14 +32,14 @@ type (
 		Coverages []CoverageResponse `json:"coverages"`
 	}
 
-	// hanldleFileList
+	// handleFileList
 	FileResponse struct {
 		FileName string `json:"filename"`
 		Hits     int    `json:"hits"`
 		Lines    int    `json:"lines"`
 	}
 
-	MetaResonse struct {
+	MetaResponse struct {
 		Revision    string    `json:"revision"`
 		RevisionURL string    `json:"revision_url"`
 		Time        time.Time `json:"time"`
@@ -48,7 +48,7 @@ type (
 	}
 
 	FileListResponse struct {
-		Metadata MetaResonse     `json:"meta"`
+		Metadata MetaResponse     `json:"meta"`
 		Repo     core.Repository `json:"repo"`
 		Files    []*FileResponse `json:"files"`
 	}
@@ -231,7 +231,7 @@ func makeFileListResponse(rm core.RepositoryClient, repo core.Repository, cov *C
 	return FileListResponse{
 		Files: files,
 		Repo:  repo,
-		Metadata: MetaResonse{
+		Metadata: MetaResponse{
 			Revision:    cov.Revision,
 			RevisionURL: rm.RevisionURL(repo.Url, cov.Revision),
 			Time:        cov.Timestamp,
