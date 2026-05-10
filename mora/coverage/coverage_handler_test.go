@@ -318,7 +318,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 		Lines:    17,
 	}
 
-	metaRes := MetaResonse{
+	metaRes := MetaResponse{
 		Revision:    revision,
 		RevisionURL: rm.RevisionURL(repo.Url, cov.Revision),
 		Time:        cov.Timestamp,
