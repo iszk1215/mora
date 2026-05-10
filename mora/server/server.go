@@ -45,7 +45,7 @@ type (
 	RepositoryManagerResponse struct {
 		ID      int64  `json:"id"`
 		URL     string `json:"url"`
-		Logined bool   `json:"logined"`
+		LoggedIn bool   `json:"logined"`
 	}
 
 	RepositoryManagerStore interface {
@@ -134,7 +134,7 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 		resp = append(resp, RepositoryManagerResponse{
 			ID:      rm.ID(),
 			URL:     rm.URL().String(),
-			Logined: ok,
+			LoggedIn: ok,
 		})
 	}
 

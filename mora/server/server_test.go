@@ -298,7 +298,7 @@ func TestServerRepositoryManagerList(t *testing.T) {
 		{
 			ID:      rm.ID(),
 			URL:     rm.URL().String(),
-			Logined: true,
+			LoggedIn: true,
 		},
 	}
 	require.Equal(t, expected, got)
