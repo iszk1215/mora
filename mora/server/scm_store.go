@@ -52,7 +52,7 @@ func (s *repositoryManagerStoreImpl) FindURL(url string) (int64, string, error) 
 }
 
 func (s *repositoryManagerStoreImpl) Insert(driver string, url string) (int64, error) {
-	query := "INSERT INTO scm (driver, url) values($1, $2)"
+	query := "INSERT INTO scm (driver, url) values(?, ?)"
 	res, err := s.db.Exec(query, driver, url)
 	if err != nil {
 		return -1, err

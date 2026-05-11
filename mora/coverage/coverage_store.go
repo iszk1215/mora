@@ -81,7 +81,7 @@ func (s *coverageStoreImpl) Migrate() error {
 		}
 		log.Print(contents)
 
-		query = "UPDATE coverage SET contents = $1 WHERE id = $2"
+		query = "UPDATE coverage SET contents = ? WHERE id = ?"
 		_, err = s.db.Exec(query, contents, row.ID)
 		if err != nil {
 			return err
@@ -180,7 +180,7 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 
 	rows := []int64{}
 	err = s.db.Select(&rows,
-		"SELECT id FROM coverage WHERE repo_id = $1 and revision = $2",
+		"SELECT id FROM coverage WHERE repo_id = ? and revision = ?",
 		cov.RepoID, cov.Revision)
 	if err != nil {
 		return err
@@ -189,7 +189,7 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 	if len(rows) == 0 { // insert
 		log.Print("Insert")
 		res, err := s.db.Exec(
-			"INSERT INTO coverage (repo_id, revision, time, contents) VALUES ($1, $2, $3, $4)",
+			"INSERT INTO coverage (repo_id, revision, time, contents) VALUES (?, ?, ?, ?)",
 			cov.RepoID, cov.Revision, cov.Timestamp, contents)
 		if err != nil {
 			return err
@@ -201,7 +201,7 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 	} else { // update
 		log.Print("Update")
 		_, err = s.db.Exec(
-			"UPDATE coverage SET contents = $1 WHERE id = $2", contents, rows[0])
+			"UPDATE coverage SET contents = ? WHERE id = ?", contents, rows[0])
 		return err
 	}
 }

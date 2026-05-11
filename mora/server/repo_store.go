@@ -80,7 +80,7 @@ func (s *repositoryStoreImpl) FindURL(url string) (Repository, error) {
 
 func (s *repositoryStoreImpl) Put(repo *Repository) error {
 	res, err := s.db.Exec(
-		"INSERT INTO repository (scm, namespace, name, url) VALUES ($1, $2, $3, $4)",
+		"INSERT INTO repository (scm, namespace, name, url) VALUES (?, ?, ?, ?)",
 		repo.RepositoryManager, repo.Namespace, repo.Name, repo.Url)
 	if err != nil {
 		return err

@@ -63,7 +63,7 @@ func newUdmStore(db *sqlx.DB) *udmStore {
 // Metric
 
 func (s *udmStore) addMetric(metric *metricModel) error {
-	query := "INSERT INTO udm_metric (repo_id, name) VALUES ($1, $2)"
+	query := "INSERT INTO udm_metric (repo_id, name) VALUES (?, ?)"
 
 	res, err := s.db.Exec(query, metric.RepoId, metric.Name)
 	if err != nil {
@@ -116,7 +116,7 @@ func (s *udmStore) deleteMetric(id int64) error {
 		return errorMetricInUse
 	}
 
-	query := "DELETE FROM udm_metric WHERE id = $1"
+	query := "DELETE FROM udm_metric WHERE id = ?"
 	_, err = s.db.Exec(query, id)
 	return err
 }
@@ -131,7 +131,7 @@ func (s *udmStore) addItem(item *itemModel) error {
 		return err
 	}
 
-	query := "INSERT INTO udm_item (metric_id, name, type) VALUES ($1, $2, $3)"
+	query := "INSERT INTO udm_item (metric_id, name, type) VALUES (?, ?, ?)"
 
 	res, err := s.db.Exec(query, item.MetricId, item.Name, item.ValueType)
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *udmStore) deleteItem(id int64) error {
 		return errorItemInUse
 	}
 
-	query := "DELETE FROM udm_item WHERE id = $1"
+	query := "DELETE FROM udm_item WHERE id = ?"
 
 	_, err = s.db.Exec(query, id)
 	return err
@@ -199,7 +199,7 @@ func (s *udmStore) addValue(value *valueModel) error {
 		return err
 	}
 
-	query := "INSERT INTO udm_value (item_id, revision, time, value) VALUES ($1, $2, $3, $4)"
+	query := "INSERT INTO udm_value (item_id, revision, time, value) VALUES (?, ?, ?, ?)"
 
 	res, err := s.db.Exec(query, value.ItemId, value.Revision, value.Timestamp, value.Value)
 	if err != nil {
@@ -227,7 +227,7 @@ func (s *udmStore) listValues(itemId int64) ([]valueModel, error) {
 }
 
 func (s *udmStore) deleteValues(itemId int64) error {
-	query := "DELETE FROM udm_value WHERE item_id = $1"
+	query := "DELETE FROM udm_value WHERE item_id = ?"
 	_, err := s.db.Exec(query, itemId)
 	return err
 }
