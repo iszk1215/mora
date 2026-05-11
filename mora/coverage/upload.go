@@ -156,12 +156,12 @@ func isDirty(repo *git.Repository) (bool, error) {
 }
 
 func checkRequest(req *CoverageUploadRequest, repo *git.Repository) (bool, error) {
-	isDirty, err := isDirty(repo)
+	dirty, err := isDirty(repo)
 	if err != nil {
 		return false, err
 	}
 
-	return !isDirty, nil
+	return !dirty, nil
 }
 
 func makeRequest(repo *git.Repository, url, entryName string, files ...string) (*CoverageUploadRequest, error) {
