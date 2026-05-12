@@ -6,7 +6,6 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/rs/zerolog/log"
 )
 
 var schema = `
@@ -118,8 +117,6 @@ func toCoverage(record storableCoverage) (*Coverage, error) {
 }
 
 func (s *coverageStoreImpl) scan(query string, params ...interface{}) ([]*Coverage, error) {
-	log.Print("query=", query)
-
 	rows := []storableCoverage{}
 	err := s.db.Select(&rows, query, params...)
 	if err != nil {
@@ -184,8 +181,7 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		return err
 	}
 
-	if len(rows) == 0 { // insert
-		log.Print("Insert")
+	if len(rows) == 0 {
 		res, err := s.db.Exec(
 			"INSERT INTO coverage (repo_id, revision, time, contents) VALUES (?, ?, ?, ?)",
 			cov.RepoID, cov.Revision, cov.Timestamp, contents)
@@ -196,10 +192,8 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		cov.ID, err = res.LastInsertId()
 		// log.Print("Assing id=", cov.ID)
 		return err
-	} else { // update
-		log.Print("Update")
-		_, err = s.db.Exec(
-			"UPDATE coverage SET contents = ? WHERE id = ?", contents, rows[0])
-		return err
 	}
+	_, err = s.db.Exec(
+		"UPDATE coverage SET contents = ? WHERE id = ?", contents, rows[0])
+	return err
 }

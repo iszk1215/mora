@@ -259,7 +259,6 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Print("addValue: new id=", value.Id)
 	render.JSON(w, value, http.StatusOK)
 }
 
@@ -297,7 +296,6 @@ func (h *udmHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 
 func (h *udmHandler) injectMetric(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Print("injectMetric")
 		id, err := strconv.ParseInt(chi.URLParam(r, "metricId"), 10, 64)
 		if err != nil {
 			log.Warn().Err(err).Msg("udm.handler.injectMetric")
@@ -351,7 +349,6 @@ func assertRepo(next http.Handler) http.Handler {
 }
 
 func newHandler(store *udmStore) http.Handler {
-	log.Print("udm.newHandler")
 	h := &udmHandler{store: store}
 	r := chi.NewRouter()
 

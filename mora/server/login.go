@@ -28,7 +28,6 @@ func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 			return
 		}
 
-		log.Print("Set token to session for RepositoryManager: id=", rm.ID(), " url=", rm.URL())
 		token := convertToken(login.TokenFrom(r.Context()))
 
 		sess, _ := MoraSessionFrom(r.Context())
@@ -58,7 +57,6 @@ func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) htt
 			return
 		}
 
-		log.Print("LoginHandler: sess.loggingInto=", sess.loggingInto)
 		if sess.loggingInto < 0 {
 			log.Error().Msg("No current scm_id in session")
 			render.NotFound(w, render.ErrNotFound)
@@ -83,11 +81,9 @@ func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) htt
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-		log.Print("login: rm_id=", rm_id)
 
 		sess, _ := MoraSessionFrom(r.Context())
 		if sess != nil {
-			log.Print("LoginHandler: sess.loggingInto=", sess.loggingInto)
 			sess.loggingInto = rm_id
 		}
 

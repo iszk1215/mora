@@ -87,8 +87,6 @@ func (s *MoraServer) findRepositoryManager(id int64) RepositoryManager {
 // API Handler
 
 func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
-	log.Print("HandleRepoList")
-
 	repositories, err := s.repos.ListAll()
 	if err != nil {
 		log.Err(err).Msg("")
@@ -160,16 +158,13 @@ func checkRepoAccess(sess *MoraSession, rm RepositoryManager, repo Repository) e
 	cache := sess.getReposCache(rm.ID())
 	_, ok := cache[repo.Id]
 	if ok {
-		log.Print("checkRepoAccess: found in cache")
 		return nil
 	}
 
 	err := checkRepoAccessByRepositoryManager(sess, rm, repo.Namespace, repo.Name)
 	if err != nil {
-		log.Print("checkRepoAccess: no repo or no access at RepositoryManager")
 		return err
 	}
-	log.Print("checkRepoAccess: found in RepositoryManager: ", repo.Url)
 
 	// store cache
 	if cache == nil {
@@ -189,8 +184,6 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 			render.BadRequest(w, errors.New("invalid repository id"))
 			return
 		}
-
-		log.Print("injectRepo: repo_id=", repo_id)
 
 		repo, err := s.repos.Find(repo_id)
 		if err != nil {
@@ -222,10 +215,7 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 				return
 			} else {
 				ctx, _ = sess.WithToken(ctx, rm.ID())
-				log.Print(ctx)
 			}
-		} else {
-			log.Print("injectRepo: skip checking repo access")
 		}
 
 		// ctx := r.Context()
@@ -386,8 +376,6 @@ func initFrontendFileServer(config MoraConfig) (http.Handler, error) {
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
-	log.Print("config.Debug=", config.Debug)
-
 	db, rmStore, repoStore, err := initStore(config.DatabaseFilename)
 	if err != nil {
 		log.Err(err).Msg("initStore")

@@ -228,7 +228,6 @@ func (c *udmCommand) parsePersistentFlags(cmd *cobra.Command) error {
 
 	filename, _ := cmd.Flags().GetString("config")
 	if filename != "" {
-		log.Print("filename=", filename)
 		if _, err := os.Stat(filename); err == nil {
 			config, err := core.ReadClientConfig(filename)
 			if err != nil {
@@ -266,9 +265,7 @@ func (c *udmCommand) parsePersistentFlags(cmd *cobra.Command) error {
 		c.config.Token = key
 	}
 
-	log.Print("c.client=", c.client)
 	if c.client == nil {
-		log.Print("init UdmClient")
 		c.client = newUdmClient(c.config.ServerURL, c.config.Token)
 	}
 
@@ -358,7 +355,6 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 
 		var timestamp time.Time
 		timestamp_str, _ := cmd.Flags().GetString("time")
-		log.Print("timestamp_str=", timestamp_str)
 		if timestamp_str == "" {
 			timestamp = time.Now()
 		} else {
@@ -367,7 +363,6 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return err
 			}
-			log.Print(timestamp)
 		}
 
 		repoId, err := c.getRepoId(c.config.RepositoryURL)

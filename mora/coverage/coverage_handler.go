@@ -240,7 +240,6 @@ func makeFileListResponse(rm core.RepositoryClient, repo core.Repository, cov *C
 }
 
 func handleFileList(w http.ResponseWriter, r *http.Request) {
-	log.Print("handleFileList")
 	rm, _ := core.RepositoryClientFrom(r.Context())
 	repo, _ := core.RepoFrom(r.Context())
 	cov, _ := CoverageFrom(r.Context())
@@ -256,9 +255,8 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 
 	client := rm.Client()
 	repoPath := repo.Namespace + "/" + repo.Name
-	content, meta, err := client.Contents.Find(ctx, repoPath, path, revision)
+	content, _, err := client.Contents.Find(ctx, repoPath, path, revision)
 	if err != nil {
-		log.Print(meta)
 		return nil, err
 	}
 
@@ -266,13 +264,11 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 }
 
 func handleFile(w http.ResponseWriter, r *http.Request) {
-	log.Print("handleFile")
 	repo, _ := core.RepoFrom(r.Context())
 	cov, _ := CoverageFrom(r.Context())
 	entry, _ := CoverageEntryFrom(r.Context())
 
 	file := chi.URLParam(r, "*")
-	log.Print("file=", file)
 
 	profile, ok := entry.Profiles[file]
 	if !ok {
@@ -299,14 +295,12 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *CoverageHandler) AddCoverage(cov *Coverage) error {
-	log.Print("AddCoverage: Add coverage to CoverageStore")
 	found, err := s.coverages.FindRevision(cov.RepoID, cov.Revision)
 	if err != nil {
 		return err
 	}
 
 	if found != nil {
-		log.Print("Merge with ", found.ID)
 		cov.ID = found.ID
 		cov, err = mergeCoverage(found, cov)
 		if err != nil {
@@ -314,7 +308,6 @@ func (s *CoverageHandler) AddCoverage(cov *Coverage) error {
 		}
 	}
 
-	log.Print("AddCoverage: Put: cov.ID=", cov.ID)
 	return s.coverages.Put(cov)
 }
 
