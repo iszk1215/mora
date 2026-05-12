@@ -216,7 +216,7 @@ func (h *udmHandler) deleteItem(w http.ResponseWriter, r *http.Request) {
 	item, _ := itemFrom(r.Context())
 
 	err := h.store.deleteItem(item.Id)
-	if err == errorItemInUse {
+	if errors.Is(err, errorItemInUse) {
 		render.BadRequest(w, err)
 		return
 	} else if err != nil {

@@ -213,7 +213,7 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		if s.apiKey == "" || s.apiKey != token {
 			sess, _ := MoraSessionFrom(r.Context())
 			err = checkRepoAccess(sess, rm, repo)
-			if err == errorTokenNotFound {
+			if errors.Is(err, errorTokenNotFound) {
 				render.Forbidden(w, render.ErrForbidden)
 				return
 			} else if err != nil {
