@@ -2,7 +2,6 @@ package coverage
 
 import (
 	"encoding/json"
-	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -31,7 +30,6 @@ type (
 
 	coverageStoreImpl struct {
 		db *sqlx.DB
-		sync.Mutex
 
 		selectQuery string
 	}

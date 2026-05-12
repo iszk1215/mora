@@ -2,7 +2,6 @@ package udm
 
 import (
 	"errors"
-	"sync"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -42,11 +41,10 @@ CREATE TABLE IF NOT EXISTS udm_value (
     UNIQUE(item_id, time)
 )`
 
-type (
-	udmStore struct {
-		db *sqlx.DB
-		sync.Mutex
-	}
+	type (
+		udmStore struct {
+			db *sqlx.DB
+		}
 
 	ValueType int
 )
