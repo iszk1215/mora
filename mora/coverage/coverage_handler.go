@@ -69,9 +69,7 @@ type (
 		Profiles []*profile.Profile `json:"profiles"`
 	}
 
-	// FIXME: Remove RepoURL
 	CoverageUploadRequest struct {
-		RepoURL   string                        `json:"repo"`
 		Revision  string                        `json:"revision"`
 		Timestamp time.Time                     `json:"time"`
 		Entries   []*CoverageEntryUploadRequest `json:"entries"`

@@ -14,7 +14,6 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/iszk1215/mora/mora/core"
 	"github.com/iszk1215/mora/mora/profile"
-	"github.com/rs/zerolog/log"
 )
 
 type (
@@ -191,18 +190,7 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 		entries = append(entries, e)
 	}
 
-	if url == "" {
-		remote, err := repo.Remote("origin")
-		if err != nil {
-			return nil, err
-		}
-		log.Print(remote.Config().URLs)
-		url = remote.Config().URLs[0]
-		url = strings.TrimSuffix(url, ".git")
-	}
-
 	req := &CoverageUploadRequest{
-		RepoURL:   url,
 		Revision:  commit.Hash.String(),
 		Timestamp: commit.Committer.When,
 		Entries:   entries,
@@ -233,7 +221,6 @@ func printRequest(req *CoverageUploadRequest) {
 		nfiles += len(e.Profiles)
 	}
 
-	fmt.Printf("%-20s%s\n", "Repository", req.RepoURL)
 	fmt.Printf("%-20s%s\n", "Revision", req.Revision)
 	fmt.Printf("%-20s%s\n", "Time:", req.Timestamp)
 	fmt.Printf("%-20s%.1f%% (%d Hit / %d Lines, %d Files)\n", "Coverage",

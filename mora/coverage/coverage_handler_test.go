@@ -77,7 +77,6 @@ func makeCoverageUploadRequest(repo core.Repository) (*CoverageUploadRequest, *C
 	}
 
 	req := CoverageUploadRequest{
-		RepoURL:   repo.Url,
 		Revision:  revision,
 		Timestamp: now,
 		Entries: []*CoverageEntryUploadRequest{
@@ -624,7 +623,6 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 	}
 
 	request := &CoverageUploadRequest{
-		RepoURL:   "hoge", // FIXME
 		Revision:  cov.Revision,
 		Timestamp: cov.Timestamp,
 		Entries: []*CoverageEntryUploadRequest{
