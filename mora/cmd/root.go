@@ -10,6 +10,7 @@ import (
 
 	"github.com/iszk1215/mora/mora/coverage"
 	"github.com/iszk1215/mora/mora/udm"
+	"github.com/iszk1215/mora/mora/version"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -25,9 +26,9 @@ func New() *cobra.Command {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
 
 	var cmd = &cobra.Command{
-		Use:   "mora",
-		Short: "Mora is a coverage tracker",
-		// Long
+		Use:     "mora",
+		Short:   "Mora is a coverage tracker",
+		Version: version.Version,
 	}
 
 	cmd.PersistentFlags().Bool("debug", false, "debug log")

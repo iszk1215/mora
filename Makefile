@@ -1,12 +1,17 @@
 EXE = bin/mora
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS  = -ldflags "-X github.com/iszk1215/mora/mora/version.Version=$(VERSION) -X github.com/iszk1215/mora/mora/version.Commit=$(COMMIT) -X github.com/iszk1215/mora/mora/version.Date=$(DATE)"
+
 all: $(EXE) coverage.html check
 
 SOURCES = $(shell find . -name '*.go')
 
 bin/mora: $(SOURCES)
 	go build ./...
-	go build -o $@ main.go
+	go build $(LDFLAGS) -o $@ main.go
 
 check: $(SOURCES)
 	golangci-lint run
