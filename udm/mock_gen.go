@@ -12,7 +12,7 @@ package udm
 import (
 	reflect "reflect"
 
-	core "github.com/iszk1215/mora/mora/core"
+	core "github.com/iszk1215/mora/core"
 	gomock "go.uber.org/mock/gomock"
 )
 

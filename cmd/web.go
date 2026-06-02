@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/iszk1215/mora/mora/server"
+	"github.com/iszk1215/mora/server"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"

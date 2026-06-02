@@ -7,16 +7,16 @@ Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
 - `make` - build, test, coverage.html
 - `make test` - `go test -v ./...`
 - `make check` - golangci-lint run
-- `make generate` - mockgen for `mora/mockscm` and `mora/udm`
+- `make generate` - mockgen for `mockscm` and `udm`
 - `make run` - test then `bin/mora web --debug`
 
 ## Structure
 
-- `main.go` → `mora/cmd` (cobra CLI)
-- `mora/server` - web server (chi router, sqlite3 via sqlx)
-- `mora/core` - client/interfaces
-- `mora/udm` - user defined metrics (UDM)
-- `mora/mockscm` - SCM mocks (build tag `//go:build !oss`)
+- `main.go` → `cmd` (cobra CLI)
+- `server` - web server (chi router, sqlite3 via sqlx)
+- `core` - client/interfaces
+- `udm` - user defined metrics (UDM)
+- `mockscm` - SCM mocks (build tag `//go:build !oss`)
 
 ## Notes
 
@@ -24,7 +24,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
 - Default config: `mora.conf` (flag: `-c`)
 - Server default port: 4000 (flag: `-p`)
 - Tests use in-memory sqlite3 (`sqlite3`, `:memory:?_loc=auto`)
-- Static files embedded in `mora/server/static`
+- Static files embedded in `server/static`
 - Coverage: `make coverage.html` (requires `coverage.out` from `go test -coverprofile`)
 
 ## UDM (User Defined Metrics)

@@ -12,8 +12,8 @@ import (
 	"unicode"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/iszk1215/mora/mora/core"
-	"github.com/iszk1215/mora/mora/profile"
+	"github.com/iszk1215/mora/core"
+	"github.com/iszk1215/mora/profile"
 )
 
 type (

@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/iszk1215/mora/mora/core"
-	"github.com/iszk1215/mora/mora/profile"
-	"github.com/iszk1215/mora/mora/render"
+	"github.com/iszk1215/mora/core"
+	"github.com/iszk1215/mora/profile"
+	"github.com/iszk1215/mora/render"
 	"github.com/rs/zerolog/log"
 )
 

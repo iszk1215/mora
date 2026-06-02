@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/iszk1215/mora/mora/core"
+	"github.com/iszk1215/mora/core"
 	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
 )

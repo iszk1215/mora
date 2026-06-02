@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iszk1215/mora/mora/core"
+	"github.com/iszk1215/mora/core"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )

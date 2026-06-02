@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/iszk1215/mora/mora/coverage"
-	"github.com/iszk1215/mora/mora/udm"
-	"github.com/iszk1215/mora/mora/version"
+	"github.com/iszk1215/mora/coverage"
+	"github.com/iszk1215/mora/udm"
+	"github.com/iszk1215/mora/version"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"

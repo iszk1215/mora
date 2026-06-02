@@ -22,7 +22,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/iszk1215/mora/mora/core"
+	"github.com/iszk1215/mora/core"
 )
 
 // indent the json-encoded API responses

@@ -16,9 +16,9 @@ import (
 
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
-	"github.com/iszk1215/mora/mora/core"
-	"github.com/iszk1215/mora/mora/mockscm"
-	"github.com/iszk1215/mora/mora/profile"
+	"github.com/iszk1215/mora/core"
+	"github.com/iszk1215/mora/mockscm"
+	"github.com/iszk1215/mora/profile"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
