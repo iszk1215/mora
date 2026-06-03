@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iszk1215/mora/profile"
+	"github.com/iszk1215/mora/coverage/profile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

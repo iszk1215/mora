@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/iszk1215/mora/core"
-	"github.com/iszk1215/mora/profile"
+	"github.com/iszk1215/mora/coverage/profile"
 )
 
 type (

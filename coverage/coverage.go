@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/elliotchance/pie/v2"
-	"github.com/iszk1215/mora/profile"
+	"github.com/iszk1215/mora/coverage/profile"
 )
 
 type (
