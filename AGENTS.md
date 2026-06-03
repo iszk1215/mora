@@ -12,7 +12,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
 
 ## Structure
 
-- `main.go` → `cmd` (cobra CLI)
+- `cmd/` - entry point + CLI (cobra, all `package main`)
 - `server` - web server (chi router, sqlite3 via sqlx)
 - `core` - client/interfaces
 - `udm` - user defined metrics (UDM)

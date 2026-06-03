@@ -11,7 +11,7 @@ SOURCES = $(shell find . -name '*.go')
 
 bin/mora: $(SOURCES)
 	go build ./...
-	go build $(LDFLAGS) -o $@ main.go
+	go build $(LDFLAGS) -o $@ ./cmd
 
 check: $(SOURCES)
 	golangci-lint run
