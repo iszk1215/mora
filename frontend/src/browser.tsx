@@ -4,7 +4,7 @@ import { DefaultLink } from './util'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faFolder, faFolderOpen } from '@fortawesome/free-regular-svg-icons'
 
-interface Item {
+export interface Item {
   name: string
   type: string
   depth: number
@@ -18,7 +18,7 @@ interface Item {
   file?: FileData
 }
 
-const forEachItem = (item: Item, func: (item: Item) => boolean): void => {
+export const forEachItem = (item: Item, func: (item: Item) => boolean): void => {
   const flag = func(item)
   if (flag) {
     for (const child of item.children) {
@@ -27,7 +27,7 @@ const forEachItem = (item: Item, func: (item: Item) => boolean): void => {
   }
 }
 
-const list2tree = (files: FileData[]): Item => {
+export const list2tree = (files: FileData[]): Item => {
   // console.log('list2tree')
   const makeItem = (name: string, type: string, depth: number): Item => {
     return {
@@ -184,35 +184,33 @@ interface BrowserProp {
   files: FileData[]
 }
 
+export const collectItems = (root: Item): Item[] => {
+  const items: Item[] = []
+  forEachItem(root, (item) => {
+    if (item.name !== '') {
+      items.push(item)
+    }
+    return item.type === 'dir' && item.state === 1
+  })
+  return items
+}
+
+export const updateTree = (src: Item, selectedItem: Item): Item => {
+  const children: Item[] = []
+  for (const child of src.children) {
+    children.push(updateTree(child, selectedItem))
+  }
+
+  let state = src.state
+  if (src === selectedItem) {
+    state = state === 0 ? 1 : 0
+  }
+
+  return { ...src, state, children }
+}
+
 export const Browser = (props: BrowserProp): JSX.Element => {
-  // console.log("Browser");
   const files = props.files
-
-  const collectItems = (root: Item): Item[] => {
-    // console.log('collectItems')
-    const items: Item[] = []
-    forEachItem(root, (item) => {
-      if (item.name !== '') {
-        items.push(item)
-      }
-      return item.type === 'dir' && item.state === 1
-    })
-    return items
-  }
-
-  const updateTree = (src: Item, selectedItem: Item): Item => {
-    const children: Item[] = []
-    for (const child of src.children) {
-      children.push(updateTree(child, selectedItem))
-    }
-
-    let state = src.state
-    if (src === selectedItem) {
-      state = state === 0 ? 1 : 0
-    }
-
-    return { ...src, state, children }
-  }
 
   const [root, setRoot] = React.useState(() => { return list2tree(files) })
   const items = collectItems(root)

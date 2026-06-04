@@ -7,7 +7,7 @@ import hljs from 'highlight.js'
 var hitBackgroundColor = "bg-green-300"
 var missBackgroundColor = "bg-red-200"
 
-function loadDarkModeFromCookie(): boolean {
+export function loadDarkModeFromCookie(): boolean {
   const cookies = document.cookie
   // console.log("cookie:", cookies)
   if (cookies === '') {
@@ -19,7 +19,7 @@ function loadDarkModeFromCookie(): boolean {
   return false
 }
 
-function markupCode(code: string, blocks: number[][]): string[] {
+export function markupCode(code: string, blocks: number[][]): string[] {
   code = code.replace(/\s+$/g, '') // remove trailing '\n'
   const tmp = hljs.highlightAuto(code)
   const lines = tmp.value.split('\n')

@@ -13,8 +13,11 @@ bin/mora: $(SOURCES)
 	go build ./...
 	go build $(LDFLAGS) -o $@ main.go
 
-check: $(SOURCES)
+check: frontend-test $(SOURCES)
 	golangci-lint run
+
+frontend-test:
+	$(MAKE) -C frontend test
 	# staticcheck ./...
 
 test: $(SOURCES)

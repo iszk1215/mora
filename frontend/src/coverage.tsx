@@ -35,25 +35,25 @@ interface CodeData {
   blocks: any
 }
 
-function makeRepoCoverageListPath(params: Params) {
+export function makeRepoCoverageListPath(params: Params) {
   return `repos/${params.repo_id}/coverages`
 }
 
-function makeEntryPath(params: Params) {
+export function makeEntryPath(params: Params) {
   return `${makeRepoCoverageListPath(params)}/${params.index}/${params.entry}`
 }
 
 // formatters
 
-function formatRevision(revision: string) {
+export function formatRevision(revision: string) {
   return revision.substring(0, 10)
 }
 
-function formatTime(time: string) {
+export function formatTime(time: string) {
   return DateTime.fromISO(time).toLocaleString(DateTime.DATETIME_FULL)
 }
 
-function formatRatio(hits: number, lines: number) {
+export function formatRatio(hits: number, lines: number) {
   return (hits * 100.0 / lines).toFixed(1)
 }
 
