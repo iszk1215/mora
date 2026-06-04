@@ -5,6 +5,8 @@ import {
 
 import Datepicker from "react-tailwindcss-datepicker";
 
+import ReactECharts from 'echarts-for-react'
+
 import {
   Link,
   LoaderFunctionArgs,
@@ -12,8 +14,6 @@ import {
   redirect,
   useLoaderData,
 } from 'react-router-dom'
-
-import { Line } from 'react-chartjs-2'
 
 import { Repo } from './core'
 
@@ -74,14 +74,6 @@ async function loadUdmMetricsFromParam({ params }: LoaderFunctionArgs): Promise<
     return _loadUdmMetrics(parseInt(params.repo_id))
 
   throw new Error("repo_id is undefined")
-  /*
-  const url = `/api/repos/${params.repo_id}/udm/metrics`
-  const resp = await fetch(url)
-  if (!resp.ok)
-    throw resp
- 
-  return resp.json()
-  */
 }
 
 async function loadMetricItems({ params }: LoaderFunctionArgs): Promise<Response> {
@@ -129,29 +121,36 @@ const UdmRoot = (): JSX.Element => {
 }
 
 const UdmChart = (params: any): JSX.Element => {
-  console.log(params)
-  const options = {
-    scales: {
-      x: {
-        type: 'time' as const,
-        position: 'bottom' as const,
-        label: { display: true, text: "date" },
-        min: params.min,
-        max: params.max
-      },
-      y: {
-        type: 'linear' as const,
-        position: 'left' as const,
-        title: {
-          display: true,
-          text: params.ylabel,
-        }
-      },
-    }
+  const datasets = params.data?.datasets ?? []
+
+  const option: any = {
+    grid: { left: 60, right: 20, top: 20, bottom: 40 },
+    xAxis: {
+      type: 'time' as const,
+    },
+    yAxis: {
+      type: 'value' as const,
+      name: params.ylabel,
+    },
+    series: datasets.map((ds: any) => ({
+      name: ds.label,
+      type: 'line' as const,
+      data: ds.data.map((p: any) => [p.x, p.y]),
+    })),
+    tooltip: {
+      trigger: 'axis' as const,
+    },
+  }
+
+  if (params.min) {
+    option.xAxis.min = params.min
+  }
+  if (params.max) {
+    option.xAxis.max = params.max
   }
 
   return (
-    <Line data={params.data} options={options} width={400} height={100} id="udm-chart" />)
+    <ReactECharts option={option} style={{ width: 400, height: 100 }} id="udm-chart" />)
 }
 
 const UdmMetricRoot = (): JSX.Element => {
@@ -196,8 +195,6 @@ const UdmMetricRoot = (): JSX.Element => {
     />
   )
 
-  // console.log(metricValues)
-
   const elem = items.map((item: UdmItem, i: number) => (<li key={i}>{item.name}</li>))
 
   return (
@@ -240,4 +237,3 @@ export const udmRoute = [
     element: <UdmMetricRoot />,
   },
 ]
-

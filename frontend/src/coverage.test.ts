@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath } from './coverage'
 
 describe('formatRevision', () => {

@@ -1,35 +1,42 @@
 import { DateTime } from 'luxon'
-import React from 'react'
-import { Chart, registerables } from 'chart.js'
-import { color } from 'chart.js/helpers'
-import 'chartjs-adapter-luxon'
-import 'hw-chartjs-plugin-colorschemes'
-import { Line } from 'react-chartjs-2'
-import { getChartData, makeDataset } from './chart'
-
+import React, { useCallback } from 'react'
+import ReactECharts from 'echarts-for-react'
+import { getCoverageOption, makeCoverageSeries } from './chart'
 import { Coverage } from './core'
-(Chart as any).helpers = { color }
-Chart.register(...registerables)
 
 export const CoverageChart = (params: any): JSX.Element => {
   const coverages = params.coverages as Coverage[]
 
-  const tmp = getChartData()
-  const options = tmp.options
+  const option: any = getCoverageOption()
 
   if (params.min) {
-    options.scales.x.min = DateTime.fromJSDate(params.min).toISO()
+    option.xAxis.min = DateTime.fromJSDate(params.min).toISO()
   }
-
   if (params.max) {
-    options.scales.x.max = DateTime.fromJSDate(params.max).toISO()
+    option.xAxis.max = DateTime.fromJSDate(params.max).toISO()
   }
 
-  let datasets: any = []
   if (coverages.length > 0) {
-    datasets = makeDataset(coverages)
+    option.series = makeCoverageSeries(coverages)
+  } else {
+    option.series = []
   }
+
+  const onChartClick = useCallback((rawParams: any) => {
+    if (rawParams.seriesName !== 'total') {
+      const d = rawParams.data
+      if (d?.index !== undefined) {
+        const url = `${window.location}/${d.index}/${rawParams.seriesName}`
+        window.location.assign(url)
+      }
+    }
+  }, [])
 
   return (
-    <Line data={{ datasets }} options={options} width={400} height={100} id="chart-cov" />)
+    <ReactECharts
+      option={option}
+      style={{ width: 400, height: 100 }}
+      onEvents={{ click: onChartClick }}
+    />
+  )
 }

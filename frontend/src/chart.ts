@@ -6,79 +6,27 @@ interface Point {
   index: number
 }
 
-export function getChartData () {
-  const chartData = {
-    type: 'line',
-    data: {
-      datasets: [],
-      labels: null
+export function getCoverageOption() {
+  return {
+    grid: { left: 60, right: 20, top: 20, bottom: 40 },
+    xAxis: {
+      type: 'time' as const,
     },
-    options: {
-      onClick: function (_ev: any, elements: any, chart: any) {
-        // console.log(chart.data)
-        if (elements.length === 1) {
-          const e = elements[0]
-          const dataset = chart.data.datasets[e.datasetIndex]
-          if (dataset.label !== 'total') {
-            const d = dataset.data[e.index] as Point
-            const url = `${window.location}/${d.index}/${dataset.entry}`;
-            // window.location = url;
-            (window as Window).location = url
-          }
-        }
+    yAxis: {
+      type: 'value' as const,
+      name: 'Coverage %',
+      axisLabel: {
+        formatter: '{value}%',
       },
-      scales: {
-        x: {
-          type: 'time' as const,
-          position: 'bottom' as const,
-          title: {},
-          min: undefined as string | undefined,
-          max: undefined as string | undefined,
-        },
-        y: {
-          type: 'linear' as const,
-          position: 'left' as const,
-          title: {
-            display: true,
-            text: 'Coverage %'
-          }
-        }
-      },
-      animation: {
-        duration: 0
-      },
-      plugins: {
-        colorschemes: {
-          scheme: 'tableau.Classic10'
-        },
-        // datalabels: {
-        //     align: "top",
-        //     // backgroundColor: function(context) {
-        //     //     return context.dataset.backgroundColor
-        //     // },
-        //     // borderRadius: 4,
-        //     formatter: function(value, context) {
-        //         return `#${value.index}`
-        //     },
-        // },
-        tooltip: {
-          callbacks: {
-            label: function (context: any) {
-              const data = context.dataset.data[context.dataIndex] as Point
-              const label = context.dataset.label
-              const y = context.raw.y
-              return `#${data.index}: ${label} ${y.toFixed(1)}%`
-            }
-          }
-        }
-      }
-    }
+    },
+    tooltip: {
+      trigger: 'axis' as const,
+    },
+    animation: false,
   }
-
-  return chartData
 }
 
-export function makeDataset (coverages: Coverage[]) {
+export function makeCoverageSeries(coverages: Coverage[]) {
   const map: { [name: string]: Point[] } = {}
 
   const hasMultiEntries = coverages.reduce(
@@ -104,11 +52,16 @@ export function makeDataset (coverages: Coverage[]) {
       )
     }
   }
-  const datasets = []
+
+  const series = []
   for (const k in map) {
-    const label = k === '_default' ? 'coverage' : k
-    datasets.push({ borderWidth: 1, label, data: map[k], entry: k })
+    const name = k === '_default' ? 'coverage' : k
+    series.push({
+      name,
+      type: 'line' as const,
+      data: map[k].map(p => ({ value: [p.x, p.y], index: p.index })),
+    })
   }
 
-  return datasets
+  return series
 }
