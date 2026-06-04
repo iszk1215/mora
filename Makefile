@@ -13,7 +13,7 @@ bin/mora: $(SOURCES)
 	go build ./...
 	go build $(LDFLAGS) -o $@ main.go
 
-check: frontend-test $(SOURCES)
+check: $(SOURCES)
 	golangci-lint run
 
 frontend-test:
@@ -22,6 +22,8 @@ frontend-test:
 
 test: $(SOURCES)
 	go test -v ./...
+
+test-all: frontend-test test
 
 run: bin/mora
 	go test ./...
