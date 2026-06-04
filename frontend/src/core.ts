@@ -1,0 +1,28 @@
+export interface Repo {
+  id: number
+  url: string
+  namespace: string
+  name: string
+}
+
+export interface CoverageEntry {
+  name: string
+  hits: number
+  lines: number
+}
+
+export interface Coverage {
+  index: number
+  hits: number
+  lines: number
+  entries: CoverageEntry[]
+  revision: string
+  revision_url: string
+  time: string
+}
+
+export interface FileData {
+  filename: string
+  hits: number
+  lines: number
+}
