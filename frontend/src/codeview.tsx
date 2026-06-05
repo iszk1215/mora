@@ -4,8 +4,8 @@ import hljs from 'highlight.js'
 // let darkMode = true
 // let linkElement: Element | null = null
 
-var hitBackgroundColor = "bg-green-300"
-var missBackgroundColor = "bg-red-200"
+const hitBackgroundColor = "bg-green-300"
+const missBackgroundColor = "bg-red-200"
 
 export function loadDarkModeFromCookie(): boolean {
   const cookies = document.cookie

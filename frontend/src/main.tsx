@@ -160,7 +160,7 @@ interface Crumb {
 }
 
 const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
-  var elems = crumbs.map((crumb: { label: string, link?: string }, i: number) => {
+  const elems = crumbs.map((crumb: { label: string, link?: string }, i: number) => {
     if (i < crumbs.length - 1 && crumb.link) {
       return <DefaultLink to={crumb.link} key={i}>{crumb.label}</DefaultLink>
     } else {
@@ -185,7 +185,7 @@ const Breadcrumbs = (): React.JSX.Element => {
   const last = matches[matches.length - 1]
   const data = last.data as any
 
-  let crumbs: Crumb[] = matches
+  const crumbs: Crumb[] = matches
     .filter((match: any) => Boolean(match.handle?.crumb))
     .map((match: any) => match.handle.crumb(match.params, last.data))
     .filter((crumb: Crumb) => Boolean(crumb.label))
