@@ -143,7 +143,7 @@ interface CodeViewProps {
   blocks: any
 }
 
-export const CodeView = (props: CodeViewProps): JSX.Element => {
+export const CodeView = (props: CodeViewProps): React.JSX.Element => {
   // darkMode = loadDarkModeFromCookie()
 
   const blocks = props.blocks

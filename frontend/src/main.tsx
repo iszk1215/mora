@@ -44,7 +44,7 @@ async function loadRepoList(): Promise<Repo[]> {
   return json
 }
 
-const RepoList = (): JSX.Element => {
+const RepoList = (): React.JSX.Element => {
   const repos: Repo[] = useLoaderData() as Repo[]
 
   const [metrics, setMetrics] = useState<Metric[][]>([])
@@ -55,12 +55,12 @@ const RepoList = (): JSX.Element => {
   }, [])
 
 
-  const elems: JSX.Element[] = []
+  const elems: React.JSX.Element[] = []
   console.log(repos)
   console.log(metrics)
 
   repos.forEach((repo: Repo, i: number) => {
-    let metricElems: JSX.Element[] = []
+    let metricElems: React.JSX.Element[] = []
     if (metrics.length > 0) {
       metricElems = metrics[i].map((m, j) =>
         <li key={j}>
@@ -99,13 +99,13 @@ async function loadSCMList(): Promise<Response> {
   return resp
 }
 
-const SCMList = (): JSX.Element => {
+const SCMList = (): React.JSX.Element => {
   const scmList = useLoaderData() as SCMData[]
   console.log(scmList)
 
-  const items: JSX.Element[] = []
+  const items: React.JSX.Element[] = []
   scmList.forEach((scm: SCMData, i: number) => {
-    let buttons: JSX.Element
+    let buttons: React.JSX.Element
     if (scm.logined) {
       buttons = (
         <div className="flex mb-2">
@@ -121,7 +121,7 @@ const SCMList = (): JSX.Element => {
         </div>
       )
     }
-    const item: JSX.Element = (
+    const item: React.JSX.Element = (
       <div key={i}>
         <ExternalLink href={scm.url}>{scm.url}</ExternalLink>
         {buttons}
@@ -141,7 +141,7 @@ const SCMList = (): JSX.Element => {
   )
 }
 
-const Header = (): JSX.Element => {
+const Header = (): React.JSX.Element => {
   return (
     <header className="sticky top-0 mb-2 bg-black text-white">
       <div className="w-8/12 m-auto">
@@ -159,7 +159,7 @@ interface Crumb {
   link?: string
 }
 
-const makeBredcrumbs = (crumbs: Crumb[]): JSX.Element => {
+const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
   var elems = crumbs.map((crumb: { label: string, link?: string }, i: number) => {
     if (i < crumbs.length - 1 && crumb.link) {
       return <DefaultLink to={crumb.link} key={i}>{crumb.label}</DefaultLink>
@@ -168,7 +168,7 @@ const makeBredcrumbs = (crumbs: Crumb[]): JSX.Element => {
     }
   })
 
-  const elems2: JSX.Element[] = []
+  const elems2: React.JSX.Element[] = []
   for (let i = 0; i < elems.length; i++) {
     elems2.push(elems[i])
     if (i < elems.length - 1)
@@ -178,7 +178,7 @@ const makeBredcrumbs = (crumbs: Crumb[]): JSX.Element => {
   return <div>{elems2}</div>
 }
 
-const Breadcrumbs = (): JSX.Element => {
+const Breadcrumbs = (): React.JSX.Element => {
   const matches = useMatches()
   // console.log(matches)
 
@@ -193,7 +193,7 @@ const Breadcrumbs = (): JSX.Element => {
   return makeBredcrumbs(crumbs)
 }
 
-const Root = (): JSX.Element => {
+const Root = (): React.JSX.Element => {
   return (
     <div>
       <ScrollRestoration />
@@ -206,7 +206,7 @@ const Root = (): JSX.Element => {
   )
 }
 
-const ErrorPage = (): JSX.Element => {
+const ErrorPage = (): React.JSX.Element => {
   const error = useRouteError()
   console.log(error)
   let message = <span>Error</span>

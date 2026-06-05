@@ -1,4 +1,4 @@
-import {
+import React, {
   useEffect,
   useState,
 } from 'react'
@@ -100,11 +100,11 @@ async function loadMetricValues(
   return await resp.json()
 }
 
-const UdmRoot = (): JSX.Element => {
+const UdmRoot = (): React.JSX.Element => {
   const data = useLoaderData() as MetricsResponse
   const repo = data.repo
   const metrics = data.metrics
-  const elems: JSX.Element[] = []
+  const elems: React.JSX.Element[] = []
   metrics.forEach((metric: UdmMetric, i: number) => {
     elems.push(
       <div className="ui item" key={i}>
@@ -120,7 +120,7 @@ const UdmRoot = (): JSX.Element => {
   )
 }
 
-const UdmChart = (params: any): JSX.Element => {
+const UdmChart = (params: any): React.JSX.Element => {
   const datasets = params.data?.datasets ?? []
 
   const option: any = {
@@ -153,7 +153,7 @@ const UdmChart = (params: any): JSX.Element => {
     <ReactECharts option={option} style={{ width: '100%', height: 300 }} id="udm-chart" />)
 }
 
-const UdmMetricRoot = (): JSX.Element => {
+const UdmMetricRoot = (): React.JSX.Element => {
   const data = useLoaderData() as ItemsResponse
   console.log(data)
 

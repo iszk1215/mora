@@ -1,5 +1,5 @@
 import { DateTime, Duration } from 'luxon'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Datepicker from "react-tailwindcss-datepicker";
 import {
   LoaderFunctionArgs,
@@ -68,7 +68,7 @@ async function loadFile({ params }: any): Promise<Response> {
   return resp
 }
 
-const FilePage = (): JSX.Element => {
+const FilePage = (): React.JSX.Element => {
   const data = useLoaderData() as CodeData
   return (
     <div>
@@ -91,7 +91,7 @@ async function loadCoverageEntry({ params }: LoaderFunctionArgs): Promise<Respon
   return resp
 }
 
-const CoverageEntryPage = (): JSX.Element => {
+const CoverageEntryPage = (): React.JSX.Element => {
   const resp = useLoaderData() as CoverageEntryData
   // console.log(resp)
   const meta = resp.meta
@@ -166,11 +166,11 @@ interface CoverageSegmentProperty {
 }
 
 
-const CoverageSegment = (props: CoverageSegmentProperty): JSX.Element => {
+const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
   const params = props.params
   const cov = props.cov
 
-  const elems: JSX.Element[] = []
+  const elems: React.JSX.Element[] = []
 
   if (cov.entries.length > 1) { // Add "Total"
     elems.push(
@@ -187,7 +187,7 @@ const CoverageSegment = (props: CoverageSegmentProperty): JSX.Element => {
       </DefaultLink>)
   })
 
-  const elemsWithMargin = elems.map((e: JSX.Element, i: number) => {
+  const elemsWithMargin = elems.map((e: React.JSX.Element, i: number) => {
     return <span className="mx-2" key={i}>{e} </span>
   })
 
@@ -206,7 +206,7 @@ const CoverageSegment = (props: CoverageSegmentProperty): JSX.Element => {
     </div>)
 }
 
-const CoverageList = (): JSX.Element => {
+const CoverageList = (): React.JSX.Element => {
   const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
   // console.log(document.location)
   const params = useParams()
@@ -216,7 +216,7 @@ const CoverageList = (): JSX.Element => {
 
   const [min, setMin] = useState<DateTime | null>(null);
 
-  const items: JSX.Element[] = []
+  const items: React.JSX.Element[] = []
   data.coverages.forEach((cov: Coverage, i: number) => {
     items.push(<div key={i}>
       <CoverageSegment cov={cov} params={params} />

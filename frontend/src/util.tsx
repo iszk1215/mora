@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import React, { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
 interface LinkProps {
@@ -6,11 +6,11 @@ interface LinkProps {
     children: ReactNode
 }
 
-export const DefaultLink = (props: LinkProps): JSX.Element => {
+export const DefaultLink = (props: LinkProps): React.JSX.Element => {
     return <Link className="text-blue-600 dark:text-blue-500 hover:underline" to={props.to}>{props.children}</Link>
 }
 
-export const HeaderLink = (props: LinkProps): JSX.Element => {
+export const HeaderLink = (props: LinkProps): React.JSX.Element => {
     return <Link to={props.to}>{props.children}</Link>
 }
 
@@ -19,6 +19,6 @@ interface ExternalLinkProps {
     children: ReactNode
 }
 
-export const ExternalLink = (props: ExternalLinkProps): JSX.Element => {
+export const ExternalLink = (props: ExternalLinkProps): React.JSX.Element => {
     return <a className="text-blue-600 dark:text-blue-500 hover:underline" href={props.href}>{props.children}</a>
 }

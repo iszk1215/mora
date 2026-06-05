@@ -116,8 +116,8 @@ interface Config {
   negativeThreshold: number
 }
 
-const Table = (props: TableProp): JSX.Element => {
-  const rows: JSX.Element[] = []
+const Table = (props: TableProp): React.JSX.Element => {
+  const rows: React.JSX.Element[] = []
 
   // TODO: user config
   const config: Config = { positiveThreshold: 90, negativeThreshold: 70 }
@@ -132,7 +132,7 @@ const Table = (props: TableProp): JSX.Element => {
 
   props.items.forEach((item: Item, i: number) => {
     // console.log(item)
-    const elems: JSX.Element[] = []
+    const elems: React.JSX.Element[] = []
     for (let j = 0; j < item.depth; j++) {
       elems.push(<FontAwesomeIcon key={j} icon={faFolder} fixedWidth className="opacity-0 mr-1" />)
     }
@@ -209,7 +209,7 @@ export const updateTree = (src: Item, selectedItem: Item): Item => {
   return { ...src, state, children }
 }
 
-export const Browser = (props: BrowserProp): JSX.Element => {
+export const Browser = (props: BrowserProp): React.JSX.Element => {
   const files = props.files
 
   const [root, setRoot] = React.useState(() => { return list2tree(files) })

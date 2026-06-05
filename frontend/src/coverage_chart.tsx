@@ -4,7 +4,7 @@ import ReactECharts from 'echarts-for-react'
 import { getCoverageOption, makeCoverageSeries } from './chart'
 import { Coverage } from './core'
 
-export const CoverageChart = (params: any): JSX.Element => {
+export const CoverageChart = (params: any): React.JSX.Element => {
   const coverages = params.coverages as Coverage[]
 
   const option: any = getCoverageOption()
