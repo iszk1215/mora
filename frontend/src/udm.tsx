@@ -150,7 +150,7 @@ const UdmChart = (params: any): JSX.Element => {
   }
 
   return (
-    <ReactECharts option={option} style={{ width: 400, height: 100 }} id="udm-chart" />)
+    <ReactECharts option={option} style={{ width: '100%', height: 300 }} id="udm-chart" />)
 }
 
 const UdmMetricRoot = (): JSX.Element => {

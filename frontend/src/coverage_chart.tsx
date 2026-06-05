@@ -35,7 +35,7 @@ export const CoverageChart = (params: any): JSX.Element => {
   return (
     <ReactECharts
       option={option}
-      style={{ width: 400, height: 100 }}
+      style={{ width: '100%', height: 300 }}
       onEvents={{ click: onChartClick }}
     />
   )
