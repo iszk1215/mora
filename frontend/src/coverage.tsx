@@ -7,7 +7,7 @@ import {
   redirect,
   useLoaderData,
   useParams,
-} from 'react-router-dom'
+} from 'react-router'
 
 import { Coverage, CoverageEntry, FileData, Repo } from './core'
 import { CoverageChart } from './coverage_chart'

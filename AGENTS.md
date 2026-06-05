@@ -18,6 +18,12 @@ Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
 - `udm` - user defined metrics (UDM)
 - `mockscm` - SCM mocks (build tag `//go:build !oss`)
 
+## Frontend
+
+- React Router v7: import from `react-router` (not `react-router-dom`); use `react-router/dom` for `RouterProvider`
+- Charts use ECharts (not chart.js)
+- React 19 + ReactDOM 19 (matching `@types/react` 19)
+
 ## Notes
 
 - Binary output: `bin/mora`

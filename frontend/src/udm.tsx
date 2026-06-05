@@ -13,7 +13,7 @@ import {
   Params,
   redirect,
   useLoaderData,
-} from 'react-router-dom'
+} from 'react-router'
 
 import { Repo } from './core'
 

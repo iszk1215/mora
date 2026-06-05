@@ -6,13 +6,13 @@ import {
   createBrowserRouter,
   Outlet,
   Params,
-  RouterProvider,
-  ScrollRestoration,
   isRouteErrorResponse,
+  ScrollRestoration,
   useLoaderData,
   useMatches,
   useRouteError,
-} from 'react-router-dom'
+} from 'react-router'
+import { RouterProvider } from 'react-router/dom'
 import './index.css'
 
 import { Repo } from './core'

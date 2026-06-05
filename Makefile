@@ -7,14 +7,14 @@ LDFLAGS  = -ldflags "-X github.com/iszk1215/mora/version.Version=$(VERSION) -X g
 
 all: frontend $(EXE) coverage.html check
 
-SOURCES = $(shell find . -name '*.go')
+SOURCES = $(shell find . -name '*.go' -not -path './frontend/node_modules/*')
 
 bin/mora: $(SOURCES)
 	go build ./...
 	go build $(LDFLAGS) -o $@ main.go
 
 check: $(SOURCES)
-	golangci-lint run
+	golangci-lint run ./cmd/... ./coverage/... ./core/... ./server/... ./udm/... ./version/...
 
 frontend-test:
 	$(MAKE) -C frontend test
