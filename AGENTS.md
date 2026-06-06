@@ -34,6 +34,11 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - Build output: `server/static/public/` (committed to git, `emptyOutDir: true`)
 - Dev server: `make -C frontend dev`
 
+## Workflow
+
+- All work must be done in `feature/<name>` branches
+- Merge to `main` only when explicitly instructed by the user
+
 ## Notes
 
 - Binary output: `bin/mora`
