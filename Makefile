@@ -38,6 +38,11 @@ coverage.html: coverage.out
 frontend:
 	$(MAKE) -C frontend build
 
+frontend-coverage:
+	$(MAKE) -C frontend coverage
+
+coverage-all: coverage.out frontend-coverage
+
 clean:
 	rm -f coverage.out coverage.html ${EXE}
 
