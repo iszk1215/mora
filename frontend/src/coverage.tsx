@@ -105,7 +105,7 @@ export const CoverageEntryPage = (): React.JSX.Element => {
         </div>
         <div>
           <span className="mr-2">
-            <ExternalLink href="{meta.revision_url}">
+            <ExternalLink href={meta.revision_url}>
               {formatRevision(meta.revision)}
             </ExternalLink>
           </span>
