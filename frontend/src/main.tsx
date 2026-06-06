@@ -1,4 +1,3 @@
-// import { DateTime } from 'luxon'
 import React from 'react'
 import { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
@@ -40,7 +39,6 @@ async function loadMetrics(repo_id: number): Promise<Metric[]> {
 async function loadRepoList(): Promise<Repo[]> {
   const data = await fetch('/api/repos')
   const json = await data.json()
-  // console.log(json);
   return json
 }
 
@@ -56,8 +54,6 @@ const RepoList = (): React.JSX.Element => {
 
 
   const elems: React.JSX.Element[] = []
-  console.log(repos)
-  console.log(metrics)
 
   repos.forEach((repo: Repo, i: number) => {
     let metricElems: React.JSX.Element[] = []
@@ -101,8 +97,6 @@ async function loadSCMList(): Promise<Response> {
 
 const SCMList = (): React.JSX.Element => {
   const scmList = useLoaderData() as SCMData[]
-  console.log(scmList)
-
   const items: React.JSX.Element[] = []
   scmList.forEach((scm: SCMData, i: number) => {
     let buttons: React.JSX.Element
@@ -180,7 +174,6 @@ const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
 
 const Breadcrumbs = (): React.JSX.Element => {
   const matches = useMatches()
-  // console.log(matches)
 
   const last = matches[matches.length - 1]
   const data = last.data as any
@@ -208,7 +201,6 @@ const Root = (): React.JSX.Element => {
 
 const ErrorPage = (): React.JSX.Element => {
   const error = useRouteError()
-  console.log(error)
   let message = <span>Error</span>
   if (isRouteErrorResponse(error)) {
     message = <i>{error.statusText}</i>
@@ -251,7 +243,6 @@ const router = createBrowserRouter([
       {
         path: '/repos/:repo_id',
         handle: {
-          // crumb: (params: Params) => ({ placeholder: "repo" })
           crumb: (params: Params, data: any) => {
             if (data)
               return { label: `${data.repo.namespace}/${data.repo.name}` }
@@ -271,22 +262,14 @@ const router = createBrowserRouter([
           },
           {
             path: 'udm',
-            handle: {
-              /*
-crumb: (params: Params) => ({
-label: "udm",
-link: `/repos/${params.repo_id}/udm`
-})
-*/
-            },
+            handle: {},
             children: udmRoute,
           },
         ],
       },
     ]
   }
-],
-  // {basename: "/b" }
+]
 )
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

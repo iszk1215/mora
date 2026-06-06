@@ -59,12 +59,10 @@ export function formatRatio(hits: number, lines: number) {
 
 // returns CodeData
 async function loadFile({ params }: any): Promise<Response> {
-  // console.log(params)
   const url = `/api/${makeEntryPath(params)}/files/${params["*"]}`
   const resp = await fetch(url)
   if (!resp.ok)
     throw resp
-  console.log(resp)
   return resp
 }
 
@@ -79,10 +77,8 @@ const FilePage = (): React.JSX.Element => {
 // CoverageEntryPage
 
 async function loadCoverageEntry({ params }: LoaderFunctionArgs): Promise<Response> {
-  // console.log(params);
   const url = `/api/${makeEntryPath(params)}/files`
   const resp = await fetch(url)
-  // console.log(resp)
   if (resp.status == 403) {
     return redirect("/scms")
   }
@@ -93,7 +89,6 @@ async function loadCoverageEntry({ params }: LoaderFunctionArgs): Promise<Respon
 
 export const CoverageEntryPage = (): React.JSX.Element => {
   const resp = useLoaderData() as CoverageEntryData
-  // console.log(resp)
   const meta = resp.meta
 
   return (
@@ -134,8 +129,6 @@ async function loadCoverageList({ params }: { params: Params }): Promise<Respons
   const data = await resp.json()
 
   const coverages = data.coverages
-
-  // const coverages = await resp.json() as Coverage[]
 
   // preprocess
   coverages.sort((a: Coverage, b: Coverage) => {
@@ -208,13 +201,8 @@ const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
 
 const CoverageList = (): React.JSX.Element => {
   const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
-  // console.log(document.location)
   const params = useParams()
   const repo = data.repo
-
-  // console.log(data.coverages)
-
-  const [min, setMin] = useState<DateTime | null>(null);
 
   const items: React.JSX.Element[] = []
   data.coverages.forEach((cov: Coverage, i: number) => {

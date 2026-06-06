@@ -28,7 +28,6 @@ export const forEachItem = (item: Item, func: (item: Item) => boolean): void => 
 }
 
 export const list2tree = (files: FileData[]): Item => {
-  // console.log('list2tree')
   const makeItem = (name: string, type: string, depth: number): Item => {
     return {
       name,
@@ -131,7 +130,6 @@ const Table = (props: TableProp): React.JSX.Element => {
   }
 
   props.items.forEach((item: Item, i: number) => {
-    // console.log(item)
     const elems: React.JSX.Element[] = []
     for (let j = 0; j < item.depth; j++) {
       elems.push(<FontAwesomeIcon key={j} icon={faFolder} fixedWidth className="opacity-0 mr-1" />)
@@ -216,7 +214,6 @@ export const Browser = (props: BrowserProp): React.JSX.Element => {
   const items = collectItems(root)
 
   const selectItem = (item: Item): void => {
-    console.log('selectItem')
     if (item.type === 'dir') {
       const newRoot = updateTree(root, item)
       setRoot(newRoot)

@@ -155,7 +155,6 @@ const UdmChart = (params: any): React.JSX.Element => {
 
 const UdmMetricRoot = (): React.JSX.Element => {
   const data = useLoaderData() as ItemsResponse
-  console.log(data)
 
   const [valuesList, setValuesList] = useState<UdmValue[][]>([])
 

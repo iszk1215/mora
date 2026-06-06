@@ -5,7 +5,6 @@ export function markupCode(code: string, blocks: number[][]): string[] {
   code = code.replace(/\s+$/g, '') // remove trailing '\n'
   const tmp = hljs.highlightAuto(code)
   const lines = tmp.value.split('\n')
-  // console.log(tmp.value)
 
   const blockIter = {
     curr: 0,
@@ -17,7 +16,6 @@ export function markupCode(code: string, blocks: number[][]): string[] {
   }
 
   const checkSpan = (line: string): string[] => {
-    // console.log("checkSpan: " + line)
     const spans = []
     let i = 0
     while (i < line.length) {
@@ -31,7 +29,6 @@ export function markupCode(code: string, blocks: number[][]): string[] {
         i += '</span>'.length
       } else { ++i }
     }
-    // console.log(spans)
     return spans
   }
 
@@ -42,8 +39,6 @@ export function markupCode(code: string, blocks: number[][]): string[] {
     const lineno = i + 1
     let line = lines[i]
 
-    // console.log(lines[i])
-    // console.log("lastSpan=" + lastSpan)
     if (line.length > 0) {
       line = lastSpan + line
       lastSpan = ''
