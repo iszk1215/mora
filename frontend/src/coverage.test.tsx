@@ -38,6 +38,11 @@ describe('formatRatio', () => {
   it('handles zero coverage', () => {
     expect(formatRatio(0, 100)).toBe('0.0')
   })
+
+  it('returns N/A when lines is 0', () => {
+    expect(formatRatio(0, 0)).toBe('N/A')
+    expect(formatRatio(75, 0)).toBe('N/A')
+  })
 })
 
 describe('formatTime', () => {

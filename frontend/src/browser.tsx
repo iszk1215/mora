@@ -82,7 +82,7 @@ export const list2tree = (files: FileData[]): Item => {
 
   const calcDirCoverage = (item: Item): void => {
     if (item.type !== 'dir') {
-      item.ratio = item.hits * 100.0 / item.lines
+      item.ratio = item.lines === 0 ? 0 : item.hits * 100.0 / item.lines
       return
     }
     item.hits = 0
@@ -92,7 +92,7 @@ export const list2tree = (files: FileData[]): Item => {
       item.hits += child.hits
       item.lines += child.lines
     }
-    item.ratio = item.hits * 100.0 / item.lines
+    item.ratio = item.lines === 0 ? 0 : item.hits * 100.0 / item.lines
   }
 
   calcDirCoverage(root)

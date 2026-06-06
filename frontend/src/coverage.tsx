@@ -54,6 +54,7 @@ export function formatTime(time: string) {
 }
 
 export function formatRatio(hits: number, lines: number) {
+  if (lines === 0) { return 'N/A' }
   return (hits * 100.0 / lines).toFixed(1)
 }
 

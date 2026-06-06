@@ -43,12 +43,12 @@ export function makeCoverageSeries(coverages: Coverage[]) {
         map[e.name] = []
       }
       map[e.name].push(
-        { x: cov.time, y: e.hits * 100.0 / e.lines, index: cov.index }
+        { x: cov.time, y: e.lines === 0 ? 0 : e.hits * 100.0 / e.lines, index: cov.index }
       )
     }
     if (hasMultiEntries) {
       map.total.push(
-        { x: cov.time, y: cov.hits * 100.0 / cov.lines, index: cov.index }
+        { x: cov.time, y: cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines, index: cov.index }
       )
     }
   }
