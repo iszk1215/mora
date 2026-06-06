@@ -104,7 +104,9 @@ const SCMList = (): React.JSX.Element => {
       buttons = (
         <div className="flex mb-2">
           <div className="px-4 py-2 rounded-l bg-gray-200 text-gray-400">login</div>
-          <a className="px-4 py-2 rounded-r bg-gray-400 font-bold" href={'/logout/' + scm.id}>logout</a>
+          <form method="POST" action={'/logout/' + scm.id}>
+            <button type="submit" className="px-4 py-2 rounded-r bg-gray-400 font-bold cursor-pointer">logout</button>
+          </form>
         </div>
       )
     } else {

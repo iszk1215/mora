@@ -106,7 +106,7 @@ func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) htt
 func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) http.Handler {
 	r := chi.NewRouter()
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		s, ok := MoraSessionFrom(r.Context())
 		if !ok {
 			log.Error().Msg("No session found in context")
@@ -119,7 +119,7 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 		next.ServeHTTP(w, r)
 	})
 
-	r.Get("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
+	r.Post("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
 		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
 		if err != nil {
 			log.Err(err).Msg("")

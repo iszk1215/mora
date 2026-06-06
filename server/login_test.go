@@ -118,7 +118,8 @@ func testLogout(t *testing.T, logoutAll bool) {
 	sess := NewMoraSession()
 	sess.setToken(rm0.ID(), scm.Token{})
 	sess.setToken(rm1.ID(), scm.Token{})
-	req := NewGetRequestWithMoraSession(path, sess)
+	req := httptest.NewRequest(http.MethodPost, path, nil)
+	req = req.WithContext(WithMoraSession(req.Context(), sess))
 
 	next := func(w http.ResponseWriter, r *http.Request) {}
 	repositoryManagers := []RepositoryManager{rm0, rm1}
