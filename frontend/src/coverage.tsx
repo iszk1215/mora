@@ -91,7 +91,7 @@ async function loadCoverageEntry({ params }: LoaderFunctionArgs): Promise<Respon
   return resp
 }
 
-const CoverageEntryPage = (): React.JSX.Element => {
+export const CoverageEntryPage = (): React.JSX.Element => {
   const resp = useLoaderData() as CoverageEntryData
   // console.log(resp)
   const meta = resp.meta

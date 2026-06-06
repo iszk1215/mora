@@ -1,5 +1,12 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
-import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath } from './coverage'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { useLoaderData } from 'react-router'
+import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage } from './coverage'
+
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router')
+  return { ...actual, useLoaderData: vi.fn() }
+})
 
 describe('formatRevision', () => {
   it('returns first 10 characters of revision', () => {
@@ -60,5 +67,26 @@ describe('makeEntryPath', () => {
   it('builds path from repo_id, index, and entry', () => {
     const params = { repo_id: '42', index: '3', entry: 'src' }
     expect(makeEntryPath(params)).toBe('repos/42/coverages/3/src')
+  })
+})
+
+describe('CoverageEntryPage', () => {
+  beforeEach(() => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      meta: {
+        hits: 75,
+        lines: 100,
+        revision: 'abcdefghijklmnop',
+        revision_url: 'https://example.com/commit/abc123',
+        time: '2024-01-15T10:30:00Z',
+      },
+      files: [],
+    })
+  })
+
+  it('renders revision link with href from meta.revision_url', () => {
+    render(<CoverageEntryPage />)
+    const link = screen.getByText('abcdefghij').closest('a')
+    expect(link).toHaveAttribute('href', 'https://example.com/commit/abc123')
   })
 })
