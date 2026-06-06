@@ -1,14 +1,20 @@
 # AGENTS.md
 
-Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
+Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 
 ## Commands
 
-- `make` - build, test, coverage.html
+- `make` - build + test + coverage.html + check + frontend build
 - `make test` - `go test -v ./...`
 - `make check` - golangci-lint run
 - `make generate` - mockgen for `mockscm` and `udm`
-- `make run` - test then `bin/mora web --debug`
+- `make run` - `go test ./...` then `bin/mora web --debug`
+- `make frontend` - `npm run build` (frontend)
+- `make frontend-test` - `npm run test` (frontend)
+- `make test-all` - frontend-test + test
+- `make frontend-coverage` - `npm run test:coverage` (frontend, outputs `frontend/coverage/lcov.info`)
+- `make coverage-all` - `coverage.out` + `frontend-coverage`
+- `make clean` - rm coverage.out coverage.html bin/mora
 
 ## Structure
 
@@ -23,6 +29,10 @@ Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
 - React Router v7: import from `react-router` (not `react-router-dom`); use `react-router/dom` for `RouterProvider`
 - Charts use ECharts (not chart.js)
 - React 19 + ReactDOM 19 (matching `@types/react` 19)
+- Vite 8 (rolldown bundler), Tailwind CSS v4 (`@tailwindcss/vite` plugin, no PostCSS), TypeScript 6.0
+- Test: Vitest + `@testing-library/react` + jsdom
+- Build output: `server/static/public/` (committed to git, `emptyOutDir: true`)
+- Dev server: `make -C frontend dev`
 
 ## Notes
 
@@ -31,7 +41,10 @@ Go module: `github.com/iszk1215/mora` (Go 1.23+, toolchain go1.24.2)
 - Server default port: 4000 (flag: `-p`)
 - Tests use in-memory sqlite3 (`sqlite3`, `:memory:?_loc=auto`)
 - Static files embedded in `server/static`
-- Coverage: `make coverage.html` (requires `coverage.out` from `go test -coverprofile`)
+- Coverage: `make coverage.html` (requires `coverage.out` from `go test -coverprofile`); frontend coverage via `make frontend-coverage` (outputs `frontend/coverage/lcov.info`)
+- `frontend/Makefile` needs `.PHONY` because the `coverage` target name collides with a directory name
+- `upload.sh` post-processes lcov.info paths: `sed -i 's|^SF:src/|SF:frontend/src/|g'` (changes frontend-relative to repo-root-relative for mora upload)
+- Two remotes: `origin` (GitHub, https://github.com/iszk1215/mora) and `gitea` (http://localhost:3001/kazuhisa/mora)
 
 ## UDM (User Defined Metrics)
 
