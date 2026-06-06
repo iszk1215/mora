@@ -4,3 +4,4 @@ coverage.html
 coverage.out
 frontend/node_modules/
 frontend/coverage/
+frontend/test-results/

@@ -30,7 +30,12 @@ func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 
 		token := convertToken(login.TokenFrom(r.Context()))
 
-		sess, _ := MoraSessionFrom(r.Context())
+		sess, ok := MoraSessionFrom(r.Context())
+		if !ok {
+			log.Error().Msg("No session found in context")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 		sess.setToken(rm.ID(), token)
 
 		next.ServeHTTP(w, r)
@@ -102,7 +107,12 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 	r := chi.NewRouter()
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		s, _ := MoraSessionFrom(r.Context())
+		s, ok := MoraSessionFrom(r.Context())
+		if !ok {
+			log.Error().Msg("No session found in context")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 		for _, rm := range repositoryManagers {
 			s.Remove(rm.ID())
 		}
@@ -116,7 +126,12 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-		s, _ := MoraSessionFrom(r.Context())
+		s, ok := MoraSessionFrom(r.Context())
+		if !ok {
+			log.Error().Msg("No session found in context")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 		s.Remove(rm_id)
 		next.ServeHTTP(w, r)
 	})
