@@ -20,8 +20,11 @@ frontend-test:
 	$(MAKE) -C frontend test
 	# staticcheck ./...
 
-test: $(SOURCES)
+test: test-race
 	go test -v ./...
+
+test-race:
+	go test -race -run 'TestMoraSession' -count=1 -timeout 30s ./server/
 
 test-all: frontend-test test
 

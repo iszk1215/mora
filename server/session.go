@@ -21,6 +21,8 @@ const (
 )
 
 type MoraSession struct {
+	lock sync.Mutex
+
 	reposMap    map[int64]map[int64]bool // [rmID][repoID]
 	tokenMap    map[int64]scm.Token      // [rmID]
 	timestamp   time.Time
@@ -37,29 +39,41 @@ func NewMoraSession() *MoraSession {
 }
 
 func (s *MoraSession) getReposCache(rmID int64) map[int64]bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	return s.reposMap[rmID]
 }
 
 func (s *MoraSession) setReposCache(rumID int64, repos map[int64]bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.reposMap[rumID] = repos
 }
 
 func (s *MoraSession) getToken(rmID int64) (scm.Token, bool) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	token, ok := s.tokenMap[rmID]
 	return token, ok
 }
 
 func (s *MoraSession) setToken(rmID int64, token scm.Token) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	s.tokenMap[rmID] = token
 }
 
 func (s *MoraSession) Remove(rmID int64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
 	delete(s.tokenMap, rmID)
 	delete(s.reposMap, rmID)
 }
 
 func (s *MoraSession) WithToken(ctx context.Context, rmID int64) (context.Context, error) {
-	token, ok := s.getToken(rmID)
+	s.lock.Lock()
+	token, ok := s.tokenMap[rmID]
+	s.lock.Unlock()
 	if !ok {
 		return nil, errorTokenNotFound
 	}
@@ -107,7 +121,10 @@ func (m *MoraSessionManager) GC() {
 
 	now := time.Now()
 	for sid, sess := range m.store {
-		if now.Sub(sess.timestamp) > m.lifetime {
+		sess.lock.Lock()
+		expired := now.Sub(sess.timestamp) > m.lifetime
+		sess.lock.Unlock()
+		if expired {
 			delete(m.store, sid)
 		}
 	}
@@ -147,7 +164,9 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 			sess = NewMoraSession()
 			m.put(sid, sess)
 		}
+		sess.lock.Lock()
 		sess.timestamp = time.Now()
+		sess.lock.Unlock()
 
 		cookie = &http.Cookie{
 			Name:     m.cookiename,
