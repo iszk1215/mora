@@ -97,7 +97,11 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	// log.Print("HandleRepoList: token=", token)
 
 	resp := []Repository{}
-	sess, _ := MoraSessionFrom(r.Context())
+	sess, ok := MoraSessionFrom(r.Context())
+	if !ok {
+		render.Forbidden(w, render.ErrForbidden)
+		return
+	}
 
 	for _, repo := range repositories {
 		rm := s.findRepositoryManager(repo.RepositoryManager)
@@ -124,7 +128,11 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 
 func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.Request) {
 	resp := []RepositoryManagerResponse{}
-	sess, _ := MoraSessionFrom(r.Context())
+	sess, ok := MoraSessionFrom(r.Context())
+	if !ok {
+		render.Forbidden(w, render.ErrForbidden)
+		return
+	}
 
 	for _, rm := range s.repositoryManagers {
 		_, ok := sess.getToken(rm.ID())
@@ -203,7 +211,11 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		ctx := r.Context()
 
 		if s.apiKey == "" || s.apiKey != token {
-			sess, _ := MoraSessionFrom(r.Context())
+			sess, ok := MoraSessionFrom(r.Context())
+			if !ok {
+				render.Forbidden(w, render.ErrForbidden)
+				return
+			}
 			err = checkRepoAccess(sess, rm, repo)
 			if errors.Is(err, errorTokenNotFound) {
 				render.Forbidden(w, render.ErrForbidden)
