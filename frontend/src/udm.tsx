@@ -168,7 +168,7 @@ const UdmMetricRoot = (): React.JSX.Element => {
       items.map((item: UdmItem) => loadMetricValues(repo.id, metric.id, item.id))
     ).then((responses) => responses.map((r: ValuesResponse) => r.values))
       .then(setValuesList)
-  }, [])
+  }, [items, repo.id, metric.id])
 
   const valuesToDataset = (values: UdmValue[], metric: UdmItem) => {
     return {
