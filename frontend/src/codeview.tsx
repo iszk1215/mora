@@ -1,23 +1,5 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import hljs from 'highlight.js'
-
-// let darkMode = true
-// let linkElement: Element | null = null
-
-const hitBackgroundColor = "bg-green-300"
-const missBackgroundColor = "bg-red-200"
-
-export function loadDarkModeFromCookie(): boolean {
-  const cookies = document.cookie
-  // console.log("cookie:", cookies)
-  if (cookies === '') {
-    for (const cookie of cookies.split(';')) {
-      const [key, value] = cookie.split('=')
-      if (key === 'darkMode' && value === '1') { return true }
-    }
-  }
-  return false
-}
 
 export function markupCode(code: string, blocks: number[][]): string[] {
   code = code.replace(/\s+$/g, '') // remove trailing '\n'
@@ -86,56 +68,12 @@ export function markupCode(code: string, blocks: number[][]): string[] {
         color = 'miss'
       }
     }
-    lst.push(`<span class="${color}" style="display: inline-block; width: 100%; padding-left: 10px">${text}</span>`)
+    const spanClass = color === 'hit' ? 'hit bg-green-300' : color === 'miss' ? 'miss bg-red-200' : ''
+    lst.push(`<span class="${spanClass}" style="display: inline-block; width: 100%; padding-left: 10px">${text}</span>`)
   }
 
   return lst
 }
-
-function setStyle(darkMode: boolean): void {
-  // console.log("setStyle: ", darkMode)
-
-  // source code highlight theme
-  const themeURL = 'https://unpkg.com/@highlightjs/cdn-assets@11.5.1/styles/'
-  const hrefDark = themeURL + 'github-dark.min.css'
-  const hrefLight = themeURL + 'github.min.css'
-
-  const link = document.createElement('link')
-  link.rel = 'stylesheet'
-  link.type = 'text/css'
-  link.href = darkMode ? hrefDark : hrefLight
-
-  const head = document.getElementsByTagName('head')[0]
-  // if (linkElement != null) { linkElement.remove() }
-  head.appendChild(link)
-  // linkElement = link
-
-  // source code line background
-  for (const e of document.querySelectorAll<HTMLElement>('.hit')) {
-    e.classList.add(hitBackgroundColor)
-  }
-  for (const e of document.querySelectorAll<HTMLElement>('.miss')) {
-    e.classList.add(missBackgroundColor)
-  }
-
-  /*
-    // toggle button
-    const button = document.getElementById('darkModeButton')
-    if (darkMode) {
-      button.classList.add('active')
-    } else {
-      button.classList.remove('active')
-    }
-    */
-}
-
-/*
-function _toggleDarkMode(button) {
-  darkMode = !darkMode
-  document.cookie = "darkMode=" + (darkMode ? "1" : "0")
-  setStyle()
-}
-*/
 
 interface CodeViewProps {
   path: string
@@ -144,8 +82,6 @@ interface CodeViewProps {
 }
 
 export const CodeView = (props: CodeViewProps): React.JSX.Element => {
-  // darkMode = loadDarkModeFromCookie()
-
   const blocks = props.blocks
   let hit = 0, miss = 0
   for (const block of blocks) {
@@ -156,12 +92,7 @@ export const CodeView = (props: CodeViewProps): React.JSX.Element => {
       miss += lines
   }
 
-  useEffect(() => {
-    setStyle(false)
-  })
-
   const lst = markupCode(props.code, props.blocks)
-  // console.log(lst)
   return <div>
     <h1 className="text-3xl my-2">{props.path}</h1>
     <div className="flex my-2">

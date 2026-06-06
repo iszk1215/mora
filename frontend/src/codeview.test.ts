@@ -31,26 +31,26 @@ describe('markupCode', () => {
     const code = 'a\nb\nc'
     const blocks = [[2, 2, 1]] // line 2, hit
     const result = markupCode(code, blocks)
-    expect(result[0]).not.toContain('class="hit"')
-    expect(result[1]).toContain('class="hit"')
-    expect(result[2]).not.toContain('class="hit"')
+    expect(result[0]).not.toContain('class="hit')
+    expect(result[1]).toContain('class="hit bg-green-300"')
+    expect(result[2]).not.toContain('class="hit')
   })
 
   it('marks miss lines with miss class', () => {
     const code = 'a\nb\nc'
     const blocks = [[2, 2, 0]] // line 2, miss
     const result = markupCode(code, blocks)
-    expect(result[1]).toContain('class="miss"')
+    expect(result[1]).toContain('class="miss bg-red-200"')
   })
 
   it('handles range blocks (multiple lines)', () => {
     const code = 'a\nb\nc\nd'
     const blocks = [[2, 3, 1]] // lines 2-3, hit
     const result = markupCode(code, blocks)
-    expect(result[0]).not.toContain('class="hit"')
-    expect(result[1]).toContain('class="hit"')
-    expect(result[2]).toContain('class="hit"')
-    expect(result[3]).not.toContain('class="hit"')
+    expect(result[0]).not.toContain('class="hit')
+    expect(result[1]).toContain('class="hit bg-green-300"')
+    expect(result[2]).toContain('class="hit bg-green-300"')
+    expect(result[3]).not.toContain('class="hit')
   })
 
   it('handles empty code string', () => {
