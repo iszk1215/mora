@@ -1,3 +1,5 @@
+.PHONY: build test coverage dev
+
 build:
 	npm run build
 
