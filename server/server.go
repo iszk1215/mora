@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -357,17 +356,8 @@ func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositorySto
 //go:embed static
 var embedded embed.FS
 
-func getStaticFS(staticDir string, path string, debug bool) (fs.FS, error) {
-	if debug {
-		return os.DirFS(filepath.Join(staticDir, path)), nil
-	}
-
-	return fs.Sub(embedded, filepath.Join("static", path))
-}
-
-func initFrontendFileServer(config MoraConfig) (http.Handler, error) {
-	staticDir := "mora/server/static"
-	frontendFS, err := getStaticFS(staticDir, "public", config.Debug)
+func initFrontendFileServer() (http.Handler, error) {
+	frontendFS, err := fs.Sub(embedded, "static/public")
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +380,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, errors.New("no RepositoryManager is configured")
 	}
 
-	frontendFileServer, err := initFrontendFileServer(config)
+	frontendFileServer, err := initFrontendFileServer()
 	if err != nil {
 		return nil, err
 	}
