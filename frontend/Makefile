@@ -1,4 +1,4 @@
-.PHONY: build test coverage dev lint
+.PHONY: build test coverage dev
 
 build:
 	npm run build
@@ -8,9 +8,6 @@ test:
 
 coverage:
 	npm run test:coverage
-
-lint:
-	npm run lint
 
 dev:
 	npm run dev -- --no-open
