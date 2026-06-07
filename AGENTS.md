@@ -4,11 +4,13 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 
 ## Commands
 
-- `make` - build + test + coverage.html + check + frontend build
-- `make test` - `go test -v ./...`
-- `make check` - golangci-lint run
+- `make` - build + test + coverage.html + lint + frontend build
+- `make test` - `go test -v $(GO_PKGS)`
+- `make lint` - golangci-lint run
+- `make frontend-lint` - `npm run lint` (frontend ESLint)
+- `make lint-all` - lint + frontend-lint
 - `make generate` - mockgen for `mockscm` and `udm`
-- `make run` - `go test ./...` then `bin/mora web --debug`
+- `make run` - `go test $(GO_PKGS)` then `bin/mora web --debug`
 - `make frontend` - `npm run build` (frontend)
 - `make frontend-test` - `npm run test` (frontend)
 - `make test-all` - frontend-test + test
