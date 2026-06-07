@@ -240,6 +240,61 @@ func Test_injectRepo(t *testing.T) {
 		require.Equal(t, http.StatusOK, status)
 		require.Equal(t, repo, got)
 	})
+
+	t.Run("rm not found", func(t *testing.T) {
+		server2 := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithRepo(&repo).Finish()
+
+		strayRepo := Repository{
+			RepositoryManager: 999,
+			Namespace:         "stray",
+			Name:              "stray",
+			Url:               "http://mock.com/stray/stray",
+		}
+		err := server2.repos.Put(&strayRepo)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d", strayRepo.Id), nil)
+		sess := NewMoraSessionWithTokenFor(rm)
+		req = req.WithContext(WithMoraSession(req.Context(), sess))
+
+		r := chi.NewRouter()
+		r.Route("/{repo_id}", func(r chi.Router) {
+			r.Use(server2.injectRepo)
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {})
+		})
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		status := w.Result().StatusCode
+		require.Equal(t, http.StatusInternalServerError, status)
+	})
+}
+
+func Test_initRepositoryManager_EmptyURL(t *testing.T) {
+	config := RepositoryManagerConfig{
+		Driver: "gitea",
+		URL:    "",
+	}
+	_, err := initRepositoryManager(config, "http://localhost:4000", nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "rm.url is empty")
+}
+
+func Test_initRepositoryManager_UnknownDriver(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	store := NewRepositoryManagerStore(db)
+	err = store.Init()
+	require.NoError(t, err)
+
+	config := RepositoryManagerConfig{
+		Driver:         "unknown",
+		URL:            "https://example.com",
+		SecretFilename: "/tmp/secret.conf",
+	}
+	_, err = initRepositoryManager(config, "http://localhost:4000", store)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown repository manager")
 }
 
 // API Test with ServerHandler
@@ -367,6 +422,42 @@ func TestServerRepoList(t *testing.T) {
 		require.Equal(t, http.StatusOK, res.StatusCode)
 		requireEqualRepoList(t, []Repository{}, res)
 	})
+}
+
+func TestServerRepoList_RMNotFound(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	repo0 := Repository{
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "repo0",
+		Url:               "https://scm.com/owner/repo0"}
+
+	repo1 := Repository{
+		RepositoryManager: 999,
+		Namespace:         "owner",
+		Name:              "repo1",
+		Url:               "https://scm.com/owner/repo1"}
+
+	rm := NewMockRepositoryManager(1)
+	rm.loginHandler = MockLoginMiddleware{"/login"}.Handler
+	rm.client.Repositories = createMockRepoService(controller, repo0)
+
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithRepo(&repo0, &repo1).
+		WithSessionManager().Finish()
+	handler := server.Handler()
+
+	cookie := requireLogin(t, handler, rm.ID())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/repos", nil)
+	req.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	res := w.Result()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	requireEqualRepoList(t, []Repository{repo0}, res)
 }
 
 func TestServerRepoList2(t *testing.T) {
