@@ -9,9 +9,9 @@ FRONTEND_OUT := server/static/public/index.html
 
 GO_PKGS = ./cmd/... ./coverage/... ./core/... ./mockscm/... ./render/... ./server/... ./udm/... ./version/...
 
-.PHONY: all frontend frontend-test frontend-coverage test test-all test-race check run clean generate
+.PHONY: all frontend frontend-test frontend-coverage test test-all test-race lint frontend-lint lint-all run clean generate
 
-all: frontend $(EXE) coverage.html check
+all: frontend $(EXE) coverage.html lint
 
 SOURCES = $(shell find . -name '*.go' -not -path './frontend/node_modules/*')
 
@@ -19,8 +19,13 @@ bin/mora: $(SOURCES) $(FRONTEND_OUT)
 	go build $(GO_PKGS)
 	go build $(LDFLAGS) -o $@ main.go
 
-check: $(SOURCES)
+lint: $(SOURCES)
 	golangci-lint run $(GO_PKGS)
+
+frontend-lint:
+	$(MAKE) -C frontend lint
+
+lint-all: lint frontend-lint
 
 frontend-test:
 	$(MAKE) -C frontend test
