@@ -344,6 +344,7 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 }
 
 func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
 	defer func() {
 		_ = r.Body.Close()
 	}()

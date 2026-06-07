@@ -91,6 +91,7 @@ func renderNoContent(w http.ResponseWriter) {
 // Metric
 
 func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
 		if err := r.Body.Close(); err != nil {
 			log.Error().Err(err).Msg("Body.Close")
@@ -154,6 +155,7 @@ func (h *udmHandler) deleteMetric(w http.ResponseWriter, r *http.Request) {
 // item
 
 func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
 		if err := r.Body.Close(); err != nil {
 			log.Error().Err(err).Msg("Body.Close")
@@ -232,6 +234,7 @@ func (h *udmHandler) deleteItem(w http.ResponseWriter, r *http.Request) {
 // value
 
 func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
 		if err := r.Body.Close(); err != nil {
 			log.Error().Err(err).Msg("Body.Close")
