@@ -7,6 +7,8 @@ LDFLAGS  = -ldflags "-X github.com/iszk1215/mora/version.Version=$(VERSION) -X g
 
 FRONTEND_OUT := server/static/public/index.html
 
+GO_PKGS = ./cmd/... ./coverage/... ./core/... ./mockscm/... ./render/... ./server/... ./udm/... ./version/...
+
 .PHONY: all frontend frontend-test frontend-coverage test test-all test-race check run clean generate
 
 all: frontend $(EXE) coverage.html check
@@ -14,18 +16,18 @@ all: frontend $(EXE) coverage.html check
 SOURCES = $(shell find . -name '*.go' -not -path './frontend/node_modules/*')
 
 bin/mora: $(SOURCES) $(FRONTEND_OUT)
-	go build ./...
+	go build $(GO_PKGS)
 	go build $(LDFLAGS) -o $@ main.go
 
 check: $(SOURCES)
-	golangci-lint run ./cmd/... ./coverage/... ./core/... ./server/... ./udm/... ./version/...
+	golangci-lint run $(GO_PKGS)
 
 frontend-test:
 	$(MAKE) -C frontend test
 	# staticcheck ./...
 
 test: test-race
-	go test -v ./...
+	go test -v $(GO_PKGS)
 
 test-race:
 	go test -race -run 'TestMoraSession' -count=1 -timeout 30s ./server/
@@ -33,11 +35,11 @@ test-race:
 test-all: frontend-test test
 
 run: bin/mora
-	go test ./...
+	go test $(GO_PKGS)
 	bin/mora web --debug
 
 coverage.out: $(SOURCES)
-	go test -coverprofile=$@ ./...
+	go test -coverprofile=$@ $(GO_PKGS)
 
 coverage.html: coverage.out
 	go tool cover -html=$< -o $@
