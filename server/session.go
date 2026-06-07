@@ -173,6 +173,7 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 			Value:    sid,
 			Path:     "/",
 			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
 		}
 
 		http.SetCookie(w, cookie)
