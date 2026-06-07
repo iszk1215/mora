@@ -36,13 +36,13 @@ async function loadMetrics(repo_id: number): Promise<Metric[]> {
   return metrics.concat(tmp)
 }
 
-async function loadRepoList(): Promise<Repo[]> {
+export async function loadRepoList(): Promise<Repo[]> {
   const data = await fetch('/api/repos')
   const json = await data.json()
   return json
 }
 
-const RepoList = (): React.JSX.Element => {
+export const RepoList = (): React.JSX.Element => {
   const repos: Repo[] = useLoaderData() as Repo[]
 
   const [metrics, setMetrics] = useState<Metric[][]>([])
@@ -95,7 +95,7 @@ async function loadSCMList(): Promise<Response> {
   return resp
 }
 
-const SCMList = (): React.JSX.Element => {
+export const SCMList = (): React.JSX.Element => {
   const scmList = useLoaderData() as SCMData[]
   const items: React.JSX.Element[] = []
   scmList.forEach((scm: SCMData, i: number) => {
@@ -137,7 +137,7 @@ const SCMList = (): React.JSX.Element => {
   )
 }
 
-const Header = (): React.JSX.Element => {
+export const Header = (): React.JSX.Element => {
   return (
     <header className="sticky top-0 mb-2 bg-black text-white">
       <div className="w-8/12 m-auto">
@@ -155,7 +155,7 @@ interface Crumb {
   link?: string
 }
 
-const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
+export const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
   const elems = crumbs.map((crumb: { label: string, link?: string }, i: number) => {
     if (i < crumbs.length - 1 && crumb.link) {
       return <DefaultLink to={crumb.link} key={i}>{crumb.label}</DefaultLink>
@@ -174,7 +174,7 @@ const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
   return <div>{elems2}</div>
 }
 
-const Breadcrumbs = (): React.JSX.Element => {
+export const Breadcrumbs = (): React.JSX.Element => {
   const matches = useMatches()
 
   const last = matches[matches.length - 1]
@@ -201,7 +201,7 @@ const Root = (): React.JSX.Element => {
   )
 }
 
-const ErrorPage = (): React.JSX.Element => {
+export const ErrorPage = (): React.JSX.Element => {
   const error = useRouteError()
   let message = <span>Error</span>
   if (isRouteErrorResponse(error)) {

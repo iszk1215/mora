@@ -76,7 +76,7 @@ async function loadUdmMetricsFromParam({ params }: LoaderFunctionArgs): Promise<
   throw new Error("repo_id is undefined")
 }
 
-async function loadMetricItems({ params }: LoaderFunctionArgs): Promise<Response> {
+export async function loadMetricItems({ params }: LoaderFunctionArgs): Promise<Response> {
   const url = `/api/repos/${params.repo_id}/udm/metrics/${params.metric_id}/items`
   const resp = await fetch(url)
   if (resp.status == 403) {
@@ -90,7 +90,7 @@ async function loadMetricItems({ params }: LoaderFunctionArgs): Promise<Response
 }
 
 
-async function loadMetricValues(
+export async function loadMetricValues(
   repo_id: number, metric_id: number, item_id: number): Promise<ValuesResponse> {
   const url = `/api/repos/${repo_id}/udm/metrics/${metric_id}/items/${item_id}/values`
   const resp = await fetch(url)
@@ -100,7 +100,7 @@ async function loadMetricValues(
   return await resp.json()
 }
 
-const UdmRoot = (): React.JSX.Element => {
+export const UdmRoot = (): React.JSX.Element => {
   const data = useLoaderData() as MetricsResponse
   const repo = data.repo
   const metrics = data.metrics
@@ -120,7 +120,7 @@ const UdmRoot = (): React.JSX.Element => {
   )
 }
 
-const UdmChart = (params: any): React.JSX.Element => {
+export const UdmChart = (params: any): React.JSX.Element => {
   const datasets = params.data?.datasets ?? []
 
   const option: any = {
@@ -153,7 +153,7 @@ const UdmChart = (params: any): React.JSX.Element => {
     <ReactECharts option={option} style={{ width: '100%', height: 300 }} id="udm-chart" />)
 }
 
-const UdmMetricRoot = (): React.JSX.Element => {
+export const UdmMetricRoot = (): React.JSX.Element => {
   const data = useLoaderData() as ItemsResponse
 
   const [valuesList, setValuesList] = useState<UdmValue[][]>([])
