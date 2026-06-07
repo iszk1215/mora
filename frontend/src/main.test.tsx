@@ -197,11 +197,11 @@ describe('Breadcrumbs', () => {
   it('renders breadcrumbs from route matches', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
-        id: '0', pathname: '/', params: {}, data: undefined,
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
         handle: { crumb: () => ({ label: 'Top', link: '/' }) },
       },
       {
-        id: '1', pathname: '/scms', params: {}, data: undefined,
+        id: '1', pathname: '/scms', params: {}, data: undefined, loaderData: undefined,
         handle: { crumb: () => ({ label: 'SCM', link: '/scms' }) },
       },
     ])
@@ -213,15 +213,15 @@ describe('Breadcrumbs', () => {
   it('filters out matches without crumb handle', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
-        id: '0', pathname: '/', params: {}, data: undefined,
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
         handle: { crumb: () => ({ label: 'Top', link: '/' }) },
       },
       {
-        id: '1', pathname: '/no-crumb', params: {}, data: undefined,
+        id: '1', pathname: '/no-crumb', params: {}, data: undefined, loaderData: undefined,
         handle: {},
       },
       {
-        id: '2', pathname: '/scms', params: {}, data: undefined,
+        id: '2', pathname: '/scms', params: {}, data: undefined, loaderData: undefined,
         handle: { crumb: () => ({ label: 'SCM', link: '/scms' }) },
       },
     ])
@@ -233,11 +233,11 @@ describe('Breadcrumbs', () => {
   it('filters out crumbs with undefined label', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
-        id: '0', pathname: '/', params: {}, data: undefined,
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
         handle: { crumb: () => ({ label: 'Top', link: '/' }) },
       },
       {
-        id: '1', pathname: '/hidden', params: {}, data: undefined,
+        id: '1', pathname: '/hidden', params: {}, data: undefined, loaderData: undefined,
         handle: { crumb: () => ({ label: undefined }) },
       },
     ])

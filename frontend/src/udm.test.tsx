@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
+import type { LoaderFunctionArgs } from 'react-router'
 import { UdmRoot, UdmChart, UdmMetricRoot, loadUdmMetrics, loadMetricItems, loadMetricValues } from './udm'
 
 vi.mock('react-router', async () => {
@@ -66,7 +67,9 @@ describe('loadMetricItems', () => {
       ok: false,
     } as Response)
 
-    const result = await loadMetricItems({ params: { repo_id: '1', metric_id: '2' } })
+    const params = { repo_id: '1', metric_id: '2' }
+    const args = { params, request: {} as Request, url: new URL('http://localhost'), pattern: '/', context: {} }
+    const result = await loadMetricItems(args)
     expect(result.status).toBe(302)
   })
 
@@ -76,8 +79,10 @@ describe('loadMetricItems', () => {
       ok: false,
     } as Response)
 
+    const params = { repo_id: '1', metric_id: '2' }
+    const args = { params, request: {} as Request, url: new URL('http://localhost'), pattern: '/', context: {} }
     await expect(
-      loadMetricItems({ params: { repo_id: '1', metric_id: '2' } })
+      loadMetricItems(args)
     ).rejects.toBeDefined()
   })
 
@@ -89,7 +94,9 @@ describe('loadMetricItems', () => {
     } as Response
     vi.mocked(globalThis.fetch).mockResolvedValue(mockResponse)
 
-    const result = await loadMetricItems({ params: { repo_id: '1', metric_id: '2' } })
+    const params = { repo_id: '1', metric_id: '2' }
+    const args = { params, request: {} as Request, url: new URL('http://localhost'), pattern: '/', context: {} }
+    const result = await loadMetricItems(args)
     expect(result).toBe(mockResponse)
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/repos/1/udm/metrics/2/items')
   })

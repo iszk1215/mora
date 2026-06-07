@@ -83,6 +83,36 @@ func TestCoverageStore_ListAll_Empty(t *testing.T) {
 	require.Empty(t, covs)
 }
 
+func TestCoverageStore_Init_CreatesUniqueConstraint(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+
+	s := NewCoverageStore(db)
+	err = s.Init()
+	require.NoError(t, err)
+
+	type idxInfo struct {
+		Seq     int    `db:"seq"`
+		Name    string `db:"name"`
+		Unique  bool   `db:"unique"`
+		Origin  string `db:"origin"`
+		Partial int    `db:"partial"`
+	}
+	var indices []idxInfo
+	err = db.Select(&indices, "PRAGMA index_list('coverage')")
+	require.NoError(t, err)
+
+	uniqueCount := 0
+	for _, idx := range indices {
+		if idx.Unique && (idx.Origin == "u" || idx.Origin == "c") {
+			uniqueCount++
+		}
+	}
+	require.GreaterOrEqual(t, uniqueCount, 1,
+		"Init() must create a UNIQUE constraint or unique index on coverage")
+}
+
 func TestCoverageStore_Put_Insert(t *testing.T) {
 	want := &Coverage{
 		RepoID:    1215,
