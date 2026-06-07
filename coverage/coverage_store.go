@@ -90,12 +90,12 @@ func (s *coverageStoreImpl) Migrate() error {
 
 func (s *coverageStoreImpl) Init() error {
 	_, err := s.db.Exec(schema)
-	/*
-		if err != nil {
-			return err
-		}
-		err = s.Migrate()
-	*/
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_coverage_repo_revision ON coverage(repo_id, revision)")
 	return err
 }
 
