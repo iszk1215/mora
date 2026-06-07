@@ -23,6 +23,85 @@ func TestSessionManager(t *testing.T) {
 	handler.ServeHTTP(got, req)
 }
 
+func TestSessionManager_SetsCookie(t *testing.T) {
+	m := NewMoraSessionManager()
+	next := func(w http.ResponseWriter, r *http.Request) {}
+	handler := m.SessionMiddleware(http.HandlerFunc(next))
+	req := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
+	got := httptest.NewRecorder()
+	handler.ServeHTTP(got, req)
+
+	res := got.Result()
+	cookies := res.Cookies()
+	require.Len(t, cookies, 1)
+
+	cookie := cookies[0]
+	require.Equal(t, "morasessionid", cookie.Name)
+	require.NotEmpty(t, cookie.Value)
+	require.Equal(t, "/", cookie.Path)
+	require.True(t, cookie.HttpOnly)
+	require.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
+}
+
+func TestSessionManager_ReusesExistingSession(t *testing.T) {
+	m := NewMoraSessionManager()
+
+	// First request: no cookie → middleware creates new session
+	var firstSid string
+	first := func(w http.ResponseWriter, r *http.Request) {
+		sess, ok := MoraSessionFrom(r.Context())
+		require.True(t, ok)
+		sess.setToken(1, scm.Token{Token: "test-token"})
+	}
+	handler := m.SessionMiddleware(http.HandlerFunc(first))
+	req := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
+	got := httptest.NewRecorder()
+	handler.ServeHTTP(got, req)
+
+	res := got.Result()
+	cookies := res.Cookies()
+	require.Len(t, cookies, 1)
+	firstSid = cookies[0].Value
+
+	// Second request: include the cookie → middleware reuses existing session
+	var gotToken string
+	second := func(w http.ResponseWriter, r *http.Request) {
+		sess, ok := MoraSessionFrom(r.Context())
+		require.True(t, ok)
+		tok, ok := sess.getToken(1)
+		require.True(t, ok, "token from first request should persist")
+		gotToken = tok.Token
+	}
+	handler2 := m.SessionMiddleware(http.HandlerFunc(second))
+	req2 := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
+	req2.AddCookie(&http.Cookie{Name: "morasessionid", Value: firstSid})
+	got2 := httptest.NewRecorder()
+	handler2.ServeHTTP(got2, req2)
+
+	require.Equal(t, "test-token", gotToken)
+}
+
+func TestMoraSession_Remove(t *testing.T) {
+	sess := NewMoraSession()
+	sess.setToken(1, scm.Token{Token: "token1"})
+	sess.setToken(2, scm.Token{Token: "token2"})
+	sess.setReposCache(1, map[int64]bool{42: true})
+
+	_, ok := sess.getToken(1)
+	require.True(t, ok)
+	_, ok = sess.getToken(2)
+	require.True(t, ok)
+
+	sess.Remove(1)
+
+	_, ok = sess.getToken(1)
+	require.False(t, ok, "token for rm 1 should be removed")
+	_, ok = sess.getToken(2)
+	require.True(t, ok, "token for rm 2 should remain")
+	cache := sess.getReposCache(1)
+	require.Nil(t, cache, "repos cache for rm 1 should be removed")
+}
+
 func TestMoraSessionDirectRace(t *testing.T) {
 	t.Parallel()
 	sess := NewMoraSession()
