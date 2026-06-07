@@ -149,3 +149,57 @@ func TestLogoutHandlerAll(t *testing.T) {
 func TestLogoutHandlerOne(t *testing.T) {
 	testLogout(t, false)
 }
+
+func TestLoginRedirect_NoLoggingInto(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+	rm.loginHandler = MockLoginMiddleware{"/"}.Handler
+	handler := createTestLoginHandler(rm)
+
+	sess := NewMoraSession()
+	req := NewGetRequestWithMoraSession("/", sess)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	res := w.Result()
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
+func TestLoginRedirect_UnknownHandler(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+	rm.loginHandler = MockLoginMiddleware{"/"}.Handler
+	handler := createTestLoginHandler(rm)
+
+	sess := NewMoraSession()
+	sess.loggingInto = 999
+	req := NewGetRequestWithMoraSession("/", sess)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	res := w.Result()
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
+func TestLogout_InvalidScmID(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+	next := func(w http.ResponseWriter, r *http.Request) {}
+	r := LogoutHandler([]RepositoryManager{rm}, http.HandlerFunc(next))
+
+	req := httptest.NewRequest(http.MethodPost, "/abc", nil)
+	sess := NewMoraSession()
+	req = req.WithContext(WithMoraSession(req.Context(), sess))
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	res := w.Result()
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
+func TestLogout_NoSession(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+	next := func(w http.ResponseWriter, r *http.Request) {}
+	r := LogoutHandler([]RepositoryManager{rm}, http.HandlerFunc(next))
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	res := w.Result()
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
