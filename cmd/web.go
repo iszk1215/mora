@@ -45,8 +45,16 @@ func NewWebCommand() *cobra.Command {
 
 			handler := server.Handler()
 
+			srv := &http.Server{
+				Addr:         ":" + strconv.Itoa(config.Server.Port),
+				Handler:      handler,
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 30 * time.Second,
+				IdleTimeout:  120 * time.Second,
+			}
+
 			log.Info().Msg("Started")
-			err = http.ListenAndServe(":"+strconv.Itoa(config.Server.Port), handler)
+			err = srv.ListenAndServe()
 			if err != nil {
 				log.Err(err).Msg("")
 				return err
