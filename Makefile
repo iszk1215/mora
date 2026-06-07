@@ -9,7 +9,7 @@ FRONTEND_OUT := server/static/public/index.html
 
 GO_PKGS = ./cmd/... ./coverage/... ./core/... ./mockscm/... ./render/... ./server/... ./udm/... ./version/...
 
-.PHONY: all frontend frontend-test frontend-coverage test test-all test-race check run clean generate
+.PHONY: all frontend frontend-test frontend-coverage test test-all test-race check frontend-lint check-all run clean generate
 
 all: frontend $(EXE) coverage.html check
 
@@ -28,6 +28,11 @@ frontend-test:
 
 test: test-race
 	go test -v $(GO_PKGS)
+
+frontend-lint:
+	$(MAKE) -C frontend lint
+
+check-all: check frontend-lint
 
 test-race:
 	go test -race -run 'TestMoraSession' -count=1 -timeout 30s ./server/
