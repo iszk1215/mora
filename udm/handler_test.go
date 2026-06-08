@@ -177,7 +177,7 @@ func TestHandlerInjectMetricDBError(t *testing.T) {
 	// other than errorMetricNotFound. This triggers the bug in injectMetric:
 	// InternalError is written but execution continues, causing a nil pointer
 	// dereference on *metric (metric is nil when findMetricById fails).
-	store.db.Close()
+	require.NoError(t, store.db.Close())
 
 	h := newHandler(store)
 	path := fmt.Sprintf("/metrics/%d", metric.Id)
@@ -192,7 +192,7 @@ func TestHandlerInjectMetricDBError(t *testing.T) {
 	})
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	require.Equal(t, http.StatusInternalServerError, res.StatusCode)
 }
 

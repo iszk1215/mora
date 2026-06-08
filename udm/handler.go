@@ -146,6 +146,7 @@ func (h *udmHandler) deleteMetric(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error().Err(err).Msg("deleteMetric")
 		render.InternalError(w, err)
+		return
 	}
 
 	renderNoContent(w)
@@ -313,6 +314,7 @@ func (h *udmHandler) injectMetric(next http.Handler) http.Handler {
 		} else if err != nil {
 			log.Warn().Err(err).Msg("udm.handler.injectMetric")
 			render.InternalError(w, err)
+			return
 		}
 
 		r = r.WithContext(withMetric(r.Context(), *metric))
