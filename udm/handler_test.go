@@ -159,6 +159,43 @@ func TestHandlerDeleteMetric(t *testing.T) {
 	})
 }
 
+func TestHandlerInjectMetricDBError(t *testing.T) {
+	repo := core.Repository{
+		Id: 1215,
+	}
+
+	metric := &metricModel{
+		RepoId: repo.Id,
+		Name:   "metric1",
+	}
+
+	store := initTestStore(t)
+	err := store.addMetric(metric)
+	require.NoError(t, err)
+
+	// Close the database to cause findMetricById to return an error
+	// other than errorMetricNotFound. This triggers the bug in injectMetric:
+	// InternalError is written but execution continues, causing a nil pointer
+	// dereference on *metric (metric is nil when findMetricById fails).
+	store.db.Close()
+
+	h := newHandler(store)
+	path := fmt.Sprintf("/metrics/%d", metric.Id)
+	r := httptest.NewRequest(http.MethodDelete, path, nil)
+	r = r.WithContext(core.WithRepo(r.Context(), repo))
+	w := httptest.NewRecorder()
+
+	// The current code panics due to the missing return after render.InternalError.
+	// After the fix, it should return a proper 500 error without panicking.
+	require.NotPanics(t, func() {
+		h.ServeHTTP(w, r)
+	})
+
+	res := w.Result()
+	defer res.Body.Close()
+	require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+}
+
 func TestHandlerListMetric(t *testing.T) {
 	repo := core.Repository{
 		Id: 1215,
