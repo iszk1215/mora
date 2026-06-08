@@ -348,10 +348,14 @@ func initRepositoryManagers(config MoraConfig, store RepositoryManagerStore) ([]
 func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, error) {
 	log.Info().Msgf("Initialize store: filename=%s", filename)
 
+	if filename != "" {
+		filename += "?_journal_mode=WAL&_busy_timeout=5000"
+	}
 	db, err := sqlx.Connect("sqlite3", filename)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	db.SetMaxOpenConns(1)
 
 	rmStore := NewRepositoryManagerStore(db)
 	if err := rmStore.Init(); err != nil {
