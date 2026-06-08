@@ -94,7 +94,7 @@ func NewMoraSessionManager() *MoraSessionManager {
 	return &MoraSessionManager{
 		cookiename: "morasessionid",
 		store:      map[string]*MoraSession{},
-		lifetime:   3600 * 24 * time.Hour,
+		lifetime:   24 * time.Hour,
 	}
 }
 
