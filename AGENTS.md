@@ -49,7 +49,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - Tests use in-memory sqlite3 (`sqlite3`, `:memory:?_loc=auto`)
 - Static files embedded in `server/static`
 - Coverage: `make coverage.html` (requires `coverage.out` from `go test -coverprofile`); frontend coverage via `make frontend-coverage` (outputs `frontend/coverage/lcov.info`)
-- `frontend/Makefile` needs `.PHONY` because the `coverage` target name collides with a directory name
+- `frontend/Makefile`: renamed `coverage` target to `coverage-report` to avoid collision with `coverage/` directory; uses file-based dependency on `coverage/lcov.info` for incremental builds
 - `upload.sh` post-processes lcov.info paths: `sed -i 's|^SF:src/|SF:frontend/src/|g'` (changes frontend-relative to repo-root-relative for mora upload)
 - Two remotes: `origin` (GitHub, https://github.com/iszk1215/mora) and `gitea` (http://localhost:3001/kazuhisa/mora)
 

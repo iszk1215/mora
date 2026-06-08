@@ -53,7 +53,7 @@ frontend:
 	$(MAKE) -C frontend build
 
 frontend-coverage:
-	$(MAKE) -C frontend coverage
+	$(MAKE) -C frontend coverage-report
 
 coverage-all: coverage.out frontend-coverage
 
