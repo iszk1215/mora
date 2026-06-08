@@ -1,11 +1,12 @@
 #!/bin/bash
 set -ex
-cd /home/kazuhisa/work/mora-project/mora
 
 SERVER=http://localhost:4000
 
 # REPO_URL=https://github.com/iszk1215/mora
 REPO_URL=http://localhost:3001/kazuhisa/mora
+
+make coverage-all
 
 git push gitea HEAD
 
