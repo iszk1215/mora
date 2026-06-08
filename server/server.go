@@ -240,6 +240,7 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 func (s *MoraServer) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 	r.Use(s.sessionManager.SessionMiddleware)
 
 	// api
