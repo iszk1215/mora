@@ -140,7 +140,7 @@ async function loadCoverageList({ params }: { params: Params }): Promise<Respons
     let hits = 0; let lines = 0
 
     cov.entries.sort((a: CoverageEntry, b: CoverageEntry) => {
-      return a.name < b.name ? -1 : 1
+      return a.name.localeCompare(b.name)
     })
 
     for (const e of cov.entries) {
