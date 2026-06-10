@@ -2,8 +2,10 @@ package coverage
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/iszk1215/mora/coverage/profile"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -16,7 +18,26 @@ CREATE TABLE IF NOT EXISTS coverage (
     time DATETIME NOT NULL,
     contents TEXT NOT NULL,
     UNIQUE(repo_id, revision)
-)`
+);
+
+CREATE TABLE IF NOT EXISTS coverage_entry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    coverage_id INTEGER NOT NULL REFERENCES coverage(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    hits INTEGER NOT NULL DEFAULT 0,
+    lines INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(coverage_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS coverage_block (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id INTEGER NOT NULL REFERENCES coverage_entry(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    hits INTEGER NOT NULL DEFAULT 0,
+    lines INTEGER NOT NULL DEFAULT 0,
+    blocks TEXT NOT NULL,
+    UNIQUE(entry_id, filename)
+);`
 
 type (
 	storableCoverage struct {
@@ -24,7 +45,23 @@ type (
 		RepoID   int64     `db:"repo_id"`
 		Revision string    `db:"revision"`
 		Time     time.Time `db:"time"`
-		Contents string    `db:"contents"`
+	}
+
+	storableEntry struct {
+		ID         int64  `db:"id"`
+		CoverageID int64  `db:"coverage_id"`
+		Name       string `db:"name"`
+		Hits       int    `db:"hits"`
+		Lines      int    `db:"lines"`
+	}
+
+	storableBlock struct {
+		ID       int64  `db:"id"`
+		EntryID  int64  `db:"entry_id"`
+		Filename string `db:"filename"`
+		Hits     int    `db:"hits"`
+		Lines    int    `db:"lines"`
+		Blocks   string `db:"blocks"`
 	}
 
 	coverageStoreImpl struct {
@@ -35,58 +72,9 @@ type (
 )
 
 func NewCoverageStore(db *sqlx.DB) CoverageStore {
-	query := "SELECT id, repo_id, revision, time, contents FROM coverage"
+	query := "SELECT id, repo_id, revision, time FROM coverage"
 	return &coverageStoreImpl{db: db, selectQuery: query}
 }
-
-/*
-// contents is serialized []CoverageEntryUploadRequest
-func parseStorableCoverageContents(contents string) ([]*CoverageEntry, error) {
-	var req []*CoverageEntryUploadRequest
-
-	err := json.Unmarshal([]byte(contents), &req)
-	if err != nil {
-		return nil, err
-	}
-
-	entries, err := parseCoverageEntryUploadRequests(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return entries, nil
-}
-
-func (s *coverageStoreImpl) Migrate() error {
-	query := "SELECT id, contents FROM coverage"
-	rows := []storableCoverage{}
-	err := s.db.Select(&rows, query)
-	if err != nil {
-		return err
-	}
-
-	for _, row := range rows {
-		log.Print(row)
-		entries, err := parseStorableCoverageContents(row.Contents)
-		if err != nil {
-			return err
-		}
-
-		contents, err := json.Marshal(entries)
-		if err != nil {
-			return err
-		}
-		log.Print(contents)
-
-		query = "UPDATE coverage SET contents = ? WHERE id = ?"
-		_, err = s.db.Exec(query, contents, row.ID)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-*/
 
 func (s *coverageStoreImpl) Init() error {
 	_, err := s.db.Exec(schema)
@@ -96,41 +84,127 @@ func (s *coverageStoreImpl) Init() error {
 
 	_, err = s.db.Exec(
 		"CREATE UNIQUE INDEX IF NOT EXISTS idx_coverage_repo_revision ON coverage(repo_id, revision)")
-	return err
+	if err != nil {
+		return err
+	}
+
+	return s.migrateIfNeeded()
 }
 
-func toCoverage(record storableCoverage) (*Coverage, error) {
-	var entries []*CoverageEntry
-	err := json.Unmarshal([]byte(record.Contents), &entries)
-	if err != nil {
+func (s *coverageStoreImpl) migrateIfNeeded() error {
+	var entryCount int
+	if err := s.db.Get(&entryCount, "SELECT COUNT(*) FROM coverage_entry"); err != nil {
+		return err
+	}
+	if entryCount > 0 {
+		return nil
+	}
+
+	var coverageCount int
+	if err := s.db.Get(&coverageCount, "SELECT COUNT(*) FROM coverage"); err != nil {
+		return err
+	}
+	if coverageCount == 0 {
+		return nil
+	}
+
+	return s.migrateFromContents()
+}
+
+func (s *coverageStoreImpl) migrateFromContents() error {
+	var rows []struct {
+		ID       int64     `db:"id"`
+		Contents string    `db:"contents"`
+	}
+	if err := s.db.Select(&rows, "SELECT id, contents FROM coverage"); err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		var entries []*CoverageEntry
+		if err := json.Unmarshal([]byte(row.Contents), &entries); err != nil {
+			return fmt.Errorf("migrate: failed to parse contents for coverage %d: %w", row.ID, err)
+		}
+
+		if err := s.replaceEntries(row.ID, entries); err != nil {
+			return fmt.Errorf("migrate: failed to insert entries for coverage %d: %w", row.ID, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *coverageStoreImpl) loadCoverage(row storableCoverage) (*Coverage, error) {
+	var entryRows []storableEntry
+	if err := s.db.Select(&entryRows,
+		"SELECT id, coverage_id, name, hits, lines FROM coverage_entry WHERE coverage_id = ? ORDER BY id",
+		row.ID); err != nil {
 		return nil, err
 	}
 
-	cov := &Coverage{}
-	cov.ID = record.ID
-	cov.RepoID = record.RepoID
-	cov.Revision = record.Revision
-	cov.Entries = entries
-	cov.Timestamp = record.Time
+	var blockRows []storableBlock
+	if err := s.db.Select(&blockRows,
+		`SELECT b.id, b.entry_id, b.filename, b.hits, b.lines, b.blocks
+		 FROM coverage_block b
+		 JOIN coverage_entry e ON e.id = b.entry_id
+		 WHERE e.coverage_id = ?`, row.ID); err != nil {
+		return nil, err
+	}
 
-	return cov, nil
+	blocksByEntry := make(map[int64][]storableBlock)
+	for _, br := range blockRows {
+		blocksByEntry[br.EntryID] = append(blocksByEntry[br.EntryID], br)
+	}
+
+	entries := make([]*CoverageEntry, len(entryRows))
+	for i, er := range entryRows {
+		var profiles map[string]*profile.Profile
+		for _, br := range blocksByEntry[er.ID] {
+			var blocks [][]int
+			if err := json.Unmarshal([]byte(br.Blocks), &blocks); err != nil {
+				return nil, err
+			}
+			if profiles == nil {
+				profiles = make(map[string]*profile.Profile)
+			}
+			profiles[br.Filename] = &profile.Profile{
+				FileName: br.Filename,
+				Hits:     br.Hits,
+				Lines:    br.Lines,
+				Blocks:   blocks,
+			}
+		}
+
+		entries[i] = &CoverageEntry{
+			Name:     er.Name,
+			Hits:     er.Hits,
+			Lines:    er.Lines,
+			Profiles: profiles,
+		}
+	}
+
+	return &Coverage{
+		ID:        row.ID,
+		RepoID:    row.RepoID,
+		Revision:  row.Revision,
+		Timestamp: row.Time,
+		Entries:   entries,
+	}, nil
 }
 
 func (s *coverageStoreImpl) scan(query string, params ...interface{}) ([]*Coverage, error) {
 	rows := []storableCoverage{}
-	err := s.db.Select(&rows, query, params...)
-	if err != nil {
+	if err := s.db.Select(&rows, query, params...); err != nil {
 		return nil, err
 	}
 
-	coverages := []*Coverage{}
-	for _, record := range rows {
-		cov, err := toCoverage(record)
+	coverages := make([]*Coverage, len(rows))
+	for i, record := range rows {
+		cov, err := s.loadCoverage(record)
 		if err != nil {
 			return nil, err
 		}
-
-		coverages = append(coverages, cov)
+		coverages[i] = cov
 	}
 
 	return coverages, nil
@@ -184,6 +258,45 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		return err
 	}
 	cov.ID = id
+
+	return s.replaceEntries(cov.ID, cov.Entries)
+}
+
+func (s *coverageStoreImpl) replaceEntries(coverageID int64, entries []*CoverageEntry) error {
+	if _, err := s.db.Exec(
+		"DELETE FROM coverage_block WHERE entry_id IN (SELECT id FROM coverage_entry WHERE coverage_id = ?)",
+		coverageID); err != nil {
+		return err
+	}
+	if _, err := s.db.Exec(
+		"DELETE FROM coverage_entry WHERE coverage_id = ?", coverageID); err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		res, err := s.db.Exec(
+			"INSERT INTO coverage_entry (coverage_id, name, hits, lines) VALUES (?, ?, ?, ?)",
+			coverageID, entry.Name, entry.Hits, entry.Lines)
+		if err != nil {
+			return err
+		}
+		entryID, err := res.LastInsertId()
+		if err != nil {
+			return err
+		}
+
+		for _, prof := range entry.Profiles {
+			blocksJSON, err := json.Marshal(prof.Blocks)
+			if err != nil {
+				return err
+			}
+			if _, err := s.db.Exec(
+				"INSERT INTO coverage_block (entry_id, filename, hits, lines, blocks) VALUES (?, ?, ?, ?, ?)",
+				entryID, prof.FileName, prof.Hits, prof.Lines, string(blocksJSON)); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
