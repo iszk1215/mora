@@ -6,6 +6,7 @@ DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS  = -ldflags "-X github.com/iszk1215/mora/version.Version=$(VERSION) -X github.com/iszk1215/mora/version.Commit=$(COMMIT) -X github.com/iszk1215/mora/version.Date=$(DATE)"
 
 FRONTEND_OUT := server/static/public/index.html
+FRONTEND_SRCS := $(shell find frontend/src -type f 2>/dev/null)
 
 GO_PKGS = ./cmd/... ./coverage/... ./core/... ./mockscm/... ./render/... ./server/... ./udm/... ./version/...
 
@@ -14,6 +15,9 @@ GO_PKGS = ./cmd/... ./coverage/... ./core/... ./mockscm/... ./render/... ./serve
 all: frontend $(EXE) coverage.html lint
 
 SOURCES = $(shell find . -name '*.go' -not -path './frontend/node_modules/*')
+
+$(FRONTEND_OUT): $(FRONTEND_SRCS)
+	$(MAKE) -C frontend build
 
 bin/mora: $(SOURCES) $(FRONTEND_OUT)
 	go build $(GO_PKGS)
