@@ -104,7 +104,17 @@ export const SCMList = (): React.JSX.Element => {
       buttons = (
         <div className="flex mb-2">
           <div className="px-4 py-2 rounded-l bg-gray-200 text-gray-400">login</div>
-          <form method="POST" action={'/logout/' + scm.id}>
+          <form method="POST" action={'/logout/' + scm.id}
+                onSubmit={(e) => {
+                  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
+                  if (match) {
+                    const input = document.createElement('input')
+                    input.type = 'hidden'
+                    input.name = 'csrf_token'
+                    input.value = match[1]
+                    e.currentTarget.appendChild(input)
+                  }
+                }}>
             <button type="submit" className="px-4 py-2 rounded-r bg-gray-400 font-bold cursor-pointer">logout</button>
           </form>
         </div>

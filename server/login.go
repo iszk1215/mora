@@ -1,6 +1,9 @@
 package server
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"net/http"
 	"strconv"
 
@@ -10,6 +13,29 @@ import (
 	"github.com/iszk1215/mora/render"
 	"github.com/rs/zerolog/log"
 )
+
+const csrfCookieName = "csrf_token"
+
+func generateCSRFToken() (string, error) {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+func verifyCSRF(r *http.Request) bool {
+	cookie, err := r.Cookie(csrfCookieName)
+	if err != nil {
+		return false
+	}
+	bodyToken := r.FormValue(csrfCookieName)
+	if bodyToken == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(bodyToken)) == 1
+}
 
 func convertToken(token *login.Token) scm.Token {
 	return scm.Token{
@@ -37,6 +63,18 @@ func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 			return
 		}
 		sess.setToken(rm.ID(), token)
+
+		if csrfToken, err := generateCSRFToken(); err == nil {
+			http.SetCookie(w, &http.Cookie{
+				Name:     csrfCookieName,
+				Value:    csrfToken,
+				Path:     "/",
+				SameSite: http.SameSiteLaxMode,
+				HttpOnly: false,
+			})
+		} else {
+			log.Error().Err(err).Msg("failed to generate CSRF token")
+		}
 
 		next.ServeHTTP(w, r)
 	}
@@ -113,6 +151,11 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
+		if !verifyCSRF(r) {
+			log.Warn().Msg("CSRF token mismatch on logout")
+			render.Forbidden(w, render.ErrForbidden)
+			return
+		}
 		for _, rm := range repositoryManagers {
 			s.Remove(rm.ID())
 		}
@@ -130,6 +173,11 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 		if !ok {
 			log.Error().Msg("No session found in context")
 			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+		if !verifyCSRF(r) {
+			log.Warn().Msg("CSRF token mismatch on logout")
+			render.Forbidden(w, render.ErrForbidden)
 			return
 		}
 		s.Remove(rm_id)

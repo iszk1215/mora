@@ -115,10 +115,20 @@ func testLogout(t *testing.T, logoutAll bool) {
 	}
 	w := httptest.NewRecorder()
 
+	csrfToken := "test-csrf-token-for-testing"
 	sess := NewMoraSession()
 	sess.setToken(rm0.ID(), scm.Token{})
 	sess.setToken(rm1.ID(), scm.Token{})
-	req := httptest.NewRequest(http.MethodPost, path, nil)
+	body := strings.NewReader("csrf_token=" + csrfToken)
+	req := httptest.NewRequest(http.MethodPost, path, body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{
+		Name:     csrfCookieName,
+		Value:    csrfToken,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		HttpOnly: false,
+	})
 	req = req.WithContext(WithMoraSession(req.Context(), sess))
 
 	next := func(w http.ResponseWriter, r *http.Request) {}
@@ -182,7 +192,17 @@ func TestLogout_InvalidScmID(t *testing.T) {
 	next := func(w http.ResponseWriter, r *http.Request) {}
 	r := LogoutHandler([]RepositoryManager{rm}, http.HandlerFunc(next))
 
-	req := httptest.NewRequest(http.MethodPost, "/abc", nil)
+	csrfToken := "test-csrf-token"
+	body := strings.NewReader("csrf_token=" + csrfToken)
+	req := httptest.NewRequest(http.MethodPost, "/abc", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{
+		Name:     csrfCookieName,
+		Value:    csrfToken,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		HttpOnly: false,
+	})
 	sess := NewMoraSession()
 	req = req.WithContext(WithMoraSession(req.Context(), sess))
 
