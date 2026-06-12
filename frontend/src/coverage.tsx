@@ -1,6 +1,7 @@
 import { DateTime, Duration } from 'luxon'
 import React, { useEffect, useState } from 'react'
 import Datepicker from "react-tailwindcss-datepicker";
+import "./datepicker-classes";
 import {
   LoaderFunctionArgs,
   Params,
