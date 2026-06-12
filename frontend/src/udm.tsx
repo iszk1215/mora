@@ -4,6 +4,7 @@ import React, {
 } from 'react'
 
 import Datepicker from "react-tailwindcss-datepicker";
+import "./datepicker-classes";
 
 import ReactECharts from 'echarts-for-react'
 
