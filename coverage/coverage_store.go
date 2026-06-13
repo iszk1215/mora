@@ -192,7 +192,7 @@ func (s *coverageStoreImpl) loadCoverage(row storableCoverage) (*Coverage, error
 	}, nil
 }
 
-func (s *coverageStoreImpl) scan(query string, params ...interface{}) ([]*Coverage, error) {
+func (s *coverageStoreImpl) scanFull(query string, params ...interface{}) ([]*Coverage, error) {
 	rows := []storableCoverage{}
 	if err := s.db.Select(&rows, query, params...); err != nil {
 		return nil, err
@@ -210,8 +210,60 @@ func (s *coverageStoreImpl) scan(query string, params ...interface{}) ([]*Covera
 	return coverages, nil
 }
 
+func (s *coverageStoreImpl) scanLite(repoID int64) ([]*Coverage, error) {
+	type row struct {
+		ID         int64     `db:"id"`
+		RepoID     int64     `db:"repo_id"`
+		Revision   string    `db:"revision"`
+		Time       time.Time `db:"time"`
+		EntryID    *int64    `db:"entry_id"`
+		EntryName  *string   `db:"entry_name"`
+		EntryHits  *int      `db:"entry_hits"`
+		EntryLines *int      `db:"entry_lines"`
+	}
+
+	rows := []row{}
+	if err := s.db.Select(&rows, `
+		SELECT c.id, c.repo_id, c.revision, c.time,
+		       e.id        AS entry_id,
+		       e.name      AS entry_name,
+		       e.hits      AS entry_hits,
+		       e.lines     AS entry_lines
+		FROM coverage c
+		LEFT JOIN coverage_entry e ON e.coverage_id = c.id
+		WHERE c.repo_id = ?
+		ORDER BY c.id, e.id`, repoID); err != nil {
+		return nil, err
+	}
+
+	var coverages []*Coverage
+	var current *Coverage
+	for _, r := range rows {
+		if current == nil || current.ID != r.ID {
+			current = &Coverage{
+				ID:        r.ID,
+				RepoID:    r.RepoID,
+				Revision:  r.Revision,
+				Timestamp: r.Time,
+			}
+			coverages = append(coverages, current)
+		}
+		if r.EntryID != nil {
+			current.Entries = append(current.Entries, &CoverageEntry{
+				Name:  *r.EntryName,
+				Hits:  *r.EntryHits,
+				Lines: *r.EntryLines,
+			})
+		}
+	}
+	if coverages == nil {
+		coverages = []*Coverage{}
+	}
+	return coverages, nil
+}
+
 func (s *coverageStoreImpl) findOne(query string, params ...interface{}) (*Coverage, error) {
-	coverages, err := s.scan(query, params...)
+	coverages, err := s.scanFull(query, params...)
 	if err != nil {
 		return nil, err
 	}
@@ -231,11 +283,7 @@ func (s *coverageStoreImpl) FindRevision(repoID int64, revision string) (*Covera
 }
 
 func (s *coverageStoreImpl) List(repo_id int64) ([]*Coverage, error) {
-	return s.scan(s.selectQuery+" WHERE repo_id = ?", repo_id)
-}
-
-func (s *coverageStoreImpl) ListAll() ([]*Coverage, error) {
-	return s.scan(s.selectQuery)
+	return s.scanLite(repo_id)
 }
 
 func (s *coverageStoreImpl) Put(cov *Coverage) error {

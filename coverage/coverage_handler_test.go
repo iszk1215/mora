@@ -504,9 +504,9 @@ func TestCoverageHandler_AddCoverage(t *testing.T) {
 	err := handler.AddCoverage(cov)
 
 	require.NoError(t, err)
-	got, err := store.ListAll()
+	got, err := store.Find(cov.ID)
 	require.NoError(t, err)
-	assert.Equal(t, []*Coverage{cov}, got)
+	assert.Equal(t, cov, got)
 }
 
 func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
@@ -594,10 +594,10 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 
 	require.NoError(t, err)
 
-	got, err := store.ListAll()
-	require.NoError(t, err)
 	want.ID = 1
-	assert.Equal(t, []*Coverage{want}, got)
+	got, err := store.Find(want.ID)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
 }
 
 func TestCoverageHandler_HandleUpload(t *testing.T) {
@@ -647,8 +647,8 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 	s.Handler().ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusCreated, w.Result().StatusCode)
-	got, err := store.ListAll()
-	require.NoError(t, err)
 	cov.ID = 1 // 1 will be assigned by the server
-	assert.Equal(t, []*Coverage{cov}, got)
+	got, err := store.Find(cov.ID)
+	require.NoError(t, err)
+	assert.Equal(t, cov, got)
 }

@@ -79,14 +79,6 @@ func TestCoverageStore_List_Empty(t *testing.T) {
 	require.Empty(t, covs)
 }
 
-func TestCoverageStore_ListAll_Empty(t *testing.T) {
-	s := initCoverageStore(t)
-
-	covs, err := s.ListAll()
-	require.NoError(t, err)
-	require.Empty(t, covs)
-}
-
 func TestCoverageStore_Init_CreatesUniqueConstraint(t *testing.T) {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
@@ -293,10 +285,7 @@ func TestCoverageStore_MigrateFromContents(t *testing.T) {
 	assert.Equal(t, "go", cov.Entries[0].Name)
 	assert.Equal(t, 13, cov.Entries[0].Hits)
 	assert.Equal(t, 17, cov.Entries[0].Lines)
-	require.NotNil(t, cov.Entries[0].Profiles)
-	assert.Len(t, cov.Entries[0].Profiles, 1)
-	assert.Equal(t, "test.go", cov.Entries[0].Profiles["test.go"].FileName)
-	assert.Equal(t, [][]int{{1, 5, 1}, {10, 13, 0}}, cov.Entries[0].Profiles["test.go"].Blocks)
+	assert.Nil(t, cov.Entries[0].Profiles)
 
 	assert.Equal(t, "py", cov.Entries[1].Name)
 	assert.Equal(t, 5, cov.Entries[1].Hits)
@@ -304,6 +293,15 @@ func TestCoverageStore_MigrateFromContents(t *testing.T) {
 	assert.Nil(t, cov.Entries[1].Profiles)
 
 	assert.Equal(t, cov, covs[0])
+
+	// Find returns full data with profiles
+	full, err := s.Find(1)
+	require.NoError(t, err)
+	require.NotNil(t, full.Entries[0].Profiles)
+	assert.Len(t, full.Entries[0].Profiles, 1)
+	assert.Equal(t, "test.go", full.Entries[0].Profiles["test.go"].FileName)
+	assert.Equal(t, [][]int{{1, 5, 1}, {10, 13, 0}}, full.Entries[0].Profiles["test.go"].Blocks)
+	assert.Nil(t, full.Entries[1].Profiles)
 }
 
 func TestCoverageStore_MigrateIdempotent(t *testing.T) {
