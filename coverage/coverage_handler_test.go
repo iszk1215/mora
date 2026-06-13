@@ -501,12 +501,13 @@ func TestCoverageHandler_AddCoverage(t *testing.T) {
 
 	store := setupCoverageStore(t)
 	handler := newCoverageHandler(store)
-	err := handler.AddCoverage(cov)
+	got, err := handler.AddCoverage(cov)
 
 	require.NoError(t, err)
-	got, err := store.Find(cov.ID)
+	cov.ID = got.ID
+	saved, err := store.Find(cov.ID)
 	require.NoError(t, err)
-	assert.Equal(t, cov, got)
+	assert.Equal(t, cov, saved)
 }
 
 func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
@@ -590,14 +591,72 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	store := setupCoverageStore(t, existing)
 
 	handler := newCoverageHandler(store)
-	err := handler.AddCoverage(&added)
+	got, err := handler.AddCoverage(&added)
 
 	require.NoError(t, err)
 
-	want.ID = 1
-	got, err := store.Find(want.ID)
+	want.ID = got.ID
+	saved, err := store.Find(want.ID)
 	require.NoError(t, err)
-	assert.Equal(t, want, got)
+	assert.Equal(t, want, saved)
+}
+
+func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
+	repo := core.Repository{Id: 1215}
+
+	entryGo := &CoverageEntryUploadRequest{
+		Name:  "go",
+		Hits:  13,
+		Lines: 17,
+		Profiles: []*profile.Profile{
+			{FileName: "test.go", Hits: 13, Lines: 17, Blocks: [][]int{{1, 5, 1}}},
+		},
+	}
+	entryCc := &CoverageEntryUploadRequest{
+		Name:  "cc",
+		Hits:  0,
+		Lines: 3,
+		Profiles: []*profile.Profile{
+			{FileName: "test.cc", Hits: 0, Lines: 3, Blocks: [][]int{{1, 3, 0}}},
+		},
+	}
+
+	store := setupCoverageStore(t)
+	s := newCoverageHandler(store)
+
+	makeUpload := func(revision string, entry *CoverageEntryUploadRequest) *httptest.ResponseRecorder {
+		req := &CoverageUploadRequest{
+			Revision:  revision,
+			Timestamp: time.Now(),
+			Entries:   []*CoverageEntryUploadRequest{entry},
+		}
+		body, err := json.Marshal(req)
+		require.NoError(t, err)
+
+		r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+		r = r.WithContext(core.WithRepo(r.Context(), repo))
+		w := httptest.NewRecorder()
+		s.Handler().ServeHTTP(w, r)
+		return w
+	}
+
+	// First upload: entry "go"
+	w1 := makeUpload("abc", entryGo)
+	require.Equal(t, http.StatusCreated, w1.Result().StatusCode)
+
+	// Second upload: entry "cc" for same revision (triggers merge)
+	w2 := makeUpload("abc", entryCc)
+	require.Equal(t, http.StatusCreated, w2.Result().StatusCode)
+
+	// Decode response body
+	var resp Coverage
+	err := json.NewDecoder(w2.Result().Body).Decode(&resp)
+	require.NoError(t, err)
+
+	// Assert response contains both entries (merged)
+	assert.Len(t, resp.Entries, 2)
+	assert.Equal(t, "cc", resp.Entries[0].Name)
+	assert.Equal(t, "go", resp.Entries[1].Name)
 }
 
 func TestCoverageHandler_HandleUpload(t *testing.T) {
