@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, useLoaderData, useParams } from 'react-router'
 import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList, filterCoveragesByDate } from './coverage'
 import { Coverage } from './core'
@@ -10,7 +10,16 @@ vi.mock('react-router', async () => {
 })
 
 vi.mock('react-datepicker', () => ({
-  default: (props: any) => <input data-testid="datepicker" {...props} />,
+  default: (props: any) => {
+    const { onChange, ...rest } = props
+    return (
+      <input
+        data-testid="datepicker"
+        onChange={(e) => onChange(new Date(e.target.value))}
+        {...rest}
+      />
+    )
+  },
 }))
 
 vi.mock('echarts-for-react', () => ({
@@ -201,5 +210,19 @@ describe('CoverageList', () => {
     render(<MemoryRouter><CoverageList /></MemoryRouter>)
     const pickers = screen.getAllByTestId('datepicker')
     expect(pickers).toHaveLength(2)
+  })
+
+  it('filters coverage list items when start date is set', () => {
+    render(<MemoryRouter><CoverageList /></MemoryRouter>)
+    expect(screen.getByText(/#1/)).toBeInTheDocument()
+    expect(screen.getByText(/#2/)).toBeInTheDocument()
+    expect(screen.getByText(/#3/)).toBeInTheDocument()
+
+    const pickers = screen.getAllByTestId('datepicker')
+    fireEvent.change(pickers[0], { target: { value: '2024-06-01' } })
+
+    expect(screen.queryByText(/#1/)).not.toBeInTheDocument()
+    expect(screen.getByText(/#2/)).toBeInTheDocument()
+    expect(screen.getByText(/#3/)).toBeInTheDocument()
   })
 })

@@ -218,18 +218,20 @@ export const CoverageList = (): React.JSX.Element => {
   const params = useParams()
   const repo = data.repo
 
-  const items: React.JSX.Element[] = []
-  data.coverages.forEach((cov: Coverage, i: number) => {
-    items.push(<div key={i}>
-      <CoverageSegment cov={cov} params={params} />
-    </div>)
-  })
-
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null)
 
   const onStartDateChange = (date: Date | null) => { setStartDate(date) }
   const onEndDateChange = (date: Date | null) => { setEndDate(date) }
+
+  const filteredCoverages = filterCoveragesByDate(data.coverages, startDate, endDate)
+
+  const items: React.JSX.Element[] = []
+  filteredCoverages.forEach((cov: Coverage, i: number) => {
+    items.push(<div key={i}>
+      <CoverageSegment cov={cov} params={params} />
+    </div>)
+  })
 
   return (
     <div><h2 className="text-3xl my-4">Coverages</h2>
