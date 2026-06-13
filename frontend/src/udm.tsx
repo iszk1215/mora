@@ -135,7 +135,7 @@ export const UdmChart = (params: any): React.JSX.Element => {
     series: datasets.map((ds: any) => ({
       name: ds.label,
       type: 'line' as const,
-      data: ds.data.map((p: any) => [p.x, p.y]),
+      data: ds.data.map((p: any) => [p.x, Number(p.y)]),
     })),
     tooltip: {
       trigger: 'axis',
