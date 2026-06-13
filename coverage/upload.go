@@ -279,8 +279,7 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 
 	if !dryRun {
 		if server == "" {
-			fmt.Println("use -server=<server url>")
-			os.Exit(1)
+			return fmt.Errorf("use -server=<server url>")
 		}
 
 		err = upload(server, repoURL, req)
