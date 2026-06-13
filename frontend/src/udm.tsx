@@ -138,7 +138,9 @@ export const UdmChart = (params: any): React.JSX.Element => {
       data: ds.data.map((p: any) => [p.x, p.y]),
     })),
     tooltip: {
-      trigger: 'axis' as const,
+      trigger: 'axis',
+      valueFormatter: (value: number) =>
+        Number.isInteger(value) ? String(value) : value.toFixed(1),
     },
   }
 

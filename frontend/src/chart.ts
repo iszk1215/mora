@@ -20,7 +20,8 @@ export function getCoverageOption() {
       },
     },
     tooltip: {
-      trigger: 'axis' as const,
+      trigger: 'axis',
+      valueFormatter: (value: number) => value.toFixed(1) + '%',
     },
     animation: false,
   }
