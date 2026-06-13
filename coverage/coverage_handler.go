@@ -294,21 +294,21 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
-func (s *CoverageHandler) AddCoverage(cov *Coverage) error {
+func (s *CoverageHandler) AddCoverage(cov *Coverage) (*Coverage, error) {
 	found, err := s.coverages.FindRevision(cov.RepoID, cov.Revision)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if found != nil {
 		cov.ID = found.ID
 		cov, err = mergeCoverage(found, cov)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return s.coverages.Put(cov)
+	return cov, s.coverages.Put(cov)
 }
 
 func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {
@@ -369,7 +369,7 @@ func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Re
 	cov.Entries = entries
 	cov.Timestamp = request.Timestamp
 
-	err = s.AddCoverage(cov)
+	cov, err = s.AddCoverage(cov)
 	if err != nil {
 		log.Error().Err(err).Msg("HandleCoverageUpload")
 		render.InternalError(w, err)
