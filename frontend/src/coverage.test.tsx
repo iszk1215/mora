@@ -1,12 +1,21 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { useLoaderData } from 'react-router'
-import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage } from './coverage'
+import { MemoryRouter, useLoaderData, useParams } from 'react-router'
+import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList, filterCoveragesByDate } from './coverage'
+import { Coverage } from './core'
 
 vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
-  return { ...actual, useLoaderData: vi.fn() }
+  return { ...actual, useLoaderData: vi.fn(), useParams: vi.fn() }
 })
+
+vi.mock('react-datepicker', () => ({
+  default: (props: any) => <input data-testid="datepicker" {...props} />,
+}))
+
+vi.mock('echarts-for-react', () => ({
+  default: () => <div data-testid="echart" />,
+}))
 
 describe('formatRevision', () => {
   it('returns first 10 characters of revision', () => {
@@ -93,5 +102,104 @@ describe('CoverageEntryPage', () => {
     render(<CoverageEntryPage />)
     const link = screen.getByText('abcdefghij').closest('a')
     expect(link).toHaveAttribute('href', 'https://example.com/commit/abc123')
+  })
+})
+
+const makeCoverages = (): Coverage[] => [
+  {
+    index: 1, hits: 90, lines: 100, revision: 'abc', revision_url: '',
+    time: '2024-01-15T10:00:00Z',
+    entries: [{ name: 'go', hits: 90, lines: 100 }],
+  },
+  {
+    index: 2, hits: 50, lines: 100, revision: 'def', revision_url: '',
+    time: '2024-06-15T10:00:00Z',
+    entries: [{ name: 'py', hits: 50, lines: 100 }],
+  },
+  {
+    index: 3, hits: 80, lines: 100, revision: 'ghi', revision_url: '',
+    time: '2024-12-25T10:00:00Z',
+    entries: [{ name: 'js', hits: 80, lines: 100 }],
+  },
+]
+
+describe('filterCoveragesByDate', () => {
+  it('returns all coverages when no dates are set', () => {
+    const result = filterCoveragesByDate(makeCoverages(), null, null)
+    expect(result).toHaveLength(3)
+  })
+
+  it('filters out coverages before start date', () => {
+    const result = filterCoveragesByDate(makeCoverages(), new Date('2024-06-01'), null)
+    expect(result).toHaveLength(2)
+    expect(result[0].index).toBe(2)
+    expect(result[1].index).toBe(3)
+  })
+
+  it('filters out coverages after end date', () => {
+    const result = filterCoveragesByDate(makeCoverages(), null, new Date('2024-06-30'))
+    expect(result).toHaveLength(2)
+    expect(result[0].index).toBe(1)
+    expect(result[1].index).toBe(2)
+  })
+
+  it('returns only coverages within both dates', () => {
+    const result = filterCoveragesByDate(makeCoverages(), new Date('2024-06-01'), new Date('2024-12-31'))
+    expect(result).toHaveLength(2)
+    expect(result[0].index).toBe(2)
+    expect(result[1].index).toBe(3)
+  })
+
+  it('includes coverage on the boundary of start date', () => {
+    const result = filterCoveragesByDate(makeCoverages(), new Date('2024-01-15'), null)
+    expect(result).toHaveLength(3)
+  })
+
+  it('includes coverage on the boundary of end date', () => {
+    const result = filterCoveragesByDate(makeCoverages(), null, new Date('2024-12-25'))
+    expect(result).toHaveLength(3)
+  })
+
+  it('returns empty array when all coverages are before start date', () => {
+    const result = filterCoveragesByDate(makeCoverages(), new Date('2025-01-01'), null)
+    expect(result).toHaveLength(0)
+  })
+
+  it('returns empty array when all coverages are after end date', () => {
+    const result = filterCoveragesByDate(makeCoverages(), null, new Date('2024-01-01'))
+    expect(result).toHaveLength(0)
+  })
+})
+
+describe('CoverageList', () => {
+  beforeEach(() => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      repo: { id: 1, url: 'https://example.com/repo', namespace: 'ns', name: 'repo' },
+      coverages: makeCoverages(),
+    })
+    vi.mocked(useParams).mockReturnValue({ repo_id: '1' })
+  })
+
+  it('renders all coverage segments', () => {
+    render(<MemoryRouter><CoverageList /></MemoryRouter>)
+    expect(screen.getByText(/#1/)).toBeInTheDocument()
+    expect(screen.getByText(/#2/)).toBeInTheDocument()
+    expect(screen.getByText(/#3/)).toBeInTheDocument()
+  })
+
+  it('renders coverage entry links', () => {
+    render(<MemoryRouter><CoverageList /></MemoryRouter>)
+    const links = screen.getAllByRole('link')
+    const entryLinks = links.filter(l => l.getAttribute('href')?.startsWith('/repos/1/coverages/'))
+    expect(entryLinks).toHaveLength(3)
+    expect(entryLinks[0]).toHaveAttribute('href', '/repos/1/coverages/1/go')
+    expect(entryLinks[1]).toHaveAttribute('href', '/repos/1/coverages/2/py')
+    expect(entryLinks[2]).toHaveAttribute('href', '/repos/1/coverages/3/js')
+  })
+
+  it('renders date pickers for filtering', () => {
+    render(<MemoryRouter><CoverageList /></MemoryRouter>)
+    const pickers = screen.getAllByTestId('datepicker')
+    expect(pickers).toHaveLength(2)
   })
 })

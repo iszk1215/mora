@@ -15,6 +15,19 @@ import { Browser } from './browser'
 import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
 
+export function filterCoveragesByDate(
+  coverages: Coverage[],
+  startDate: Date | null,
+  endDate: Date | null
+): Coverage[] {
+  return coverages.filter((cov) => {
+    const t = DateTime.fromISO(cov.time)
+    if (startDate && t < DateTime.fromJSDate(startDate).startOf('day')) return false
+    if (endDate && t > DateTime.fromJSDate(endDate).endOf('day')) return false
+    return true
+  })
+}
+
 interface CoverageEntryMetadata {
   hits: number
   lines: number
@@ -200,7 +213,7 @@ const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
     </div>)
 }
 
-const CoverageList = (): React.JSX.Element => {
+export const CoverageList = (): React.JSX.Element => {
   const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
   const params = useParams()
   const repo = data.repo
