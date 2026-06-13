@@ -260,8 +260,7 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 	}
 
 	if !force && !flag {
-		fmt.Println("working tree is dirty")
-		return err
+		return fmt.Errorf("working tree is dirty")
 	}
 
 	printRequest(req)
