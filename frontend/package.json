@@ -21,9 +21,9 @@
     "highlight.js": "^11.7.0",
     "luxon": "^3.1.1",
     "react": "^19.2.7",
+    "react-datepicker": "^9.1.0",
     "react-dom": "^19.2.7",
-    "react-router": "^7.17.0",
-    "react-tailwindcss-datepicker": "^2.0.0"
+    "react-router": "^7.17.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

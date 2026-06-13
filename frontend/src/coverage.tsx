@@ -1,7 +1,6 @@
 import { DateTime, Duration } from 'luxon'
 import React, { useEffect, useState } from 'react'
-import Datepicker from "react-tailwindcss-datepicker";
-import "./datepicker-classes";
+import DatePicker from "react-datepicker";
 import {
   LoaderFunctionArgs,
   Params,
@@ -222,23 +221,27 @@ const CoverageList = (): React.JSX.Element => {
   return (
     <div><h2 className="text-3xl my-4">Coverages</h2>
       Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
-      <div className="pt-2 flex">
-        From
-        <Datepicker
-          containerClassName="relative w-1/4"
-          value={{ startDate: startDate, endDate: startDate }}
-          onChange={(range) => { if (range) { onStartDateChange(range.startDate) } }}
-          useRange={false}
-          asSingle={true}
-        />
+      <div className="pt-2 flex items-center">
+        <span className="mr-1">From</span>
+        <div className="w-1/4">
+          <DatePicker
+            selected={startDate}
+            onChange={onStartDateChange}
+            className="border rounded px-2 py-1 w-full"
+            placeholderText="Select date"
+            dateFormat="yyyy-MM-dd"
+          />
+        </div>
         <span className="px-2">To</span>
-        <Datepicker
-          containerClassName="relative w-1/4"
-          value={{ startDate: endDate, endDate: endDate }}
-          onChange={(range) => { if (range) { onEndDateChange(range.startDate) } }}
-          useRange={false}
-          asSingle={true}
-        />
+        <div className="w-1/4">
+          <DatePicker
+            selected={endDate}
+            onChange={onEndDateChange}
+            className="border rounded px-2 py-1 w-full"
+            placeholderText="Select date"
+            dateFormat="yyyy-MM-dd"
+          />
+        </div>
       </div>
       <CoverageChart coverages={data.coverages} min={startDate} max={endDate} />
       <div>{items}</div>
