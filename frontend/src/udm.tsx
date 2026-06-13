@@ -3,8 +3,7 @@ import React, {
   useState,
 } from 'react'
 
-import Datepicker from "react-tailwindcss-datepicker";
-import "./datepicker-classes";
+import DatePicker from "react-datepicker";
 
 import ReactECharts from 'echarts-for-react'
 
@@ -199,23 +198,27 @@ export const UdmMetricRoot = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="pt-2 flex">
-        From
-        <Datepicker
-          containerClassName="relative w-1/4"
-          value={{ startDate: startDate, endDate: startDate }}
-          onChange={(range) => { if (range) { onStartDateChange(range.startDate) } }}
-          useRange={false}
-          asSingle={true}
-        />
+      <div className="pt-2 flex items-center">
+        <span className="mr-1">From</span>
+        <div className="w-1/4">
+          <DatePicker
+            selected={startDate}
+            onChange={onStartDateChange}
+            className="border rounded px-2 py-1 w-full"
+            placeholderText="Select date"
+            dateFormat="yyyy-MM-dd"
+          />
+        </div>
         <span className="px-2">To</span>
-        <Datepicker
-          containerClassName="relative w-1/4"
-          value={{ startDate: endDate, endDate: endDate }}
-          onChange={(range) => { if (range) { onEndDateChange(range.startDate) } }}
-          useRange={false}
-          asSingle={true}
-        />
+        <div className="w-1/4">
+          <DatePicker
+            selected={endDate}
+            onChange={onEndDateChange}
+            className="border rounded px-2 py-1 w-full"
+            placeholderText="Select date"
+            dateFormat="yyyy-MM-dd"
+          />
+        </div>
       </div>
       {chart}
     </div>

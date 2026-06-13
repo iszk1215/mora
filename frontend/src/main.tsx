@@ -12,6 +12,7 @@ import {
   useRouteError,
 } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
+import 'react-datepicker/dist/react-datepicker.css'
 import './index.css'
 
 import { Repo } from './core'

@@ -14,8 +14,8 @@ vi.mock('echarts-for-react', () => ({
   default: () => <div data-testid="echart" />,
 }))
 
-vi.mock('react-tailwindcss-datepicker', () => ({
-  default: () => <div data-testid="datepicker" />,
+vi.mock('react-datepicker', () => ({
+  default: (props: any) => <input data-testid="datepicker" {...props} />,
 }))
 
 describe('loadUdmMetrics', () => {
