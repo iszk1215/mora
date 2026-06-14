@@ -341,7 +341,7 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 
 	if clearFlag {
 		if len(args) != 1 {
-			return errors.New("no metric name give")
+			return errors.New("no metric name given")
 		}
 		repoId, err := c.getRepoId(c.config.RepositoryURL)
 		if err != nil {
@@ -372,7 +372,7 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 		return c.addValue(repoId, args[0], timestamp, args[1])
 	} else if listFlag {
 		if len(args) != 1 {
-			return errors.New("no metric name give")
+			return errors.New("no metric name given")
 		}
 
 		metricName, itemName, err := unpackMetricName(args[0])

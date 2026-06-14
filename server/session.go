@@ -44,10 +44,10 @@ func (s *MoraSession) getReposCache(rmID int64) map[int64]bool {
 	return s.reposMap[rmID]
 }
 
-func (s *MoraSession) setReposCache(rumID int64, repos map[int64]bool) {
+func (s *MoraSession) setReposCache(rmID int64, repos map[int64]bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.reposMap[rumID] = repos
+	s.reposMap[rmID] = repos
 }
 
 func (s *MoraSession) getToken(rmID int64) (scm.Token, bool) {
