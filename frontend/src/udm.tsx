@@ -135,10 +135,12 @@ export const UdmChart = (params: any): React.JSX.Element => {
     series: datasets.map((ds: any) => ({
       name: ds.label,
       type: 'line' as const,
-      data: ds.data.map((p: any) => [p.x, p.y]),
+      data: ds.data.map((p: any) => [p.x, Number(p.y)]),
     })),
     tooltip: {
-      trigger: 'axis' as const,
+      trigger: 'axis',
+      valueFormatter: (value: number) =>
+        Number.isInteger(value) ? String(value) : value.toFixed(1),
     },
   }
 
