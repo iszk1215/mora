@@ -58,6 +58,7 @@ func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer reader.Close()
 	return profile.ParseCoverage(reader)
 }
 
