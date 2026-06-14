@@ -239,6 +239,7 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, r)
 	res := w.Result()
+	defer res.Body.Close()
 
 	want := makeCoverageListResponse(rm, repo, []*Coverage{cov1, cov0})
 
@@ -646,11 +647,12 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 
 	// Second upload: entry "cc" for same revision (triggers merge)
 	w2 := makeUpload("abc", entryCc)
-	require.Equal(t, http.StatusCreated, w2.Result().StatusCode)
+	res2 := w2.Result()
+	defer res2.Body.Close()
+	require.Equal(t, http.StatusCreated, res2.StatusCode)
 
-	// Decode response body
 	var resp Coverage
-	err := json.NewDecoder(w2.Result().Body).Decode(&resp)
+	err := json.NewDecoder(res2.Body).Decode(&resp)
 	require.NoError(t, err)
 
 	// Assert response contains both entries (merged)
