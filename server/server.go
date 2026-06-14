@@ -20,6 +20,7 @@ import (
 	"github.com/iszk1215/mora/render"
 	"github.com/iszk1215/mora/udm"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog/log"
 )
 
