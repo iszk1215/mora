@@ -19,6 +19,7 @@ import { Repo } from './core'
 import { coverageRoute } from './coverage'
 import { udmRoute, loadUdmMetrics } from './udm'
 import { DefaultLink, HeaderLink, ExternalLink } from './util'
+import { Button } from '@/components/ui/button'
 
 // RepoList
 
@@ -104,7 +105,7 @@ export const SCMList = (): React.JSX.Element => {
     if (scm.logined) {
       buttons = (
         <div className="flex mb-2">
-          <div className="px-4 py-2 rounded-l bg-gray-200 text-gray-400">login</div>
+          <Button variant="ghost" disabled>login</Button>
           <form method="POST" action={'/logout/' + scm.id}
                 onSubmit={(e) => {
                   const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
@@ -116,15 +117,17 @@ export const SCMList = (): React.JSX.Element => {
                     e.currentTarget.appendChild(input)
                   }
                 }}>
-            <button type="submit" className="px-4 py-2 rounded-r bg-gray-400 font-bold cursor-pointer">logout</button>
+            <Button variant="secondary" type="submit">logout</Button>
           </form>
         </div>
       )
     } else {
       buttons = (
         <div className="flex mb-2">
-          <a className="px-4 py-2 rounded-l bg-gray-400 font-bold" href={'/login/' + scm.id}>login</a>
-          <div className="px-4 py-2 rounded-r bg-gray-200 text-gray-400">logout</div>
+          <Button variant="secondary" asChild>
+            <a href={'/login/' + scm.id}>login</a>
+          </Button>
+          <Button variant="ghost" disabled>logout</Button>
         </div>
       )
     }
