@@ -72,8 +72,8 @@ func (s *MoraSession) Remove(rmID int64) {
 
 func (s *MoraSession) WithToken(ctx context.Context, rmID int64) (context.Context, error) {
 	s.lock.Lock()
+	defer s.lock.Unlock()
 	token, ok := s.tokenMap[rmID]
-	s.lock.Unlock()
 	if !ok {
 		return nil, errorTokenNotFound
 	}
