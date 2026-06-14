@@ -1,9 +1,13 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/iszk1215/mora/server"
@@ -53,14 +57,27 @@ func NewWebCommand() *cobra.Command {
 				IdleTimeout:  120 * time.Second,
 			}
 
-			log.Info().Msg("Started")
-			err = srv.ListenAndServe()
-			if err != nil {
-				log.Err(err).Msg("")
-				return err
-			}
+		log.Info().Msg("Started")
 
-			return nil
+		go func() {
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+			<-sigCh
+
+			log.Info().Msg("Shutting down...")
+			server.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			srv.Shutdown(ctx)
+		}()
+
+		err = srv.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Err(err).Msg("")
+			return err
+		}
+
+		return nil
 		},
 	}
 

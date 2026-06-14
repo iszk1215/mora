@@ -62,6 +62,7 @@ type (
 	}
 
 	MoraServer struct {
+		db                 *sqlx.DB
 		repositoryManagers []RepositoryManager
 		repos              RepositoryStore
 		coverage           *coverage.CoverageService
@@ -413,6 +414,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	}
 
 	s := &MoraServer{
+		db:                 db,
 		sessionManager:     NewMoraSessionManager(),
 		repositoryManagers: repositoryManagers,
 		repos:              repoStore,
@@ -423,4 +425,8 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 	}
 
 	return s, err
+}
+
+func (s *MoraServer) Close() error {
+	return s.db.Close()
 }
