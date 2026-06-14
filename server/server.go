@@ -230,8 +230,6 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 			}
 		}
 
-		// ctx := r.Context()
-		// ctx = core.WithRepostioryManager(ctx, rm)
 		ctx = core.WithRepositoryClient(ctx, rm)
 		ctx = core.WithRepo(ctx, repo)
 		next.ServeHTTP(w, r.WithContext(ctx))

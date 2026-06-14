@@ -62,53 +62,6 @@ func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 	return store
 }
 
-// Test Data
-
-/*
-func makeCoverageUploadRequest(repo core.Repository) (*CoverageUploadRequest, *Coverage) {
-	revision := "12345"
-	now := time.Now().Round(0)
-
-	prof := profile.Profile{
-		FileName: "test2.go",
-		Hits:     0,
-		Lines:    3,
-		Blocks:   [][]int{{1, 3, 0}},
-	}
-
-	req := CoverageUploadRequest{
-		Revision:  revision,
-		Timestamp: now,
-		Entries: []*CoverageEntryUploadRequest{
-			{
-				Name:     "go",
-				Hits:     0,
-				Lines:    3,
-				Profiles: []*profile.Profile{&prof},
-			},
-		},
-	}
-
-	want := Coverage{
-		RepoID:    repo.Id,
-		Revision:  revision,
-		Timestamp: now,
-		Entries: []*CoverageEntry{
-			{
-				Name:  "go",
-				Hits:  0,
-				Lines: 3,
-				Profiles: map[string]*profile.Profile{
-					"test2.go": &prof,
-				},
-			},
-		},
-	}
-
-	return &req, &want
-}
-*/
-
 // Test Cases
 
 func Test_injectCoverage(t *testing.T) {
@@ -455,28 +408,6 @@ func Test_CoverageHandler_File(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, result.StatusCode)
 	})
 }
-
-/*
-func TestCoverageHandlerProcessUploadRequest(t *testing.T) {
-	covStore := setupCoverageStore(t)
-	repo := core.Repository{
-		Namespace: "mockowner",
-		Name:      "mockrepo",
-		Url:       "http://mock.scm/mockowner/mockrepo",
-	}
-	repoStore := setupRepositoryStore(t, &repo)
-	s := newCoverageHandler(repoStore, covStore)
-
-	req, want := makeCoverageUploadRequest(repo)
-	err := s.processUploadRequest(req)
-	require.NoError(t, err)
-
-	got, err := covStore.ListAll()
-	require.NoError(t, err)
-	want.ID = 1
-	assert.Equal(t, []*Coverage{want}, got)
-}
-*/
 
 func TestCoverageHandler_AddCoverage(t *testing.T) {
 	cov := &Coverage{

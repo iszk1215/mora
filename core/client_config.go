@@ -54,18 +54,4 @@ func ReadClientConfig(filename string) (ClientConfig, error) {
 	}
 
 	return config.Client, nil
-
-	/*
-		b, err := os.ReadFile(filename)
-		if err != nil {
-			return ClientConfig{}, err
-		}
-
-		var config ClientConfig
-		if err := toml.Unmarshal(b, &config); err != nil {
-			return ClientConfig{}, err
-		}
-
-		return config, nil
-	*/
 }
