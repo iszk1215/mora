@@ -292,7 +292,7 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		return err
 	}
 
-	res, err := s.db.Exec(
+	_, err = s.db.Exec(
 		`INSERT INTO coverage (repo_id, revision, time, contents)
 		 VALUES (?, ?, ?, ?)
 		 ON CONFLICT(repo_id, revision) DO UPDATE SET contents = ?`,
@@ -301,11 +301,12 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		return err
 	}
 
-	id, err := res.LastInsertId()
+	err = s.db.Get(&cov.ID,
+		"SELECT id FROM coverage WHERE repo_id = ? AND revision = ?",
+		cov.RepoID, cov.Revision)
 	if err != nil {
 		return err
 	}
-	cov.ID = id
 
 	return s.replaceEntries(cov.ID, cov.Entries)
 }
