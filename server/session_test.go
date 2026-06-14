@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/rand"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +12,39 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/stretchr/testify/require"
 )
+
+type failReader struct{}
+
+func (f *failReader) Read(p []byte) (int, error) {
+	return 0, errors.New("mock read error")
+}
+
+func TestSessionID_ReturnsErrorOnReadFailure(t *testing.T) {
+	old := rand.Reader
+	rand.Reader = &failReader{}
+	defer func() { rand.Reader = old }()
+
+	id, err := sessionID()
+	require.Error(t, err)
+	require.Empty(t, id)
+}
+
+func TestSessionMiddleware_Returns500OnSessionIDError(t *testing.T) {
+	old := rand.Reader
+	rand.Reader = &failReader{}
+	defer func() { rand.Reader = old }()
+
+	m := NewMoraSessionManager()
+	next := func(w http.ResponseWriter, r *http.Request) {
+		t.Error("next handler should not be called")
+	}
+	handler := m.SessionMiddleware(http.HandlerFunc(next))
+	req := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
+	got := httptest.NewRecorder()
+	handler.ServeHTTP(got, req)
+
+	require.Equal(t, http.StatusInternalServerError, got.Code)
+}
 
 func TestSessionManager(t *testing.T) {
 	m := NewMoraSessionManager()

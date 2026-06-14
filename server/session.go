@@ -107,12 +107,12 @@ func MoraSessionFrom(ctx context.Context) (*MoraSession, bool) {
 	return sess, ok
 }
 
-func sessionID() string {
+func sessionID() (string, error) {
 	b := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, b); err != nil {
-		return ""
+		return "", err
 	}
-	return base64.URLEncoding.EncodeToString(b)
+	return base64.URLEncoding.EncodeToString(b), nil
 }
 
 func (m *MoraSessionManager) GC() {
@@ -153,7 +153,12 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 
 		var sid string
 		if err != nil || cookie.Value == "" {
-			sid = sessionID()
+			sid, err = sessionID()
+			if err != nil {
+				log.Err(err).Msg("failed to generate session ID")
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
 		} else {
 			sid = cookie.Value
 		}
