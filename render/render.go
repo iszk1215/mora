@@ -23,6 +23,7 @@ import (
 	"strconv"
 
 	"github.com/iszk1215/mora/core"
+	"github.com/rs/zerolog/log"
 )
 
 // indent the json-encoded API responses
@@ -119,5 +120,7 @@ func JSON(w http.ResponseWriter, v interface{}, status int) {
 	if indent {
 		enc.SetIndent("", "  ")
 	}
-	enc.Encode(v) // nolint:all
+	if err := enc.Encode(v); err != nil {
+		log.Error().Err(err).Msg("failed to encode JSON response")
+	}
 }
