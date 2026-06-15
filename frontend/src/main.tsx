@@ -20,6 +20,14 @@ import { coverageRoute } from './coverage'
 import { udmRoute, loadUdmMetrics } from './udm'
 import { DefaultLink, HeaderLink, ExternalLink } from './util'
 import { Button } from '@/components/ui/button'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 
 // RepoList
 
@@ -170,22 +178,31 @@ interface Crumb {
 }
 
 export const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
-  const elems = crumbs.map((crumb: { label: string, link?: string }, i: number) => {
-    if (i < crumbs.length - 1 && crumb.link) {
-      return <DefaultLink to={crumb.link} key={i}>{crumb.label}</DefaultLink>
-    } else {
-      return <span key={i}>{crumb.label}</span>
-    }
-  })
-
-  const elems2: React.JSX.Element[] = []
-  for (let i = 0; i < elems.length; i++) {
-    elems2.push(elems[i])
-    if (i < elems.length - 1)
-      elems2.push(<span key={elems.length + i} className="mx-1">&gt;</span>)
-  }
-
-  return <div>{elems2}</div>
+  return (
+    <Breadcrumb>
+      <BreadcrumbList>
+        {crumbs.map((crumb, i) => {
+          const isLast = i === crumbs.length - 1
+          return (
+            <React.Fragment key={i}>
+              <BreadcrumbItem>
+                {isLast ? (
+                  <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                ) : crumb.link ? (
+                  <BreadcrumbLink asChild>
+                    <DefaultLink to={crumb.link}>{crumb.label}</DefaultLink>
+                  </BreadcrumbLink>
+                ) : (
+                  <span>{crumb.label}</span>
+                )}
+              </BreadcrumbItem>
+              {!isLast && <BreadcrumbSeparator />}
+            </React.Fragment>
+          )
+        })}
+      </BreadcrumbList>
+    </Breadcrumb>
+  )
 }
 
 export const Breadcrumbs = (): React.JSX.Element => {

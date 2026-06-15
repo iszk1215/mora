@@ -38,7 +38,7 @@ describe('makeBredcrumbs', () => {
     )
     expect(screen.getByText('Home')).toBeInTheDocument()
     expect(screen.getByText('Page')).toBeInTheDocument()
-    expect(container.innerHTML).toContain('&gt;')
+    expect(container.querySelector('[data-slot="breadcrumb-separator"]')).toBeInTheDocument()
   })
 
   it('renders link for non-last crumb when link is set', () => {
