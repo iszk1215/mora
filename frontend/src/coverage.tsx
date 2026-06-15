@@ -15,6 +15,7 @@ import { Browser } from './browser'
 import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 
 export function filterCoveragesByDate(
   coverages: Coverage[],
@@ -200,18 +201,20 @@ const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
   })
 
   return (
-    <div className="border-2 rounded my-2 p-2 flex justify-between">
-      <div>
-        <Badge variant="outline" className="mr-2">#{cov.index}</Badge>
-        {elemsWithMargin}
-      </div>
-      <div>
-        <span className="mr-2">{formatTime(cov.time)}</span>
-        <ExternalLink href={cov.revision_url}>
-          {formatRevision(cov.revision)}
-        </ExternalLink>
-      </div>
-    </div>)
+    <Card size="sm" className="my-2">
+      <CardContent className="flex justify-between">
+        <div>
+          <Badge variant="outline" className="mr-2">#{cov.index}</Badge>
+          {elemsWithMargin}
+        </div>
+        <div>
+          <span className="mr-2">{formatTime(cov.time)}</span>
+          <ExternalLink href={cov.revision_url}>
+            {formatRevision(cov.revision)}
+          </ExternalLink>
+        </div>
+      </CardContent>
+    </Card>)
 }
 
 export const CoverageList = (): React.JSX.Element => {
