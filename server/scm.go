@@ -51,8 +51,8 @@ func (s *BaseRepositoryManager) LoginHandler(next http.Handler) http.Handler {
 }
 
 type secret struct {
-	ClientID     string `yaml:"ClientID"`
-	ClientSecret string `yaml:"ClientSecret"`
+	ClientID     string `toml:"ClientID"`
+	ClientSecret string `toml:"ClientSecret"`
 }
 
 func readSecret(filename string) (secret, error) {
