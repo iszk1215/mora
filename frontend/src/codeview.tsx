@@ -1,6 +1,8 @@
 import React from 'react'
 import hljs from 'highlight.js'
 
+import { Badge } from '@/components/ui/badge'
+
 export function markupCode(code: string, blocks: number[][]): string[] {
   code = code.replace(/\s+$/g, '') // remove trailing '\n'
   const tmp = hljs.highlightAuto(code)
@@ -90,16 +92,16 @@ export const CodeView = (props: CodeViewProps): React.JSX.Element => {
   const lst = markupCode(props.code, props.blocks)
   return <div>
     <h1 className="text-3xl my-2">{props.path}</h1>
-    <div className="flex my-2">
-      <div className="rounded bg-green-300 px-2 mr-2">
-        <span className="pr-2 font-bold">Hit</span>
-        {hit}
+      <div className="flex my-2">
+        <Badge variant="outline" className="bg-green-300 px-3 py-1">
+          <span className="pr-2 font-bold">Hit</span>
+          {hit}
+        </Badge>
+        <Badge variant="outline" className="bg-pink-300 px-3 py-1">
+          <span className="pr-2 font-bold">Miss</span>
+          {miss}
+        </Badge>
       </div>
-      <div className="rounded bg-pink-300 px-2 mr-2">
-        <span className="pr-2 font-bold">Miss</span>
-        {miss}
-      </div>
-    </div>
     <pre dangerouslySetInnerHTML={{ __html: lst.join('\n') }}
       style={{ border: 'solid 1px darkgray', padding: '0px' }}
     />
