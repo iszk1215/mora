@@ -293,11 +293,11 @@ func initRepositoryManager(config RepositoryManagerConfig, baseURL string, store
 	}
 
 	if config.URL == "" {
-		return nil, errors.New("ConfigError: rm.url is empty")
+		return nil, fmt.Errorf("ConfigError: rm.url is empty")
 	}
 
 	if config.SecretFilename == "" {
-		return nil, errors.New("ConfigError: rm.secret_url is empty")
+		return nil, fmt.Errorf("ConfigError: rm.secret_url is empty")
 	}
 
 	id, _, err := store.FindURL(config.URL)
@@ -394,7 +394,7 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 	if len(repositoryManagers) == 0 {
-		return nil, errors.New("no RepositoryManager is configured")
+		return nil, fmt.Errorf("ConfigError: no RepositoryManager is configured")
 	}
 
 	frontendFileServer, err := initFrontendFileServer()
