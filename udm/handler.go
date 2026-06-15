@@ -3,6 +3,8 @@ package udm
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -10,7 +12,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/render"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 )
 
@@ -252,7 +253,7 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	item, _ := itemFrom(r.Context())
 	if value.ItemId != item.Id {
 		render.BadRequest(w,
-			errors.Errorf("itemId mismatch: expected %d but %d",
+			fmt.Errorf("itemId mismatch: expected %d but %d",
 				item.Id, value.ItemId))
 		return
 	}
