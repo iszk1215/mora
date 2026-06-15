@@ -347,7 +347,9 @@ func assertRepo(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, ok := core.RepoFrom(r.Context())
 		if !ok {
-			log.Panic().Msg("no repository in a context")
+			log.Error().Msg("no repository in a context")
+			render.NotFound(w, render.ErrNotFound)
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
