@@ -14,6 +14,7 @@ import { CoverageChart } from './coverage_chart'
 import { Browser } from './browser'
 import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
+import { Badge } from '@/components/ui/badge'
 
 export function filterCoveragesByDate(
   coverages: Coverage[],
@@ -201,7 +202,7 @@ const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
   return (
     <div className="border-2 rounded my-2 p-2 flex justify-between">
       <div>
-        <span className="mr-2">#{cov.index}</span>
+        <Badge variant="outline" className="mr-2">#{cov.index}</Badge>
         {elemsWithMargin}
       </div>
       <div>
