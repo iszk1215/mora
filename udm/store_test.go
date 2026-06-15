@@ -106,7 +106,7 @@ func TestStoreFindMetric(t *testing.T) {
 
 	t.Run("find by non existing id", func(t *testing.T) {
 		_, err := s.findMetricById( /* id= */ 1976)
-		require.ErrorIs(t, errorMetricNotFound, err)
+		require.ErrorIs(t, err, errorMetricNotFound)
 	})
 
 	t.Run("list by existing repo id", func(t *testing.T) {
@@ -192,7 +192,7 @@ func TestStoreAddItem(t *testing.T) {
 		}
 
 		err = s.addItem(item)
-		require.ErrorIs(t, errorMetricNotFound, err)
+		require.ErrorIs(t, err, errorMetricNotFound)
 	})
 }
 

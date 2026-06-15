@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -31,7 +32,7 @@ func defaultTransport(skipverify bool) http.RoundTripper {
 func NewGitea(id int64, url string, config login.Config) (*Gitea, error) {
 	client, err := driver.New(url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gitea driver.New(%s): %w", url, err)
 	}
 
 	gitea := new(Gitea)

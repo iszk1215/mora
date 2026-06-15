@@ -1,6 +1,7 @@
 package udm
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/jmoiron/sqlx"
@@ -18,7 +19,7 @@ func NewService(db *sqlx.DB) (*Service, error) {
 	store := newUdmStore(db)
 	err := store.initialize()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("udm store initialize: %w", err)
 	}
 	return &Service{store: store}, nil
 }

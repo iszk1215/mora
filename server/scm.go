@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -57,13 +58,13 @@ type secret struct {
 func readSecret(filename string) (secret, error) {
 	b, err := os.ReadFile(filename)
 	if err != nil {
-		return secret{}, err
+		return secret{}, fmt.Errorf("readSecret(%s): %w", filename, err)
 	}
 
 	s := secret{}
 	err = toml.Unmarshal(b, &s)
 	if err != nil {
-		return secret{}, err
+		return secret{}, fmt.Errorf("readSecret Unmarshal: %w", err)
 	}
 
 	return s, nil

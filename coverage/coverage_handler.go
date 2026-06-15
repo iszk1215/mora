@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -257,7 +258,7 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 	repoPath := repo.Namespace + "/" + repo.Name
 	content, _, err := client.Contents.Find(ctx, repoPath, path, revision)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getSourceCode Contents.Find(%s/%s): %w", repoPath, path, err)
 	}
 
 	return content.Data, nil
@@ -297,14 +298,14 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 func (s *CoverageHandler) AddCoverage(cov *Coverage) (*Coverage, error) {
 	found, err := s.coverages.FindRevision(cov.RepoID, cov.Revision)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("AddCoverage FindRevision: %w", err)
 	}
 
 	if found != nil {
 		cov.ID = found.ID
 		cov, err = mergeCoverage(found, cov)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("AddCoverage merge: %w", err)
 		}
 	}
 
@@ -335,7 +336,7 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 	for _, e := range req {
 		entry, err := parseCoverageEntryUploadRequest(e)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parseCoverageEntryUploadRequests: %w", err)
 		}
 		entries = append(entries, entry)
 	}

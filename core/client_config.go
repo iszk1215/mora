@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/pelletier/go-toml/v2"
@@ -34,12 +35,12 @@ type MoraConfig struct {
 func ReadMoraConfig(filename string) (MoraConfig, error) {
 	b, err := os.ReadFile(filename)
 	if err != nil {
-		return MoraConfig{}, err
+		return MoraConfig{}, fmt.Errorf("ReadMoraConfig(%s): %w", filename, err)
 	}
 
 	var config MoraConfig
 	if err := toml.Unmarshal(b, &config); err != nil {
-		return MoraConfig{}, err
+		return MoraConfig{}, fmt.Errorf("ReadMoraConfig Unmarshal: %w", err)
 	}
 
 	config.DatabaseFilename = "mora.db"
@@ -50,7 +51,7 @@ func ReadMoraConfig(filename string) (MoraConfig, error) {
 func ReadClientConfig(filename string) (ClientConfig, error) {
 	config, err := ReadMoraConfig(filename)
 	if err != nil {
-		return ClientConfig{}, err
+		return ClientConfig{}, fmt.Errorf("ReadClientConfig: %w", err)
 	}
 
 	return config.Client, nil

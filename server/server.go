@@ -156,7 +156,7 @@ func checkRepoAccessByRepositoryManager(session *MoraSession, rm RepositoryManag
 
 	_, _, err = rm.Client().Repositories.Find(ctx, owner+"/"+name)
 	if err != nil {
-		return err
+		return fmt.Errorf("Repositories.Find(%s/%s): %w", owner, name, err)
 	}
 
 	return nil
@@ -337,7 +337,7 @@ func initRepositoryManagers(config MoraConfig, store RepositoryManagerStore) ([]
 	for _, rmConfig := range config.RepositoryManagers {
 		rm, err := initRepositoryManager(rmConfig, config.Server.URL, store)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("initRepositoryManager(%s): %w", rmConfig.Driver, err)
 		}
 		repositoryManagers = append(repositoryManagers, rm)
 	}
@@ -353,18 +353,18 @@ func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositorySto
 	}
 	db, err := sqlx.Connect("sqlite3", filename)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("sqlx.Connect: %w", err)
 	}
 	db.SetMaxOpenConns(1)
 
 	rmStore := NewRepositoryManagerStore(db)
 	if err := rmStore.Init(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("rmStore.Init: %w", err)
 	}
 
 	repoStore := NewRepositoryStore(db)
 	if err := repoStore.Init(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("repoStore.Init: %w", err)
 	}
 
 	return db, rmStore, repoStore, nil
@@ -376,7 +376,7 @@ var embedded embed.FS
 func initFrontendFileServer() (http.Handler, error) {
 	frontendFS, err := fs.Sub(embedded, "static/public")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fs.Sub(static/public): %w", err)
 	}
 
 	return http.FileServer(http.FS(frontendFS)), err

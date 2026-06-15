@@ -107,11 +107,11 @@ func parseLcov(reader io.Reader) ([]*Profile, error) {
 			tmp := strings.Split(list[1], ",")
 			start, err := strconv.Atoi(tmp[0])
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("parseLcov parse DA start: %w", err)
 			}
 			count, err := strconv.Atoi(tmp[1])
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("parseLcov parse DA count: %w", err)
 			}
 			blocks = append(blocks, []int{start, start, count})
 		case "end_of_record":
@@ -180,7 +180,7 @@ func convertGoProfile(profile *cover.Profile) *Profile {
 func parseGocov(reader io.Reader) ([]*Profile, error) {
 	goProfiles, err := cover.ParseProfilesFromReader(reader)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parseGocov: %w", err)
 	}
 
 	profiles := []*Profile{}
@@ -195,7 +195,7 @@ func parseGocov(reader io.Reader) ([]*Profile, error) {
 func ParseCoverage(reader io.Reader) ([]*Profile, error) {
 	b, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ParseCoverage io.ReadAll: %w", err)
 	}
 
 	profiles, err := parseLcov(bytes.NewReader(b))
@@ -204,7 +204,7 @@ func ParseCoverage(reader io.Reader) ([]*Profile, error) {
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ParseCoverage: %w", err)
 	}
 
 	profiles = postprocess(profiles)

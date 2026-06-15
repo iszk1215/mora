@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -74,7 +75,7 @@ func NewWebCommand() *cobra.Command {
 		err = srv.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Err(err).Msg("")
-			return err
+			return fmt.Errorf("ListenAndServe: %w", err)
 		}
 
 		return nil

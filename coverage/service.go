@@ -1,6 +1,7 @@
 package coverage
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/jmoiron/sqlx"
@@ -16,7 +17,7 @@ func NewCoverageService(db *sqlx.DB) (*CoverageService, error) {
 
 	store := NewCoverageStore(db)
 	if err := store.Init(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("coverage store Init: %w", err)
 	}
 
 	return &CoverageService{handler: newCoverageHandler(store)}, nil

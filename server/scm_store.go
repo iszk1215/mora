@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 )
@@ -32,7 +34,7 @@ func (s *repositoryManagerStoreImpl) Init() error {
 	_, err := s.db.Exec(schema_repository_manager)
 	if err != nil {
 		log.Err(err).Msg("")
-		return err
+		return fmt.Errorf("scm Init: %w", err)
 	}
 	return nil
 }
@@ -41,7 +43,7 @@ func (s *repositoryManagerStoreImpl) FindURL(url string) (int64, string, error) 
 	rows := []storableRepositoryManager{}
 	err := s.db.Select(&rows, "SELECT id, driver FROM scm WHERE url = ?", url)
 	if err != nil {
-		return 0, "", err
+		return 0, "", fmt.Errorf("scm FindURL: %w", err)
 	}
 
 	if len(rows) == 0 {
@@ -55,12 +57,12 @@ func (s *repositoryManagerStoreImpl) Insert(driver string, url string) (int64, e
 	query := "INSERT INTO scm (driver, url) values(?, ?)"
 	res, err := s.db.Exec(query, driver, url)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("scm Insert: %w", err)
 	}
 
 	id, err := res.LastInsertId()
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("scm Insert LastInsertId: %w", err)
 	}
 
 	return id, nil

@@ -27,7 +27,7 @@ func (c *APIClientImpl) Do(method, path string, in any, out any) error {
 	if in != nil {
 		data, err := json.Marshal(in)
 		if err != nil {
-			return err
+			return fmt.Errorf("json.Marshal request body: %w", err)
 		}
 		body = bytes.NewBuffer(data)
 	}
@@ -35,7 +35,7 @@ func (c *APIClientImpl) Do(method, path string, in any, out any) error {
 	url := fmt.Sprintf("%s%s", c.BaseURL, path)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return err
+		return fmt.Errorf("http.NewRequest %s %s: %w", method, url, err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.Token)
@@ -47,27 +47,29 @@ func (c *APIClientImpl) Do(method, path string, in any, out any) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("client.Do %s %s: %w", method, url, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	msg, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return fmt.Errorf("io.ReadAll response body: %w", err)
 	}
 
 	if resp.StatusCode >= 400 {
 		var e ErrorResponse
 		err = json.Unmarshal(msg, &e)
 		if err != nil {
-			return err
+			return fmt.Errorf("json.Unmarshal error response: %w", err)
 		}
 
 		return errors.New(e.Message)
 	}
 
 	if out != nil {
-		return json.Unmarshal(msg, out)
+		if err := json.Unmarshal(msg, out); err != nil {
+			return fmt.Errorf("json.Unmarshal response: %w", err)
+		}
 	}
 
 	return nil

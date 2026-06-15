@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
@@ -39,7 +40,7 @@ func (s *repositoryStoreImpl) Init() error {
 	_, err := s.db.Exec(schema_repo)
 	if err != nil {
 		log.Err(err).Msg("")
-		return err
+		return fmt.Errorf("repo Init: %w", err)
 	}
 	return nil
 }
@@ -58,7 +59,7 @@ func (s *repositoryStoreImpl) findOne(query string, params ...interface{}) (Repo
 	rows := []storableRepository{}
 	err := s.db.Select(&rows, query, params...)
 	if err != nil {
-		return Repository{}, err
+		return Repository{}, fmt.Errorf("repo Find: %w", err)
 	}
 
 	if len(rows) == 0 {
@@ -83,11 +84,14 @@ func (s *repositoryStoreImpl) Put(repo *Repository) error {
 		"INSERT INTO repository (scm, namespace, name, url) VALUES (?, ?, ?, ?)",
 		repo.RepositoryManager, repo.Namespace, repo.Name, repo.Url)
 	if err != nil {
-		return err
+		return fmt.Errorf("repo Insert: %w", err)
 	}
 
 	repo.Id, err = res.LastInsertId()
-	return err
+	if err != nil {
+		return fmt.Errorf("repo Put LastInsertId: %w", err)
+	}
+	return nil
 }
 
 func (s *repositoryStoreImpl) ListAll() ([]Repository, error) {
@@ -95,7 +99,7 @@ func (s *repositoryStoreImpl) ListAll() ([]Repository, error) {
 	err := s.db.Select(&rows, "SELECT id, scm, name, namespace, url FROM repository")
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("repo ListAll: %w", err)
 	}
 
 	repos := []Repository{}

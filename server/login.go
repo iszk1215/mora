@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -20,7 +21,7 @@ func generateCSRFToken() (string, error) {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("generateCSRFToken: %w", err)
 	}
 	return hex.EncodeToString(b), nil
 }

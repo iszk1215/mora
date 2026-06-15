@@ -39,7 +39,7 @@ func findRepositoryByURL(baseURL, repoURL string) (*core.Repository, error) {
 
 	repos, err := client.listRepositories()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("findRepositoryByURL listRepositories: %w", err)
 	}
 
 	for _, r := range repos {
@@ -56,7 +56,7 @@ func findRepositoryByURL(baseURL, repoURL string) (*core.Repository, error) {
 func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 	reader, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parseCoverageFromFile open %s: %w", filename, err)
 	}
 	defer reader.Close()
 	return profile.ParseCoverage(reader)
@@ -88,12 +88,12 @@ func replaceFileName(profiles []*profile.Profile, root fs.FS) error {
 func parseFile(filename, entryName string, root fs.FS) (*CoverageEntryUploadRequest, error) {
 	profiles, err := parseCoverageFromFile(filename)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parseFile(%s): %w", filename, err)
 	}
 
 	err = replaceFileName(profiles, root)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parseFile replaceFileName: %w", err)
 	}
 
 	hits := 0
@@ -116,7 +116,7 @@ func parseFile(filename, entryName string, root fs.FS) (*CoverageEntryUploadRequ
 func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
 	repo, err := findRepositoryByURL(serverURL, repoURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("upload findRepositoryByURL: %w", err)
 	}
 
 	client := coverageClient{
@@ -130,7 +130,7 @@ func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
 	url := fmt.Sprintf("/api/repos/%d/coverages", repo.Id)
 	err = client.client.Do(http.MethodPost, url, &req, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("upload client.Do: %w", err)
 	}
 
 	return nil
@@ -139,12 +139,12 @@ func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
 func isDirty(repo *git.Repository) (bool, error) {
 	w, err := repo.Worktree()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("isDirty Worktree: %w", err)
 	}
 
 	status, err := w.Status()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("isDirty Status: %w", err)
 	}
 
 	for _, s := range status {
@@ -167,17 +167,17 @@ func checkRequest(req *CoverageUploadRequest, repo *git.Repository) (bool, error
 func makeRequest(repo *git.Repository, url, entryName string, files ...string) (*CoverageUploadRequest, error) {
 	ref, err := repo.Head()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("makeRequest repo.Head: %w", err)
 	}
 
 	commit, err := repo.CommitObject(ref.Hash())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("makeRequest CommitObject: %w", err)
 	}
 
 	wt, err := repo.Worktree()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("makeRequest Worktree: %w", err)
 	}
 	root := os.DirFS(wt.Filesystem.Root())
 
@@ -185,7 +185,7 @@ func makeRequest(repo *git.Repository, url, entryName string, files ...string) (
 	for _, file := range files {
 		e, err := parseFile(file, entryName, root)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("makeRequest parseFile %s: %w", file, err)
 		}
 
 		entries = append(entries, e)
@@ -234,7 +234,7 @@ func ask() (bool, error) {
 	reader := bufio.NewReader(os.Stdin)
 	ru, _, err := reader.ReadRune()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("ask reader.ReadRune: %w", err)
 	}
 	lru := unicode.ToLower(ru)
 	if lru != rune('y') && lru != rune('\n') {
@@ -251,13 +251,12 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 
 	req, err := makeRequest(repo, repoURL, entryName, args...)
 	if err != nil {
-		// log.Fatal().Err(err).Msg("failed to make a request")
-		return err
+		return fmt.Errorf("Upload makeRequest: %w", err)
 	}
 
 	flag, err := checkRequest(req, repo)
 	if err != nil {
-		return err
+		return fmt.Errorf("Upload checkRequest: %w", err)
 	}
 
 	if !force && !flag {
@@ -269,7 +268,7 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 	if !yes {
 		ok, err := ask()
 		if err != nil {
-			return err
+			return fmt.Errorf("Upload ask: %w", err)
 		}
 		if !ok {
 			fmt.Println("Canceled")
@@ -284,7 +283,7 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 
 		err = upload(server, repoURL, req)
 		if err != nil {
-			return err
+			return fmt.Errorf("Upload upload: %w", err)
 		}
 
 		fmt.Println("Uploaded")

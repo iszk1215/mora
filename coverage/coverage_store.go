@@ -79,13 +79,13 @@ func NewCoverageStore(db *sqlx.DB) CoverageStore {
 func (s *coverageStoreImpl) Init() error {
 	_, err := s.db.Exec(schema)
 	if err != nil {
-		return err
+		return fmt.Errorf("coverage Init schema: %w", err)
 	}
 
 	_, err = s.db.Exec(
 		"CREATE UNIQUE INDEX IF NOT EXISTS idx_coverage_repo_revision ON coverage(repo_id, revision)")
 	if err != nil {
-		return err
+		return fmt.Errorf("coverage Init index: %w", err)
 	}
 
 	return s.migrateIfNeeded()
@@ -94,7 +94,7 @@ func (s *coverageStoreImpl) Init() error {
 func (s *coverageStoreImpl) migrateIfNeeded() error {
 	var entryCount int
 	if err := s.db.Get(&entryCount, "SELECT COUNT(*) FROM coverage_entry"); err != nil {
-		return err
+		return fmt.Errorf("migrateIfNeeded count entries: %w", err)
 	}
 	if entryCount > 0 {
 		return nil
@@ -102,7 +102,7 @@ func (s *coverageStoreImpl) migrateIfNeeded() error {
 
 	var coverageCount int
 	if err := s.db.Get(&coverageCount, "SELECT COUNT(*) FROM coverage"); err != nil {
-		return err
+		return fmt.Errorf("migrateIfNeeded count coverages: %w", err)
 	}
 	if coverageCount == 0 {
 		return nil
@@ -117,7 +117,7 @@ func (s *coverageStoreImpl) migrateFromContents() error {
 		Contents string    `db:"contents"`
 	}
 	if err := s.db.Select(&rows, "SELECT id, contents FROM coverage"); err != nil {
-		return err
+		return fmt.Errorf("migrateFromContents select: %w", err)
 	}
 
 	for _, row := range rows {
@@ -139,7 +139,7 @@ func (s *coverageStoreImpl) loadCoverage(row storableCoverage) (*Coverage, error
 	if err := s.db.Select(&entryRows,
 		"SELECT id, coverage_id, name, hits, lines FROM coverage_entry WHERE coverage_id = ? ORDER BY id",
 		row.ID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loadCoverage select entries: %w", err)
 	}
 
 	var blockRows []storableBlock
@@ -148,7 +148,7 @@ func (s *coverageStoreImpl) loadCoverage(row storableCoverage) (*Coverage, error
 		 FROM coverage_block b
 		 JOIN coverage_entry e ON e.id = b.entry_id
 		 WHERE e.coverage_id = ?`, row.ID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loadCoverage select blocks: %w", err)
 	}
 
 	blocksByEntry := make(map[int64][]storableBlock)
@@ -162,7 +162,7 @@ func (s *coverageStoreImpl) loadCoverage(row storableCoverage) (*Coverage, error
 		for _, br := range blocksByEntry[er.ID] {
 			var blocks [][]int
 			if err := json.Unmarshal([]byte(br.Blocks), &blocks); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("loadCoverage unmarshal blocks: %w", err)
 			}
 			if profiles == nil {
 				profiles = make(map[string]*profile.Profile)
@@ -195,14 +195,14 @@ func (s *coverageStoreImpl) loadCoverage(row storableCoverage) (*Coverage, error
 func (s *coverageStoreImpl) scanFull(query string, params ...interface{}) ([]*Coverage, error) {
 	rows := []storableCoverage{}
 	if err := s.db.Select(&rows, query, params...); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scanFull select: %w", err)
 	}
 
 	coverages := make([]*Coverage, len(rows))
 	for i, record := range rows {
 		cov, err := s.loadCoverage(record)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scanFull loadCoverage: %w", err)
 		}
 		coverages[i] = cov
 	}
@@ -233,7 +233,7 @@ func (s *coverageStoreImpl) scanLite(repoID int64) ([]*Coverage, error) {
 		LEFT JOIN coverage_entry e ON e.coverage_id = c.id
 		WHERE c.repo_id = ?
 		ORDER BY c.id, e.id`, repoID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("scanLite select: %w", err)
 	}
 
 	var coverages []*Coverage
@@ -265,7 +265,7 @@ func (s *coverageStoreImpl) scanLite(repoID int64) ([]*Coverage, error) {
 func (s *coverageStoreImpl) findOne(query string, params ...interface{}) (*Coverage, error) {
 	coverages, err := s.scanFull(query, params...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("findOne scanFull: %w", err)
 	}
 	if len(coverages) == 0 {
 		return nil, nil
@@ -289,7 +289,7 @@ func (s *coverageStoreImpl) List(repo_id int64) ([]*Coverage, error) {
 func (s *coverageStoreImpl) Put(cov *Coverage) error {
 	contents, err := json.Marshal(cov.Entries)
 	if err != nil {
-		return err
+		return fmt.Errorf("Put marshal entries: %w", err)
 	}
 
 	_, err = s.db.Exec(
@@ -298,14 +298,14 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		 ON CONFLICT(repo_id, revision) DO UPDATE SET contents = ?`,
 		cov.RepoID, cov.Revision, cov.Timestamp, contents, contents)
 	if err != nil {
-		return err
+		return fmt.Errorf("Put insert coverage: %w", err)
 	}
 
 	err = s.db.Get(&cov.ID,
 		"SELECT id FROM coverage WHERE repo_id = ? AND revision = ?",
 		cov.RepoID, cov.Revision)
 	if err != nil {
-		return err
+		return fmt.Errorf("Put select coverage id: %w", err)
 	}
 
 	return s.replaceEntries(cov.ID, cov.Entries)
@@ -315,11 +315,11 @@ func (s *coverageStoreImpl) replaceEntries(coverageID int64, entries []*Coverage
 	if _, err := s.db.Exec(
 		"DELETE FROM coverage_block WHERE entry_id IN (SELECT id FROM coverage_entry WHERE coverage_id = ?)",
 		coverageID); err != nil {
-		return err
+		return fmt.Errorf("replaceEntries delete blocks: %w", err)
 	}
 	if _, err := s.db.Exec(
 		"DELETE FROM coverage_entry WHERE coverage_id = ?", coverageID); err != nil {
-		return err
+		return fmt.Errorf("replaceEntries delete entries: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -327,22 +327,22 @@ func (s *coverageStoreImpl) replaceEntries(coverageID int64, entries []*Coverage
 			"INSERT INTO coverage_entry (coverage_id, name, hits, lines) VALUES (?, ?, ?, ?)",
 			coverageID, entry.Name, entry.Hits, entry.Lines)
 		if err != nil {
-			return err
+			return fmt.Errorf("replaceEntries insert entry %q: %w", entry.Name, err)
 		}
 		entryID, err := res.LastInsertId()
 		if err != nil {
-			return err
+			return fmt.Errorf("replaceEntries LastInsertId for %q: %w", entry.Name, err)
 		}
 
 		for _, prof := range entry.Profiles {
 			blocksJSON, err := json.Marshal(prof.Blocks)
 			if err != nil {
-				return err
+				return fmt.Errorf("replaceEntries marshal blocks for %q: %w", prof.FileName, err)
 			}
 			if _, err := s.db.Exec(
 				"INSERT INTO coverage_block (entry_id, filename, hits, lines, blocks) VALUES (?, ?, ?, ?, ?)",
 				entryID, prof.FileName, prof.Hits, prof.Lines, string(blocksJSON)); err != nil {
-				return err
+				return fmt.Errorf("replaceEntries insert block for %q: %w", prof.FileName, err)
 			}
 		}
 	}

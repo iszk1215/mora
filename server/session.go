@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -110,7 +111,7 @@ func MoraSessionFrom(ctx context.Context) (*MoraSession, bool) {
 func sessionID() (string, error) {
 	b := make([]byte, 32)
 	if _, err := io.ReadFull(rand.Reader, b); err != nil {
-		return "", err
+		return "", fmt.Errorf("sessionID: %w", err)
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
 }
