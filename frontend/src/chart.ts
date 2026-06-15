@@ -8,7 +8,7 @@ interface Point {
 
 export function getCoverageOption() {
   return {
-    grid: { left: 60, right: 20, top: 20, bottom: 40 },
+    grid: { left: 60, right: 20, top: 40, bottom: 40 },
     xAxis: {
       type: 'time' as const,
     },
@@ -24,6 +24,10 @@ export function getCoverageOption() {
       valueFormatter: (value: number) => value.toFixed(1) + '%',
     },
     animation: false,
+    legend: {
+      type: 'scroll',
+      top: 0,
+    },
   }
 }
 
