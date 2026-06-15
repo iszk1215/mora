@@ -271,7 +271,6 @@ func TestStoreDeleteItem(t *testing.T) {
 	// items[0] has a value
 	value := &valueModel{
 		ItemId:    items[0].Id,
-		Revision:  "revision",
 		Timestamp: time.Now().Round(0),
 		Value:     "1976",
 	}
@@ -316,7 +315,6 @@ func TestStoreValue(t *testing.T) {
 
 	value := &valueModel{
 		ItemId:    item.Id,
-		Revision:  "revision",
 		Timestamp: time.Now().Round(0),
 		Value:     "1976",
 	}

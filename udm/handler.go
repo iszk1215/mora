@@ -36,7 +36,6 @@ type (
 	valueModel struct {
 		Id        int64     `db:"id"`
 		ItemId    int64     `db:"item_id"`
-		Revision  string    `json:"revision" db:"revision"`
 		Timestamp time.Time `json:"time"     db:"time"`
 		Value     string    `json:"value"    db:"value"`
 	}

@@ -33,7 +33,6 @@ interface UdmItem {
 interface UdmValue {
   id: number,
   item_id: number,
-  revision: string,
   time: string,
   value: string,
 }

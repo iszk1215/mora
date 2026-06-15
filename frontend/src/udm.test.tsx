@@ -113,7 +113,7 @@ describe('loadMetricValues', () => {
 
   it('returns values from successful API response', async () => {
     const mockValues = [
-      { id: 1, item_id: 1, revision: 'abc', time: '2024-01-01', value: '10' },
+      { id: 1, item_id: 1, time: '2024-01-01', value: '10' },
     ]
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,

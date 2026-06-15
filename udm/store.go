@@ -36,7 +36,6 @@ var schema_value = `
 CREATE TABLE IF NOT EXISTS udm_value (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     item_id INTEGER NOT NULL,
-    revision TEXT NOT NULL,
     time DATETIME NOT NULL,
     value TEXT NOT NULL,
     UNIQUE(item_id, time)
@@ -204,9 +203,9 @@ func (s *udmStore) addValue(value *valueModel) error {
 		return fmt.Errorf("addValue findItemById: %w", err)
 	}
 
-	query := "INSERT INTO udm_value (item_id, revision, time, value) VALUES (?, ?, ?, ?)"
+	query := "INSERT INTO udm_value (item_id, time, value) VALUES (?, ?, ?)"
 
-	res, err := s.db.Exec(query, value.ItemId, value.Revision, value.Timestamp, value.Value)
+	res, err := s.db.Exec(query, value.ItemId, value.Timestamp, value.Value)
 	if err != nil {
 		return fmt.Errorf("addValue insert: %w", err)
 	}
@@ -220,7 +219,7 @@ func (s *udmStore) addValue(value *valueModel) error {
 }
 
 func (s *udmStore) listValues(itemId int64) ([]valueModel, error) {
-	query := "SELECT id,item_id,revision,time,value FROM udm_value WHERE item_id = ? ORDER BY time"
+	query := "SELECT id,item_id,time,value FROM udm_value WHERE item_id = ? ORDER BY time"
 
 	rows := []valueModel{}
 	err := s.db.Select(&rows, query, itemId)
@@ -254,6 +253,20 @@ func (s *udmStore) initialize() error {
 	_, err = s.db.Exec(schema_value)
 	if err != nil {
 		return fmt.Errorf("initialize schema_value: %w", err)
+	}
+
+	// migration: drop revision column from udm_value if present
+	var hasRevision bool
+	err = s.db.Get(&hasRevision,
+		`SELECT COUNT(*) > 0 FROM pragma_table_info('udm_value') WHERE name = 'revision'`)
+	if err != nil {
+		return fmt.Errorf("migration check revision column: %w", err)
+	}
+	if hasRevision {
+		_, err = s.db.Exec(`ALTER TABLE udm_value DROP COLUMN revision`)
+		if err != nil {
+			return fmt.Errorf("migration drop revision column: %w", err)
+		}
 	}
 
 	return nil

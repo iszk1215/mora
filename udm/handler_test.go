@@ -437,7 +437,6 @@ func TestDeleteItem(t *testing.T) {
 
 	value := valueModel{
 		ItemId:    item.Id,
-		Revision:  "rev1",
 		Timestamp: time.Now().Round(0),
 		Value:     "10",
 	}
@@ -487,7 +486,6 @@ func TestHandlerCreateValue(t *testing.T) {
 
 	value := valueModel{
 		ItemId:    metric.Id,
-		Revision:  "rev1",
 		Timestamp: time.Now().Round(0),
 		Value:     "10",
 	}
@@ -533,7 +531,6 @@ func setupTestValues(t *testing.T, store *udmStore) (core.Repository, metricMode
 	values := []valueModel{
 		{
 			ItemId:    item.Id,
-			Revision:  "rev1",
 			Timestamp: now.Add(time.Hour * 24),
 			Value:     "10",
 		},

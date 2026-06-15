@@ -177,11 +177,8 @@ func (c *udmCommand) addValue(
 		return err
 	}
 
-	revision := "" // FIXME
-
 	val := &valueModel{
 		ItemId:    item.Id,
-		Revision:  revision,
 		Timestamp: timestamp,
 		Value:     value,
 	}
