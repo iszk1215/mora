@@ -202,7 +202,7 @@ const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
 
   return (
     <Card size="sm" className="my-2">
-      <CardContent className="flex justify-between">
+      <CardContent className="flex justify-between text-base">
         <div>
           <Badge variant="outline" className="mr-2">#{cov.index}</Badge>
           {elemsWithMargin}
