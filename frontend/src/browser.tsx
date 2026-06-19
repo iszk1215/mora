@@ -3,6 +3,14 @@ import { FileData } from './core'
 import { DefaultLink } from './util'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faFolder, faFolderOpen } from '@fortawesome/free-regular-svg-icons'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table'
 
 export interface Item {
   name: string
@@ -115,7 +123,7 @@ interface Config {
   negativeThreshold: number
 }
 
-const Table = (props: TableProp): React.JSX.Element => {
+const FileBrowserTable = (props: TableProp): React.JSX.Element => {
   const rows: React.JSX.Element[] = []
 
   // TODO: user config
@@ -123,9 +131,9 @@ const Table = (props: TableProp): React.JSX.Element => {
 
   const getClass = (item: Item): string => {
     if (item.ratio > config.positiveThreshold)
-      return "border bg-green-100"
+      return "bg-green-100"
     else if (item.ratio < config.negativeThreshold)
-      return "border bg-red-100"
+      return "bg-red-100"
     return ""
   }
 
@@ -150,32 +158,30 @@ const Table = (props: TableProp): React.JSX.Element => {
         <DefaultLink key={100} to={item.file!.filename}>{item.name}</DefaultLink>)
     }
 
-    const elem = (<tr key={i} className={getClass(item)}>
-      <td className="border">{elems}</td>
-      <td className="border">{item.hits}</td>
-      <td className="border">{item.lines - item.hits}</td>
-      <td className="border">{item.lines}</td>
-      <td className="border">{item.ratio.toFixed(1)}%</td>
-    </tr>)
+    const elem = (<TableRow key={i} className={getClass(item)}>
+      <TableCell>{elems}</TableCell>
+      <TableCell>{item.hits}</TableCell>
+      <TableCell>{item.lines - item.hits}</TableCell>
+      <TableCell>{item.lines}</TableCell>
+      <TableCell>{item.ratio.toFixed(1)}%</TableCell>
+    </TableRow>)
     rows.push(elem)
   })
 
-  return (<div>
-    <table className="w-full border table-auto">
-      <thead>
-        <tr className="border">
-          <th>Filename</th>
-          <th>Hit</th>
-          <th>Miss</th>
-          <th>Total</th>
-          <th>Coverage</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows}
-      </tbody>
-    </table>
-  </div>)
+  return (<Table>
+    <TableHeader>
+      <TableRow>
+        <TableHead>Filename</TableHead>
+        <TableHead>Hit</TableHead>
+        <TableHead>Miss</TableHead>
+        <TableHead>Total</TableHead>
+        <TableHead>Coverage</TableHead>
+      </TableRow>
+    </TableHeader>
+    <TableBody>
+      {rows}
+    </TableBody>
+  </Table>)
 }
 
 interface BrowserProp {
@@ -220,5 +226,5 @@ export const Browser = (props: BrowserProp): React.JSX.Element => {
     }
   }
 
-  return <Table items={items} selectItem={selectItem} />
+  return <FileBrowserTable items={items} selectItem={selectItem} />
 }
