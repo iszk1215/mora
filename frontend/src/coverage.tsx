@@ -123,7 +123,9 @@ export const CoverageEntryPage = (): React.JSX.Element => {
           {formatTime(meta.time)}
         </div>
       </div>
-      <Browser files={resp.files} />
+      <div className="overflow-y-auto" style={{ maxHeight: 'calc(100dvh - 180px)' }}>
+        <Browser files={resp.files} />
+      </div>
     </div>)
 }
 
