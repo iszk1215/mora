@@ -38,7 +38,7 @@ func setupRepositoryStore(t *testing.T, repos ...*Repository) RepositoryStore {
 }
 
 func requireEqualRepoList(t *testing.T, want []Repository, res *http.Response) {
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
@@ -342,7 +342,7 @@ func TestServerRepositoryManagerList(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)

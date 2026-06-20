@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage/profile"
+	"github.com/rs/zerolog/log"
 )
 
 type (
@@ -58,7 +59,11 @@ func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parseCoverageFromFile open %s: %w", filename, err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Error().Err(err).Msg("parseCoverageFromFile reader.Close")
+		}
+	}()
 	return profile.ParseCoverage(reader)
 }
 

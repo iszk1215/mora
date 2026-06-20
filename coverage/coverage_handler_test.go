@@ -192,7 +192,7 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.Handler().ServeHTTP(w, r)
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	want := makeCoverageListResponse(rm, repo, []*Coverage{cov1, cov0})
 
@@ -579,7 +579,7 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 	// Second upload: entry "cc" for same revision (triggers merge)
 	w2 := makeUpload("abc", entryCc)
 	res2 := w2.Result()
-	defer res2.Body.Close()
+	defer func() { _ = res2.Body.Close() }()
 	require.Equal(t, http.StatusCreated, res2.StatusCode)
 
 	var resp Coverage

@@ -66,10 +66,14 @@ func NewWebCommand() *cobra.Command {
 			<-sigCh
 
 			log.Info().Msg("Shutting down...")
-			server.Close()
+			if err := server.Close(); err != nil {
+				log.Error().Err(err).Msg("server.Close")
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			srv.Shutdown(ctx)
+			if err := srv.Shutdown(ctx); err != nil {
+				log.Error().Err(err).Msg("srv.Shutdown")
+			}
 		}()
 
 		err = srv.ListenAndServe()
