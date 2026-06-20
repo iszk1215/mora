@@ -169,13 +169,13 @@ const FileBrowserTable = (props: TableProp): React.JSX.Element => {
   })
 
   return (<Table>
-    <TableHeader>
+    <TableHeader className="sticky top-0 z-10">
       <TableRow>
-        <TableHead>Filename</TableHead>
-        <TableHead>Hit</TableHead>
-        <TableHead>Miss</TableHead>
-        <TableHead>Total</TableHead>
-        <TableHead>Coverage</TableHead>
+        <TableHead className="bg-background">Filename</TableHead>
+        <TableHead className="bg-background">Hit</TableHead>
+        <TableHead className="bg-background">Miss</TableHead>
+        <TableHead className="bg-background">Total</TableHead>
+        <TableHead className="bg-background">Coverage</TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
