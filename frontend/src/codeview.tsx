@@ -75,7 +75,7 @@ export function markupCode(code: string, blocks: number[][]): string[] {
 interface CodeViewProps {
   path: string
   code: string
-  blocks: any
+  blocks: number[][]
 }
 
 export const CodeView = (props: CodeViewProps): React.JSX.Element => {

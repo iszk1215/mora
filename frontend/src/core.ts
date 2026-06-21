@@ -21,6 +21,8 @@ export interface Coverage {
   time: string
 }
 
+export type CoverageBlock = [number, number, number]
+
 export interface FileData {
   filename: string
   hits: number

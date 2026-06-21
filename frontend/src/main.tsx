@@ -59,7 +59,7 @@ export const RepoList = (): React.JSX.Element => {
 
   useEffect(() => {
     Promise.all(
-      repos.map((r: Repo) => loadMetrics(r.id))).then(setMetrics)
+      repos.map((r: Repo) => loadMetrics(r.id))).then(setMetrics).catch(() => {})
   }, [])
 
 
@@ -209,7 +209,6 @@ export const Breadcrumbs = (): React.JSX.Element => {
   const matches = useMatches()
 
   const last = matches[matches.length - 1]
-  const data = last.data as any
 
   const crumbs: Crumb[] = matches
     .filter((match: any) => Boolean(match.handle?.crumb))
@@ -270,7 +269,7 @@ const router = createBrowserRouter([
         element: <SCMList />,
         loader: loadSCMList,
         handle: {
-          crumb: (params: Params, data: any) => ({ label: "scm", link: "/scms" }),
+          crumb: (_params: Params, _data: any) => ({ label: "scm", link: "/scms" }),
         }
       },
       {

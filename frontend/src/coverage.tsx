@@ -1,5 +1,5 @@
-import { DateTime, Duration } from 'luxon'
-import React, { useEffect, useState } from 'react'
+import { DateTime } from 'luxon'
+import React, { useState } from 'react'
 import DatePicker from "react-datepicker";
 import {
   LoaderFunctionArgs,
@@ -43,11 +43,13 @@ interface CoverageEntryData {
   meta: CoverageEntryMetadata
 }
 
+import type { CoverageBlock } from './core'
+
 interface CodeData {
   repo: Repo
   filename: string
   code: string
-  blocks: any
+  blocks: CoverageBlock[]
 }
 
 export function makeRepoCoverageListPath(params: Params) {
@@ -74,7 +76,7 @@ export function formatRatio(hits: number, lines: number) {
 }
 
 // returns CodeData
-async function loadFile({ params }: any): Promise<Response> {
+async function loadFile({ params }: LoaderFunctionArgs): Promise<Response> {
   const url = `/api/${makeEntryPath(params)}/files/${params["*"]}`
   const resp = await fetch(url)
   if (!resp.ok)
@@ -190,7 +192,7 @@ const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
       </span>)
   }
 
-  cov.entries.forEach((e: any, i: number) => {
+  cov.entries.forEach((e: CoverageEntry) => {
     const href = `/${makeRepoCoverageListPath(params)}/${cov.index}/${e.name}`
     elems.push(
       <DefaultLink to={href}>

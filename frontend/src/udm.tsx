@@ -119,7 +119,19 @@ export const UdmRoot = (): React.JSX.Element => {
   )
 }
 
-export const UdmChart = (params: any): React.JSX.Element => {
+interface Dataset {
+  data: Array<{ x: string; y: string }>
+  label: string
+}
+
+interface UdmChartProps {
+  data?: { datasets: Dataset[] }
+  ylabel?: string
+  min?: Date | null
+  max?: Date | null
+}
+
+export const UdmChart = (params: UdmChartProps): React.JSX.Element => {
   const datasets = params.data?.datasets ?? []
 
   const option: any = {
@@ -131,10 +143,10 @@ export const UdmChart = (params: any): React.JSX.Element => {
       type: 'value' as const,
       name: params.ylabel,
     },
-    series: datasets.map((ds: any) => ({
+    series: datasets.map((ds) => ({
       name: ds.label,
       type: 'line' as const,
-      data: ds.data.map((p: any) => [p.x, Number(p.y)]),
+      data: ds.data.map((p) => [p.x, Number(p.y)]),
     })),
     tooltip: {
       trigger: 'axis',
@@ -167,7 +179,7 @@ export const UdmMetricRoot = (): React.JSX.Element => {
     Promise.all(
       items.map((item: UdmItem) => loadMetricValues(repo.id, metric.id, item.id))
     ).then((responses) => responses.map((r: ValuesResponse) => r.values))
-      .then(setValuesList)
+      .then(setValuesList).catch(() => {})
   }, [items, repo.id, metric.id])
 
   const valuesToDataset = (values: UdmValue[], metric: UdmItem) => {
@@ -177,7 +189,7 @@ export const UdmMetricRoot = (): React.JSX.Element => {
     }
   }
 
-  const datasets: any = valuesList.map(
+  const datasets: Dataset[] = valuesList.map(
     (values, i) => valuesToDataset(values, items[i]))
 
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -194,8 +206,6 @@ export const UdmMetricRoot = (): React.JSX.Element => {
       max={endDate}
     />
   )
-
-  const elem = items.map((item: UdmItem, i: number) => (<li key={i}>{item.name}</li>))
 
   return (
     <div>
