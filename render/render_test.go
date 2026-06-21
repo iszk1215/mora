@@ -21,7 +21,7 @@ func TestErrorCode(t *testing.T) {
 	ErrorCode(w, err, http.StatusBadRequest)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 	assert.Equal(t, "application/json", res.Header.Get("Content-Type"))
@@ -37,11 +37,11 @@ func TestInternalError(t *testing.T) {
 	InternalError(w, errors.New("internal"))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "internal", body.Message)
 }
 
@@ -50,11 +50,11 @@ func TestInternalErrorf(t *testing.T) {
 	InternalErrorf(w, "error %d: %s", 42, "timeout")
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusInternalServerError, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "error 42: timeout", body.Message)
 }
 
@@ -63,11 +63,11 @@ func TestNotImplemented(t *testing.T) {
 	NotImplemented(w, errors.New("not implemented"))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusNotImplemented, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "not implemented", body.Message)
 }
 
@@ -76,11 +76,11 @@ func TestNotFound(t *testing.T) {
 	NotFound(w, errors.New("not found"))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "not found", body.Message)
 }
 
@@ -89,11 +89,11 @@ func TestNotFoundf(t *testing.T) {
 	NotFoundf(w, "repo %d not found", 5)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusNotFound, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "repo 5 not found", body.Message)
 }
 
@@ -102,11 +102,11 @@ func TestUnauthorized(t *testing.T) {
 	Unauthorized(w, errors.New("unauthorized"))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "unauthorized", body.Message)
 }
 
@@ -115,11 +115,11 @@ func TestForbidden(t *testing.T) {
 	Forbidden(w, errors.New("forbidden"))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusForbidden, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "forbidden", body.Message)
 }
 
@@ -128,11 +128,11 @@ func TestBadRequest(t *testing.T) {
 	BadRequest(w, errors.New("bad request"))
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "bad request", body.Message)
 }
 
@@ -141,11 +141,11 @@ func TestBadRequestf(t *testing.T) {
 	BadRequestf(w, "invalid %s: %s", "name", "empty")
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
 
 	var body core.ErrorResponse
-	json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 	assert.Equal(t, "invalid name: empty", body.Message)
 }
 
@@ -159,7 +159,7 @@ func TestJSON(t *testing.T) {
 		JSON(w, &data, http.StatusOK)
 
 		res := w.Result()
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 		assert.Equal(t, "application/json", res.Header.Get("Content-Type"))
 
@@ -175,7 +175,7 @@ func TestJSON(t *testing.T) {
 		JSON(w, nil, http.StatusNoContent)
 
 		res := w.Result()
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		assert.Equal(t, http.StatusNoContent, res.StatusCode)
 	})
 
@@ -184,7 +184,7 @@ func TestJSON(t *testing.T) {
 		JSON(w, &core.ErrorResponse{Message: "created"}, http.StatusCreated)
 
 		res := w.Result()
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		assert.Equal(t, http.StatusCreated, res.StatusCode)
 	})
 }
@@ -197,7 +197,7 @@ func TestJSONIndent(t *testing.T) {
 	JSON(w, &core.ErrorResponse{Message: "test"}, http.StatusOK)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
@@ -239,11 +239,11 @@ func TestErrorCodeWithSentinel(t *testing.T) {
 			tt.fn(w, tt.err)
 
 			res := w.Result()
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 			assert.Equal(t, tt.wantStatus, res.StatusCode)
 
 			var body core.ErrorResponse
-			json.NewDecoder(res.Body).Decode(&body)
+			require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
 			assert.Equal(t, tt.err.Error(), body.Message)
 		})
 	}
