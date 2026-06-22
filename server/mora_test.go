@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drone/go-login/login"
 	"github.com/drone/go-scm/scm"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -54,7 +53,7 @@ func NewMockRepositoryManager(id int64) *MockRepositoryManager {
 	m.loginHandler = func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			err := errors.New("login error(mock)")
-			ctx := login.WithError(r.Context(), err)
+			ctx := withOAuthError(r.Context(), err)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

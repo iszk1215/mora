@@ -6,30 +6,31 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/drone/go-login/login"
 	"github.com/drone/go-scm/scm"
 	"github.com/drone/go-scm/scm/transport/oauth2"
 	"github.com/pelletier/go-toml/v2"
 )
 
 type BaseRepositoryManager struct {
-	id              int64
-	client          *scm.Client
-	url             *url.URL
-	loginMiddleware login.Middleware
+	id           int64
+	client       *scm.Client
+	url          *url.URL
+	oauthHandler *OAuthHandler
 }
 
 func (s *BaseRepositoryManager) Init(id int64, url *url.URL, client *scm.Client,
-	loginMiddleware login.Middleware) {
+	oauthHandler *OAuthHandler) {
 	s.id = id
 	s.url = url
 	s.client = client
-	s.loginMiddleware = loginMiddleware
+	s.oauthHandler = oauthHandler
+}
 
+func (s *BaseRepositoryManager) SetupTransport(source scm.TokenSource, scheme string) {
 	s.client.Client = &http.Client{
 		Transport: &oauth2.Transport{
-			Scheme: "token",
-			Source: oauth2.ContextTokenSource(),
+			Scheme: scheme,
+			Source: source,
 		},
 	}
 }
@@ -47,7 +48,7 @@ func (s *BaseRepositoryManager) URL() *url.URL {
 }
 
 func (s *BaseRepositoryManager) LoginHandler(next http.Handler) http.Handler {
-	return s.loginMiddleware.Handler(next)
+	return s.oauthHandler.Handler(next)
 }
 
 type secret struct {

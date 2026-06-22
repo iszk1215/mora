@@ -325,7 +325,7 @@ func initRepositoryManager(config RepositoryManagerConfig, baseURL string, store
 			config.URL,
 			baseURL+"/login")
 	case "github":
-		return NewGithubFromFile(id, config.URL, config.SecretFilename)
+		return NewGithubFromFile(id, config.URL, config.SecretFilename, baseURL+"/login")
 	default:
 		return nil, fmt.Errorf("ConfigError: unknown repository manager: %s", config.Driver)
 	}

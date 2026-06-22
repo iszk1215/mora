@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/drone/go-login/login"
-	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/render"
 	"github.com/rs/zerolog/log"
@@ -38,24 +36,21 @@ func verifyCSRF(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(bodyToken)) == 1
 }
 
-func convertToken(token *login.Token) scm.Token {
-	return scm.Token{
-		Token:   token.Access,
-		Refresh: token.Refresh,
-		Expires: token.Expires,
-	}
-}
-
 func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 	h := func(w http.ResponseWriter, r *http.Request) {
-		err := login.ErrorFrom(r.Context())
+		err := oauthErrorFrom(r.Context())
 		if err != nil {
 			log.Error().Err(err).Msg("")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
-		token := convertToken(login.TokenFrom(r.Context()))
+		token, ok := tokenFromContext(r.Context())
+		if !ok {
+			log.Error().Msg("No token found in context")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
 
 		sess, ok := MoraSessionFrom(r.Context())
 		if !ok {
@@ -63,7 +58,7 @@ func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
-		sess.setToken(rm.ID(), token)
+		sess.setToken(rm.ID(), *token)
 
 		if csrfToken, err := generateCSRFToken(); err == nil {
 			http.SetCookie(w, &http.Cookie{

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	login "github.com/drone/go-login/login/gitea"
 	driver "github.com/drone/go-scm/scm/driver/gitea"
 	"github.com/drone/go-scm/scm/transport/oauth2"
 )
@@ -19,7 +18,6 @@ func (g *Gitea) RevisionURL(baseURL string, revision string) string {
 	return baseURL + "/src/commit/" + revision
 }
 
-// from drone
 func defaultTransport(skipverify bool) http.RoundTripper {
 	return &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
@@ -29,42 +27,45 @@ func defaultTransport(skipverify bool) http.RoundTripper {
 	}
 }
 
-func NewGitea(id int64, url string, config login.Config) (*Gitea, error) {
-	client, err := driver.New(url)
+func NewGitea(id int64, serverURL, clientID, clientSecret, redirectURL string) (*Gitea, error) {
+	client, err := driver.New(serverURL)
 	if err != nil {
-		return nil, fmt.Errorf("gitea driver.New(%s): %w", url, err)
+		return nil, fmt.Errorf("gitea driver.New(%s): %w", serverURL, err)
+	}
+
+	oauthCfg := OAuthConfig{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		AuthURL:      strings.TrimSuffix(serverURL, "/") + "/login/oauth/authorize",
+		TokenURL:     strings.TrimSuffix(serverURL, "/") + "/login/oauth/access_token",
+		RedirectURL:  redirectURL,
+		Scopes:       []string{"repo"},
 	}
 
 	gitea := new(Gitea)
-	gitea.Init(id, client.BaseURL, client, &config)
+	gitea.Init(id, client.BaseURL, client, NewOAuthHandler(oauthCfg))
 
 	gitea.client.Client = &http.Client{
 		Transport: &oauth2.Transport{
 			Scheme: oauth2.SchemeBearer,
 			Source: &oauth2.Refresher{
-				ClientID:     config.ClientID,
-				ClientSecret: config.ClientSecret,
-				Endpoint:     strings.TrimSuffix(url, "/") + "/login/oauth/access_token",
+				ClientID:     clientID,
+				ClientSecret: clientSecret,
+				Endpoint:     strings.TrimSuffix(serverURL, "/") + "/login/oauth/access_token",
 				Source:       oauth2.ContextTokenSource(),
 			},
-			Base: defaultTransport( /*config.SkipVerify*/ false),
+			Base: defaultTransport(false),
 		},
 	}
+
 	return gitea, nil
 }
 
-func NewGiteaFromFile(id int64, filename string, url string, redirect_url string) (*Gitea, error) {
+func NewGiteaFromFile(id int64, filename, url, redirectURL string) (*Gitea, error) {
 	secret, err := readSecret(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	config := login.Config{
-		ClientID:     secret.ClientID,
-		ClientSecret: secret.ClientSecret,
-		Server:       url,
-		RedirectURL:  redirect_url,
-	}
-
-	return NewGitea(id, url, config)
+	return NewGitea(id, url, secret.ClientID, secret.ClientSecret, redirectURL)
 }

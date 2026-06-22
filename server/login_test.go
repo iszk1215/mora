@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/drone/go-login/login"
 	"github.com/drone/go-scm/scm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,11 +26,11 @@ func (m MockLoginMiddleware) Handler(next http.Handler) http.Handler {
 			return
 		}
 
-		token := login.Token{
-			Access: "MockAccessToken",
+		token := &scm.Token{
+			Token: "MockAccessToken",
 		}
 
-		ctx := login.WithToken(r.Context(), &token)
+		ctx := scm.WithContext(r.Context(), token)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -68,7 +67,6 @@ func TestLoginSuccess(t *testing.T) {
 
 	// Second request
 
-	//sess := NewMoraSession()
 	req = NewGetRequestWithMoraSession(loc.String(), sess)
 	got = httptest.NewRecorder()
 	handler.ServeHTTP(got, req)
