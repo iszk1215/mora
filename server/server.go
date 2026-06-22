@@ -427,5 +427,8 @@ func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
 }
 
 func (s *MoraServer) Close() error {
+	if err := s.sessionManager.Close(); err != nil {
+		return fmt.Errorf("session manager close: %w", err)
+	}
 	return s.db.Close()
 }

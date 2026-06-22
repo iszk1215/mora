@@ -89,14 +89,36 @@ type MoraSessionManager struct {
 	store      map[string]*MoraSession
 	lifetime   time.Duration
 	lock       sync.Mutex
+	stopCh     chan struct{}
 }
 
 func NewMoraSessionManager() *MoraSessionManager {
-	return &MoraSessionManager{
+	m := &MoraSessionManager{
 		cookiename: "morasessionid",
 		store:      map[string]*MoraSession{},
 		lifetime:   24 * time.Hour,
+		stopCh:     make(chan struct{}),
 	}
+	go m.periodicGC()
+	return m
+}
+
+func (m *MoraSessionManager) periodicGC() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			m.GC()
+		case <-m.stopCh:
+			return
+		}
+	}
+}
+
+func (m *MoraSessionManager) Close() error {
+	close(m.stopCh)
+	return nil
 }
 
 func WithMoraSession(ctx context.Context, sess *MoraSession) context.Context {
@@ -148,8 +170,6 @@ func (m *MoraSessionManager) put(sid string, session *MoraSession) {
 
 func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		m.GC()
-
 		cookie, err := r.Cookie(m.cookiename)
 
 		var sid string

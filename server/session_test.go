@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/drone/go-scm/scm"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,15 @@ type failReader struct{}
 
 func (f *failReader) Read(p []byte) (int, error) {
 	return 0, errors.New("mock read error")
+}
+
+func newTestSessionManager() *MoraSessionManager {
+	return &MoraSessionManager{
+		cookiename: "morasessionid",
+		store:      map[string]*MoraSession{},
+		lifetime:   24 * time.Hour,
+		stopCh:     make(chan struct{}),
+	}
 }
 
 func TestSessionID_ReturnsErrorOnReadFailure(t *testing.T) {
@@ -34,7 +44,7 @@ func TestSessionMiddleware_Returns500OnSessionIDError(t *testing.T) {
 	rand.Reader = &failReader{}
 	defer func() { rand.Reader = old }()
 
-	m := NewMoraSessionManager()
+	m := newTestSessionManager()
 	next := func(w http.ResponseWriter, r *http.Request) {
 		t.Error("next handler should not be called")
 	}
@@ -47,7 +57,7 @@ func TestSessionMiddleware_Returns500OnSessionIDError(t *testing.T) {
 }
 
 func TestSessionManager(t *testing.T) {
-	m := NewMoraSessionManager()
+	m := newTestSessionManager()
 	next := func(w http.ResponseWriter, r *http.Request) {
 		_, ok := MoraSessionFrom(r.Context())
 		require.True(t, ok)
@@ -59,7 +69,7 @@ func TestSessionManager(t *testing.T) {
 }
 
 func TestSessionManager_SetsCookie(t *testing.T) {
-	m := NewMoraSessionManager()
+	m := newTestSessionManager()
 	next := func(w http.ResponseWriter, r *http.Request) {}
 	handler := m.SessionMiddleware(http.HandlerFunc(next))
 	req := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
@@ -79,7 +89,7 @@ func TestSessionManager_SetsCookie(t *testing.T) {
 }
 
 func TestSessionManager_ReusesExistingSession(t *testing.T) {
-	m := NewMoraSessionManager()
+	m := newTestSessionManager()
 
 	// First request: no cookie → middleware creates new session
 	var firstSid string
@@ -157,7 +167,7 @@ func TestMoraSessionDirectRace(t *testing.T) {
 
 func TestMoraSessionConcurrentHTTPRace(t *testing.T) {
 	t.Parallel()
-	m := NewMoraSessionManager()
+	m := newTestSessionManager()
 	handler := m.SessionMiddleware(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			sess, _ := MoraSessionFrom(r.Context())

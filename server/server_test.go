@@ -138,7 +138,7 @@ func (b *MoraServerBuilder) WithRepo(repos ...*Repository) *MoraServerBuilder {
 }
 
 func (b *MoraServerBuilder) WithSessionManager() *MoraServerBuilder {
-	b.Server.sessionManager = NewMoraSessionManager()
+	b.Server.sessionManager = newTestSessionManager()
 	return b
 }
 
