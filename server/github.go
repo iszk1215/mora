@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -16,8 +17,11 @@ func (g *Github) RevisionURL(baseURL string, revision string) string {
 	return baseURL + "/tree/" + revision
 }
 
-func NewGithub(id int64, urlstr string, clientID, clientSecret, redirectURL string) *Github {
-	u, _ := url.Parse(urlstr)
+func NewGithub(id int64, urlstr string, clientID, clientSecret, redirectURL string) (*Github, error) {
+	u, err := url.Parse(urlstr)
+	if err != nil {
+		return nil, fmt.Errorf("NewGithub: invalid URL %q: %w", urlstr, err)
+	}
 
 	oauthCfg := OAuthConfig{
 		ClientID:     clientID,
@@ -42,7 +46,7 @@ func NewGithub(id int64, urlstr string, clientID, clientSecret, redirectURL stri
 		oauth2.SchemeBearer,
 	)
 
-	return github
+	return github, nil
 }
 
 func NewGithubFromFile(id int64, url, filename, redirectURL string) (*Github, error) {
@@ -51,5 +55,5 @@ func NewGithubFromFile(id int64, url, filename, redirectURL string) (*Github, er
 		return nil, err
 	}
 
-	return NewGithub(id, url, secret.ClientID, secret.ClientSecret, redirectURL), nil
+	return NewGithub(id, url, secret.ClientID, secret.ClientSecret, redirectURL)
 }
