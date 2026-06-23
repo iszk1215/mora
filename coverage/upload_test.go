@@ -23,6 +23,22 @@ func Test_relativePathFromRoot(t *testing.T) {
 	assert.Equal(t, "src/test.cc", got)
 }
 
+// Test_relativePathFromRoot_Fallback confirms the first-match-wins heuristic:
+// when root/cmd/main.go does not exist but root/main.go does, the function
+// falls back to root/main.go. This is intentional behaviour for lcov paths
+// that use different directory layouts between build and checkout.
+func Test_relativePathFromRoot_Fallback(t *testing.T) {
+	fsys := fstest.MapFS{
+		"main.go":     &fstest.MapFile{},
+		"src/main.go": &fstest.MapFile{},
+	}
+
+	got := relativePathFromRoot("/home/user/project/cmd/main.go", fsys)
+
+	assert.Equal(t, "main.go", got,
+		"should fall back to root/main.go when cmd/main.go does not exist")
+}
+
 func TestUpload_ReturnsErrorWhenDirty(t *testing.T) {
 	tmpDir := t.TempDir()
 	gitDir := filepath.Join(tmpDir, "repo")

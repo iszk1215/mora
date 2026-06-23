@@ -67,6 +67,13 @@ func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 	return profile.ParseCoverage(reader)
 }
 
+// relativePathFromRoot converts a possibly-absolute path to a path relative
+// to root by progressively stripping leading path segments until it finds a
+// file that exists in root. This handles lcov's flexible path formats
+// (absolute paths, build-directory-relative paths, etc.) and is a best-effort
+// heuristic rather than an exact computation. The first match wins, which is
+// intentional: if root/main.go exists and root/cmd/main.go does not, then a
+// coverage entry for cmd/main.go is assumed to refer to root/main.go.
 func relativePathFromRoot(path string, root fs.FS) string {
 	lst := strings.Split(filepath.ToSlash(filepath.Clean(path)), "/")
 	for i := range lst {
