@@ -573,11 +573,11 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 	}
 
 	// First upload: entry "go"
-	w1 := makeUpload("abc", entryGo)
+	w1 := makeUpload("abcdef", entryGo)
 	require.Equal(t, http.StatusCreated, w1.Result().StatusCode)
 
 	// Second upload: entry "cc" for same revision (triggers merge)
-	w2 := makeUpload("abc", entryCc)
+	w2 := makeUpload("abcdef", entryCc)
 	res2 := w2.Result()
 	defer func() { _ = res2.Body.Close() }()
 	require.Equal(t, http.StatusCreated, res2.StatusCode)
@@ -643,4 +643,75 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 	got, err := store.Find(cov.ID)
 	require.NoError(t, err)
 	assert.Equal(t, cov, got)
+}
+
+func TestValidateCoverageUploadRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		revision string
+		timestamp time.Time
+		wantErr string
+	}{
+		{name: "valid", revision: "abcdef1234", timestamp: time.Now()},
+		{name: "valid full SHA", revision: "a12345678901234567890123456789012345678", timestamp: time.Now()},
+		{name: "empty revision", revision: "", timestamp: time.Now(), wantErr: "revision is required"},
+		{name: "too short", revision: "abcde", timestamp: time.Now(), wantErr: "invalid revision format"},
+		{name: "non-hex", revision: "zzzzzz", timestamp: time.Now(), wantErr: "invalid revision format"},
+		{name: "contains space", revision: "abc def", timestamp: time.Now(), wantErr: "invalid character"},
+		{name: "too long", revision: string(make([]byte, 256)), timestamp: time.Now(), wantErr: "too long"},
+		{name: "zero timestamp", revision: "abcdef", timestamp: time.Time{}, wantErr: "timestamp must not be zero"},
+		{name: "uppercase hex", revision: "ABCDEF", timestamp: time.Now()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &CoverageUploadRequest{
+				Revision:  tt.revision,
+				Timestamp: tt.timestamp,
+				Entries:   []*CoverageEntryUploadRequest{{Name: "test", Hits: 1, Lines: 1}},
+			}
+			err := validateCoverageUploadRequest(req)
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCoverageHandler_HandleUpload_ValidationErrors(t *testing.T) {
+	repo := core.Repository{Id: 1215}
+	store := setupCoverageStore(t)
+	s := newCoverageHandler(store)
+
+	tests := []struct {
+		name    string
+		request *CoverageUploadRequest
+	}{
+		{
+			name:    "missing revision",
+			request: &CoverageUploadRequest{Revision: "", Timestamp: time.Now(), Entries: []*CoverageEntryUploadRequest{{Name: "go", Hits: 1, Lines: 1}}},
+		},
+		{
+			name:    "invalid revision",
+			request: &CoverageUploadRequest{Revision: "zzz", Timestamp: time.Now(), Entries: []*CoverageEntryUploadRequest{{Name: "go", Hits: 1, Lines: 1}}},
+		},
+		{
+			name:    "zero timestamp",
+			request: &CoverageUploadRequest{Revision: "abcdef", Timestamp: time.Time{}, Entries: []*CoverageEntryUploadRequest{{Name: "go", Hits: 1, Lines: 1}}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body, err := json.Marshal(tt.request)
+			require.NoError(t, err)
+
+			r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+			r = r.WithContext(core.WithRepo(r.Context(), repo))
+			w := httptest.NewRecorder()
+			s.Handler().ServeHTTP(w, r)
+
+			require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+		})
+	}
 }
