@@ -27,7 +27,7 @@ func defaultTransport(skipverify bool) http.RoundTripper {
 	}
 }
 
-func NewGitea(id int64, serverURL, clientID, clientSecret, redirectURL string) (*Gitea, error) {
+func NewGitea(id int64, serverURL, clientID, clientSecret, redirectURL string, insecureSkipVerify bool) (*Gitea, error) {
 	client, err := driver.New(serverURL)
 	if err != nil {
 		return nil, fmt.Errorf("gitea driver.New(%s): %w", serverURL, err)
@@ -54,18 +54,18 @@ func NewGitea(id int64, serverURL, clientID, clientSecret, redirectURL string) (
 				Endpoint:     strings.TrimSuffix(serverURL, "/") + "/login/oauth/access_token",
 				Source:       oauth2.ContextTokenSource(),
 			},
-			Base: defaultTransport(false),
+			Base: defaultTransport(insecureSkipVerify),
 		},
 	}
 
 	return gitea, nil
 }
 
-func NewGiteaFromFile(id int64, filename, url, redirectURL string) (*Gitea, error) {
+func NewGiteaFromFile(id int64, filename, url, redirectURL string, insecureSkipVerify bool) (*Gitea, error) {
 	secret, err := readSecret(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewGitea(id, url, secret.ClientID, secret.ClientSecret, redirectURL)
+	return NewGitea(id, url, secret.ClientID, secret.ClientSecret, redirectURL, insecureSkipVerify)
 }
