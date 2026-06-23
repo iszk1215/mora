@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/drone/go-scm/scm"
+	"github.com/drone/go-scm/scm/transport/oauth2"
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/mockscm"
@@ -574,4 +575,113 @@ func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 	got := server.repositoryManagers[0]
 	assert.Equal(t, int64(1), got.ID())
 	assert.Equal(t, config.RepositoryManagers[0].URL, got.URL().String())
+}
+
+func TestNewGitea_InsecureSkipVerify(t *testing.T) {
+	tests := []struct {
+		name     string
+		skip     bool
+		expected bool
+	}{
+		{name: "enabled", skip: true, expected: true},
+		{name: "disabled", skip: false, expected: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gitea, err := NewGitea(1, "https://gitea.example.com", "id", "secret",
+				"http://localhost:4000/login", tt.skip)
+			require.NoError(t, err)
+
+			oauthTransport, ok := gitea.Client().Client.Transport.(*oauth2.Transport)
+			require.True(t, ok, "Transport should be *oauth2.Transport")
+
+			baseTransport, ok := oauthTransport.Base.(*http.Transport)
+			require.True(t, ok, "Base transport should be *http.Transport")
+
+			require.NotNil(t, baseTransport.TLSClientConfig,
+				"TLSClientConfig should not be nil")
+			assert.Equal(t, tt.expected, baseTransport.TLSClientConfig.InsecureSkipVerify)
+		})
+	}
+}
+
+func TestNewMoraServerFromConfig_Gitea_InsecureSkipVerify(t *testing.T) {
+	secretFile, err := os.CreateTemp("", "gitea-*.conf")
+	require.NoError(t, err)
+	defer func() { _ = os.Remove(secretFile.Name()) }()
+
+	_, err = secretFile.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
+	require.NoError(t, err)
+
+	tests := []struct {
+		name   string
+		toml   string
+		want   bool
+	}{
+		{
+			name: "enabled",
+			toml: fmt.Sprintf(`
+[server]
+url = "http://localhost:4000"
+[[scm]]
+scm = "gitea"
+url = "https://gitea.example.com"
+secret_file = "%s"
+insecure_skip_verify = true
+`, secretFile.Name()),
+			want: true,
+		},
+		{
+			name: "disabled",
+			toml: fmt.Sprintf(`
+[server]
+url = "http://localhost:4000"
+[[scm]]
+scm = "gitea"
+url = "https://gitea.example.com"
+secret_file = "%s"
+`, secretFile.Name()),
+			want: false,
+		},
+		{
+			name: "explicitly_false",
+			toml: fmt.Sprintf(`
+[server]
+url = "http://localhost:4000"
+[[scm]]
+scm = "gitea"
+url = "https://gitea.example.com"
+secret_file = "%s"
+insecure_skip_verify = false
+`, secretFile.Name()),
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configFile, err := os.CreateTemp("", "mora-*.conf")
+			require.NoError(t, err)
+			defer func() { _ = os.Remove(configFile.Name()) }()
+
+			_, err = configFile.Write([]byte(tt.toml))
+			require.NoError(t, err)
+
+			config, err := ReadMoraConfig(configFile.Name())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, config.RepositoryManagers[0].InsecureSkipVerify)
+
+			srv, err := NewMoraServerFromConfig(config)
+			require.NoError(t, err)
+			defer func() { _ = srv.Close() }()
+
+			rm := srv.repositoryManagers[0]
+			oauthTransport, ok := rm.Client().Client.Transport.(*oauth2.Transport)
+			require.True(t, ok)
+
+			baseTransport, ok := oauthTransport.Base.(*http.Transport)
+			require.True(t, ok)
+			require.NotNil(t, baseTransport.TLSClientConfig)
+			assert.Equal(t, tt.want, baseTransport.TLSClientConfig.InsecureSkipVerify)
+		})
+	}
 }
