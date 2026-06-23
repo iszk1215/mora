@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/drone/go-scm/scm"
+	"github.com/drone/go-scm/scm/transport/oauth2"
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/mockscm"
@@ -574,4 +575,67 @@ func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 	got := server.repositoryManagers[0]
 	assert.Equal(t, int64(1), got.ID())
 	assert.Equal(t, config.RepositoryManagers[0].URL, got.URL().String())
+}
+
+func TestNewGitea_InsecureSkipVerify(t *testing.T) {
+	tests := []struct {
+		name     string
+		skip     bool
+		expected bool
+	}{
+		{name: "enabled", skip: true, expected: true},
+		{name: "disabled", skip: false, expected: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gitea, err := NewGitea(1, "https://gitea.example.com", "id", "secret",
+				"http://localhost:4000/login", tt.skip)
+			require.NoError(t, err)
+
+			oauthTransport, ok := gitea.Client().Client.Transport.(*oauth2.Transport)
+			require.True(t, ok, "Transport should be *oauth2.Transport")
+
+			baseTransport, ok := oauthTransport.Base.(*http.Transport)
+			require.True(t, ok, "Base transport should be *http.Transport")
+
+			require.NotNil(t, baseTransport.TLSClientConfig,
+				"TLSClientConfig should not be nil")
+			assert.Equal(t, tt.expected, baseTransport.TLSClientConfig.InsecureSkipVerify)
+		})
+	}
+}
+
+func TestNewGiteaFromFile_InsecureSkipVerify(t *testing.T) {
+	tmp, err := os.CreateTemp("", "gitea-insecure-*.conf")
+	require.NoError(t, err)
+	defer func() { _ = os.Remove(tmp.Name()) }()
+
+	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		skip     bool
+		expected bool
+	}{
+		{name: "enabled", skip: true, expected: true},
+		{name: "disabled", skip: false, expected: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gitea, err := NewGiteaFromFile(1, tmp.Name(), "https://gitea.example.com",
+				"http://localhost:4000/login", tt.skip)
+			require.NoError(t, err)
+
+			oauthTransport, ok := gitea.Client().Client.Transport.(*oauth2.Transport)
+			require.True(t, ok, "Transport should be *oauth2.Transport")
+
+			baseTransport, ok := oauthTransport.Base.(*http.Transport)
+			require.True(t, ok, "Base transport should be *http.Transport")
+
+			require.NotNil(t, baseTransport.TLSClientConfig,
+				"TLSClientConfig should not be nil")
+			assert.Equal(t, tt.expected, baseTransport.TLSClientConfig.InsecureSkipVerify)
+		})
+	}
 }
