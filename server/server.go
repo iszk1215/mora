@@ -323,7 +323,8 @@ func initRepositoryManager(config RepositoryManagerConfig, baseURL string, store
 			id,
 			config.SecretFilename,
 			config.URL,
-			baseURL+"/login")
+			baseURL+"/login",
+			config.InsecureSkipVerify)
 	case "github":
 		return NewGithubFromFile(id, config.URL, config.SecretFilename, baseURL+"/login")
 	default:

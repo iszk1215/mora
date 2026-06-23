@@ -13,9 +13,10 @@ type ServerConfig struct {
 }
 
 type RepositoryManagerConfig struct {
-	Driver         string `toml:"scm"`
-	URL            string
-	SecretFilename string `toml:"secret_file"`
+	Driver             string `toml:"scm"`
+	URL                string
+	SecretFilename     string `toml:"secret_file"`
+	InsecureSkipVerify bool   `toml:"insecure_skip_verify"`
 }
 
 type MoraConfig struct {

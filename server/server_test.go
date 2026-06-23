@@ -569,7 +569,7 @@ func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = NewGiteaFromFile(
-		1, tmp.Name(), config.RepositoryManagers[0].URL, config.Server.URL+"/login")
+		1, tmp.Name(), config.RepositoryManagers[0].URL, config.Server.URL+"/login", false)
 	require.NoError(t, err)
 	got := server.repositoryManagers[0]
 	assert.Equal(t, int64(1), got.ID())
