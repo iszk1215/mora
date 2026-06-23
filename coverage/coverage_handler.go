@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/core"
@@ -356,6 +358,11 @@ func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	if err := validateCoverageUploadRequest(&request); err != nil {
+		render.BadRequest(w, err)
+		return
+	}
+
 	repo, _ := core.RepoFrom(r.Context())
 
 	entries, err := parseCoverageEntryUploadRequests(request.Entries)
@@ -395,6 +402,29 @@ func (s *CoverageHandler) Handler() http.Handler {
 	})
 
 	return r
+}
+
+var validRevision = regexp.MustCompile(`^[a-fA-F0-9]{6,40}$`)
+
+func validateCoverageUploadRequest(req *CoverageUploadRequest) error {
+	if req.Revision == "" {
+		return errors.New("revision is required")
+	}
+	if len(req.Revision) > 255 {
+		return fmt.Errorf("revision too long: %d characters (max 255)", len(req.Revision))
+	}
+	for _, r := range req.Revision {
+		if r > unicode.MaxASCII || unicode.IsSpace(r) || unicode.IsControl(r) {
+			return fmt.Errorf("revision contains invalid character %q", r)
+		}
+	}
+	if !validRevision.MatchString(req.Revision) {
+		return fmt.Errorf("invalid revision format: %q (expected hex SHA)", req.Revision)
+	}
+	if req.Timestamp.IsZero() {
+		return errors.New("timestamp must not be zero")
+	}
+	return nil
 }
 
 func newCoverageHandler(store CoverageStore) *CoverageHandler {
