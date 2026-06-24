@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -74,10 +75,10 @@ func parseCoverageFromFile(filename string) ([]*profile.Profile, error) {
 // heuristic rather than an exact computation. The first match wins, which is
 // intentional: if root/main.go exists and root/cmd/main.go does not, then a
 // coverage entry for cmd/main.go is assumed to refer to root/main.go.
-func relativePathFromRoot(path string, root fs.FS) string {
-	lst := strings.Split(filepath.ToSlash(filepath.Clean(path)), "/")
+func relativePathFromRoot(filePath string, root fs.FS) string {
+	lst := strings.Split(filepath.ToSlash(filepath.Clean(filePath)), "/")
 	for i := range lst {
-		relativePath := filepath.Join(lst[i:]...)
+		relativePath := path.Join(lst[i:]...)
 		_, err := fs.Stat(root, relativePath)
 		if !os.IsNotExist(err) {
 			return relativePath
