@@ -1,17 +1,16 @@
 package coverage
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
 func processDebugOption(cmd *cobra.Command) {
 	debug, _ := cmd.Flags().GetBool("debug")
-	fmt.Printf("debug=%t\n", debug)
 	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		log.Debug().Msg("debug mode enabled")
 	}
 }
 

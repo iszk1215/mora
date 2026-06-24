@@ -96,7 +96,6 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	// log.Print("HandleRepoList: token=", token)
 
 	resp := []Repository{}
 	sess, ok := MoraSessionFrom(r.Context())
@@ -372,10 +371,10 @@ func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositorySto
 }
 
 //go:embed static
-var embedded embed.FS
+var staticFS embed.FS
 
 func initFrontendFileServer() (http.Handler, error) {
-	frontendFS, err := fs.Sub(embedded, "static/public")
+	frontendFS, err := fs.Sub(staticFS, "static/public")
 	if err != nil {
 		return nil, fmt.Errorf("fs.Sub(static/public): %w", err)
 	}
