@@ -60,7 +60,10 @@ func NewWebCommand() *cobra.Command {
 
 		log.Info().Msg("Started")
 
+		shutdownDone := make(chan struct{})
+
 		go func() {
+			defer close(shutdownDone)
 			sigCh := make(chan os.Signal, 1)
 			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 			<-sigCh
@@ -82,6 +85,7 @@ func NewWebCommand() *cobra.Command {
 			return fmt.Errorf("ListenAndServe: %w", err)
 		}
 
+		<-shutdownDone
 		return nil
 		},
 	}
