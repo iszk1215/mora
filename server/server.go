@@ -379,7 +379,7 @@ func initFrontendFileServer() (http.Handler, error) {
 		return nil, fmt.Errorf("fs.Sub(static/public): %w", err)
 	}
 
-	return http.FileServer(http.FS(frontendFS)), err
+	return http.FileServer(http.FS(frontendFS)), nil
 }
 
 func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
