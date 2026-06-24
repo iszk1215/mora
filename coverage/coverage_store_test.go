@@ -212,6 +212,12 @@ func TestCoverageStore_Put_Update(t *testing.T) {
 	err = s.Put(want) // Update
 	require.NoError(t, err)
 	require.Equal(t, int64(1), want.ID)
+
+	got, err := s.Find(want.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, want.Timestamp.Unix(), got.Timestamp.Unix(),
+		"timestamp should be updated on UPSERT conflict")
 }
 
 // --- Migration tests ---

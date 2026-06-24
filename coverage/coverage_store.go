@@ -295,8 +295,8 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 	_, err = s.db.Exec(
 		`INSERT INTO coverage (repo_id, revision, time, contents)
 		 VALUES (?, ?, ?, ?)
-		 ON CONFLICT(repo_id, revision) DO UPDATE SET contents = ?`,
-		cov.RepoID, cov.Revision, cov.Timestamp, contents, contents)
+		 ON CONFLICT(repo_id, revision) DO UPDATE SET contents = ?, time = ?`,
+		cov.RepoID, cov.Revision, cov.Timestamp, contents, contents, cov.Timestamp)
 	if err != nil {
 		return fmt.Errorf("Put insert coverage: %w", err)
 	}
