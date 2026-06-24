@@ -38,7 +38,7 @@ lint: $(SOURCES)
 	golangci-lint run $(GO_PKGS)
 
 test: test-race
-	go test -v $(GO_PKGS)
+	go test $(GO_PKGS)
 
 test-race:
 	go test -race -run 'TestMoraSession' -count=1 -timeout 30s ./server/
