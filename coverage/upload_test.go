@@ -117,3 +117,75 @@ func TestUpload_ReturnsErrorWhenServerEmpty(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "server")
 }
+
+func initGitRepo(t *testing.T, dir string) *git.Repository {
+	t.Helper()
+	repo, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	srcFile := filepath.Join(dir, "tracked.go")
+	err = os.WriteFile(srcFile, []byte("package main\n"), 0644)
+	require.NoError(t, err)
+
+	wt, err := repo.Worktree()
+	require.NoError(t, err)
+	_, err = wt.Add("tracked.go")
+	require.NoError(t, err)
+	_, err = wt.Commit("init", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "test",
+			Email: "test@test.com",
+			When:  time.Now(),
+		},
+	})
+	require.NoError(t, err)
+	return repo
+}
+
+func TestIsDirty_Clean(t *testing.T) {
+	repo := initGitRepo(t, t.TempDir())
+	dirty, err := isDirty(repo)
+	require.NoError(t, err)
+	assert.False(t, dirty, "clean repo should not be dirty")
+}
+
+func TestIsDirty_ModifiedFile(t *testing.T) {
+	dir := t.TempDir()
+	repo := initGitRepo(t, dir)
+
+	err := os.WriteFile(filepath.Join(dir, "tracked.go"), []byte("package main\n\nfunc main() {}\n"), 0644)
+	require.NoError(t, err)
+
+	dirty, err := isDirty(repo)
+	require.NoError(t, err)
+	assert.True(t, dirty, "modified file should be dirty")
+}
+
+func TestIsDirty_StagedNewFile(t *testing.T) {
+	dir := t.TempDir()
+	repo := initGitRepo(t, dir)
+
+	err := os.WriteFile(filepath.Join(dir, "new.go"), []byte("package new\n"), 0644)
+	require.NoError(t, err)
+
+	wt, err := repo.Worktree()
+	require.NoError(t, err)
+	_, err = wt.Add("new.go")
+	require.NoError(t, err)
+
+	dirty, err := isDirty(repo)
+	require.NoError(t, err)
+	assert.True(t, dirty, "staged new file should be dirty")
+}
+
+func TestIsDirty_DeletedFile(t *testing.T) {
+	dir := t.TempDir()
+	repo := initGitRepo(t, dir)
+
+	err := os.Remove(filepath.Join(dir, "tracked.go"))
+	require.NoError(t, err)
+
+	dirty, err := isDirty(repo)
+	require.NoError(t, err)
+	assert.True(t, dirty, "deleted file should be dirty")
+}

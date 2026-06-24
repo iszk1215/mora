@@ -160,7 +160,7 @@ func isDirty(repo *git.Repository) (bool, error) {
 	}
 
 	for _, s := range status {
-		if s.Worktree == 'M' {
+		if s.Worktree != ' ' || s.Staging != ' ' {
 			return true, nil
 		}
 	}
