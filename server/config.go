@@ -37,7 +37,9 @@ func ReadMoraConfig(filename string) (MoraConfig, error) {
 		return MoraConfig{}, fmt.Errorf("ReadMoraConfig Unmarshal: %w", err)
 	}
 
-	config.DatabaseFilename = "mora.db"
+	if config.DatabaseFilename == "" {
+		config.DatabaseFilename = "mora.db"
+	}
 
 	return config, nil
 }

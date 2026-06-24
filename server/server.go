@@ -348,7 +348,8 @@ func initRepositoryManagers(config MoraConfig, store RepositoryManagerStore) ([]
 func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, error) {
 	log.Info().Msgf("Initialize store: filename=%s", filename)
 
-	if filename != "" {
+	if filename != "" && !strings.HasPrefix(filename, ":memory:") &&
+		!strings.HasPrefix(filename, "file::memory:") {
 		filename += "?_journal_mode=WAL&_busy_timeout=5000"
 	}
 	db, err := sqlx.Connect("sqlite3", filename)

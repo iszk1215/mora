@@ -621,8 +621,11 @@ func TestNewMoraServerFromConfig_Gitea_InsecureSkipVerify(t *testing.T) {
 		{
 			name: "enabled",
 			toml: fmt.Sprintf(`
+DatabaseFilename = ":memory:"
+
 [server]
 url = "http://localhost:4000"
+
 [[scm]]
 scm = "gitea"
 url = "https://gitea.example.com"
@@ -634,8 +637,11 @@ insecure_skip_verify = true
 		{
 			name: "disabled",
 			toml: fmt.Sprintf(`
+DatabaseFilename = ":memory:"
+
 [server]
 url = "http://localhost:4000"
+
 [[scm]]
 scm = "gitea"
 url = "https://gitea.example.com"
@@ -646,8 +652,11 @@ secret_file = "%s"
 		{
 			name: "explicitly_false",
 			toml: fmt.Sprintf(`
+DatabaseFilename = ":memory:"
+
 [server]
 url = "http://localhost:4000"
+
 [[scm]]
 scm = "gitea"
 url = "https://gitea.example.com"
