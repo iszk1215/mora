@@ -30,7 +30,7 @@ type (
 		Find(id int64) (*Coverage, error)
 		FindRevision(id int64, revision string) (*Coverage, error)
 		List(id int64) ([]*Coverage, error)
-		Put(*Coverage) error
+		Put(*Coverage) (int64, error)
 	}
 )
 

@@ -47,10 +47,11 @@ func TestCoverageStore_Find(t *testing.T) {
 		},
 	}
 
-	err := s.Put(want)
+	id, err := s.Put(want)
 	require.NoError(t, err)
+	want.ID = id
 
-	got, err := s.Find(want.ID)
+	got, err := s.Find(id)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
 }
@@ -119,11 +120,12 @@ func TestCoverageStore_Put_Insert(t *testing.T) {
 
 	s := initCoverageStore(t)
 
-	err := s.Put(want)
+	id, err := s.Put(want)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), want.ID)
+	require.Equal(t, int64(1), id)
+	want.ID = id
 
-	got, err := s.Find(want.ID)
+	got, err := s.Find(id)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
 }
@@ -144,11 +146,12 @@ func TestCoverageStore_Put_InsertWithEntry(t *testing.T) {
 
 	s := initCoverageStore(t)
 
-	err := s.Put(want)
+	id, err := s.Put(want)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), want.ID)
+	require.Equal(t, int64(1), id)
+	want.ID = id
 
-	got, err := s.Find(want.ID)
+	got, err := s.Find(id)
 	require.NoError(t, err)
 	require.Equal(t, want, got)
 }
@@ -175,7 +178,8 @@ func TestCoverageStore_Put_Concurrent(t *testing.T) {
 			defer wg.Done()
 			barrier.Wait()
 			runtime.Gosched()
-			errs <- s.Put(cov)
+			_, err := s.Put(cov)
+			errs <- err
 		}()
 	}
 
@@ -205,15 +209,15 @@ func TestCoverageStore_Put_Update(t *testing.T) {
 
 	s := initCoverageStore(t)
 
-	err := s.Put(cov) // Insert
+	id1, err := s.Put(cov) // Insert
 	require.NoError(t, err)
-	require.Equal(t, int64(1), cov.ID)
+	require.Equal(t, int64(1), id1)
 
-	err = s.Put(want) // Update
+	id2, err := s.Put(want) // Update
 	require.NoError(t, err)
-	require.Equal(t, int64(1), want.ID)
+	require.Equal(t, int64(1), id2)
 
-	got, err := s.Find(want.ID)
+	got, err := s.Find(id2)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, want.Timestamp.Unix(), got.Timestamp.Unix(),

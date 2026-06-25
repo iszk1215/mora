@@ -311,7 +311,8 @@ func (s *CoverageHandler) AddCoverage(cov *Coverage) (*Coverage, error) {
 		}
 	}
 
-	return cov, s.coverages.Put(cov)
+	cov.ID, err = s.coverages.Put(cov)
+	return cov, err
 }
 
 func parseCoverageEntryUploadRequest(req *CoverageEntryUploadRequest) (*CoverageEntry, error) {

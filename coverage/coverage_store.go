@@ -286,10 +286,10 @@ func (s *coverageStoreImpl) List(repo_id int64) ([]*Coverage, error) {
 	return s.scanLite(repo_id)
 }
 
-func (s *coverageStoreImpl) Put(cov *Coverage) error {
+func (s *coverageStoreImpl) Put(cov *Coverage) (int64, error) {
 	contents, err := json.Marshal(cov.Entries)
 	if err != nil {
-		return fmt.Errorf("Put marshal entries: %w", err)
+		return 0, fmt.Errorf("Put marshal entries: %w", err)
 	}
 
 	_, err = s.db.Exec(
@@ -298,17 +298,18 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 		 ON CONFLICT(repo_id, revision) DO UPDATE SET contents = ?, time = ?`,
 		cov.RepoID, cov.Revision, cov.Timestamp, contents, contents, cov.Timestamp)
 	if err != nil {
-		return fmt.Errorf("Put insert coverage: %w", err)
+		return 0, fmt.Errorf("Put insert coverage: %w", err)
 	}
 
-	err = s.db.Get(&cov.ID,
+	var id int64
+	err = s.db.Get(&id,
 		"SELECT id FROM coverage WHERE repo_id = ? AND revision = ?",
 		cov.RepoID, cov.Revision)
 	if err != nil {
-		return fmt.Errorf("Put select coverage id: %w", err)
+		return 0, fmt.Errorf("Put select coverage id: %w", err)
 	}
 
-	return s.replaceEntries(cov.ID, cov.Entries)
+	return id, s.replaceEntries(id, cov.Entries)
 }
 
 func (s *coverageStoreImpl) replaceEntries(coverageID int64, entries []*CoverageEntry) error {

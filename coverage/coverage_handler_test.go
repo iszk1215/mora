@@ -55,8 +55,9 @@ func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 	require.NoError(t, err)
 
 	for _, cov := range coverages {
-		err = store.Put(cov)
+		id, err := store.Put(cov)
 		require.NoError(t, err)
+		cov.ID = id
 	}
 
 	return store
