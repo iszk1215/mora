@@ -312,18 +312,24 @@ func (s *coverageStoreImpl) Put(cov *Coverage) error {
 }
 
 func (s *coverageStoreImpl) replaceEntries(coverageID int64, entries []*CoverageEntry) error {
-	if _, err := s.db.Exec(
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("replaceEntries begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(
 		"DELETE FROM coverage_block WHERE entry_id IN (SELECT id FROM coverage_entry WHERE coverage_id = ?)",
 		coverageID); err != nil {
 		return fmt.Errorf("replaceEntries delete blocks: %w", err)
 	}
-	if _, err := s.db.Exec(
+	if _, err := tx.Exec(
 		"DELETE FROM coverage_entry WHERE coverage_id = ?", coverageID); err != nil {
 		return fmt.Errorf("replaceEntries delete entries: %w", err)
 	}
 
 	for _, entry := range entries {
-		res, err := s.db.Exec(
+		res, err := tx.Exec(
 			"INSERT INTO coverage_entry (coverage_id, name, hits, lines) VALUES (?, ?, ?, ?)",
 			coverageID, entry.Name, entry.Hits, entry.Lines)
 		if err != nil {
@@ -339,7 +345,7 @@ func (s *coverageStoreImpl) replaceEntries(coverageID int64, entries []*Coverage
 			if err != nil {
 				return fmt.Errorf("replaceEntries marshal blocks for %q: %w", prof.FileName, err)
 			}
-			if _, err := s.db.Exec(
+			if _, err := tx.Exec(
 				"INSERT INTO coverage_block (entry_id, filename, hits, lines, blocks) VALUES (?, ?, ?, ?, ?)",
 				entryID, prof.FileName, prof.Hits, prof.Lines, string(blocksJSON)); err != nil {
 				return fmt.Errorf("replaceEntries insert block for %q: %w", prof.FileName, err)
@@ -347,5 +353,5 @@ func (s *coverageStoreImpl) replaceEntries(coverageID int64, entries []*Coverage
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
