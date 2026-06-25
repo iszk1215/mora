@@ -488,7 +488,7 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	want := &Coverage{
 		RepoID:    1215,
 		Revision:  "012345",
-		Timestamp: existing.Timestamp,
+		Timestamp: added.Timestamp,
 		Entries: []*CoverageEntry{
 			// sorted by Name
 			{
@@ -530,7 +530,10 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	want.ID = got.ID
 	saved, err := store.Find(want.ID)
 	require.NoError(t, err)
-	assert.Equal(t, want, saved)
+	assert.Equal(t, want.RepoID, saved.RepoID)
+	assert.Equal(t, want.Revision, saved.Revision)
+	assert.True(t, want.Timestamp.Equal(saved.Timestamp))
+	assert.Equal(t, want.Entries, saved.Entries)
 }
 
 func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
@@ -559,7 +562,7 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 	makeUpload := func(revision string, entry *CoverageEntryUploadRequest) *httptest.ResponseRecorder {
 		req := &CoverageUploadRequest{
 			Revision:  revision,
-			Timestamp: time.Now(),
+		Timestamp: time.Now().Round(0),
 			Entries:   []*CoverageEntryUploadRequest{entry},
 		}
 		body, err := json.Marshal(req)

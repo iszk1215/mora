@@ -60,7 +60,7 @@ func TestMergeCoverage(t *testing.T) {
 	expected := Coverage{
 		RepoID:    1215,
 		Revision:  revision,
-		Timestamp: coverage0.Timestamp,
+		Timestamp: coverage1.Timestamp,
 		Entries: []*CoverageEntry{ // alphabetical
 			{
 				Name:  "cc",

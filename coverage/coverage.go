@@ -73,7 +73,7 @@ func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 	merged := &Coverage{
 		RepoID:    a.RepoID,
 		Revision:  a.Revision,
-		Timestamp: a.Timestamp,
+		Timestamp: b.Timestamp,
 		Entries:   tmp,
 	}
 
