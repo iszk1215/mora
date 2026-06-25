@@ -174,9 +174,8 @@ func TestHandlerInjectMetricDBError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close the database to cause findMetricById to return an error
-	// other than errorMetricNotFound. This triggers the bug in injectMetric:
-	// InternalError is written but execution continues, causing a nil pointer
-	// dereference on *metric (metric is nil when findMetricById fails).
+	// other than errorMetricNotFound. Verifies that injectMetric returns
+	// InternalError without panicking (regression test for missing return).
 	require.NoError(t, store.db.Close())
 
 	h := newHandler(store)
@@ -185,8 +184,6 @@ func TestHandlerInjectMetricDBError(t *testing.T) {
 	r = r.WithContext(core.WithRepo(r.Context(), repo))
 	w := httptest.NewRecorder()
 
-	// The current code panics due to the missing return after render.InternalError.
-	// After the fix, it should return a proper 500 error without panicking.
 	require.NotPanics(t, func() {
 		h.ServeHTTP(w, r)
 	})
@@ -194,6 +191,61 @@ func TestHandlerInjectMetricDBError(t *testing.T) {
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
 	require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+}
+
+func TestHandlerInjectMetricAllPaths(t *testing.T) {
+	repo := core.Repository{Id: 1215}
+
+	t.Run("valid metric ID injects metric into context", func(t *testing.T) {
+		metric := &metricModel{RepoId: repo.Id, Name: "metric1"}
+		store := initTestStore(t)
+		require.NoError(t, store.addMetric(metric))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/metrics/%d", metric.Id)
+		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		res := getReponseWithRepo(t, http.StatusNoContent, h, r, repo)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.Empty(t, body) // 204 No Content means success with metric injected
+	})
+
+	t.Run("non-numeric metricId returns BadRequest", func(t *testing.T) {
+		store := initTestStore(t)
+		h := newHandler(store)
+		path := "/metrics/foo"
+		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+	})
+
+	t.Run("non-existing metric returns BadRequest", func(t *testing.T) {
+		store := initTestStore(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/metrics/%d", int64(9999))
+		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+	})
+
+	t.Run("DB error returns InternalError without panic", func(t *testing.T) {
+		metric := &metricModel{RepoId: repo.Id, Name: "metric1"}
+		store := initTestStore(t)
+		require.NoError(t, store.addMetric(metric))
+		require.NoError(t, store.db.Close())
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/metrics/%d", metric.Id)
+		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		r = r.WithContext(core.WithRepo(r.Context(), repo))
+		w := httptest.NewRecorder()
+
+		require.NotPanics(t, func() {
+			h.ServeHTTP(w, r)
+		})
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+	})
 }
 
 func TestHandlerListMetric(t *testing.T) {
