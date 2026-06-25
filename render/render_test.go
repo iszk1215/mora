@@ -42,7 +42,7 @@ func TestInternalError(t *testing.T) {
 
 	var body core.ErrorResponse
 	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
-	assert.Equal(t, "internal", body.Message)
+	assert.Equal(t, "internal server error", body.Message)
 }
 
 func TestInternalErrorf(t *testing.T) {
@@ -55,7 +55,7 @@ func TestInternalErrorf(t *testing.T) {
 
 	var body core.ErrorResponse
 	require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
-	assert.Equal(t, "error 42: timeout", body.Message)
+	assert.Equal(t, "internal server error", body.Message)
 }
 
 func TestNotImplemented(t *testing.T) {
@@ -224,13 +224,14 @@ func TestErrorCodeWithSentinel(t *testing.T) {
 		fn         func(w http.ResponseWriter, err error)
 		err        error
 		wantStatus int
+		wantMsg    string
 	}{
-		{"InternalError", InternalError, ErrInvalidToken, http.StatusInternalServerError},
-		{"NotImplemented", NotImplemented, ErrNotImplemented, http.StatusNotImplemented},
-		{"NotFound", NotFound, ErrNotFound, http.StatusNotFound},
-		{"Unauthorized", Unauthorized, ErrUnauthorized, http.StatusUnauthorized},
-		{"Forbidden", Forbidden, ErrForbidden, http.StatusForbidden},
-		{"BadRequest", BadRequest, fmt.Errorf("wrapped: %w", ErrNotFound), http.StatusBadRequest},
+		{"InternalError", InternalError, ErrInvalidToken, http.StatusInternalServerError, "internal server error"},
+		{"NotImplemented", NotImplemented, ErrNotImplemented, http.StatusNotImplemented, "not implemented"},
+		{"NotFound", NotFound, ErrNotFound, http.StatusNotFound, "not found"},
+		{"Unauthorized", Unauthorized, ErrUnauthorized, http.StatusUnauthorized, "unauthorized"},
+		{"Forbidden", Forbidden, ErrForbidden, http.StatusForbidden, "forbidden"},
+		{"BadRequest", BadRequest, fmt.Errorf("wrapped: %w", ErrNotFound), http.StatusBadRequest, "wrapped: not found"},
 	}
 
 	for _, tt := range tests {
@@ -244,7 +245,7 @@ func TestErrorCodeWithSentinel(t *testing.T) {
 
 			var body core.ErrorResponse
 			require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
-			assert.Equal(t, tt.err.Error(), body.Message)
+			assert.Equal(t, tt.wantMsg, body.Message)
 		})
 	}
 }

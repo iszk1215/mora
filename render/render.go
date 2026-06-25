@@ -57,16 +57,18 @@ func ErrorCode(w http.ResponseWriter, err error, status int) {
 	JSON(w, &core.ErrorResponse{Message: err.Error()}, status)
 }
 
-// InternalError writes the json-encoded error message to the response
-// with a 500 internal server error.
+// InternalError writes a generic internal server error message to the
+// response with a 500 status code. The original error is not exposed
+// to the client to avoid leaking internal details.
 func InternalError(w http.ResponseWriter, err error) {
-	ErrorCode(w, err, 500)
+	ErrorCode(w, errors.New("internal server error"), 500)
 }
 
-// InternalErrorf writes the json-encoded error message to the response
-// with a 500 internal server error.
+// InternalErrorf writes a generic internal server error message to the
+// response with a 500 status code. The formatted error is not exposed
+// to the client to avoid leaking internal details.
 func InternalErrorf(w http.ResponseWriter, format string, a ...interface{}) {
-	ErrorCode(w, fmt.Errorf(format, a...), 500)
+	ErrorCode(w, errors.New("internal server error"), 500)
 }
 
 // NotImplemented writes the json-encoded error message to the

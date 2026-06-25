@@ -259,6 +259,7 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.addValue(&value)
 	if err != nil {
+		log.Error().Err(err).Msg("addValue")
 		render.InternalError(w, err)
 		return
 	}
