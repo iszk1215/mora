@@ -81,7 +81,7 @@ func NewWebCommand() *cobra.Command {
 
 		err = srv.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Err(err).Msg("")
+			log.Err(err).Msg("server listen failed")
 			return fmt.Errorf("ListenAndServe: %w", err)
 		}
 

@@ -90,7 +90,7 @@ func (s *MoraServer) findRepositoryManager(id int64) RepositoryManager {
 func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	repositories, err := s.repos.ListAll()
 	if err != nil {
-		log.Err(err).Msg("")
+		log.Err(err).Msg("failed to list repositories")
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
@@ -188,14 +188,14 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		repo_id, err := strconv.ParseInt(chi.URLParam(r, "repo_id"), 10, 64)
 		if err != nil {
-			log.Err(err).Msg("")
+			log.Err(err).Msg("invalid repo_id in URL")
 			render.BadRequest(w, errors.New("invalid repository id"))
 			return
 		}
 
 		repo, err := s.repos.Find(repo_id)
 		if err != nil {
-			log.Err(err).Msg("")
+			log.Err(err).Msg("failed to find repository")
 			render.BadRequest(w, errors.New("invalid repository id"))
 			return
 		}

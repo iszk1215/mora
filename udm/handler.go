@@ -326,7 +326,7 @@ func (h *udmHandler) injectItem(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		itemId, err := strconv.ParseInt(chi.URLParam(r, "itemId"), 10, 64)
 		if err != nil {
-			log.Warn().Err(err).Msg("")
+			log.Warn().Err(err).Msg("invalid itemId in URL")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}

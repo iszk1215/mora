@@ -39,7 +39,7 @@ func NewRepositoryStore(db *sqlx.DB) RepositoryStore {
 func (s *repositoryStoreImpl) Init() error {
 	_, err := s.db.Exec(schema_repo)
 	if err != nil {
-		log.Err(err).Msg("")
+		log.Err(err).Msg("repo store init failed")
 		return fmt.Errorf("repo Init: %w", err)
 	}
 	return nil

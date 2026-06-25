@@ -40,7 +40,7 @@ func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 	h := func(w http.ResponseWriter, r *http.Request) {
 		err := oauthErrorFrom(r.Context())
 		if err != nil {
-			log.Error().Err(err).Msg("")
+			log.Error().Err(err).Msg("oauth error in login handler")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
@@ -116,7 +116,7 @@ func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) htt
 	r.Get("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
 		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
 		if err != nil {
-			log.Err(err).Msg("")
+			log.Err(err).Msg("invalid scm_id in login URL")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
@@ -163,7 +163,7 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 		defer func() { _ = r.Body.Close() }()
 		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
 		if err != nil {
-			log.Err(err).Msg("")
+			log.Err(err).Msg("invalid scm_id in logout URL")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}

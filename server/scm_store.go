@@ -33,7 +33,7 @@ func NewRepositoryManagerStore(db *sqlx.DB) RepositoryManagerStore {
 func (s *repositoryManagerStoreImpl) Init() error {
 	_, err := s.db.Exec(schema_repository_manager)
 	if err != nil {
-		log.Err(err).Msg("")
+		log.Err(err).Msg("scm store init failed")
 		return fmt.Errorf("scm Init: %w", err)
 	}
 	return nil

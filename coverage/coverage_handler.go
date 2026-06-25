@@ -134,14 +134,14 @@ func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
-			log.Warn().Err(err).Msg("")
+			log.Warn().Err(err).Msg("invalid coverage id in URL")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
 		cov, err := s.coverages.Find(id)
 		if err != nil {
-			log.Warn().Err(err).Msg("")
+			log.Warn().Err(err).Msg("failed to find coverage")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
@@ -199,7 +199,7 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 
 	coverages, err := s.coverages.List(repo.Id)
 	if err != nil {
-		log.Warn().Err(err).Msg("")
+		log.Warn().Err(err).Msg("failed to list coverages")
 		render.NotFound(w, render.ErrNotFound)
 		return
 	}
