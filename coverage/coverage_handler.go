@@ -179,7 +179,7 @@ func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 func makeCoverageListResponse(
 	rm core.RepositoryClient, repo core.Repository, coverages []*Coverage) CoverageListResponse {
 
-	var covs []CoverageResponse
+	covs := []CoverageResponse{}
 	for _, cov := range coverages {
 		revURL := rm.RevisionURL(repo.Url, cov.Revision)
 		covs = append(covs, makeCoverageResponse(revURL, cov))
