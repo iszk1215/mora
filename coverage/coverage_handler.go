@@ -204,12 +204,6 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if len(coverages) == 0 {
-		log.Warn().Msgf("Unknown coverage not found for repo.Id=%d", repo.Id)
-		render.NotFound(w, render.ErrNotFound)
-		return
-	}
-
 	sort.Slice(coverages, func(i, j int) bool {
 		return coverages[i].Timestamp.Before(coverages[j].Timestamp)
 	})

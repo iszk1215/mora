@@ -209,6 +209,28 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 	require.Equal(t, want, data)
 }
 
+func Test_CoverageHandler_CoverageList_Empty(t *testing.T) {
+	rm := NewMockRepositoryClient()
+	repo := core.Repository{Id: 1215, Namespace: "owner", Name: "repo", Url: "url"}
+
+	store := setupCoverageStore(t)
+	s := newCoverageHandler(store)
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r = r.WithContext(core.WithRepo(core.WithRepositoryClient(r.Context(), rm), repo))
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	var data CoverageListResponse
+	err := json.NewDecoder(res.Body).Decode(&data)
+	require.NoError(t, err)
+	require.Empty(t, data.Coverages)
+}
+
 func Test_CoverageHandler_FileList(t *testing.T) {
 	rm := NewMockRepositoryClient()
 
