@@ -1,6 +1,9 @@
 package coverage
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +12,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/iszk1215/mora/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,6 +144,74 @@ func initGitRepo(t *testing.T, dir string) *git.Repository {
 	})
 	require.NoError(t, err)
 	return repo
+}
+
+func TestFindRepositoryByURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/repos", r.URL.Path)
+		assert.Equal(t, "Bearer mytoken", r.Header.Get("Authorization"))
+		repos := []core.Repository{
+			{Id: 1, Url: "http://example.com/repo", Namespace: "owner", Name: "repo"},
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(repos))
+	}))
+	defer srv.Close()
+
+	t.Setenv("MORA_API_KEY", "mytoken")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	repo, err := findRepositoryByURL(srv.URL, "http://example.com/repo", httpClient)
+	require.NoError(t, err)
+	require.NotNil(t, repo)
+	assert.Equal(t, int64(1), repo.Id)
+}
+
+func TestFindRepositoryByURL_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewEncoder(w).Encode([]core.Repository{}))
+	}))
+	defer srv.Close()
+
+	t.Setenv("MORA_API_KEY", "mytoken")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	repo, err := findRepositoryByURL(srv.URL, "http://example.com/repo", httpClient)
+	require.Error(t, err)
+	require.Nil(t, repo)
+}
+
+func TestUpload(t *testing.T) {
+	var requestCount int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		switch requestCount {
+		case 1:
+			assert.Equal(t, "/api/repos", r.URL.Path)
+			repos := []core.Repository{
+				{Id: 1, Url: "http://example.com/repo", Namespace: "owner", Name: "repo"},
+			}
+			require.NoError(t, json.NewEncoder(w).Encode(repos))
+		case 2:
+			assert.Equal(t, "/api/repos/1/coverages", r.URL.Path)
+			w.WriteHeader(http.StatusCreated)
+		default:
+			t.Fatal("unexpected request")
+		}
+	}))
+	defer srv.Close()
+
+	t.Setenv("MORA_API_KEY", "mytoken")
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+
+	req := &CoverageUploadRequest{
+		Revision:  "abcdef",
+		Timestamp: time.Now().Round(0),
+		Entries:   []*CoverageEntryUploadRequest{},
+	}
+
+	err := upload(srv.URL, "http://example.com/repo", req, httpClient)
+	require.NoError(t, err)
+	assert.Equal(t, 2, requestCount)
 }
 
 func TestIsDirty_Clean(t *testing.T) {

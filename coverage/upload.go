@@ -29,14 +29,14 @@ func (c *coverageClient) listRepositories() ([]core.Repository, error) {
 	return c.client.ListRepositories()
 }
 
-func findRepositoryByURL(baseURL, repoURL string) (*core.Repository, error) {
+func findRepositoryByURL(baseURL, repoURL string, httpClient *http.Client) (*core.Repository, error) {
 	token := os.Getenv("MORA_API_KEY")
 
 	client := coverageClient{
 		client: &core.APIClientImpl{
 			BaseURL: baseURL,
 			Token:   token,
-			Client:  &http.Client{Timeout: 30 * time.Second},
+			Client:  httpClient,
 		},
 	}
 
@@ -127,8 +127,8 @@ func parseFile(filename, entryName string, root fs.FS) (*CoverageEntryUploadRequ
 	return e, nil
 }
 
-func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
-	repo, err := findRepositoryByURL(serverURL, repoURL)
+func upload(serverURL, repoURL string, req *CoverageUploadRequest, httpClient *http.Client) error {
+	repo, err := findRepositoryByURL(serverURL, repoURL, httpClient)
 	if err != nil {
 		return fmt.Errorf("upload findRepositoryByURL: %w", err)
 	}
@@ -137,7 +137,7 @@ func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
 		client: &core.APIClientImpl{
 			BaseURL: serverURL,
 			Token:   os.Getenv("MORA_API_KEY"),
-			Client:  &http.Client{Timeout: 30 * time.Second},
+			Client:  httpClient,
 		},
 	}
 
@@ -295,7 +295,8 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 			return fmt.Errorf("use -server=<server url>")
 		}
 
-		err = upload(server, repoURL, req)
+		httpClient := &http.Client{Timeout: 30 * time.Second}
+		err = upload(server, repoURL, req, httpClient)
 		if err != nil {
 			return fmt.Errorf("Upload upload: %w", err)
 		}
