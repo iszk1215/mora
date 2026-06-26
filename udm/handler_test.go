@@ -504,6 +504,79 @@ func TestDeleteItem(t *testing.T) {
 	})
 }
 
+func readBody(t *testing.T, res *http.Response) []byte {
+	t.Helper()
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	return body
+}
+
+func assertResponseMessage(t *testing.T, res *http.Response, expected string) {
+	t.Helper()
+	var errResp core.ErrorResponse
+	require.NoError(t, json.Unmarshal(readBody(t, res), &errResp))
+	require.Equal(t, expected, errResp.Message)
+}
+
+func TestHandlerSanitizedErrorMessages(t *testing.T) {
+	repo := core.Repository{Id: 1215}
+
+	t.Run("createMetric with invalid JSON", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := httptest.NewRequest(http.MethodPost, "/metrics", bytes.NewBufferString("{invalid}"))
+		res := getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		assertResponseMessage(t, res, "invalid request body")
+	})
+
+	t.Run("createItem with invalid JSON", func(t *testing.T) {
+		metric := &metricModel{RepoId: repo.Id, Name: "m"}
+		store := initTestStore(t)
+		require.NoError(t, store.addMetric(metric))
+		h := newHandler(store)
+		r := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/metrics/%d/items", metric.Id), bytes.NewBufferString("{invalid}"))
+		res := getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		assertResponseMessage(t, res, "invalid request body")
+	})
+
+	t.Run("createValue with invalid JSON", func(t *testing.T) {
+		store := initTestStore(t)
+		repo, metric, item := setupTestItem(t, store)
+		h := newHandler(store)
+		r := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/metrics/%d/items/%d/values", metric.Id, item.Id), bytes.NewBufferString("{invalid}"))
+		res := getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		assertResponseMessage(t, res, "invalid request body")
+	})
+
+	t.Run("createValue with itemId mismatch", func(t *testing.T) {
+		store := initTestStore(t)
+		repo, metric, item := setupTestItem(t, store)
+		value := valueModel{ItemId: item.Id + 1, Timestamp: time.Now().Round(0), Value: "10"}
+		body, err := json.Marshal(value)
+		require.NoError(t, err)
+		h := newHandler(store)
+		r := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/metrics/%d/items/%d/values", metric.Id, item.Id), bytes.NewBuffer(body))
+		res := getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		assertResponseMessage(t, res, "item id mismatch")
+	})
+
+	t.Run("injectMetric with non-numeric ID", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := httptest.NewRequest(http.MethodDelete, "/metrics/foo", nil)
+		res := getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		assertResponseMessage(t, res, "invalid metric id")
+	})
+
+	t.Run("injectItem with non-existing item", func(t *testing.T) {
+		metric := &metricModel{RepoId: repo.Id, Name: "m"}
+		store := initTestStore(t)
+		require.NoError(t, store.addMetric(metric))
+		h := newHandler(store)
+		r := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/metrics/%d/items/99999", metric.Id), nil)
+		res := getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		assertResponseMessage(t, res, "item not found")
+	})
+}
+
 // ----------------------------------------------------------------------
 // Value
 

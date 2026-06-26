@@ -355,7 +355,8 @@ func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Re
 
 	var request CoverageUploadRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		render.BadRequest(w, err)
+		log.Warn().Err(err).Msg("invalid coverage upload request body")
+		render.BadRequest(w, errors.New("invalid request body"))
 		return
 	}
 
@@ -368,7 +369,8 @@ func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Re
 
 	entries, err := parseCoverageEntryUploadRequests(request.Entries)
 	if err != nil {
-		render.BadRequest(w, err)
+		log.Warn().Err(err).Msg("failed to parse coverage entries")
+		render.BadRequest(w, errors.New("invalid coverage entry"))
 		return
 	}
 

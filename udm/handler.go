@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -101,7 +100,8 @@ func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
 	var metric metricModel
 	err := json.NewDecoder(r.Body).Decode(&metric)
 	if err != nil {
-		render.BadRequest(w, err)
+		log.Warn().Err(err).Msg("invalid metric request body")
+		render.BadRequest(w, errors.New("invalid request body"))
 		return
 	}
 
@@ -115,8 +115,8 @@ func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.addMetric(&metric)
 	if err != nil {
-		// maybe name conflict
-		render.BadRequest(w, err)
+		log.Warn().Err(err).Msg("addMetric")
+		render.BadRequest(w, errors.New("failed to create metric"))
 		return
 	}
 
@@ -167,7 +167,7 @@ func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&item)
 	if err != nil {
 		log.Warn().Err(err).Msg("udm.handler.createItem")
-		render.BadRequest(w, err)
+		render.BadRequest(w, errors.New("invalid request body"))
 		return
 	}
 
@@ -245,15 +245,14 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	var value valueModel
 	err := json.NewDecoder(r.Body).Decode(&value)
 	if err != nil {
-		render.BadRequest(w, err)
+		log.Warn().Err(err).Msg("invalid value request body")
+		render.BadRequest(w, errors.New("invalid request body"))
 		return
 	}
 
 	item, _ := itemFrom(r.Context())
 	if value.ItemId != item.Id {
-		render.BadRequest(w,
-			fmt.Errorf("itemId mismatch: expected %d but %d",
-				item.Id, value.ItemId))
+		render.BadRequest(w, errors.New("item id mismatch"))
 		return
 	}
 
@@ -304,7 +303,7 @@ func (h *udmHandler) injectMetric(next http.Handler) http.Handler {
 		id, err := strconv.ParseInt(chi.URLParam(r, "metricId"), 10, 64)
 		if err != nil {
 			log.Warn().Err(err).Msg("udm.handler.injectMetric")
-			render.BadRequest(w, err)
+			render.BadRequest(w, errors.New("invalid metric id"))
 			return
 		}
 
@@ -335,7 +334,7 @@ func (h *udmHandler) injectItem(next http.Handler) http.Handler {
 		item, err := h.store.findItemById(itemId)
 		if err != nil {
 			log.Warn().Err(err).Msg("udm.handler.injectItem")
-			render.BadRequest(w, err)
+			render.BadRequest(w, errors.New("item not found"))
 			return
 		}
 

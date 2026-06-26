@@ -683,6 +683,47 @@ func TestValidateCoverageUploadRequest(t *testing.T) {
 	}
 }
 
+func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
+	repo := core.Repository{Id: 1215}
+	store := setupCoverageStore(t)
+	s := newCoverageHandler(store)
+
+	assertBadRequestMessage := func(t *testing.T, body []byte, expected string) {
+		var errResp core.ErrorResponse
+		require.NoError(t, json.Unmarshal(body, &errResp))
+		assert.Equal(t, expected, errResp.Message)
+	}
+
+	t.Run("invalid JSON body returns sanitized message", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("{invalid}"))
+		r = r.WithContext(core.WithRepo(r.Context(), repo))
+		w := httptest.NewRecorder()
+		s.Handler().ServeHTTP(w, r)
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		body, _ := io.ReadAll(res.Body)
+		assertBadRequestMessage(t, body, "invalid request body")
+	})
+
+	t.Run("empty entry name returns sanitized message", func(t *testing.T) {
+		req := &CoverageUploadRequest{
+			Revision:  "abcdef",
+			Timestamp: time.Now().Round(0),
+			Entries:   []*CoverageEntryUploadRequest{{Name: "", Hits: 1, Lines: 1}},
+		}
+		body, err := json.Marshal(req)
+		require.NoError(t, err)
+		r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+		r = r.WithContext(core.WithRepo(r.Context(), repo))
+		w := httptest.NewRecorder()
+		s.Handler().ServeHTTP(w, r)
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		resBody, _ := io.ReadAll(res.Body)
+		assertBadRequestMessage(t, resBody, "invalid coverage entry")
+	})
+}
+
 func TestCoverageHandler_HandleUpload_ValidationErrors(t *testing.T) {
 	repo := core.Repository{Id: 1215}
 	store := setupCoverageStore(t)
