@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	driver "github.com/drone/go-scm/scm/driver/gitea"
 	"github.com/drone/go-scm/scm/transport/oauth2"
@@ -46,6 +47,7 @@ func NewGitea(id int64, serverURL, clientID, clientSecret, redirectURL string, i
 	gitea.Init(id, client.BaseURL, client, NewOAuthHandler(oauthCfg))
 
 	gitea.client.Client = &http.Client{
+		Timeout: 30 * time.Second,
 		Transport: &oauth2.Transport{
 			Scheme: oauth2.SchemeBearer,
 			Source: &oauth2.Refresher{

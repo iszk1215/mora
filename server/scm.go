@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/drone/go-scm/scm"
 	"github.com/drone/go-scm/scm/transport/oauth2"
@@ -28,6 +29,7 @@ func (s *BaseRepositoryManager) Init(id int64, url *url.URL, client *scm.Client,
 
 func (s *BaseRepositoryManager) SetupTransport(source scm.TokenSource, scheme string) {
 	s.client.Client = &http.Client{
+		Timeout: 30 * time.Second,
 		Transport: &oauth2.Transport{
 			Scheme: scheme,
 			Source: source,

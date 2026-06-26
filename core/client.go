@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type (
@@ -42,7 +43,7 @@ func (c *APIClientImpl) Do(method, path string, in any, out any) error {
 
 	client := c.Client
 	if client == nil {
-		client = &http.Client{}
+		client = &http.Client{Timeout: 30 * time.Second}
 	}
 
 	resp, err := client.Do(req)

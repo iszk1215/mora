@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/go-git/go-git/v5"
@@ -35,7 +36,7 @@ func findRepositoryByURL(baseURL, repoURL string) (*core.Repository, error) {
 		client: &core.APIClientImpl{
 			BaseURL: baseURL,
 			Token:   token,
-			Client:  &http.Client{},
+			Client:  &http.Client{Timeout: 30 * time.Second},
 		},
 	}
 
@@ -136,7 +137,7 @@ func upload(serverURL, repoURL string, req *CoverageUploadRequest) error {
 		client: &core.APIClientImpl{
 			BaseURL: serverURL,
 			Token:   os.Getenv("MORA_API_KEY"),
-			Client:  &http.Client{},
+			Client:  &http.Client{Timeout: 30 * time.Second},
 		},
 	}
 
