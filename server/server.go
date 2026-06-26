@@ -105,22 +105,27 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, repo := range repositories {
+		log.Debug().Int64("repo_id", repo.Id).Str("name", repo.Name).Msg("handleRepoList: processing repo")
+
 		rm := s.findRepositoryManager(repo.RepositoryManager)
 		if rm == nil {
-			log.Warn().Msgf(
-				"rm not found for repository: repo.ID=%d rm.ID=%d (skipped)",
-				repo.Id, repo.RepositoryManager)
+			log.Warn().Int64("repo_id", repo.Id).Int64("rm_id", repo.RepositoryManager).
+				Msg("handleRepoList: rm not found (skipped)")
 			continue
 		}
 
 		if s.apiKey != "" && s.apiKey == token {
+			log.Debug().Int64("repo_id", repo.Id).Msg("handleRepoList: included via api key")
 			resp = append(resp, repo)
 			continue
 		}
 
 		err = checkRepoAccess(sess, rm, repo)
 		if err == nil {
+			log.Debug().Int64("repo_id", repo.Id).Msg("handleRepoList: included via checkRepoAccess")
 			resp = append(resp, repo)
+		} else {
+			log.Debug().Int64("repo_id", repo.Id).Err(err).Msg("handleRepoList: checkRepoAccess denied (skipped)")
 		}
 	}
 
