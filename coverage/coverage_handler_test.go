@@ -228,6 +228,7 @@ func Test_CoverageHandler_CoverageList_Empty(t *testing.T) {
 	var data CoverageListResponse
 	err := json.NewDecoder(res.Body).Decode(&data)
 	require.NoError(t, err)
+	require.NotNil(t, data.Coverages)
 	require.Empty(t, data.Coverages)
 }
 
