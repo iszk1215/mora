@@ -3,8 +3,15 @@ package coverage
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
+
+func TestProcessDebugOption_NoFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	// No "debug" flag defined - should not panic
+	processDebugOption(cmd)
+}
 
 func TestUploadCommand_Flags_AreDefined(t *testing.T) {
 	cmd := newUploadCommand()

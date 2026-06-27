@@ -3,8 +3,21 @@ package udm
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
+
+func TestProcessDebugOption_NoFlag(t *testing.T) {
+	cmd := &cobra.Command{}
+	processDebugOption(cmd)
+}
+
+func TestParsePersistentFlags_NoPersistentFlags(t *testing.T) {
+	c := &udmCommand{}
+	cmd := &cobra.Command{}
+	err := c.parsePersistentFlags(cmd)
+	require.NoError(t, err)
+}
 
 func TestUDMCommand_Flags_AreDefined(t *testing.T) {
 	cmd := NewCommand()

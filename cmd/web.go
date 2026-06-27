@@ -27,9 +27,18 @@ func NewWebCommand() *cobra.Command {
 			log.Logger = log.Output(
 				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
 
-			config_file, _ := cmd.Flags().GetString("config")
-			debug, _ := cmd.Flags().GetBool("debug")
-			port, _ := cmd.Flags().GetInt("port")
+			config_file, err := cmd.Flags().GetString("config")
+			if err != nil {
+				return fmt.Errorf("failed to get config flag: %w", err)
+			}
+			debug, err := cmd.Flags().GetBool("debug")
+			if err != nil {
+				return fmt.Errorf("failed to get debug flag: %w", err)
+			}
+			port, err := cmd.Flags().GetInt("port")
+			if err != nil {
+				return fmt.Errorf("failed to get port flag: %w", err)
+			}
 
 			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 			if debug {

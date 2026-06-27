@@ -214,7 +214,10 @@ func (c *udmCommand) deleteValues(repoId int64, name string) error {
 }
 
 func processDebugOption(cmd *cobra.Command) {
-	debug, _ := cmd.Flags().GetBool("debug")
+	debug, err := cmd.Flags().GetBool("debug")
+	if err != nil {
+		return
+	}
 	if debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
@@ -223,8 +226,7 @@ func processDebugOption(cmd *cobra.Command) {
 func (c *udmCommand) parsePersistentFlags(cmd *cobra.Command) error {
 	processDebugOption(cmd)
 
-	filename, _ := cmd.Flags().GetString("config")
-	if filename != "" {
+	if filename, err := cmd.Flags().GetString("config"); err == nil && filename != "" {
 		if _, err := os.Stat(filename); err == nil {
 			config, err := core.ReadClientConfig(filename)
 			if err != nil {
@@ -245,15 +247,15 @@ func (c *udmCommand) parsePersistentFlags(cmd *cobra.Command) error {
 
 	// parse global flags
 
-	if v, _ := cmd.Flags().GetString("server"); v != "" {
+	if v, err := cmd.Flags().GetString("server"); err == nil && v != "" {
 		c.config.ServerURL = v
 	}
 
-	if v, _ := cmd.Flags().GetString("repo"); v != "" {
+	if v, err := cmd.Flags().GetString("repo"); err == nil && v != "" {
 		c.config.RepositoryURL = v
 	}
 
-	if v, _ := cmd.Flags().GetString("token"); v != "" {
+	if v, err := cmd.Flags().GetString("token"); err == nil && v != "" {
 		c.config.Token = v
 	}
 
@@ -275,15 +277,27 @@ func (c *udmCommand) runMetricCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	createCmd, _ := cmd.Flags().GetBool("create")
-	deleteCmd, _ := cmd.Flags().GetBool("delete")
-	listCmd, _ := cmd.Flags().GetBool("list")
+	createCmd, err := cmd.Flags().GetBool("create")
+	if err != nil {
+		return fmt.Errorf("failed to get create flag: %w", err)
+	}
+	deleteCmd, err := cmd.Flags().GetBool("delete")
+	if err != nil {
+		return fmt.Errorf("failed to get delete flag: %w", err)
+	}
+	listCmd, err := cmd.Flags().GetBool("list")
+	if err != nil {
+		return fmt.Errorf("failed to get list flag: %w", err)
+	}
 
 	if createCmd {
 		if len(args) != 1 {
 			return errors.New("no metric name given")
 		}
-		typ, _ := cmd.Flags().GetString("type")
+		typ, err := cmd.Flags().GetString("type")
+		if err != nil {
+			return fmt.Errorf("failed to get type flag: %w", err)
+		}
 		if typ != "int" {
 			return fmt.Errorf("unknown type: %s", typ)
 		}
@@ -332,9 +346,18 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	clearFlag, _ := cmd.Flags().GetBool("clear")
-	addFlag, _ := cmd.Flags().GetBool("add")
-	listFlag, _ := cmd.Flags().GetBool("list")
+	clearFlag, err := cmd.Flags().GetBool("clear")
+	if err != nil {
+		return fmt.Errorf("failed to get clear flag: %w", err)
+	}
+	addFlag, err := cmd.Flags().GetBool("add")
+	if err != nil {
+		return fmt.Errorf("failed to get add flag: %w", err)
+	}
+	listFlag, err := cmd.Flags().GetBool("list")
+	if err != nil {
+		return fmt.Errorf("failed to get list flag: %w", err)
+	}
 
 	if clearFlag {
 		if len(args) != 1 {
@@ -351,7 +374,10 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 		}
 
 		var timestamp time.Time
-		timestamp_str, _ := cmd.Flags().GetString("time")
+		timestamp_str, err := cmd.Flags().GetString("time")
+		if err != nil {
+			return fmt.Errorf("failed to get time flag: %w", err)
+		}
 		if timestamp_str == "" {
 			timestamp = time.Now()
 		} else {
