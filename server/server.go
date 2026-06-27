@@ -301,7 +301,7 @@ func initRepositoryManager(config RepositoryManagerConfig, baseURL string, store
 	}
 
 	if config.SecretFilename == "" {
-		return nil, fmt.Errorf("ConfigError: rm.secret_url is empty")
+		return nil, fmt.Errorf("ConfigError: rm.secret_file is empty")
 	}
 
 	id, _, err := store.FindURL(config.URL)

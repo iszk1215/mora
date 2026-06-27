@@ -282,6 +282,17 @@ func Test_initRepositoryManager_EmptyURL(t *testing.T) {
 	require.Contains(t, err.Error(), "rm.url is empty")
 }
 
+func Test_initRepositoryManager_EmptySecretFile(t *testing.T) {
+	config := RepositoryManagerConfig{
+		Driver:         "gitea",
+		URL:            "https://example.com",
+		SecretFilename: "",
+	}
+	_, err := initRepositoryManager(config, "http://localhost:4000", nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "rm.secret_file is empty")
+}
+
 func Test_initRepositoryManager_UnknownDriver(t *testing.T) {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
