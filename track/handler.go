@@ -119,8 +119,8 @@ func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
 // Track
 
 // ListTracks godoc
-// @Summary      全トラックを取得
-// @Description  登録されている全てのトラックを返す
+// @Summary      List all tracks
+// @Description  Return all registered tracks
 // @Tags         track
 // @Success      200  {object}  track.ListTracksResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -141,12 +141,12 @@ func (h *trackHandler) listTracks(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateTrack godoc
-// @Summary      トラックを作成
-// @Description  新しいトラックを追加する。name は一意である必要がある
+// @Summary      Create a track
+// @Description  Add a new track. The name must be unique.
 // @Tags         track
 // @Accept       json
 // @Produce      json
-// @Param        body  body      track.CreateTrackRequest  true  "トラック情報"
+// @Param        body  body      track.CreateTrackRequest  true  "Track information"
 // @Success      201   {object}  track.TrackModel
 // @Failure      400   {object}  core.ErrorResponse
 // @Failure      401   {object}  core.ErrorResponse
@@ -179,8 +179,8 @@ func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteTrack godoc
-// @Summary      トラックを削除
-// @Description  指定されたトラックを削除する。配下の series, value もカスケード削除される
+// @Summary      Delete a track
+// @Description  Delete the specified track. Child series and values are also cascade-deleted.
 // @Tags         track
 // @Param        trackId  path  int  true  "Track ID"
 // @Success      204
@@ -204,8 +204,8 @@ func (h *trackHandler) deleteTrack(w http.ResponseWriter, r *http.Request) {
 // Series
 
 // ListSeries godoc
-// @Summary      シリーズ一覧を取得
-// @Description  指定されたトラックに属する全シリーズを返す
+// @Summary      List all series
+// @Description  Return all series belonging to the specified track
 // @Tags         track
 // @Param        trackId  path  int  true  "Track ID"
 // @Success      200  {object}  track.ListSeriesResponse
@@ -232,13 +232,13 @@ func (h *trackHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateSeries godoc
-// @Summary      シリーズを作成
-// @Description  トラック配下に新しいシリーズを追加する。data_type は "int" または "float"（省略時 "float"）
+// @Summary      Create a series
+// @Description  Add a new series under a track. data_type must be "int" or "float" (defaults to "float").
 // @Tags         track
 // @Accept       json
 // @Produce      json
 // @Param        trackId  path  int                     true  "Track ID"
-// @Param        body     body  track.CreateSeriesRequest  true  "シリーズ情報"
+// @Param        body     body  track.CreateSeriesRequest  true  "Series information"
 // @Success      201  {object}  track.SeriesModel
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -287,8 +287,8 @@ func (h *trackHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteSeries godoc
-// @Summary      シリーズを削除
-// @Description  指定されたシリーズを削除する。配下の value もカスケード削除される
+// @Summary      Delete a series
+// @Description  Delete the specified series. Child values are also cascade-deleted.
 // @Tags         track
 // @Param        trackId   path  int  true  "Track ID"
 // @Param        seriesId  path  int  true  "Series ID"
@@ -314,12 +314,12 @@ func (h *trackHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 // Value
 
 // ListValues godoc
-// @Summary      値の一覧を取得
-// @Description  指定されたシリーズの時系列データを返す。limit パラメータで最大件数を制限できる
+// @Summary      List all values
+// @Description  Return time-series data for the specified series. The limit parameter restricts the maximum number of results.
 // @Tags         track
 // @Param        trackId   path  int     true   "Track ID"
 // @Param        seriesId  path  int     true   "Series ID"
-// @Param        limit     query int     false  "最大取得件数"
+// @Param        limit     query int     false  "Maximum number of results"
 // @Success      200  {object}  track.ListValuesResponse
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -355,14 +355,14 @@ func (h *trackHandler) listValues(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateValue godoc
-// @Summary      値を追加
-// @Description  シリーズに時系列データを追加する。同一系列・同一時刻のデータは重複不可
+// @Summary      Add a value
+// @Description  Add time-series data to a series. Duplicate timestamps within the same series are not allowed.
 // @Tags         track
 // @Accept       json
 // @Produce      json
 // @Param        trackId   path  int                   true  "Track ID"
 // @Param        seriesId  path  int                   true  "Series ID"
-// @Param        body      body  track.CreateValueRequest  true  "値データ"
+// @Param        body      body  track.CreateValueRequest  true  "Value data"
 // @Success      201  {object}  track.ValueModel
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -402,8 +402,8 @@ func (h *trackHandler) createValue(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteValues godoc
-// @Summary      値の全削除
-// @Description  指定されたシリーズの全時系列データを削除する
+// @Summary      Delete all values
+// @Description  Delete all time-series data for the specified series
 // @Tags         track
 // @Param        trackId   path  int  true  "Track ID"
 // @Param        seriesId  path  int  true  "Series ID"

@@ -91,7 +91,7 @@ func TestSessionManager_SetsCookie(t *testing.T) {
 func TestSessionManager_ReusesExistingSession(t *testing.T) {
 	m := newTestSessionManager()
 
-	// First request: no cookie → middleware creates new session
+	// First request: no cookie -> middleware creates new session
 	var firstSid string
 	first := func(w http.ResponseWriter, r *http.Request) {
 		sess, ok := MoraSessionFrom(r.Context())
@@ -108,7 +108,7 @@ func TestSessionManager_ReusesExistingSession(t *testing.T) {
 	require.Len(t, cookies, 1)
 	firstSid = cookies[0].Value
 
-	// Second request: include the cookie → middleware reuses existing session
+	// Second request: include the cookie -> middleware reuses existing session
 	var gotToken string
 	second := func(w http.ResponseWriter, r *http.Request) {
 		sess, ok := MoraSessionFrom(r.Context())
