@@ -10,7 +10,7 @@ SOURCES = $(shell find . -name '*.go' -not -path './frontend/node_modules/*')
 FRONTEND_OUT := server/static/public/index.html
 FRONTEND_SRCS := $(shell find frontend/src -type f 2>/dev/null)
 
-GO_PKGS = ./cmd/... ./coverage/... ./core/... ./mockscm/... ./render/... ./server/... ./udm/... ./version/...
+GO_PKGS = ./cmd/... ./config/... ./coverage/... ./core/... ./mockscm/... ./render/... ./server/... ./udm/... ./version/...
 
 .PHONY: all frontend-test frontend-coverage test test-all test-race lint frontend-lint lint-all run clean generate
 
