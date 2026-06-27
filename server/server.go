@@ -19,6 +19,7 @@ import (
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage"
 	"github.com/iszk1215/mora/render"
+	"github.com/iszk1215/mora/track"
 	"github.com/iszk1215/mora/udm"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -69,6 +70,7 @@ type (
 		repos              RepositoryStore
 		coverage           *coverage.CoverageService
 		udm                *udm.Service
+		track              *track.Service
 		apiKey             string
 
 		sessionManager     *MoraSessionManager
@@ -266,6 +268,10 @@ func (s *MoraServer) Handler() http.Handler {
 		})
 	})
 
+	if s.track != nil {
+		r.Mount("/api/track", s.track.Handler())
+	}
+
 	// login/logout
 
 	redirectHandler := http.HandlerFunc(
@@ -364,6 +370,8 @@ func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositorySto
 	}
 	db.SetMaxOpenConns(1)
 
+	db.MustExec("PRAGMA foreign_keys = ON")
+
 	rmStore := NewRepositoryManagerStore(db)
 	if err := rmStore.Init(); err != nil {
 		return nil, nil, nil, fmt.Errorf("rmStore.Init: %w", err)
@@ -419,6 +427,11 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
+	trackService, err := track.NewService(db, os.Getenv("MORA_API_KEY"))
+	if err != nil {
+		return nil, err
+	}
+
 	s := &MoraServer{
 		db:                 db,
 		sessionManager:     NewMoraSessionManager(),
@@ -427,6 +440,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		frontendFileServer: frontendFileServer,
 		coverage:           coverage,
 		udm:                udm,
+		track:              trackService,
 		apiKey:             os.Getenv("MORA_API_KEY"),
 	}
 

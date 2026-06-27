@@ -17,6 +17,7 @@ import (
 	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/mockscm"
+	"github.com/iszk1215/mora/track"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,6 +142,11 @@ func (b *MoraServerBuilder) WithRepo(repos ...*Repository) *MoraServerBuilder {
 
 func (b *MoraServerBuilder) WithSessionManager() *MoraServerBuilder {
 	b.Server.sessionManager = newTestSessionManager()
+	return b
+}
+
+func (b *MoraServerBuilder) WithTrack(trackService *track.Service) *MoraServerBuilder {
+	b.Server.track = trackService
 	return b
 }
 
@@ -705,4 +711,49 @@ insecure_skip_verify = false
 			assert.Equal(t, tt.want, baseTransport.TLSClientConfig.InsecureSkipVerify)
 		})
 	}
+}
+
+func TestTrackEndpointIsMounted(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	trackService, err := track.NewService(db, "")
+	require.NoError(t, err)
+
+	server := NewMoraServerBuilder(t).
+		WithSessionManager().
+		WithTrack(trackService).
+		Finish()
+
+	handler := server.Handler()
+
+	t.Run("GET /api/track returns 200", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/api/track", nil)
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var resp track.ListTracksResponse
+		err = json.Unmarshal(body, &resp)
+		require.NoError(t, err)
+		require.Empty(t, resp.Tracks)
+	})
+
+	t.Run("POST /api/track creates track", func(t *testing.T) {
+		body := `{"name":"integration_test"}`
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/api/track", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusCreated, res.StatusCode)
+	})
 }
