@@ -135,7 +135,7 @@ func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 		if err != nil {
 			log.Warn().Err(err).Msg("invalid coverage id in URL")
-			render.NotFound(w, render.ErrNotFound)
+			render.BadRequest(w, errors.New("invalid coverage id"))
 			return
 		}
 

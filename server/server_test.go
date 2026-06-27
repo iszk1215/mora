@@ -199,7 +199,7 @@ func Test_injectRepo(t *testing.T) {
 		req = req.WithContext(WithMoraSession(req.Context(), sess))
 
 		status, _ := callInjectRepo(req)
-		require.Equal(t, http.StatusBadRequest, status)
+		require.Equal(t, http.StatusNotFound, status)
 	})
 
 	t.Run("nologin", func(t *testing.T) {

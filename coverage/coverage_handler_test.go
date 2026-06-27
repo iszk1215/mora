@@ -107,7 +107,7 @@ func Test_injectCoverage_malformed_id(t *testing.T) {
 	s := newCoverageHandler(nil)
 	s.Handler().ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+	require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
 }
 
 func TestMakeCoverageResponseList(t *testing.T) {

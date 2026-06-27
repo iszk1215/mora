@@ -155,7 +155,7 @@ func TestHandlerDeleteMetric(t *testing.T) {
 	t.Run("delete non existing metric", func(t *testing.T) {
 		path := fmt.Sprintf("/metrics/%d", metric.Id) // delete again
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
-		getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		getReponseWithRepo(t, http.StatusNotFound, h, r, repo)
 	})
 }
 
@@ -219,12 +219,12 @@ func TestHandlerInjectMetricAllPaths(t *testing.T) {
 		getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
 	})
 
-	t.Run("non-existing metric returns BadRequest", func(t *testing.T) {
+	t.Run("non-existing metric returns NotFound", func(t *testing.T) {
 		store := initTestStore(t)
 		h := newHandler(store)
 		path := fmt.Sprintf("/metrics/%d", int64(9999))
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
-		getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		getReponseWithRepo(t, http.StatusNotFound, h, r, repo)
 	})
 
 	t.Run("DB error returns InternalError without panic", func(t *testing.T) {
@@ -431,7 +431,7 @@ func TestHandlerListItemsInvalidMetric(t *testing.T) {
 	path := fmt.Sprintf("/metrics/%d/items", 1976)
 	r := httptest.NewRequest(http.MethodGet, path, nil)
 	h := newHandler(store)
-	getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+	getReponseWithRepo(t, http.StatusNotFound, h, r, repo)
 }
 
 func TestHandlerListItemsInvalidMetricString(t *testing.T) {
@@ -481,7 +481,7 @@ func TestDeleteItem(t *testing.T) {
 		path := fmt.Sprintf("/metrics/%d/items/%d", metric.Id, item.Id+1)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		h := newHandler(store)
-		getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		getReponseWithRepo(t, http.StatusNotFound, h, r, repo)
 	})
 
 	err = store.addItem(&item)
@@ -572,7 +572,7 @@ func TestHandlerSanitizedErrorMessages(t *testing.T) {
 		require.NoError(t, store.addMetric(metric))
 		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/metrics/%d/items/99999", metric.Id), nil)
-		res := getReponseWithRepo(t, http.StatusBadRequest, h, r, repo)
+		res := getReponseWithRepo(t, http.StatusNotFound, h, r, repo)
 		assertResponseMessage(t, res, "item not found")
 	})
 }

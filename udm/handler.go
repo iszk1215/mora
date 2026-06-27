@@ -309,7 +309,7 @@ func (h *udmHandler) injectMetric(next http.Handler) http.Handler {
 
 		metric, err := h.store.findMetricById(id)
 		if err == errorMetricNotFound {
-			render.BadRequest(w, errors.New("metric not found"))
+			render.NotFound(w, errors.New("metric not found"))
 			return
 		} else if err != nil {
 			log.Warn().Err(err).Msg("udm.handler.injectMetric")
@@ -327,14 +327,14 @@ func (h *udmHandler) injectItem(next http.Handler) http.Handler {
 		itemId, err := strconv.ParseInt(chi.URLParam(r, "itemId"), 10, 64)
 		if err != nil {
 			log.Warn().Err(err).Msg("invalid itemId in URL")
-			render.NotFound(w, render.ErrNotFound)
+			render.BadRequest(w, errors.New("invalid item id"))
 			return
 		}
 
 		item, err := h.store.findItemById(itemId)
 		if err != nil {
 			log.Warn().Err(err).Msg("udm.handler.injectItem")
-			render.BadRequest(w, errors.New("item not found"))
+			render.NotFound(w, errors.New("item not found"))
 			return
 		}
 

@@ -201,7 +201,7 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 		repo, err := s.repos.Find(repo_id)
 		if err != nil {
 			log.Err(err).Msg("failed to find repository")
-			render.BadRequest(w, errors.New("invalid repository id"))
+			render.NotFound(w, errors.New("repository not found"))
 			return
 		}
 
