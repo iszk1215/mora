@@ -82,6 +82,12 @@ func (s *MoraSession) WithToken(ctx context.Context, rmID int64) (context.Contex
 	return scm.WithContext(ctx, &token), nil
 }
 
+func (s *MoraSession) IsLoggedIn() bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return len(s.tokenMap) > 0
+}
+
 // Session Manager
 
 type MoraSessionManager struct {

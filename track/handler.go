@@ -73,6 +73,7 @@ type contextKey int
 const (
 	trackContextKey contextKey = iota
 	seriesContextKey
+	authCtxKey
 )
 
 func withTrack(ctx context.Context, track TrackModel) context.Context {
@@ -93,6 +94,15 @@ func seriesFrom(ctx context.Context) (SeriesModel, bool) {
 	return s, ok
 }
 
+func ContextWithAuth(ctx context.Context) context.Context {
+	return context.WithValue(ctx, authCtxKey, true)
+}
+
+func isAuthenticated(ctx context.Context) bool {
+	v, ok := ctx.Value(authCtxKey).(bool)
+	return ok && v
+}
+
 func renderNoContent(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -102,6 +112,10 @@ func renderNoContent(w http.ResponseWriter) {
 
 func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isAuthenticated(r.Context()) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		if h.apiKey == "" {
 			next.ServeHTTP(w, r)
 			return

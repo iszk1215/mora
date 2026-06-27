@@ -18,6 +18,7 @@ import './index.css'
 import { Repo } from './core'
 import { coverageRoute } from './coverage'
 import { udmRoute, loadUdmMetrics } from './udm'
+import { trackRoute } from './track'
 import { DefaultLink, HeaderLink, ExternalLink } from './util'
 import { Button } from '@/components/ui/button'
 import {
@@ -271,6 +272,13 @@ const router = createBrowserRouter([
         handle: {
           crumb: (_params: Params, _data: any) => ({ label: "scm", link: "/scms" }),
         }
+      },
+      {
+        path: '/track',
+        handle: {
+          crumb: (_params: Params, _data: any) => ({ label: "Track", link: "/track" }),
+        },
+        children: trackRoute,
       },
       {
         path: '/repos/:repo_id',

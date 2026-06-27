@@ -43,6 +43,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 
 ## Notes
 
+- All source code (.go, .ts, .tsx, .css, etc.) must contain only ASCII characters. No Japanese or other non-ASCII characters in code files.
 - Binary output: `bin/mora`
 - Default config: `mora.conf` (flag: `-c`)
 - Server default port: 4000 (flag: `-p`)

@@ -244,6 +244,16 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 	})
 }
 
+func (s *MoraServer) requireTrackAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess, ok := MoraSessionFrom(r.Context())
+		if ok && sess.IsLoggedIn() {
+			r = r.WithContext(track.ContextWithAuth(r.Context()))
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s *MoraServer) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -269,7 +279,7 @@ func (s *MoraServer) Handler() http.Handler {
 	})
 
 	if s.track != nil {
-		r.Mount("/api/track", s.track.Handler())
+		r.With(s.requireTrackAuth).Mount("/api/track", s.track.Handler())
 	}
 
 	// login/logout

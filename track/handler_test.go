@@ -97,6 +97,20 @@ func TestRequireAuth(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		getResponse(t, http.StatusUnauthorized, h, r)
 	})
+
+	t.Run("session auth bypasses API key check", func(t *testing.T) {
+		h := newTestHandlerWithAPIKey(t, "secret123")
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r = r.WithContext(ContextWithAuth(r.Context()))
+		getResponse(t, http.StatusOK, h, r)
+	})
+
+	t.Run("session auth works without API key", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r = r.WithContext(ContextWithAuth(r.Context()))
+		getResponse(t, http.StatusOK, h, r)
+	})
 }
 
 // ----------------------------------------------------------------------
