@@ -14,6 +14,7 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/drone/go-scm/scm/transport/oauth2"
 	"github.com/go-chi/chi/v5"
+	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/mockscm"
 	"github.com/jmoiron/sqlx"
@@ -273,22 +274,22 @@ func Test_injectRepo(t *testing.T) {
 }
 
 func Test_initRepositoryManager_EmptyURL(t *testing.T) {
-	config := RepositoryManagerConfig{
+	cfg := config.RepositoryManagerConfig{
 		Driver: "gitea",
 		URL:    "",
 	}
-	_, err := initRepositoryManager(config, "http://localhost:4000", nil)
+	_, err := initRepositoryManager(cfg, "http://localhost:4000", nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "rm.url is empty")
 }
 
 func Test_initRepositoryManager_EmptySecretFile(t *testing.T) {
-	config := RepositoryManagerConfig{
+	cfg := config.RepositoryManagerConfig{
 		Driver:         "gitea",
 		URL:            "https://example.com",
 		SecretFilename: "",
 	}
-	_, err := initRepositoryManager(config, "http://localhost:4000", nil)
+	_, err := initRepositoryManager(cfg, "http://localhost:4000", nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "rm.secret_file is empty")
 }
@@ -300,12 +301,12 @@ func Test_initRepositoryManager_UnknownDriver(t *testing.T) {
 	err = store.Init()
 	require.NoError(t, err)
 
-	config := RepositoryManagerConfig{
+	cfg := config.RepositoryManagerConfig{
 		Driver:         "unknown",
 		URL:            "https://example.com",
 		SecretFilename: "/tmp/secret.conf",
 	}
-	_, err = initRepositoryManager(config, "http://localhost:4000", store)
+	_, err = initRepositoryManager(cfg, "http://localhost:4000", store)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unknown repository manager")
 }
@@ -511,19 +512,19 @@ func TestServerRepoList2(t *testing.T) {
 }
 
 func Test_NewMoraServerFromConfig_NoRepositoryManagerError(t *testing.T) {
-	config := MoraConfig{}
-	_, err := NewMoraServerFromConfig(config)
+	cfg := config.MoraConfig{}
+	_, err := NewMoraServerFromConfig(cfg)
 	require.Error(t, err)
 }
 
 func Test_NewMoraServerFromConfig_EmptySecret(t *testing.T) {
-	config := MoraConfig{}
-	config.RepositoryManagers = []RepositoryManagerConfig{
+	cfg := config.MoraConfig{}
+	cfg.RepositoryManagers = []config.RepositoryManagerConfig{
 		{
 			Driver: "github",
 		},
 	}
-	_, err := NewMoraServerFromConfig(config)
+	_, err := NewMoraServerFromConfig(cfg)
 	require.Error(t, err)
 }
 
@@ -537,15 +538,15 @@ func Test_NewMoraServerFromConfig_Github(t *testing.T) {
 	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
 	require.NoError(t, err)
 
-	config := MoraConfig{}
-	config.RepositoryManagers = []RepositoryManagerConfig{
+	cfg := config.MoraConfig{}
+	cfg.RepositoryManagers = []config.RepositoryManagerConfig{
 		{
 			Driver:         "github",
 			SecretFilename: tmp.Name(),
 		},
 	}
 
-	server, err := NewMoraServerFromConfig(config)
+	server, err := NewMoraServerFromConfig(cfg)
 	require.NoError(t, err)
 
 	// want, err := NewGithubFromFile(1, tmp.Name())
@@ -567,9 +568,9 @@ func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 	_, err = tmp.Write([]byte("ClientID = \"id\"\nClientSecret = \"secret\""))
 	require.NoError(t, err)
 
-	config := MoraConfig{}
-	config.Server.URL = "http://localhost:4000"
-	config.RepositoryManagers = []RepositoryManagerConfig{
+	cfg := config.MoraConfig{}
+	cfg.Server.URL = "http://localhost:4000"
+	cfg.RepositoryManagers = []config.RepositoryManagerConfig{
 		{
 			Driver:         "gitea",
 			URL:            "https://gitea.dayo/",
@@ -577,15 +578,15 @@ func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 		},
 	}
 
-	server, err := NewMoraServerFromConfig(config)
+	server, err := NewMoraServerFromConfig(cfg)
 	require.NoError(t, err)
 
 	_, err = NewGiteaFromFile(
-		1, tmp.Name(), config.RepositoryManagers[0].URL, config.Server.URL+"/login", false)
+		1, tmp.Name(), cfg.RepositoryManagers[0].URL, cfg.Server.URL+"/login", false)
 	require.NoError(t, err)
 	got := server.repositoryManagers[0]
 	assert.Equal(t, int64(1), got.ID())
-	assert.Equal(t, config.RepositoryManagers[0].URL, got.URL().String())
+	assert.Equal(t, cfg.RepositoryManagers[0].URL, got.URL().String())
 }
 
 func TestNewGitea_InsecureSkipVerify(t *testing.T) {
@@ -686,11 +687,11 @@ insecure_skip_verify = false
 			_, err = configFile.Write([]byte(tt.toml))
 			require.NoError(t, err)
 
-			config, err := ReadMoraConfig(configFile.Name())
+			cfg, err := config.ReadMoraConfig(configFile.Name())
 			require.NoError(t, err)
-			require.Equal(t, tt.want, config.RepositoryManagers[0].InsecureSkipVerify)
+			require.Equal(t, tt.want, cfg.RepositoryManagers[0].InsecureSkipVerify)
 
-			srv, err := NewMoraServerFromConfig(config)
+			srv, err := NewMoraServerFromConfig(cfg)
 			require.NoError(t, err)
 			defer func() { _ = srv.Close() }()
 

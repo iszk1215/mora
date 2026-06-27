@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/server"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -45,7 +46,7 @@ func NewWebCommand() *cobra.Command {
 				zerolog.SetGlobalLevel(zerolog.DebugLevel)
 			}
 
-			config, err := server.ReadMoraConfig(config_file)
+			config, err := config.ReadMoraConfig(config_file)
 			if err != nil {
 				return err
 			}

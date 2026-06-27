@@ -15,6 +15,7 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage"
 	"github.com/iszk1215/mora/render"
@@ -291,56 +292,56 @@ func (s *MoraServer) Handler() http.Handler {
 	return r
 }
 
-func initRepositoryManager(config RepositoryManagerConfig, baseURL string, store RepositoryManagerStore) (RepositoryManager, error) {
-	if config.Driver == "github" && config.URL == "" {
-		config.URL = "https://github.com"
+func initRepositoryManager(cfg config.RepositoryManagerConfig, baseURL string, store RepositoryManagerStore) (RepositoryManager, error) {
+	if cfg.Driver == "github" && cfg.URL == "" {
+		cfg.URL = "https://github.com"
 	}
 
-	if config.URL == "" {
+	if cfg.URL == "" {
 		return nil, fmt.Errorf("ConfigError: rm.url is empty")
 	}
 
-	if config.SecretFilename == "" {
+	if cfg.SecretFilename == "" {
 		return nil, fmt.Errorf("ConfigError: rm.secret_file is empty")
 	}
 
-	id, _, err := store.FindURL(config.URL)
+	id, _, err := store.FindURL(cfg.URL)
 	if err != nil {
 		return nil, err
 	}
 
 	if id < 0 {
-		id, err = store.Insert(config.Driver, config.URL)
+		id, err = store.Insert(cfg.Driver, cfg.URL)
 		if err != nil {
 			return nil, err
 		}
 		log.Info().Msgf("New repository manager is configured. ID=%d Driver=%s URL=%s",
-			id, config.Driver, config.URL)
+			id, cfg.Driver, cfg.URL)
 	} else {
 		log.Info().Msgf("repository manager enabled. ID=%d Driver=%s URL=%s",
-			id, config.Driver, config.URL)
+			id, cfg.Driver, cfg.URL)
 	}
 
-	switch config.Driver {
+	switch cfg.Driver {
 	case "gitea":
 		return NewGiteaFromFile(
 			id,
-			config.SecretFilename,
-			config.URL,
+			cfg.SecretFilename,
+			cfg.URL,
 			baseURL+"/login",
-			config.InsecureSkipVerify)
+			cfg.InsecureSkipVerify)
 	case "github":
-		return NewGithubFromFile(id, config.URL, config.SecretFilename, baseURL+"/login")
+		return NewGithubFromFile(id, cfg.URL, cfg.SecretFilename, baseURL+"/login")
 	default:
-		return nil, fmt.Errorf("ConfigError: unknown repository manager: %s", config.Driver)
+		return nil, fmt.Errorf("ConfigError: unknown repository manager: %s", cfg.Driver)
 	}
 
 }
 
-func initRepositoryManagers(config MoraConfig, store RepositoryManagerStore) ([]RepositoryManager, error) {
+func initRepositoryManagers(cfg config.MoraConfig, store RepositoryManagerStore) ([]RepositoryManager, error) {
 	repositoryManagers := []RepositoryManager{}
-	for _, rmConfig := range config.RepositoryManagers {
-		rm, err := initRepositoryManager(rmConfig, config.Server.URL, store)
+	for _, rmConfig := range cfg.RepositoryManagers {
+		rm, err := initRepositoryManager(rmConfig, cfg.Server.URL, store)
 		if err != nil {
 			return nil, fmt.Errorf("initRepositoryManager(%s): %w", rmConfig.Driver, err)
 		}
@@ -388,14 +389,14 @@ func initFrontendFileServer() (http.Handler, error) {
 	return http.FileServer(http.FS(frontendFS)), nil
 }
 
-func NewMoraServerFromConfig(config MoraConfig) (*MoraServer, error) {
-	db, rmStore, repoStore, err := initStore(config.DatabaseFilename)
+func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
+	db, rmStore, repoStore, err := initStore(cfg.DatabaseFilename)
 	if err != nil {
 		log.Err(err).Msg("initStore")
 		return nil, err
 	}
 
-	repositoryManagers, err := initRepositoryManagers(config, rmStore)
+	repositoryManagers, err := initRepositoryManagers(cfg, rmStore)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iszk1215/mora/core"
+	"github.com/iszk1215/mora/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -16,7 +16,7 @@ import (
 type (
 	udmCommand struct {
 		client *udmClient
-		config core.ClientConfig
+		config config.ClientConfig
 	}
 )
 
@@ -228,7 +228,7 @@ func (c *udmCommand) parsePersistentFlags(cmd *cobra.Command) error {
 
 	if filename, err := cmd.Flags().GetString("config"); err == nil && filename != "" {
 		if _, err := os.Stat(filename); err == nil {
-			config, err := core.ReadClientConfig(filename)
+			config, err := config.ReadClientConfig(filename)
 			if err != nil {
 				return err
 			}

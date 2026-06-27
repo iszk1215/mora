@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/core"
 	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
@@ -23,7 +24,7 @@ var (
 func newCommandWithMock(m core.APIClient, repoURL string) *udmCommand {
 	return &udmCommand{
 		client: &udmClient{client: m},
-		config: core.ClientConfig{
+		config: config.ClientConfig{
 			RepositoryURL: repoURL,
 		},
 	}
