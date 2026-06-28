@@ -79,7 +79,7 @@ describe('Header', () => {
     expect(screen.queryByText('Login/Logout')).not.toBeInTheDocument()
   })
 
-  it('renders avatar with tooltip for logged-in user', async () => {
+  it('renders avatar with Open menu tooltip for logged-in user', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -87,10 +87,37 @@ describe('Header', () => {
     render(<MemoryRouter><Header /></MemoryRouter>)
     const img = await screen.findByRole('img')
     expect(img).toHaveAttribute('src', 'https://example.com/avatar.jpg')
-    expect(img).toHaveAttribute('title', 'testuser')
-    expect(img.closest('a')).toHaveAttribute('href', '/scms')
+    expect(img).toHaveAttribute('title', 'Open menu')
     expect(screen.queryByText('testuser')).not.toBeInTheDocument()
     expect(screen.queryByText('Login')).not.toBeInTheDocument()
+  })
+
+  it('opens menu with My tracks link on avatar click', async () => {
+    const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    )
+    render(<MemoryRouter><Header /></MemoryRouter>)
+    const img = await screen.findByRole('img')
+    expect(screen.queryByText('My tracks')).not.toBeInTheDocument()
+    await img.click()
+    const link = screen.getByText('My tracks')
+    expect(link).toBeInTheDocument()
+    expect(link.closest('a')).toHaveAttribute('href', '/track')
+  })
+
+  it('closes menu when clicking My tracks', async () => {
+    const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    )
+    render(<MemoryRouter><Header /></MemoryRouter>)
+    const img = await screen.findByRole('img')
+    await img.click()
+    expect(screen.getByText('My tracks')).toBeInTheDocument()
+    const link = screen.getByText('My tracks')
+    await link.click()
+    expect(screen.queryByText('My tracks')).not.toBeInTheDocument()
   })
 
   it('renders nothing when avatar_url is empty', async () => {

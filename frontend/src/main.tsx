@@ -1,5 +1,5 @@
 import React from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
   createBrowserRouter,
@@ -163,6 +163,8 @@ export const SCMList = (): React.JSX.Element => {
 
 export const Header = (): React.JSX.Element => {
   const [user, setUser] = useState<UserData | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
 
   useEffect(() => {
@@ -176,6 +178,19 @@ export const Header = (): React.JSX.Element => {
       .catch(() => setUser(null))
   }, [location])
 
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      setMenuOpen(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen, handleClickOutside])
+
   return (
     <header className="sticky top-0 mb-2 bg-black text-white py-1">
       <div className="w-8/12 m-auto">
@@ -183,12 +198,20 @@ export const Header = (): React.JSX.Element => {
           <HeaderLink to={'/'}>Mora</HeaderLink>
           <div className="flex items-center gap-2">
             {user ? (
-              <a href="/scms" className="block">
+              <div ref={menuRef} className="relative">
                 {user.avatar_url && (
-                  <img src={user.avatar_url} className="w-6 h-6 rounded-full"
-                       title={user.username} alt={user.username} />
+                  <img src={user.avatar_url} className="w-6 h-6 rounded-full cursor-pointer"
+                       title="Open menu" alt={user.username}
+                       onClick={() => setMenuOpen(!menuOpen)} />
                 )}
-              </a>
+                {menuOpen && (
+                  <div className="absolute right-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
+                    <a href="/track"
+                       className="block px-4 py-2 hover:bg-gray-100 text-sm"
+                       onClick={() => setMenuOpen(false)}>My tracks</a>
+                  </div>
+                )}
+              </div>
             ) : (
               <HeaderLink to={'/scms'}>Login</HeaderLink>
             )}
