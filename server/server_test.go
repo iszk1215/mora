@@ -713,6 +713,74 @@ insecure_skip_verify = false
 	}
 }
 
+func TestHandleMe_Anonymous(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	userStore := NewUserStore(db)
+	require.NoError(t, userStore.Init())
+
+	server := &MoraServer{userStore: userStore}
+
+	sess := NewMoraSession()
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	r = r.WithContext(WithMoraSession(r.Context(), sess))
+	server.handleMe(w, r)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusNoContent, res.StatusCode)
+}
+
+func TestHandleMe_NoSession(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	userStore := NewUserStore(db)
+	require.NoError(t, userStore.Init())
+
+	server := &MoraServer{userStore: userStore}
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	server.handleMe(w, r)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusNoContent, res.StatusCode)
+}
+
+func TestHandleMe_LoggedIn(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	userStore := NewUserStore(db)
+	require.NoError(t, userStore.Init())
+
+	user, err := userStore.FindOrCreate("github", "12345", "testuser", "https://example.com/avatar.jpg")
+	require.NoError(t, err)
+
+	server := &MoraServer{userStore: userStore}
+
+	sess := NewMoraSession()
+	sess.SetUserID(user.ID)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	r = r.WithContext(WithMoraSession(r.Context(), sess))
+	server.handleMe(w, r)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusOK, res.StatusCode)
+
+	var got User
+	err = json.NewDecoder(res.Body).Decode(&got)
+	require.NoError(t, err)
+	require.Equal(t, user.ID, got.ID)
+	require.Equal(t, "testuser", got.Username)
+	require.Equal(t, "https://example.com/avatar.jpg", got.AvatarURL)
+}
+
 func TestTrackEndpointIsMounted(t *testing.T) {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)

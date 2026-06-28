@@ -36,7 +36,7 @@ func verifyCSRF(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(bodyToken)) == 1
 }
 
-func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
+func createLoginHandler(rm RepositoryManager, userStore UserStore, next http.Handler) http.Handler {
 	h := func(w http.ResponseWriter, r *http.Request) {
 		err := oauthErrorFrom(r.Context())
 		if err != nil {
@@ -60,6 +60,10 @@ func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 		}
 		sess.setToken(rm.ID(), *token)
 
+		if userStore != nil {
+			createUserForSession(sess, rm, token, userStore)
+		}
+
 		if csrfToken, err := generateCSRFToken(); err == nil {
 			http.SetCookie(w, &http.Cookie{
 				Name:     csrfCookieName,
@@ -78,13 +82,13 @@ func createLoginHandler(rm RepositoryManager, next http.Handler) http.Handler {
 	return rm.LoginHandler(http.HandlerFunc(h))
 }
 
-func LoginHandler(repositoryManagers []RepositoryManager, next http.Handler) http.Handler {
+func LoginHandler(repositoryManagers []RepositoryManager, userStore UserStore, next http.Handler) http.Handler {
 	r := chi.NewRouter()
 
 	handlers := map[int64]http.Handler{}
 
 	for _, rm := range repositoryManagers {
-		handlers[rm.ID()] = createLoginHandler(rm, next)
+		handlers[rm.ID()] = createLoginHandler(rm, userStore, next)
 	}
 
 	// redirect from scm

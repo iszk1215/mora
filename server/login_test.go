@@ -37,7 +37,7 @@ func (m MockLoginMiddleware) Handler(next http.Handler) http.Handler {
 
 func createTestLoginHandler(rm RepositoryManager) http.Handler {
 	next := func(w http.ResponseWriter, r *http.Request) {}
-	return LoginHandler([]RepositoryManager{rm}, http.HandlerFunc(next))
+	return LoginHandler([]RepositoryManager{rm}, nil, http.HandlerFunc(next))
 }
 
 func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request {

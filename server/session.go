@@ -28,6 +28,7 @@ type MoraSession struct {
 	tokenMap    map[int64]scm.Token      // [rmID]
 	timestamp   time.Time
 	loggingInto int64
+	userID      *int64
 }
 
 func NewMoraSession() *MoraSession {
@@ -86,6 +87,24 @@ func (s *MoraSession) IsLoggedIn() bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	return len(s.tokenMap) > 0
+}
+
+func (s *MoraSession) SetUserID(id int64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.userID = &id
+}
+
+func (s *MoraSession) UserID() *int64 {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.userID
+}
+
+func (s *MoraSession) ClearUserID() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.userID = nil
 }
 
 // Session Manager

@@ -68,6 +68,7 @@ type (
 		db                 *sqlx.DB
 		repositoryManagers []RepositoryManager
 		repos              RepositoryStore
+		userStore          UserStore
 		coverage           *coverage.CoverageService
 		udm                *udm.Service
 		track              *track.Service
@@ -153,6 +154,23 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 	}
 
 	render.JSON(w, resp, http.StatusOK)
+}
+
+func (s *MoraServer) handleMe(w http.ResponseWriter, r *http.Request) {
+	sess, ok := MoraSessionFrom(r.Context())
+	if !ok || sess.UserID() == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	user, err := s.userStore.FindByID(*sess.UserID())
+	if err != nil {
+		log.Error().Err(err).Msg("failed to find user")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	render.JSON(w, user, http.StatusOK)
 }
 
 func checkRepoAccessByRepositoryManager(session *MoraSession, rm RepositoryManager, owner, name string) error {
@@ -263,6 +281,7 @@ func (s *MoraServer) Handler() http.Handler {
 	// api
 
 	r.Get("/api/scms", s.handleRepositoryManagerList)
+	r.Get("/api/me", s.handleMe)
 
 	r.Route("/api/repos", func(r chi.Router) {
 		r.Get("/", s.handleRepoList)
@@ -289,7 +308,7 @@ func (s *MoraServer) Handler() http.Handler {
 			http.Redirect(w, r, "/scms", http.StatusSeeOther)
 		})
 
-	r.Mount("/login", LoginHandler(s.repositoryManagers, redirectHandler))
+	r.Mount("/login", LoginHandler(s.repositoryManagers, s.userStore, redirectHandler))
 	r.Mount("/logout", LogoutHandler(s.repositoryManagers, redirectHandler))
 
 	// frontend
@@ -367,7 +386,7 @@ func initRepositoryManagers(cfg config.MoraConfig, store RepositoryManagerStore)
 	return repositoryManagers, nil
 }
 
-func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, error) {
+func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, UserStore, error) {
 	log.Info().Msgf("Initialize store: filename=%s", filename)
 
 	if filename != "" && !strings.HasPrefix(filename, ":memory:") &&
@@ -376,7 +395,7 @@ func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositorySto
 	}
 	db, err := sqlx.Connect("sqlite3", filename)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("sqlx.Connect: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("sqlx.Connect: %w", err)
 	}
 	db.SetMaxOpenConns(1)
 
@@ -384,15 +403,20 @@ func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositorySto
 
 	rmStore := NewRepositoryManagerStore(db)
 	if err := rmStore.Init(); err != nil {
-		return nil, nil, nil, fmt.Errorf("rmStore.Init: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("rmStore.Init: %w", err)
 	}
 
 	repoStore := NewRepositoryStore(db)
 	if err := repoStore.Init(); err != nil {
-		return nil, nil, nil, fmt.Errorf("repoStore.Init: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("repoStore.Init: %w", err)
 	}
 
-	return db, rmStore, repoStore, nil
+	userStore := NewUserStore(db)
+	if err := userStore.Init(); err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("userStore.Init: %w", err)
+	}
+
+	return db, rmStore, repoStore, userStore, nil
 }
 
 //go:embed static
@@ -408,7 +432,7 @@ func initFrontendFileServer() (http.Handler, error) {
 }
 
 func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
-	db, rmStore, repoStore, err := initStore(cfg.DatabaseFilename)
+	db, rmStore, repoStore, userStore, err := initStore(cfg.DatabaseFilename)
 	if err != nil {
 		log.Err(err).Msg("initStore")
 		return nil, err
@@ -447,6 +471,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		sessionManager:     NewMoraSessionManager(),
 		repositoryManagers: repositoryManagers,
 		repos:              repoStore,
+		userStore:          userStore,
 		frontendFileServer: frontendFileServer,
 		coverage:           coverage,
 		udm:                udm,

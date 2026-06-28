@@ -15,7 +15,7 @@ import { RouterProvider } from 'react-router/dom'
 import 'react-datepicker/dist/react-datepicker.css'
 import './index.css'
 
-import { Repo } from './core'
+import { Repo, UserData } from './core'
 import { coverageRoute } from './coverage'
 import { udmRoute, loadUdmMetrics } from './udm'
 import { trackRoute } from './track'
@@ -161,12 +161,35 @@ export const SCMList = (): React.JSX.Element => {
 }
 
 export const Header = (): React.JSX.Element => {
+  const [user, setUser] = useState<UserData | null>(null)
+
+  useEffect(() => {
+    fetch('/api/me')
+      .then(res => {
+        if (res.status === 204) return null
+        if (res.ok) return res.json()
+        return null
+      })
+      .then((data: UserData | null) => setUser(data))
+      .catch(() => setUser(null))
+  }, [])
+
   return (
     <header className="sticky top-0 mb-2 bg-black text-white">
       <div className="w-8/12 m-auto">
         <nav className="flex justify-between">
           <HeaderLink to={'/'}>Top</HeaderLink>
-          <HeaderLink to={'/scms'}>Login/Logout</HeaderLink>
+          <div className="flex items-center gap-2">
+            {user && (
+              <>
+                {user.avatar_url && (
+                  <img src={user.avatar_url} className="w-6 h-6 rounded-full" />
+                )}
+                <span className="text-sm">{user.username}</span>
+              </>
+            )}
+            <HeaderLink to={'/scms'}>Login/Logout</HeaderLink>
+          </div>
         </nav>
       </div>
     </header>

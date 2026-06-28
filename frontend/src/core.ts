@@ -28,3 +28,11 @@ export interface FileData {
   hits: number
   lines: number
 }
+
+export interface UserData {
+  id: number
+  provider: string
+  provider_user_id: string
+  username: string
+  avatar_url: string
+}
