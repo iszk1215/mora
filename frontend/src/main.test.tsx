@@ -191,10 +191,10 @@ describe('SCMList', () => {
     vi.mocked(useLoaderData).mockReset()
   })
 
-  it('renders SCM heading', () => {
+  it('renders Login heading', () => {
     vi.mocked(useLoaderData).mockReturnValue([])
     render(<MemoryRouter><SCMList /></MemoryRouter>)
-    expect(screen.getByText('SCM')).toBeInTheDocument()
+    expect(screen.getByText('Login')).toBeInTheDocument()
   })
 
   it('renders login link for unauthenticated SCM', () => {
@@ -242,12 +242,12 @@ describe('Breadcrumbs', () => {
       },
       {
         id: '1', pathname: '/scms', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'SCM', link: '/scms' }) },
+        handle: { crumb: () => ({ label: 'login', link: '/scms' }) },
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
     expect(screen.getByText('Top')).toBeInTheDocument()
-    expect(screen.getByText('SCM')).toBeInTheDocument()
+    expect(screen.getByText('login')).toBeInTheDocument()
   })
 
   it('filters out matches without crumb handle', () => {
@@ -262,12 +262,12 @@ describe('Breadcrumbs', () => {
       },
       {
         id: '2', pathname: '/scms', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'SCM', link: '/scms' }) },
+        handle: { crumb: () => ({ label: 'login', link: '/scms' }) },
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
     expect(screen.getByText('Top')).toBeInTheDocument()
-    expect(screen.getByText('SCM')).toBeInTheDocument()
+    expect(screen.getByText('login')).toBeInTheDocument()
   })
 
   it('filters out crumbs with undefined label', () => {

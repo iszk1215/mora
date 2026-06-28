@@ -153,7 +153,7 @@ export const SCMList = (): React.JSX.Element => {
 
   return (
     <div>
-      <h1 className="text-3xl my-2">SCM</h1>
+      <h1 className="text-3xl my-2">Login</h1>
       <div>
         {items}
       </div>
@@ -296,7 +296,7 @@ const router = createBrowserRouter([
         element: <SCMList />,
         loader: loadSCMList,
         handle: {
-          crumb: (_params: Params, _data: any) => ({ label: "scm", link: "/scms" }),
+          crumb: (_params: Params, _data: any) => ({ label: "login", link: "/scms" }),
         }
       },
       {
