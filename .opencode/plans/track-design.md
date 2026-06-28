@@ -1,6 +1,7 @@
-# `/api/track` 設計書 (v7)
+# `/api/track` 設計書 (v8)
 
 - **v7**: 二重認証（Session + API Key）設計 + フロントエンド設計を追加
+- **v8**: ユーザー権限管理（track_member/track_like）、スーパーユーザー、フロントエンド閲覧/編集分離
 
 ## 概要
 
@@ -40,6 +41,21 @@ CREATE TABLE IF NOT EXISTS track_value (
     value REAL NOT NULL,
     UNIQUE(series_id, time)
 );
+
+-- v8: ユーザー権限管理
+CREATE TABLE IF NOT EXISTS track_member (
+    user_id  INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+    track_id INTEGER NOT NULL REFERENCES track(id) ON DELETE CASCADE,
+    role     TEXT NOT NULL DEFAULT 'editor',   -- 'owner' | 'editor'
+    PRIMARY KEY (user_id, track_id)
+);
+
+-- v8: ユーザーブックマーク（いいね）
+CREATE TABLE IF NOT EXISTS track_like (
+    user_id  INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+    track_id INTEGER NOT NULL REFERENCES track(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, track_id)
+);
 ```
 
 ### 時刻精度について
@@ -51,9 +67,12 @@ CREATE TABLE IF NOT EXISTS track_value (
 ### 階層構造
 
 ```
-track (id, name)
-  └── series (id, track_id, name, data_type)  — ON DELETE CASCADE
-       └── value (id, series_id, time, value)  — ON DELETE CASCADE
+user
+  ├── track_member (user_id, track_id, role)     — ON DELETE CASCADE
+  ├── track_like   (user_id, track_id)           — ON DELETE CASCADE
+  └── track (id, name)
+        └── series (id, track_id, name, data_type)   — ON DELETE CASCADE
+             └── value (id, series_id, time, value)  — ON DELETE CASCADE
 ```
 
 ### data_type
@@ -95,9 +114,17 @@ type ValueModel struct {
 ### レスポンス型（swaggo からの参照用に公開）
 
 ```go
-// ListTracksResponse は GET /api/track のレスポンス
+// v8: ユーザーごとの権限/いいね状態を含む
+type TrackResponse struct {
+    Id    int64  `json:"id"`
+    Name  string `json:"name"`
+    Role  string `json:"role"`   // "" | "owner" | "editor"（空文字=権限なし）
+    Liked bool   `json:"liked"`
+}
+
+// ListTracksResponse は GET /api/track のレスポンス (v8: TrackModel→TrackResponse)
 type ListTracksResponse struct {
-    Tracks []TrackModel `json:"tracks"`
+    Tracks []TrackResponse `json:"tracks"`
 }
 
 // ListSeriesResponse は GET /api/track/{trackId}/series のレスポンス
@@ -142,9 +169,21 @@ func seriesFrom(ctx context.Context) (SeriesModel, bool) {
     return s, ok
 }
 
+const userIDCtxKey contextKey = iota
+
 // ContextWithAuth は server パッケージから呼ばれる exported 関数
-func ContextWithAuth(ctx context.Context) context.Context {
-    return context.WithValue(ctx, authCtxKey, true)
+// v8: userID をオプションで受け取る（nil=匿名、1=superuser）
+func ContextWithAuth(ctx context.Context, userID *int64) context.Context {
+    ctx = context.WithValue(ctx, authCtxKey, true)
+    if userID != nil {
+        ctx = context.WithValue(ctx, userIDCtxKey, *userID)
+    }
+    return ctx
+}
+
+func UserIDFromContext(ctx context.Context) (int64, bool) {
+    uid, ok := ctx.Value(userIDCtxKey).(int64)
+    return uid, ok
 }
 
 func isAuthenticated(ctx context.Context) bool {
@@ -161,13 +200,15 @@ func isAuthenticated(ctx context.Context) bool {
 |--------|------|---------|-------|
 | GET | `/api/track` | 200 | - |
 | POST | `/api/track` | 201 | 400 |
-| DELETE | `/api/track/{trackId}` | 204 | 400, 404 |
+| DELETE | `/api/track/{trackId}` | 204 | 400, 403, 404 |
 | GET | `/api/track/{trackId}/series` | 200 | 400, 404 |
-| POST | `/api/track/{trackId}/series` | 201 | 400, 404 |
-| DELETE | `/api/track/{trackId}/series/{seriesId}` | 204 | 400, 404 |
+| POST | `/api/track/{trackId}/series` | 201 | 400, 403, 404 |
+| DELETE | `/api/track/{trackId}/series/{seriesId}` | 204 | 400, 403, 404 |
 | GET | `/api/track/{trackId}/series/{seriesId}/values` | 200 | 400, 404 |
-| POST | `/api/track/{trackId}/series/{seriesId}/values` | 201 | 400, 404 |
-| DELETE | `/api/track/{trackId}/series/{seriesId}/values` | 204 | 400, 404 |
+| POST | `/api/track/{trackId}/series/{seriesId}/values` | 201 | 400, 403, 404 |
+| DELETE | `/api/track/{trackId}/series/{seriesId}/values` | 204 | 400, 403, 404 |
+| POST | `/api/track/{trackId}/like` | 201 | 400, 404 |
+| DELETE | `/api/track/{trackId}/like` | 204 | 400, 404 |
 
 - POST は全エンドポイント **201 Created**
 - DELETE は **204 No Content**
@@ -192,12 +233,12 @@ func isAuthenticated(ctx context.Context) bool {
 
 ### Track
 
-#### GET /api/track — 全トラック一覧
+#### GET /api/track — トラック一覧 (v8: ユーザーごとにフィルタ)
 
 ```go
 // ListTracks godoc
-// @Summary      全トラックを取得
-// @Description  登録されている全てのトラックを返す
+// @Summary      トラック一覧を取得
+// @Description  現在のユーザーに関連するトラックを返す（所有/編集者/いいね済み）
 // @Tags         track
 // @Success      200  {object}  track.ListTracksResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -205,12 +246,17 @@ func isAuthenticated(ctx context.Context) bool {
 func (h *trackHandler) listTracks(w http.ResponseWriter, r *http.Request) {
 ```
 
+ログイン中ユーザー: `userID` で `track_member` / `track_like` を JOIN した結果を返す。
+スーパーユーザー (userID=1): 全トラックを role="owner" で返す。
+匿名ユーザー (userID=nil): 空配列を返す。
+
 Response 200:
 ```json
 {
     "tracks": [
-        { "id": 1, "name": "build_metrics" },
-        { "id": 2, "name": "performance" }
+        { "id": 1, "name": "build_metrics", "role": "owner", "liked": false },
+        { "id": 2, "name": "performance",   "role": "",     "liked": true  },
+        { "id": 3, "name": "uptime",        "role": "editor","liked": false }
     ]
 }
 ```
@@ -268,6 +314,49 @@ func (h *trackHandler) deleteTrack(w http.ResponseWriter, r *http.Request) {
 ```
 
 - `trackId` 非数値 → 400, 存在しない → 404
+- **v8**: 権限チェック（track_member に含まれない && userID != 1 → 403）
+
+---
+
+### Like (v8)
+
+#### POST /api/track/{trackId}/like — いいね
+
+```go
+// CreateLike godoc
+// @Summary      トラックにいいね
+// @Description  指定されたトラックに現在のユーザーのいいねを追加する
+// @Tags         track
+// @Param        trackId  path  int  true  "Track ID"
+// @Success      201
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/track/{trackId}/like [post]
+func (h *trackHandler) likeTrack(w http.ResponseWriter, r *http.Request) {
+```
+
+- userID が nil → 401
+- 重複いいねは 201 で正常終了（INSERT OR IGNORE）
+
+#### DELETE /api/track/{trackId}/like — いいね解除
+
+```go
+// DeleteLike godoc
+// @Summary      いいねを解除
+// @Description  指定されたトラックの現在のユーザーのいいねを削除する
+// @Tags         track
+// @Param        trackId  path  int  true  "Track ID"
+// @Success      204
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/track/{trackId}/like [delete]
+func (h *trackHandler) unlikeTrack(w http.ResponseWriter, r *http.Request) {
+```
+
+- userID が nil → 401
+- 存在しないいいねの解除は 204 で正常終了
 
 ---
 
@@ -452,22 +541,24 @@ func (h *trackHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 
 ---
 
-## 認証 (二重認証: Session + API Key)
+## 認証・認可 (v8)
+
+### 認証方式
 
 `track` パッケージ内で 2 つの認証方式をサポート:
 
-1. **Session auth** — 既存の `SessionMiddleware` 経由。server 側の `requireTrackAuth` middleware が session 確認後、context にフラグをセット
-2. **API Key (Bearer)** — 従来通り。`Authorization: Bearer <token>` ヘッダで検証
+1. **Session auth** — 既存の `SessionMiddleware` 経由。server 側の `requireTrackAuth` middleware が session 確認後、context に userID をセット
+2. **API Key (Bearer)** — `Authorization: Bearer <token>` ヘッダで検証。API Key = スーパーユーザー (userID=1)
 
 ### 判定フロー
 
 ```
 1. Context に session auth フラグあり？
-   → Yes: allow（SessionMiddleware 経由のログインユーザー）
+   → Yes: allow（userID は session.UserID()）
 2. API Key 未設定（h.apiKey == ""）？
-   → Yes: allow（認証不要モード）
+   → Yes: allow（userID=nil、匿名アクセス、編集不可）
 3. Bearer token が h.apiKey と一致？
-   → Yes: allow（API Key 認証）
+   → Yes: allow（userID=1、スーパーユーザー、全権限）
 4. → 401 Unauthorized
 ```
 
@@ -476,19 +567,20 @@ func (h *trackHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 ```go
 func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // 1. Session auth 済み
         if isAuthenticated(r.Context()) {
             next.ServeHTTP(w, r)
             return
         }
-        // 2. API Key 未設定 → 認証不要
         if h.apiKey == "" {
+            r = r.WithContext(ContextWithAuth(r.Context(), nil))
             next.ServeHTTP(w, r)
             return
         }
-        // 3. Bearer token 確認
         token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
         if token == h.apiKey {
+            // API key = スーパーユーザー
+            var uid int64 = 1
+            r = r.WithContext(ContextWithAuth(r.Context(), &uid))
             next.ServeHTTP(w, r)
             return
         }
@@ -497,36 +589,54 @@ func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
 }
 ```
 
-- `apiKey` は `NewService(db, apiKey)` → `Service` → `trackHandler` へ受け渡し（従来通り）
-- `isAuthenticated()` は context の `authCtxKey` フラグを確認（server 側の `requireTrackAuth` がセット）
-- 両方式は排他でなく、同時に使える
+- 認証成功時に `ContextWithAuth(ctx, &userID)` を呼び、context に auth フラグ＋userID を設定
+- スーパーユーザー (userID=1) は全トラックに対して全操作（編集・削除）が可能
 
 ### requireTrackAuth (server/server.go)
 
-session 認証を通ったユーザーに context フラグを付与する middleware。`SessionMiddleware` より後、track handler の前に配置する。
+session 認証を通ったユーザーに context の userID を付与する middleware。
 
 ```go
 func (s *MoraServer) requireTrackAuth(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         sess, ok := MoraSessionFrom(r.Context())
         if ok && sess.IsLoggedIn() {
-            r = r.WithContext(track.ContextWithAuth(r.Context()))
+            r = r.WithContext(track.ContextWithAuth(r.Context(), sess.UserID()))
         }
         next.ServeHTTP(w, r)
     })
 }
 ```
 
-### IsLoggedIn (server/session.go)
+### ユーザー種別
 
-`MoraSession` に追加するメソッド。1 つ以上の SCM にログイン済みかを判定する。
+| 種別 | userID | 権限 |
+|------|--------|------|
+| スーパーユーザー | 1 | 全トラック編集・削除可能（API Key 認証時） |
+| ログインユーザー | 2+ | 所有/編集者トラックのみ編集・削除可能 |
+| 匿名ユーザー | nil | 参照のみ（API Key 未設定かつ未ログインの場合） |
+
+### 編集権限チェック
+
+編集系エンドポイント（POST/DELETE series, values, DELETE track）では以下のチェックを行う:
+
+```
+1. userID == 1 → allow（スーパーユーザー）
+2. track_member に (userID, trackID) が存在 → allow（role 不問）
+3. → 403 Forbidden
+```
+
+Like 系エンドポイントは userID==nil の場合 401。userID があれば誰でも実行可能。
+
+### スーパーユーザー seed
+
+`userStore.Init()` で `user` テーブルに id=1 のレコードを seed する:
 
 ```go
-func (s *MoraSession) IsLoggedIn() bool {
-    s.lock.Lock()
-    defer s.lock.Unlock()
-    return len(s.tokenMap) > 0
-}
+_, err := s.db.Exec(
+    `INSERT OR IGNORE INTO user (id, provider, provider_user_id, username, avatar_url)
+     VALUES (1, 'system', 'superuser', 'admin', '')`,
+)
 ```
 
 ---
@@ -547,6 +657,8 @@ func newHandler(store *trackStore, apiKey string) http.Handler {
         r.Route("/{trackId}", func(r chi.Router) {
             r.Use(h.injectTrack)
             r.Delete("/", h.deleteTrack)
+            r.Post("/like", h.likeTrack)       // v8
+            r.Delete("/like", h.unlikeTrack)   // v8
 
             r.Route("/series", func(r chi.Router) {
                 r.Get("/", h.listSeries)
@@ -606,9 +718,9 @@ var (
 Store メソッド一覧:
 
 ```go
-// Track
-addTrack(track *TrackModel) error
-listTracks() ([]TrackModel, error)
+// Track (v8: userID を引数に取るものあり)
+addTrack(track *TrackModel, userID int64) error  // 作成者を track_member(role=owner) に追加
+listTracks(userID int64) ([]TrackResponse, error)  // ユーザーの所有/いいね済みトラックを返す
 findTrackById(id int64) (*TrackModel, error)
 deleteTrack(id int64) error
 
@@ -622,6 +734,13 @@ deleteSeries(id int64) error
 addValue(value *ValueModel) error
 listValues(seriesId int64, limit int) ([]ValueModel, error)  // limit: 0 means no limit
 deleteValues(seriesId int64) error
+
+// Member (v8)
+isMember(userID, trackID int64) (bool, string, error)  // 存在確認 + role 取得
+
+// Like (v8)
+addLike(userID, trackID int64) error
+removeLike(userID, trackID int64) error
 ```
 
 ### `track/handler.go` — HTTP ハンドラ
@@ -728,84 +847,114 @@ func (s *Service) Handler() http.Handler {
 
 ---
 
-## フロントエンド設計
+## フロントエンド設計 (v8)
 
 ### ルート構成
 
 top-level (`/track`、repo 非依存、`/scms` と同列):
 
-| Path | Page | 説明 |
-|------|------|------|
-| `/track` | TrackList | 全トラック一覧、作成/削除 |
-| `/track/:trackId` | TrackDetail | シリーズ一覧 + チャート + 値追加 |
+| Path | Page | 説明 | 編集権限 |
+|------|------|------|---------|
+| `/track` | TrackListView | 「My Tracks」「Liked Tracks」セクション分け一覧 | なし |
+| `/track/:trackId` | TrackDetailView | トラック詳細（閲覧のみ＋Likeボタン） | なし |
+| `/track/:trackId/edit` | TrackDetailEdit | トラック詳細（編集用） | role 必須 |
 
-`main.tsx` に `trackRoute` として登録（`udmRoute`/`coverageRoute` と同パターン）。
+`main.tsx` に `trackRoute` として登録:
+
+```typescript
+export const trackRoute = [
+  { index: true, element: <TrackListView />, loader: loadTrackList },
+  {
+    path: ':trackId',
+    loader: loadTrackDetail,
+    handle: { crumb: (p, d) => ({ label: d?.track?.name ?? 'Track' }) },
+    children: [
+      { index: true, element: <TrackDetailView /> },
+      {
+        path: 'edit',
+        element: <TrackDetailEdit />,
+        handle: { crumb: () => ({ label: 'Edit' }) },
+      },
+    ],
+  },
+]
+```
 
 ### ファイル: `frontend/src/track.tsx`
 
 #### 型定義（バックエンド JSON と一致）
 
 ```typescript
-interface TrackModel  { id: number; name: string }
+// v8: role/liked 追加
+interface TrackModel  { id: number; name: string; role: string; liked: boolean }
 interface SeriesModel { id: number; track_id: number; name: string; data_type: string }
 interface ValueModel  { time: string; value: number }
 ```
 
-#### API 関数（Udm と同様の fetch パターン）
+#### API 関数
 
-| 関数 | Method | Path |
-|------|--------|------|
-| `listTracks()` | GET | `/api/track` |
-| `createTrack(name)` | POST | `/api/track` |
-| `deleteTrack(id)` | DELETE | `/api/track/{id}` |
-| `listSeries(trackId)` | GET | `/api/track/{id}/series` |
-| `createSeries(trackId, name, dataType?)` | POST | `/api/track/{id}/series` |
-| `deleteSeries(trackId, seriesId)` | DELETE | `/api/track/{id}/series/{seriesId}` |
-| `listValues(seriesId, limit?)` | GET | `/api/track/{id}/series/{id}/values?limit=N` |
-| `createValue(seriesId, time, value)` | POST | `/api/track/{id}/series/{id}/values` |
-| `deleteValues(trackId, seriesId)` | DELETE | `/api/track/{id}/series/{id}/values` |
+| 関数 | Method | Path | v8変更 |
+|------|--------|------|--------|
+| `listTracks()` | GET | `/api/track` | 戻り値に role/liked 追加 |
+| `createTrack(name)` | POST | `/api/track` | 変更なし |
+| `deleteTrack(id)` | DELETE | `/api/track/{id}` | 変更なし |
+| `likeTrack(trackId)` | POST | `/api/track/{id}/like` | **新規** |
+| `unlikeTrack(trackId)` | DELETE | `/api/track/{id}/like` | **新規** |
+| その他 series/value系 | — | — | 変更なし |
 
-#### 認証
+#### TrackListView (`/track`)
 
-Session cookie で自動認証。バックエンドの `SessionMiddleware` + `requireTrackAuth` + `requireAuth` がチェーンで処理。フロントエンド側で API key を扱う必要なし。
+役割別にセクション分け:
 
-#### TrackList Page (`/track`)
+```
+┌─ My Tracks ────────────────────────┐
+│  Track A (owner)          [Edit]   │
+│  Track B (editor)         [Edit]   │
+└────────────────────────────────────┘
+┌─ Liked Tracks ─────────────────────┐
+│  Track C                  [View]   │
+│  Track D                  [View]   │
+└────────────────────────────────────┘
+```
 
-- `<h1>Tracks</h1>` + インラインフォーム（name input + "Add Track" button）
-- shadcn `<Table>` で一覧表示
-- 各行: トラック名（`<Link to={/track/${id}}>`）+ 削除 `<Button>`
+- `role != ""` → "My Tracks"、`liked=true && role==""` → "Liked Tracks"
+- `role != "" && liked=true` → "My Tracks" のみ（liked は冗長）
 - Loader: `listTracks()`
 
-#### TrackDetail Page (`/track/:trackId`)
+#### TrackDetailView (`/track/:trackId`)
 
 - パンくず: Top > Track > `track.name`
-- シリーズ一覧（table + create form）
-- 全シリーズを重ねた ECharts 折れ線チャート 1枚（UdmChart と同パターン）
-- 値追加フォーム（`<input type="datetime-local">` + value input + "Add" button）
-- 日付範囲フィルター（DatePicker、Udm と同じ `react-datepicker`）
-- Loader: `listSeries(trackId)` → `useEffect` で全 series の values を client-side fetch
+- track 名の横に Like/Unlike ボタン（user がいる場合のみ）
+- 系列一覧テーブル（表示のみ、編集ボタンなし）
+- 全シリーズを重ねた ECharts 折れ線チャート 1枚
+- 日付範囲フィルター（DatePicker、`react-datepicker`）
+- `role != ""` の場合: 「Edit」リンク表示 → `/track/:trackId/edit`
+- Loader: `loadTrackDetail`（既存の `listSeries`）
+
+#### TrackDetailEdit (`/track/:trackId/edit`)
+
+- パンくず: Top > Track > `track.name` > Edit
+- 現在の TrackDetail（系列作成・削除、値追加・削除）を移設
+- `role == ""` でアクセス: リダイレクト or 404 表示
 
 ---
 
-## 実装順序
+## 実装順序 (v8)
 
 ### バックエンド
 
-1. `track/store.go` — テーブル作成 + CRUD
-2. `track/store_test.go` — Store テスト
-3. `track/handler.go` — ハンドラ + ルーター + ミドルウェア（二重認証） + exported types + swaggo コメント
-4. `track/handler_test.go` — Handler テスト（Session auth + API Key）
-5. `track/service.go` — Service ラッパー
-6. `server/session.go` — `IsLoggedIn()` 追加
-7. `server/server.go` — 変更（import, field, init, `requireTrackAuth`, mount）
-8. `server/server_test.go` — 統合テスト追加
-9. `docs/track-design.md` & `.opencode/plans/track-design.md` — v7 で更新
-10. `go build ./...` でビルド確認
-11. `make test` で全テスト実行
+1. `server/user.go` — `Init()` に superuser (id=1) seed を追加
+2. `track/store.go` — `track_member`/`track_like` スキーマ追加、`TrackResponse` 型追加、既存メソッド変更 + 新規メソッド追加
+3. `track/store_test.go` — 新規メソッドのテスト追加
+4. `track/handler.go` — `ContextWithAuth` シグネチャ変更、`requireAuth` に userID 設定追加、編集権限チェック追加、`likeTrack`/`unlikeTrack` 追加、ルーター更新
+5. `track/handler_test.go` — 権限チェック/Like のテスト追加
+6. `server/server.go` — `requireTrackAuth` に userID 受け渡し追加
+7. `server/server_test.go` — 統合テスト更新
+8. `go build ./... && make test`
 
 ### フロントエンド
 
-12. `frontend/src/track.tsx` — コンポーネント + loaders + API functions
-13. `frontend/src/main.tsx` — `trackRoute` をインポートして登録
-14. `frontend/src/track.test.tsx` — コンポーネントテスト
-15. `make frontend-test` & `go build ./...` で確認
+9. `frontend/src/track.tsx` — `TrackListView`/`TrackDetailView`/`TrackDetailEdit` に分割、like/unlike API 追加
+10. `frontend/src/main.tsx` — ルート定義更新（view/edit 分離 + パンくず）
+11. `frontend/src/track.test.tsx` — テスト更新
+12. `make frontend-test && go build ./...`
