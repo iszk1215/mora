@@ -79,7 +79,7 @@ export async function loadMetricItems({ params }: LoaderFunctionArgs): Promise<R
   const url = `/api/repos/${params.repo_id}/udm/metrics/${params.metric_id}/items`
   const resp = await fetch(url)
   if (resp.status == 403) {
-    return redirect("/login")
+    return redirect("/scms")
   }
 
   if (!resp.ok)

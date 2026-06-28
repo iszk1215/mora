@@ -88,7 +88,7 @@ describe('Header', () => {
     const img = await screen.findByRole('img')
     expect(img).toHaveAttribute('src', 'https://example.com/avatar.jpg')
     expect(img).toHaveAttribute('title', 'testuser')
-    expect(img.closest('a')).toHaveAttribute('href', '/login')
+    expect(img.closest('a')).toHaveAttribute('href', '/scms')
     expect(screen.queryByText('testuser')).not.toBeInTheDocument()
     expect(screen.queryByText('Login')).not.toBeInTheDocument()
   })
@@ -242,7 +242,7 @@ describe('Breadcrumbs', () => {
       },
       {
         id: '1', pathname: '/scms', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'login', link: '/login' }) },
+        handle: { crumb: () => ({ label: 'login', link: '/scms' }) },
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
@@ -262,7 +262,7 @@ describe('Breadcrumbs', () => {
       },
       {
         id: '2', pathname: '/scms', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'login', link: '/login' }) },
+        handle: { crumb: () => ({ label: 'login', link: '/scms' }) },
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)

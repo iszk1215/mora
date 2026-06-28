@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
   createBrowserRouter,
-  Navigate,
   Outlet,
   Params,
   isRouteErrorResponse,
@@ -184,14 +183,14 @@ export const Header = (): React.JSX.Element => {
           <HeaderLink to={'/'}>Mora</HeaderLink>
           <div className="flex items-center gap-2">
             {user ? (
-              <a href="/login" className="block">
+              <a href="/scms" className="block">
                 {user.avatar_url && (
                   <img src={user.avatar_url} className="w-6 h-6 rounded-full"
                        title={user.username} alt={user.username} />
                 )}
               </a>
             ) : (
-              <HeaderLink to={'/login'}>Login</HeaderLink>
+              <HeaderLink to={'/scms'}>Login</HeaderLink>
             )}
           </div>
         </nav>
@@ -294,14 +293,10 @@ const router = createBrowserRouter([
       },
       {
         path: '/scms',
-        element: <Navigate to="/login" replace />,
-      },
-      {
-        path: '/login',
         element: <SCMList />,
         loader: loadSCMList,
         handle: {
-          crumb: (_params: Params, _data: any) => ({ label: "login", link: "/login" }),
+          crumb: (_params: Params, _data: any) => ({ label: "login", link: "/scms" }),
         }
       },
       {
