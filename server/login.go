@@ -160,6 +160,7 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 		for _, rm := range repositoryManagers {
 			s.Remove(rm.ID())
 		}
+		s.ClearUserID()
 		next.ServeHTTP(w, r)
 	})
 
@@ -183,6 +184,7 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 			return
 		}
 		s.Remove(rm_id)
+		s.ClearUserID()
 		next.ServeHTTP(w, r)
 	})
 

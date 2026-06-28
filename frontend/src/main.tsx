@@ -8,6 +8,7 @@ import {
   isRouteErrorResponse,
   ScrollRestoration,
   useLoaderData,
+  useLocation,
   useMatches,
   useRouteError,
 } from 'react-router'
@@ -162,6 +163,7 @@ export const SCMList = (): React.JSX.Element => {
 
 export const Header = (): React.JSX.Element => {
   const [user, setUser] = useState<UserData | null>(null)
+  const location = useLocation()
 
   useEffect(() => {
     fetch('/api/me')
@@ -172,7 +174,7 @@ export const Header = (): React.JSX.Element => {
       })
       .then((data: UserData | null) => setUser(data))
       .catch(() => setUser(null))
-  }, [])
+  }, [location])
 
   return (
     <header className="sticky top-0 mb-2 bg-black text-white">
