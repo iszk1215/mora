@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData, useRouteError, useMatches, isRouteErrorResponse } from 'react-router'
 import { RepoList, SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs } from './main'
@@ -68,36 +68,42 @@ describe('Header', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders navigation links for anonymous user', async () => {
+  it('renders Login link for anonymous user', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(null, { status: 204 })
     )
     render(<MemoryRouter><Header /></MemoryRouter>)
     expect(screen.getByText('Top')).toBeInTheDocument()
-    const loginLogout = await screen.findByText('Login/Logout')
-    expect(loginLogout).toBeInTheDocument()
-    expect(screen.queryByText('testuser')).not.toBeInTheDocument()
+    const login = await screen.findByText('Login')
+    expect(login).toBeInTheDocument()
+    expect(screen.queryByText('Login/Logout')).not.toBeInTheDocument()
   })
 
-  it('renders username and avatar for logged-in user', async () => {
+  it('renders avatar with tooltip for logged-in user', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
     )
     render(<MemoryRouter><Header /></MemoryRouter>)
-    expect(await screen.findByText('testuser')).toBeInTheDocument()
-    const img = screen.getByRole('img')
+    const img = await screen.findByRole('img')
     expect(img).toHaveAttribute('src', 'https://example.com/avatar.jpg')
+    expect(img).toHaveAttribute('title', 'testuser')
+    expect(img.closest('a')).toHaveAttribute('href', '/scms')
+    expect(screen.queryByText('testuser')).not.toBeInTheDocument()
+    expect(screen.queryByText('Login')).not.toBeInTheDocument()
   })
 
-  it('renders without avatar when avatar_url is empty', async () => {
+  it('renders nothing when avatar_url is empty', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
     )
     render(<MemoryRouter><Header /></MemoryRouter>)
-    expect(await screen.findByText('testuser')).toBeInTheDocument()
-    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    })
+    expect(screen.queryByText('testuser')).not.toBeInTheDocument()
+    expect(screen.queryByText('Login')).not.toBeInTheDocument()
   })
 })
 

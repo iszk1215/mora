@@ -182,15 +182,16 @@ export const Header = (): React.JSX.Element => {
         <nav className="flex justify-between">
           <HeaderLink to={'/'}>Top</HeaderLink>
           <div className="flex items-center gap-2">
-            {user && (
-              <>
+            {user ? (
+              <a href="/scms" className="block">
                 {user.avatar_url && (
-                  <img src={user.avatar_url} className="w-6 h-6 rounded-full" />
+                  <img src={user.avatar_url} className="w-6 h-6 rounded-full"
+                       title={user.username} alt={user.username} />
                 )}
-                <span className="text-sm">{user.username}</span>
-              </>
+              </a>
+            ) : (
+              <HeaderLink to={'/scms'}>Login</HeaderLink>
             )}
-            <HeaderLink to={'/scms'}>Login/Logout</HeaderLink>
           </div>
         </nav>
       </div>
