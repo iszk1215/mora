@@ -73,7 +73,7 @@ describe('Header', () => {
       new Response(null, { status: 204 })
     )
     render(<MemoryRouter><Header /></MemoryRouter>)
-    expect(screen.getByText('Top')).toBeInTheDocument()
+    expect(screen.getByText('Mora')).toBeInTheDocument()
     const login = await screen.findByText('Login')
     expect(login).toBeInTheDocument()
     expect(screen.queryByText('Login/Logout')).not.toBeInTheDocument()

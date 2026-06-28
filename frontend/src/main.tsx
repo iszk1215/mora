@@ -180,7 +180,7 @@ export const Header = (): React.JSX.Element => {
     <header className="sticky top-0 mb-2 bg-black text-white py-1">
       <div className="w-8/12 m-auto">
         <nav className="flex justify-between">
-          <HeaderLink to={'/'}>Top</HeaderLink>
+          <HeaderLink to={'/'}>Mora</HeaderLink>
           <div className="flex items-center gap-2">
             {user ? (
               <a href="/scms" className="block">
