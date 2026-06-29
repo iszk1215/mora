@@ -222,7 +222,6 @@ export const Header = (): React.JSX.Element => {
                               input.value = match[1]
                               e.currentTarget.appendChild(input)
                             }
-                            setMenuOpen(false)
                           }}>
                       <button type="submit"
                               className="block w-full text-left px-4 py-2 hover:bg-gray-100 text-sm">
