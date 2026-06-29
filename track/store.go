@@ -295,6 +295,16 @@ func (s *trackStore) removeLike(userID, trackID int64) error {
 	return nil
 }
 
+func (s *trackStore) isLiked(userID, trackID int64) (bool, error) {
+	query := "SELECT COUNT(*) FROM track_like WHERE user_id = ? AND track_id = ?"
+	var count int
+	err := s.db.Get(&count, query, userID, trackID)
+	if err != nil {
+		return false, fmt.Errorf("isLiked select: %w", err)
+	}
+	return count > 0, nil
+}
+
 // ----------------------------------------------------------------------
 // Init
 

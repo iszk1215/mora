@@ -58,7 +58,7 @@ type (
 	}
 
 	ListSeriesResponse struct {
-		Track  TrackModel    `json:"track"`
+		Track  TrackResponse `json:"track"`
 		Series []SeriesModel `json:"series"`
 	}
 
@@ -289,8 +289,20 @@ func (h *trackHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	trackResp := TrackResponse{Id: track.Id, Name: track.Name}
+	if uid, ok := UserIDFromContext(r.Context()); ok {
+		_, role, err := h.store.isMember(uid, track.Id)
+		if err == nil {
+			trackResp.Role = role
+		}
+		liked, err := h.store.isLiked(uid, track.Id)
+		if err == nil {
+			trackResp.Liked = liked
+		}
+	}
+
 	resp := ListSeriesResponse{
-		Track:  track,
+		Track:  trackResp,
 		Series: series,
 	}
 

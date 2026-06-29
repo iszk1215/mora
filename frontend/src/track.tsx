@@ -20,11 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-
-interface TrackModel {
-  id: number
-  name: string
-}
+import { TrackResponse } from './core'
 
 interface SeriesModel {
   id: number
@@ -43,14 +39,30 @@ interface SeriesValues {
   values: ValueModel[]
 }
 
-async function listTracks(): Promise<TrackModel[]> {
+interface Dataset {
+  data: Array<{ x: string; y: string }>
+  label: string
+}
+
+interface TrackChartProps {
+  data?: { datasets: Dataset[] }
+  min?: Date | null
+  max?: Date | null
+}
+
+interface TrackDetailData {
+  track: TrackResponse
+  series: SeriesModel[]
+}
+
+async function listTracks(): Promise<TrackResponse[]> {
   const resp = await fetch('/api/track')
   if (!resp.ok) throw resp
   const data = await resp.json()
   return data.tracks ?? []
 }
 
-async function createTrack(name: string): Promise<TrackModel> {
+async function createTrack(name: string): Promise<TrackResponse> {
   const resp = await fetch('/api/track', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,7 +77,7 @@ async function deleteTrack(id: number): Promise<void> {
   if (!resp.ok) throw resp
 }
 
-async function listSeries(trackId: number): Promise<{ track: TrackModel; series: SeriesModel[] }> {
+async function listSeries(trackId: number): Promise<TrackDetailData> {
   const resp = await fetch(`/api/track/${trackId}/series`)
   if (!resp.ok) throw resp
   return resp.json()
@@ -100,104 +112,23 @@ async function deleteValues(trackId: number, seriesId: number): Promise<void> {
   if (!resp.ok) throw resp
 }
 
-export async function loadTrackList(): Promise<TrackModel[]> {
+async function likeTrack(trackId: number): Promise<void> {
+  const resp = await fetch(`/api/track/${trackId}/like`, { method: 'POST' })
+  if (!resp.ok) throw resp
+}
+
+async function unlikeTrack(trackId: number): Promise<void> {
+  const resp = await fetch(`/api/track/${trackId}/like`, { method: 'DELETE' })
+  if (!resp.ok) throw resp
+}
+
+export async function loadTrackList(): Promise<TrackResponse[]> {
   return listTracks()
 }
 
-export async function loadTrackDetail({ params }: LoaderFunctionArgs): Promise<{ track: TrackModel; series: SeriesModel[] }> {
+export async function loadTrackDetail({ params }: LoaderFunctionArgs): Promise<TrackDetailData> {
   if (!params.trackId) throw new Error('trackId is required')
   return listSeries(parseInt(params.trackId))
-}
-
-export const TrackList = (): React.JSX.Element => {
-  const initial = useLoaderData() as TrackModel[]
-  const [tracks, setTracks] = useState<TrackModel[]>(initial)
-  const [newName, setNewName] = useState('')
-
-  const handleCreate = async () => {
-    if (!newName.trim()) return
-    try {
-      const created = await createTrack(newName.trim())
-      setTracks((prev) => [...prev, created])
-      setNewName('')
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleDelete = async (id: number) => {
-    try {
-      await deleteTrack(id)
-      setTracks((prev) => prev.filter((t) => t.id !== id))
-    } catch {
-      // ignore
-    }
-  }
-
-  return (
-    <div>
-      <h1 className="text-3xl my-4">Tracks</h1>
-
-      <div className="flex items-center gap-2 mb-4">
-        <input
-          type="text"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="New track name"
-          className="border rounded px-2 py-1"
-          onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
-        />
-        <Button onClick={handleCreate} disabled={!newName.trim()}>Add Track</Button>
-      </div>
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead className="w-24">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tracks.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={2} className="text-center text-muted-foreground">
-                No tracks yet
-              </TableCell>
-            </TableRow>
-          ) : (
-            tracks.map((t) => (
-              <TableRow key={t.id}>
-                <TableCell>
-                  <Link
-                    to={`/track/${t.id}`}
-                    className="text-blue-600 dark:text-blue-500 hover:underline"
-                  >
-                    {t.name}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(t.id)}>
-                    Delete
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  )
-}
-
-interface Dataset {
-  data: Array<{ x: string; y: string }>
-  label: string
-}
-
-interface TrackChartProps {
-  data?: { datasets: Dataset[] }
-  min?: Date | null
-  max?: Date | null
 }
 
 const TrackChart = (params: TrackChartProps): React.JSX.Element => {
@@ -235,9 +166,246 @@ const TrackChart = (params: TrackChartProps): React.JSX.Element => {
   )
 }
 
-export const TrackDetail = (): React.JSX.Element => {
-  const data = useLoaderData() as { track: TrackModel; series: SeriesModel[] }
-  const track = data.track
+export const TrackListView = (): React.JSX.Element => {
+  const initial = useLoaderData() as TrackResponse[]
+  const [tracks, setTracks] = useState<TrackResponse[]>(initial)
+  const [newName, setNewName] = useState('')
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return
+    try {
+      const created = await createTrack(newName.trim())
+      setTracks((prev) => [...prev, created])
+      setNewName('')
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteTrack(id)
+      setTracks((prev) => prev.filter((t) => t.id !== id))
+    } catch {
+      // ignore
+    }
+  }
+
+  const myTracks = tracks.filter((t) => t.role !== '')
+  const likedTracks = tracks.filter((t) => t.liked)
+
+  const userCanCreate = tracks.some((t) => t.role !== '' || t.liked)
+
+  const renderTrackTable = (rows: TrackResponse[], showActions: boolean) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Name</TableHead>
+          {showActions && <TableHead className="w-24">Actions</TableHead>}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={showActions ? 2 : 1} className="text-center text-muted-foreground">
+              None
+            </TableCell>
+          </TableRow>
+        ) : (
+          rows.map((t) => (
+            <TableRow key={t.id}>
+              <TableCell>
+                <Link
+                  to={`/track/${t.id}`}
+                  className="text-blue-600 dark:text-blue-500 hover:underline"
+                >
+                  {t.name}
+                </Link>
+                {t.liked && <span className="ml-2 text-sm text-muted-foreground">&#9829;</span>}
+              </TableCell>
+              {showActions && (
+                <TableCell>
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(t.id)}>
+                    Delete
+                  </Button>
+                </TableCell>
+              )}
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  )
+
+  return (
+    <div>
+      <h1 className="text-3xl my-4">Tracks</h1>
+
+      {userCanCreate && (
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New track name"
+            className="border rounded px-2 py-1"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
+          />
+          <Button onClick={handleCreate} disabled={!newName.trim()}>Add Track</Button>
+        </div>
+      )}
+
+      {myTracks.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-xl my-2">My Tracks</h2>
+          {renderTrackTable(myTracks, true)}
+        </div>
+      )}
+
+      <div>
+        <h2 className="text-xl my-2">Liked Tracks</h2>
+        {renderTrackTable(likedTracks, false)}
+      </div>
+    </div>
+  )
+}
+
+export const TrackDetailView = (): React.JSX.Element => {
+  const data = useLoaderData() as TrackDetailData
+  const { track } = data
+  const [seriesList] = useState<SeriesModel[]>(data.series)
+  const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
+  const [liked, setLiked] = useState(track.liked)
+  const [likeLoading, setLikeLoading] = useState(false)
+
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  const [endDate, setEndDate] = useState<Date | null>(null)
+
+  useEffect(() => {
+    Promise.all(
+      seriesList.map((s) =>
+        fetch(`/api/track/${track.id}/series/${s.id}/values`)
+          .then((r) => r.json() as Promise<{ values: ValueModel[] }>)
+          .then((d) => ({ series: s, values: d.values ?? [] }))
+      )
+    ).then(setSeriesValues).catch(() => {})
+  }, [seriesList, track.id])
+
+  const handleLikeToggle = async () => {
+    setLikeLoading(true)
+    try {
+      if (liked) {
+        await unlikeTrack(track.id)
+        setLiked(false)
+      } else {
+        await likeTrack(track.id)
+        setLiked(true)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLikeLoading(false)
+    }
+  }
+
+  const valuesToDataset = (sv: SeriesValues) => ({
+    data: sv.values.map((v: ValueModel) => ({ x: v.time, y: String(v.value) })),
+    label: sv.series.name,
+  })
+
+  const datasets: Dataset[] = seriesValues.map(valuesToDataset)
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <Link to="/track" className="text-blue-600 dark:text-blue-500 hover:underline">
+          &larr; Back to Tracks
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-3 my-4">
+        <h1 className="text-3xl">{track.name}</h1>
+        <Button
+          variant={liked ? 'default' : 'secondary'}
+          size="sm"
+          onClick={handleLikeToggle}
+          disabled={likeLoading}
+        >
+          {liked ? 'Unlike' : 'Like'}
+        </Button>
+        {track.role !== '' && (
+          <Button variant="outline" size="sm" asChild>
+            <Link to={`/track/${track.id}/edit`}>Edit</Link>
+          </Button>
+        )}
+      </div>
+
+      {/* Chart */}
+      <h2 className="text-xl my-2">Chart</h2>
+
+      <div className="pt-2 flex items-center mb-2">
+        <span className="mr-1">From</span>
+        <div className="w-1/4">
+          <DatePicker
+            selected={startDate}
+            onChange={(d: Date | null) => setStartDate(d)}
+            className="border rounded px-2 py-1 w-full"
+            placeholderText="Select date"
+            dateFormat="yyyy-MM-dd"
+          />
+        </div>
+        <span className="px-2">To</span>
+        <div className="w-1/4">
+          <DatePicker
+            selected={endDate}
+            onChange={(d: Date | null) => setEndDate(d)}
+            className="border rounded px-2 py-1 w-full"
+            placeholderText="Select date"
+            dateFormat="yyyy-MM-dd"
+          />
+        </div>
+      </div>
+
+      {datasets.length > 0 ? (
+        <TrackChart data={{ datasets }} min={startDate} max={endDate} />
+      ) : (
+        <p className="text-muted-foreground">No data to display</p>
+      )}
+
+      {/* Series list (read-only) */}
+      <h2 className="text-xl my-2">Series</h2>
+
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Data Type</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {seriesList.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={2} className="text-center text-muted-foreground">
+                No series yet
+              </TableCell>
+            </TableRow>
+          ) : (
+            seriesList.map((s) => (
+              <TableRow key={s.id}>
+                <TableCell>{s.name}</TableCell>
+                <TableCell>{s.data_type}</TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
+export const TrackDetailEdit = (): React.JSX.Element => {
+  const data = useLoaderData() as TrackDetailData
+  const { track } = data
   const [seriesList, setSeriesList] = useState<SeriesModel[]>(data.series)
   const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
   const [newSeriesName, setNewSeriesName] = useState('')
@@ -322,12 +490,12 @@ export const TrackDetail = (): React.JSX.Element => {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <Link to="/track" className="text-blue-600 dark:text-blue-500 hover:underline">
-          &larr; Back to Tracks
+        <Link to={`/track/${track.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
+          &larr; Back to Track
         </Link>
       </div>
 
-      <h1 className="text-3xl my-4">{track.name}</h1>
+      <h1 className="text-3xl my-4">{track.name} (Edit)</h1>
 
       {/* Series list */}
       <h2 className="text-xl my-2">Series</h2>
@@ -466,7 +634,7 @@ export const TrackDetail = (): React.JSX.Element => {
 export const trackRoute = [
   {
     index: true,
-    element: <TrackList />,
+    element: <TrackListView />,
     loader: loadTrackList,
   },
   {
@@ -475,6 +643,14 @@ export const trackRoute = [
       crumb: (params: Params, data: any) => ({ label: data?.track?.name ?? 'Track' }),
     },
     loader: loadTrackDetail,
-    element: <TrackDetail />,
+    element: <TrackDetailView />,
+  },
+  {
+    path: ':trackId/edit',
+    handle: {
+      crumb: (params: Params, data: any) => ({ label: data?.track?.name ?? 'Track' }),
+    },
+    loader: loadTrackDetail,
+    element: <TrackDetailEdit />,
   },
 ]

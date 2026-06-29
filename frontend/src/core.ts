@@ -36,3 +36,10 @@ export interface UserData {
   username: string
   avatar_url: string
 }
+
+export interface TrackResponse {
+  id: number
+  name: string
+  role: string
+  liked: boolean
+}
