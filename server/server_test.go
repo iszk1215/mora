@@ -756,7 +756,9 @@ func TestHandleMe_LoggedIn(t *testing.T) {
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
-	user, err := userStore.FindOrCreate("github", "12345", "testuser", "https://example.com/avatar.jpg")
+	user, err := userStore.CreateUser("testuser", "https://example.com/avatar.jpg")
+	require.NoError(t, err)
+	err = userStore.LinkAuth(user.ID, "github", "12345")
 	require.NoError(t, err)
 
 	server := &MoraServer{userStore: userStore}

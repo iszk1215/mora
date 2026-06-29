@@ -3,6 +3,7 @@
 - **v7**: 二重認証（Session + API Key）設計 + フロントエンド設計を追加
 - **v8**: ユーザー権限管理（track_member/track_like）、スーパーユーザー、フロントエンド閲覧/編集分離
 - **v9**: トラック作成ページ（TrackCreate）+ visibility 作成時指定必須化、アバタードロップダウンに Create Track 追加
+- **v10**: ユーザー認証再設計 — `user` + `user_auth` テーブル分割、login/signup フロー分離、`FindOrCreate` 廃止、raw API によるプロバイダユーザー情報取得（drone/go-scm 継続、email は保存しない）
 
 ## 概要
 
@@ -635,14 +636,16 @@ Like 系エンドポイントは userID==nil の場合 401。userID があれば
 
 ### スーパーユーザー seed
 
-`userStore.Init()` で `user` テーブルに id=1 のレコードを seed する:
+`userStore.Init()` で `user` テーブルに id=1 のレコードを seed する（v10: スキーマ変更後）:
 
 ```go
 _, err := s.db.Exec(
-    `INSERT OR IGNORE INTO user (id, provider, provider_user_id, username, avatar_url)
-     VALUES (1, 'system', 'superuser', 'admin', '')`,
+    `INSERT OR IGNORE INTO user (id, username, avatar_url)
+     VALUES (1, 'admin', '')`,
 )
 ```
+
+API key 認証時は user.ID == 1 で識別する。`user_auth` エントリは作らない。
 
 ---
 
@@ -969,3 +972,179 @@ interface ValueModel  { time: string; value: number }
 4. `frontend/src/main.tsx` — アバタードロップダウンに「Create Track」リンク追加
 5. `frontend/src/track.test.tsx` — TrackCreate テスト追加 + TrackListView テスト更新
 6. `make test-all && go build ./...`
+
+---
+
+## v10: ユーザー認証再設計
+
+### 動機
+
+- `user` テーブルに provider 情報が混在しており、1ユーザー複数IdP に対応できない
+- `FindOrCreate` は login/signup の区別がなく、初回 OAuth で自動的にユーザーが作成されてしまう
+- Gitea の SCM ユーザー取得が未対応（`createUserForSession` の `default: return`）
+- `drone/go-scm` の `Users.Find()` はすべてのプロバイダで `scm.User.ID` が空のバグがある
+
+### スキーマ
+
+`user` テーブルから provider 情報を分離:
+
+```sql
+CREATE TABLE user (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    username   TEXT NOT NULL,
+    avatar_url TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE user_auth (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER NOT NULL REFERENCES user(id),
+    provider         TEXT    NOT NULL,   -- "github" | "gitea"
+    provider_user_id TEXT    NOT NULL,   -- プロバイダ側のユーザーID（文字列）
+    UNIQUE(provider, provider_user_id)
+);
+```
+
+superuser（API key 用）: `user (id=1, username='admin')` のみ。`user_auth` は作らない。
+
+### データモデル比較 (v9 → v10)
+
+| 項目 | v9 | v10 |
+|------|----|-----|
+| user テーブル | provider + provider_user_id 含む | provider 情報を user_auth に分離 |
+| プロバイダ識別子 | `provider_user_id` (user テーブル) | `user_auth.provider_user_id` |
+| 複数IdP | 不可 | 可能（後日管理画面対応） |
+| ログイン動作 | `FindOrCreate` = なければ自動作成 | `FindByProvider` → なければ signup 画面へ |
+| 初回サインアップ | なし（自動で作成） | 確認画面あり（/signup） |
+| email 保存 | なし | なし（個人情報を極力保存しない方針） |
+| SCM ライブラリ | drone/go-scm (v1.42.3) | 変更なし、drone/go-scm 継続 |
+| ユーザー情報取得 | `fetchGitHubUser()` (raw API, GitHub のみ) | `fetchProviderUserInfo()` (raw API, GitHub + Gitea) |
+
+### 方針
+
+- `drone/go-scm` は継続使用（repo アクセス、OAuth2 トランスポートで問題なし）
+- ユーザー情報取得のみ raw API を使う（`scm.Users.Find()` の ID バグを回避）
+- email は保存しない（プロバイダ間の自動リンクに使うと危険、通知機能も今は不要）
+- `FindOrCreate` を廃止し、`FindByProvider` + `CreateUser` / `LinkAuth` に分割
+
+### UserStore インターフェース
+
+```go
+type UserStore interface {
+    Init() error
+    FindByProvider(provider, providerUserID string) (*User, error) // not found → sql.ErrNoRows
+    CreateUser(username, avatarURL string) (*User, error)          // INSERT INTO user, return with id
+    LinkAuth(userID int64, provider, providerUserID string) error  // INSERT INTO user_auth
+    FindByID(id int64) (*User, error)                              // 既存
+}
+```
+
+`FindOrCreate` は削除。
+
+### Provider ユーザー情報取得
+
+```go
+type providerUserInfo struct {
+    Provider       string // "github" | "gitea"
+    ProviderUserID string // プロバイダ側のユーザーID
+    Username       string
+    AvatarURL      string
+}
+
+func fetchProviderUserInfo(rm RepositoryManager, token scm.Token) (*providerUserInfo, error)
+```
+
+Provider の判別は `rm.URL()` で行う:
+
+- **GitHub**: `GET https://api.github.com/user` → `{"id": ..., "login": ..., "avatar_url": ...}`
+  - 既存の `fetchGitHubUser` を統合・置き換え
+- **Gitea**: `GET {scmURL}/api/v1/user` → `{"id": ..., "login": ..., "username": ..., "avatar_url": ...}`
+  - ID は int、Login/Username の非空を優先
+- Token は `Authorization: Bearer <token>` ヘッダで送信
+
+### フロー
+
+#### ログイン成功（既存ユーザー）
+
+```
+/login/{scm_id}
+  → OAuth 認証
+  → callback → token を sess.setToken(rmID, token)
+  → fetchProviderUserInfo(rm, token) → {provider, providerUserID, ...}
+  → userStore.FindByProvider(provider, providerUserID)
+
+    - 見つかった → sess.SetUserID(user.ID), CSRFトークン発行, redirect /
+    - 見つからない → sess.SetPendingSignup(info), redirect /signup
+```
+
+#### サインアップ（新規ユーザー）
+
+```
+GET /api/signup/pending
+  → session から pendingSignup を返す（なければ 404）
+
+POST /api/signup/confirm (CSRF required)
+  → pendingSignup から CreateUser(username, avatarURL)
+  → LinkAuth(userID, provider, providerUserID)
+  → sess.SetUserID(user.ID), pendingSignup をクリア
+  → redirect /scms
+```
+
+#### ログアウト
+
+```
+POST /logout (CSRF required)
+  → 全 tokenMap 削除 + ClearUserID
+  → redirect /scms
+```
+
+（v9 からの変更なし）
+
+### Session 変更
+
+```go
+type pendingSignup struct {
+    rmID           int64
+    provider       string
+    providerUserID string
+    username       string
+    avatarURL      string
+}
+
+type MoraSession struct {
+    // ... 既存フィールド
+    pendingSignup *pendingSignup   // nil の場合は pending 無し
+}
+```
+
+pendingSignup アクセサ:
+
+```go
+func (s *MoraSession) SetPendingSignup(p *pendingSignup) { ... }
+func (s *MoraSession) PendingSignup() *pendingSignup     { ... }
+func (s *MoraSession) ClearPendingSignup()               { ... }
+```
+
+### ファイル変更一覧
+
+| File | 変更内容 |
+|------|---------|
+| `server/user.go` | スキーマ変更、`FindOrCreate` → `FindByProvider`/`CreateUser`/`LinkAuth`、`fetchProviderUserInfo` 追加、`fetchGitHubUser`/`createUserForSession` 削除 |
+| `server/user_test.go` | `FindOrCreate` → 新メソッドのテストに書き換え |
+| `server/session.go` | `pendingSignup` フィールド + アクセサ追加 |
+| `server/session_test.go` | 必要なら pendingSignup テスト追加 |
+| `server/login.go` | `createLoginHandler` の user 処理（`createUserForSession`）→ `fetchProviderUserInfo` + `FindByProvider`/SetPendingSignup に差し替え、成功時 redirect `/` |
+| `server/login_test.go` | 新しいフローに対応 |
+| `server/signup.go` | **新規**: `GET /api/signup/pending` + `POST /api/signup/confirm` ハンドラ |
+| `server/server.go` | signup ルートマウント、redirectHandler 調整（login → `/`, signup → `/scms`） |
+| `server/server_test.go` | 必要に応じて signup テスト追加 |
+| `frontend/src/main.tsx` | `/signup` ルート追加 |
+| `frontend/src/signup.tsx` | **新規**: signup 確認ページコンポーネント |
+
+### 補足
+
+- DB マイグレーションは不要（既存 DB は開発用かつ破棄可能。`:memory:` で再作成される）
+- `render` パッケージのエラーレスポンス型は流用
+- CSRF トークンは既存の仕組み（`csrfCookieName` + `verifyCSRF`）を流用
+- プロバイダの判別は `rm.URL()` の文字列に `"github.com"` が含まれるかで行う（既存と同様）

@@ -15,45 +15,67 @@ func newTestUserStore(t *testing.T) UserStore {
 	return store
 }
 
-func TestUserStore_FindOrCreate_CreatesNewUser(t *testing.T) {
+func TestUserStore_CreateUser(t *testing.T) {
 	store := newTestUserStore(t)
 
-	user, err := store.FindOrCreate("github", "42", "octocat", "https://avatars.example.com/42")
+	user, err := store.CreateUser("octocat", "https://avatars.example.com/42")
 	require.NoError(t, err)
 	require.NotZero(t, user.ID)
-	require.Equal(t, "github", user.Provider)
-	require.Equal(t, "42", user.ProviderUserID)
 	require.Equal(t, "octocat", user.Username)
 	require.Equal(t, "https://avatars.example.com/42", user.AvatarURL)
 }
 
-func TestUserStore_FindOrCreate_ReturnsExisting(t *testing.T) {
+func TestUserStore_LinkAuthAndFindByProvider(t *testing.T) {
 	store := newTestUserStore(t)
 
-	user1, err := store.FindOrCreate("github", "42", "octocat", "https://avatars.example.com/42")
+	user, err := store.CreateUser("octocat", "")
 	require.NoError(t, err)
 
-	user2, err := store.FindOrCreate("github", "42", "octocat", "https://avatars.example.com/42")
+	err = store.LinkAuth(user.ID, "github", "42")
 	require.NoError(t, err)
-	require.Equal(t, user1.ID, user2.ID)
+
+	found, err := store.FindByProvider("github", "42")
+	require.NoError(t, err)
+	require.Equal(t, user.ID, found.ID)
+	require.Equal(t, "octocat", found.Username)
 }
 
-func TestUserStore_FindOrCreate_UpdatesUsernameAndAvatar(t *testing.T) {
+func TestUserStore_FindByProvider_NotFound(t *testing.T) {
 	store := newTestUserStore(t)
 
-	_, err := store.FindOrCreate("github", "99", "oldname", "https://avatars.example.com/old")
+	_, err := store.FindByProvider("github", "999")
+	require.Error(t, err)
+}
+
+func TestUserStore_FindByProvider_WrongProvider(t *testing.T) {
+	store := newTestUserStore(t)
+
+	user, err := store.CreateUser("octocat", "")
+	require.NoError(t, err)
+	err = store.LinkAuth(user.ID, "github", "42")
 	require.NoError(t, err)
 
-	user, err := store.FindOrCreate("github", "99", "newname", "https://avatars.example.com/new")
+	_, err = store.FindByProvider("gitlab", "42")
+	require.Error(t, err)
+}
+
+func TestUserStore_LinkAuth_Duplicate(t *testing.T) {
+	store := newTestUserStore(t)
+
+	user, err := store.CreateUser("user1", "")
 	require.NoError(t, err)
-	require.Equal(t, "newname", user.Username)
-	require.Equal(t, "https://avatars.example.com/new", user.AvatarURL)
+
+	err = store.LinkAuth(user.ID, "github", "42")
+	require.NoError(t, err)
+
+	err = store.LinkAuth(user.ID, "github", "42")
+	require.Error(t, err)
 }
 
 func TestUserStore_FindByID(t *testing.T) {
 	store := newTestUserStore(t)
 
-	created, err := store.FindOrCreate("github", "100", "testuser", "")
+	created, err := store.CreateUser("testuser", "")
 	require.NoError(t, err)
 
 	found, err := store.FindByID(created.ID)
@@ -69,22 +91,6 @@ func TestUserStore_FindByID_NotFound(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestUserStore_UniqueProviderUserID(t *testing.T) {
-	store := newTestUserStore(t)
-
-	user1, err := store.FindOrCreate("github", "1", "user1", "")
-	require.NoError(t, err)
-
-	_, err = store.FindOrCreate("gitlab", "1", "user1", "")
-	require.NoError(t, err)
-
-	require.Equal(t, int64(2), user1.ID)
-
-	githubUsers, err := store.FindByID(2)
-	require.NoError(t, err)
-	require.Equal(t, "github", githubUsers.Provider)
-}
-
 func TestSessionUserID(t *testing.T) {
 	sess := NewMoraSession()
 	require.Nil(t, sess.UserID())
@@ -95,4 +101,39 @@ func TestSessionUserID(t *testing.T) {
 
 	sess.ClearUserID()
 	require.Nil(t, sess.UserID())
+}
+
+func TestPendingSignup(t *testing.T) {
+	sess := NewMoraSession()
+	require.Nil(t, sess.PendingSignup())
+
+	p := &pendingSignup{
+		rmID:           1,
+		provider:       "github",
+		providerUserID: "42",
+		username:       "octocat",
+		avatarURL:      "https://example.com/avatar.jpg",
+	}
+	sess.SetPendingSignup(p)
+	require.NotNil(t, sess.PendingSignup())
+	require.Equal(t, "octocat", sess.PendingSignup().username)
+
+	sess.ClearPendingSignup()
+	require.Nil(t, sess.PendingSignup())
+}
+
+func TestUserStore_SuperuserSeed(t *testing.T) {
+	store := newTestUserStore(t)
+
+	admin, err := store.FindByID(1)
+	require.NoError(t, err)
+	require.Equal(t, "admin", admin.Username)
+}
+
+func TestUserStore_CreateUser_EmptyAvatar(t *testing.T) {
+	store := newTestUserStore(t)
+
+	user, err := store.CreateUser("noname", "")
+	require.NoError(t, err)
+	require.Equal(t, "", user.AvatarURL)
 }

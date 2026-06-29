@@ -76,6 +76,16 @@ func createLoginHandler(rm RepositoryManager, userStore UserStore, next http.Han
 			log.Error().Err(err).Msg("failed to generate CSRF token")
 		}
 
+		if userStore != nil {
+			if sess.PendingSignup() != nil {
+				http.Redirect(w, r, "/signup", http.StatusSeeOther)
+				return
+			}
+			if sess.UserID() != nil {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+				return
+			}
+		}
 		next.ServeHTTP(w, r)
 	}
 

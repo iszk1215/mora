@@ -21,14 +21,23 @@ const (
 	contextMoraSessionKey moraSessionKey = iota
 )
 
+type pendingSignup struct {
+	rmID           int64
+	provider       string
+	providerUserID string
+	username       string
+	avatarURL      string
+}
+
 type MoraSession struct {
 	lock sync.Mutex
 
-	reposMap    map[int64]map[int64]bool // [rmID][repoID]
-	tokenMap    map[int64]scm.Token      // [rmID]
-	timestamp   time.Time
-	loggingInto int64
-	userID      *int64
+	reposMap      map[int64]map[int64]bool // [rmID][repoID]
+	tokenMap      map[int64]scm.Token      // [rmID]
+	timestamp     time.Time
+	loggingInto   int64
+	userID        *int64
+	pendingSignup *pendingSignup
 }
 
 func NewMoraSession() *MoraSession {
@@ -105,6 +114,24 @@ func (s *MoraSession) ClearUserID() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.userID = nil
+}
+
+func (s *MoraSession) SetPendingSignup(p *pendingSignup) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.pendingSignup = p
+}
+
+func (s *MoraSession) PendingSignup() *pendingSignup {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.pendingSignup
+}
+
+func (s *MoraSession) ClearPendingSignup() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.pendingSignup = nil
 }
 
 // Session Manager

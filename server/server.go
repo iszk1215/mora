@@ -311,6 +311,10 @@ func (s *MoraServer) Handler() http.Handler {
 	r.Mount("/login", LoginHandler(s.repositoryManagers, s.userStore, redirectHandler))
 	r.Mount("/logout", LogoutHandler(s.repositoryManagers, redirectHandler))
 
+	if s.userStore != nil {
+		r.Mount("/api/signup", SignupHandler(s.userStore))
+	}
+
 	// frontend
 
 	r.Route("/", func(r chi.Router) {

@@ -20,6 +20,7 @@ import { Repo, UserData } from './core'
 import { coverageRoute } from './coverage'
 import { udmRoute, loadUdmMetrics } from './udm'
 import { trackRoute } from './track'
+import { signupRoute } from './signup'
 import { DefaultLink, HeaderLink, ExternalLink } from './util'
 import { Button } from '@/components/ui/button'
 import {
@@ -340,6 +341,13 @@ const router = createBrowserRouter([
         handle: {
           crumb: (_params: Params, _data: any) => ({ label: "login", link: "/scms" }),
         }
+      },
+      {
+        path: '/signup',
+        handle: {
+          crumb: (_params: Params, _data: any) => ({ label: "Sign Up", link: "/signup" }),
+        },
+        children: [signupRoute],
       },
       {
         path: '/track',
