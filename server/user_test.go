@@ -72,13 +72,15 @@ func TestUserStore_FindByID_NotFound(t *testing.T) {
 func TestUserStore_UniqueProviderUserID(t *testing.T) {
 	store := newTestUserStore(t)
 
-	_, err := store.FindOrCreate("github", "1", "user1", "")
+	user1, err := store.FindOrCreate("github", "1", "user1", "")
 	require.NoError(t, err)
 
 	_, err = store.FindOrCreate("gitlab", "1", "user1", "")
 	require.NoError(t, err)
 
-	githubUsers, err := store.FindByID(1)
+	require.Equal(t, int64(2), user1.ID)
+
+	githubUsers, err := store.FindByID(2)
 	require.NoError(t, err)
 	require.Equal(t, "github", githubUsers.Provider)
 }

@@ -2,6 +2,7 @@ package track
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -34,6 +35,11 @@ func newTestHandler(t *testing.T) http.Handler {
 
 func newTestHandlerWithAPIKey(t *testing.T, apiKey string) http.Handler {
 	return newHandler(initTestStore(t), apiKey)
+}
+
+func superuserCtx() context.Context {
+	var uid int64 = 1
+	return ContextWithAuth(context.Background(), &uid)
 }
 
 func unmarshalResponse(t *testing.T, r *http.Response, data any) {
@@ -101,14 +107,14 @@ func TestRequireAuth(t *testing.T) {
 	t.Run("session auth bypasses API key check", func(t *testing.T) {
 		h := newTestHandlerWithAPIKey(t, "secret123")
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		r = r.WithContext(ContextWithAuth(r.Context()))
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusOK, h, r)
 	})
 
 	t.Run("session auth works without API key", func(t *testing.T) {
 		h := newTestHandler(t)
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		r = r.WithContext(ContextWithAuth(r.Context()))
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusOK, h, r)
 	})
 }
@@ -117,9 +123,10 @@ func TestRequireAuth(t *testing.T) {
 // Track
 
 func TestHandlerCreateTrack(t *testing.T) {
-	t.Run("valid name", func(t *testing.T) {
+	t.Run("valid name with auth", func(t *testing.T) {
 		h := newTestHandler(t)
 		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "test_track"})
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusCreated, h, r)
 
 		var got TrackModel
@@ -131,23 +138,27 @@ func TestHandlerCreateTrack(t *testing.T) {
 	t.Run("duplicate name", func(t *testing.T) {
 		h := newTestHandler(t)
 		r1 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "dup"})
+		r1 = r1.WithContext(superuserCtx())
 		getResponse(t, http.StatusCreated, h, r1)
 
 		r2 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "dup"})
+		r2 = r2.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r2)
 	})
 
-	t.Run("invalid JSON", func(t *testing.T) {
+	t.Run("forbidden without auth", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("{invalid}"))
-		getResponse(t, http.StatusBadRequest, h, r)
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "no_auth"})
+		// no auth context → anonymous user
+		getResponse(t, http.StatusForbidden, h, r)
 	})
 }
 
 func TestHandlerListTracks(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
+	t.Run("empty for authenticated user", func(t *testing.T) {
 		h := newTestHandler(t)
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
 		var got ListTracksResponse
@@ -159,35 +170,61 @@ func TestHandlerListTracks(t *testing.T) {
 		store := initTestStore(t)
 		tr1 := &TrackModel{Name: "track1"}
 		tr2 := &TrackModel{Name: "track2"}
-		require.NoError(t, store.addTrack(tr1))
-		require.NoError(t, store.addTrack(tr2))
+		require.NoError(t, store.addTrack(tr1, 1))
+		require.NoError(t, store.addTrack(tr2, 1))
 
 		h := newHandler(store, "")
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
 		var got ListTracksResponse
 		unmarshalResponse(t, res, &got)
 		require.Equal(t, 2, len(got.Tracks))
 	})
+
+	t.Run("returns empty for anonymous", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListTracksResponse
+		unmarshalResponse(t, res, &got)
+		require.Empty(t, got.Tracks)
+	})
 }
 
 func TestHandlerDeleteTrack(t *testing.T) {
-	t.Run("delete existing track", func(t *testing.T) {
+	t.Run("delete existing track as member", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d", tr.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNoContent, h, r)
+	})
+
+	t.Run("delete forbidden without edit permission", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d", tr.Id)
+		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		// anonymous user, no context set → requireAuth sets ContextWithAuth(ctx, nil)
+		r = r.WithContext(ContextWithAuth(context.Background(), nil))
+		getResponse(t, http.StatusForbidden, h, r)
 	})
 
 	t.Run("delete with invalid URL", func(t *testing.T) {
 		store := initTestStore(t)
 		h := newHandler(store, "")
 		r := httptest.NewRequest(http.MethodDelete, "/foo", nil)
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
 
@@ -195,6 +232,7 @@ func TestHandlerDeleteTrack(t *testing.T) {
 		store := initTestStore(t)
 		h := newHandler(store, "")
 		r := httptest.NewRequest(http.MethodDelete, "/99999", nil)
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
 	})
 }
@@ -202,13 +240,14 @@ func TestHandlerDeleteTrack(t *testing.T) {
 func TestHandlerInjectTrackDBError(t *testing.T) {
 	store := initTestStore(t)
 	tr := &TrackModel{Name: "test_track"}
-	require.NoError(t, store.addTrack(tr))
+	require.NoError(t, store.addTrack(tr, 1))
 
 	require.NoError(t, store.db.Close())
 
 	h := newHandler(store, "")
 	path := fmt.Sprintf("/%d", tr.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
+	r = r.WithContext(superuserCtx())
 	w := httptest.NewRecorder()
 
 	require.NotPanics(t, func() {
@@ -227,11 +266,12 @@ func TestHandlerCreateSeries(t *testing.T) {
 	t.Run("success with data_type float", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "float"})
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusCreated, h, r)
 
 		var got SeriesModel
@@ -243,11 +283,12 @@ func TestHandlerCreateSeries(t *testing.T) {
 	t.Run("success with data_type int", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s2", DataType: "int"})
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusCreated, h, r)
 
 		var got SeriesModel
@@ -258,11 +299,12 @@ func TestHandlerCreateSeries(t *testing.T) {
 	t.Run("default data_type is float", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s3"})
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusCreated, h, r)
 
 		var got SeriesModel
@@ -273,11 +315,12 @@ func TestHandlerCreateSeries(t *testing.T) {
 	t.Run("invalid data_type", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s4", DataType: "binary"})
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
 
@@ -285,7 +328,20 @@ func TestHandlerCreateSeries(t *testing.T) {
 		store := initTestStore(t)
 		h := newHandler(store, "")
 		r := newRequestWithJSON(t, http.MethodPost, "/99999/series", CreateSeriesRequest{Name: "s1", DataType: "float"})
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
+	})
+
+	t.Run("forbidden without auth", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/series", tr.Id)
+		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "float"})
+		// anonymous
+		getResponse(t, http.StatusForbidden, h, r)
 	})
 }
 
@@ -293,7 +349,7 @@ func TestHandlerListSeries(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -309,7 +365,7 @@ func TestHandlerListSeries(t *testing.T) {
 	t.Run("with series", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		s1 := &SeriesModel{TrackId: tr.Id, Name: "series1", DataType: "float"}
 		require.NoError(t, store.addSeries(s1))
@@ -330,7 +386,7 @@ func TestHandlerDeleteSeries(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
@@ -338,17 +394,19 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNoContent, h, r)
 	})
 
 	t.Run("non existing series", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series/99999", tr.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
 	})
 
@@ -356,8 +414,8 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		store := initTestStore(t)
 		tr1 := &TrackModel{Name: "track1"}
 		tr2 := &TrackModel{Name: "track2"}
-		require.NoError(t, store.addTrack(tr1))
-		require.NoError(t, store.addTrack(tr2))
+		require.NoError(t, store.addTrack(tr1, 1))
+		require.NoError(t, store.addTrack(tr2, 1))
 
 		s := &SeriesModel{TrackId: tr2.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
@@ -365,6 +423,7 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series/%d", tr1.Id, s.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
 	})
 }
@@ -376,7 +435,7 @@ func TestHandlerCreateValue(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
@@ -384,6 +443,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusCreated, h, r)
 
 		var got ValueModel
@@ -395,7 +455,7 @@ func TestHandlerCreateValue(t *testing.T) {
 	t.Run("duplicate time", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
@@ -403,23 +463,41 @@ func TestHandlerCreateValue(t *testing.T) {
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		now := time.Now().Round(0)
 		r1 := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
+		r1 = r1.WithContext(superuserCtx())
 		getResponse(t, http.StatusCreated, h, r1)
 
 		r2 := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 99.9})
+		r2 = r2.WithContext(superuserCtx())
 		getResponse(t, http.StatusInternalServerError, h, r2)
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString("{invalid}"))
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("forbidden without auth", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
+		now := time.Now().Round(0)
+		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
+		// anonymous
+		getResponse(t, http.StatusForbidden, h, r)
 	})
 }
 
@@ -427,7 +505,7 @@ func TestHandlerListValues(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
@@ -445,7 +523,7 @@ func TestHandlerListValues(t *testing.T) {
 	t.Run("with values", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
@@ -468,7 +546,7 @@ func TestHandlerListValues(t *testing.T) {
 	t.Run("with limit", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
@@ -491,7 +569,7 @@ func TestHandlerListValues(t *testing.T) {
 	t.Run("invalid limit", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr))
+		require.NoError(t, store.addTrack(tr, 1))
 		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
@@ -505,7 +583,7 @@ func TestHandlerListValues(t *testing.T) {
 func TestHandlerDeleteValues(t *testing.T) {
 	store := initTestStore(t)
 	tr := &TrackModel{Name: "test"}
-	require.NoError(t, store.addTrack(tr))
+	require.NoError(t, store.addTrack(tr, 1))
 	s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
 	require.NoError(t, store.addSeries(s))
 
@@ -518,5 +596,93 @@ func TestHandlerDeleteValues(t *testing.T) {
 	h := newHandler(store, "")
 	path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
+	r = r.WithContext(superuserCtx())
 	getResponse(t, http.StatusNoContent, h, r)
+}
+
+// ----------------------------------------------------------------------
+// Like
+
+func TestHandlerLike(t *testing.T) {
+	t.Run("like and unlike track", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/like", tr.Id)
+
+		// Like
+		r := httptest.NewRequest(http.MethodPost, path, nil)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusCreated, h, r)
+
+		// Verify liked in list
+		listR := httptest.NewRequest(http.MethodGet, "/", nil)
+		listR = listR.WithContext(superuserCtx())
+		listRes := getResponse(t, http.StatusOK, h, listR)
+		var list ListTracksResponse
+		unmarshalResponse(t, listRes, &list)
+		require.Len(t, list.Tracks, 1)
+		require.True(t, list.Tracks[0].Liked)
+
+		// Unlike
+		r2 := httptest.NewRequest(http.MethodDelete, path, nil)
+		r2 = r2.WithContext(superuserCtx())
+		getResponse(t, http.StatusNoContent, h, r2)
+
+		// Verify no longer liked
+		listR2 := httptest.NewRequest(http.MethodGet, "/", nil)
+		listR2 = listR2.WithContext(superuserCtx())
+		listRes2 := getResponse(t, http.StatusOK, h, listR2)
+		var list2 ListTracksResponse
+		unmarshalResponse(t, listRes2, &list2)
+		require.False(t, list2.Tracks[0].Liked)
+	})
+
+	t.Run("like requires auth", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/like", tr.Id)
+		r := httptest.NewRequest(http.MethodPost, path, nil)
+		getResponse(t, http.StatusForbidden, h, r)
+	})
+
+	t.Run("unlike requires auth", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/like", tr.Id)
+		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		getResponse(t, http.StatusForbidden, h, r)
+	})
+
+	t.Run("like non-existing track", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := httptest.NewRequest(http.MethodPost, "/99999/like", nil)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusNotFound, h, r)
+	})
+
+	t.Run("duplicate like is idempotent", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/like", tr.Id)
+
+		r1 := httptest.NewRequest(http.MethodPost, path, nil)
+		r1 = r1.WithContext(superuserCtx())
+		getResponse(t, http.StatusCreated, h, r1)
+
+		r2 := httptest.NewRequest(http.MethodPost, path, nil)
+		r2 = r2.WithContext(superuserCtx())
+		getResponse(t, http.StatusCreated, h, r2)
+	})
 }

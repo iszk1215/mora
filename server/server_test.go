@@ -813,7 +813,7 @@ func TestTrackEndpointIsMounted(t *testing.T) {
 		require.Empty(t, resp.Tracks)
 	})
 
-	t.Run("POST /api/track creates track", func(t *testing.T) {
+	t.Run("POST /api/track requires auth", func(t *testing.T) {
 		body := `{"name":"integration_test"}`
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/api/track", strings.NewReader(body))
@@ -822,6 +822,7 @@ func TestTrackEndpointIsMounted(t *testing.T) {
 
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
-		require.Equal(t, http.StatusCreated, res.StatusCode)
+		// anonymous users cannot create tracks
+		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 }

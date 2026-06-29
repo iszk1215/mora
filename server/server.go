@@ -266,7 +266,7 @@ func (s *MoraServer) requireTrackAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess, ok := MoraSessionFrom(r.Context())
 		if ok && sess.IsLoggedIn() {
-			r = r.WithContext(track.ContextWithAuth(r.Context()))
+			r = r.WithContext(track.ContextWithAuth(r.Context(), sess.UserID()))
 		}
 		next.ServeHTTP(w, r)
 	})

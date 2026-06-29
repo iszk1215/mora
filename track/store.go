@@ -1,6 +1,7 @@
 package track
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -36,11 +37,34 @@ CREATE TABLE IF NOT EXISTS track_value (
     UNIQUE(series_id, time)
 )`
 
+var schemaMember = `
+CREATE TABLE IF NOT EXISTS track_member (
+    user_id  INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+    track_id INTEGER NOT NULL REFERENCES track(id) ON DELETE CASCADE,
+    role     TEXT NOT NULL DEFAULT 'editor',
+    PRIMARY KEY (user_id, track_id)
+)`
+
+var schemaLike = `
+CREATE TABLE IF NOT EXISTS track_like (
+    user_id  INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+    track_id INTEGER NOT NULL REFERENCES track(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, track_id)
+)`
+
 type (
 	trackStore struct {
 		db *sqlx.DB
 	}
 )
+
+// TrackResponse is returned in track lists and includes user-specific flags.
+type TrackResponse struct {
+	Id    int64  `json:"id"    db:"id"`
+	Name  string `json:"name"  db:"name"`
+	Role  string `json:"role"`  // "" | "owner" | "editor"
+	Liked bool   `json:"liked"`
+}
 
 func newTrackStore(db *sqlx.DB) *trackStore {
 	return &trackStore{db: db}
@@ -49,7 +73,7 @@ func newTrackStore(db *sqlx.DB) *trackStore {
 // ----------------------------------------------------------------------
 // Track
 
-func (s *trackStore) addTrack(track *TrackModel) error {
+func (s *trackStore) addTrack(track *TrackModel, userID int64) error {
 	query := "INSERT INTO track (name) VALUES (?)"
 
 	res, err := s.db.Exec(query, track.Name)
@@ -62,14 +86,29 @@ func (s *trackStore) addTrack(track *TrackModel) error {
 		return fmt.Errorf("addTrack LastInsertId: %w", err)
 	}
 
+	_, err = s.db.Exec(
+		"INSERT INTO track_member (user_id, track_id, role) VALUES (?, ?, 'owner')",
+		userID, track.Id)
+	if err != nil {
+		return fmt.Errorf("addTrack addMember: %w", err)
+	}
+
 	return nil
 }
 
-func (s *trackStore) listTracks() ([]TrackModel, error) {
-	query := "SELECT id, name FROM track"
+func (s *trackStore) listTracks(userID int64) ([]TrackResponse, error) {
+	query := `
+		SELECT t.id, t.name,
+		       COALESCE(m.role, '') AS role,
+		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked
+		FROM track t
+		LEFT JOIN track_member m ON t.id = m.track_id AND m.user_id = ?
+		LEFT JOIN track_like l ON t.id = l.track_id AND l.user_id = ?
+		WHERE m.user_id IS NOT NULL OR l.user_id IS NOT NULL
+		ORDER BY t.name`
 
-	rows := []TrackModel{}
-	err := s.db.Select(&rows, query)
+	rows := []TrackResponse{}
+	err := s.db.Select(&rows, query, userID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("listTracks select: %w", err)
 	}
@@ -217,6 +256,48 @@ func (s *trackStore) deleteValues(seriesId int64) error {
 	return nil
 }
 
+// ----------------------------------------------------------------------
+// Member
+
+func (s *trackStore) isMember(userID, trackID int64) (bool, string, error) {
+	query := "SELECT role FROM track_member WHERE user_id = ? AND track_id = ?"
+	var role string
+	err := s.db.Get(&role, query, userID, trackID)
+	if err == sql.ErrNoRows {
+		return false, "", nil
+	}
+	if err != nil {
+		return false, "", fmt.Errorf("isMember select: %w", err)
+	}
+	return true, role, nil
+}
+
+// ----------------------------------------------------------------------
+// Like
+
+func (s *trackStore) addLike(userID, trackID int64) error {
+	_, err := s.db.Exec(
+		"INSERT OR IGNORE INTO track_like (user_id, track_id) VALUES (?, ?)",
+		userID, trackID)
+	if err != nil {
+		return fmt.Errorf("addLike insert: %w", err)
+	}
+	return nil
+}
+
+func (s *trackStore) removeLike(userID, trackID int64) error {
+	_, err := s.db.Exec(
+		"DELETE FROM track_like WHERE user_id = ? AND track_id = ?",
+		userID, trackID)
+	if err != nil {
+		return fmt.Errorf("removeLike delete: %w", err)
+	}
+	return nil
+}
+
+// ----------------------------------------------------------------------
+// Init
+
 func (s *trackStore) initialize() error {
 	_, err := s.db.Exec(schemaTrack)
 	if err != nil {
@@ -231,6 +312,16 @@ func (s *trackStore) initialize() error {
 	_, err = s.db.Exec(schemaValue)
 	if err != nil {
 		return fmt.Errorf("initialize schemaValue: %w", err)
+	}
+
+	_, err = s.db.Exec(schemaMember)
+	if err != nil {
+		return fmt.Errorf("initialize schemaMember: %w", err)
+	}
+
+	_, err = s.db.Exec(schemaLike)
+	if err != nil {
+		return fmt.Errorf("initialize schemaLike: %w", err)
 	}
 
 	return nil

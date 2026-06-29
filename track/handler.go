@@ -54,7 +54,7 @@ type (
 	}
 
 	ListTracksResponse struct {
-		Tracks []TrackModel `json:"tracks"`
+		Tracks []TrackResponse `json:"tracks"`
 	}
 
 	ListSeriesResponse struct {
@@ -74,6 +74,7 @@ const (
 	trackContextKey contextKey = iota
 	seriesContextKey
 	authCtxKey
+	userIDCtxKey
 )
 
 func withTrack(ctx context.Context, track TrackModel) context.Context {
@@ -94,8 +95,17 @@ func seriesFrom(ctx context.Context) (SeriesModel, bool) {
 	return s, ok
 }
 
-func ContextWithAuth(ctx context.Context) context.Context {
-	return context.WithValue(ctx, authCtxKey, true)
+func ContextWithAuth(ctx context.Context, userID *int64) context.Context {
+	ctx = context.WithValue(ctx, authCtxKey, true)
+	if userID != nil {
+		ctx = context.WithValue(ctx, userIDCtxKey, *userID)
+	}
+	return ctx
+}
+
+func UserIDFromContext(ctx context.Context) (int64, bool) {
+	uid, ok := ctx.Value(userIDCtxKey).(int64)
+	return uid, ok
 }
 
 func isAuthenticated(ctx context.Context) bool {
@@ -117,11 +127,14 @@ func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
 			return
 		}
 		if h.apiKey == "" {
+			r = r.WithContext(ContextWithAuth(r.Context(), nil))
 			next.ServeHTTP(w, r)
 			return
 		}
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if token == h.apiKey {
+			var uid int64 = 1
+			r = r.WithContext(ContextWithAuth(r.Context(), &uid))
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -129,34 +142,66 @@ func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
 	})
 }
 
+func (h *trackHandler) requireEditPermission(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := UserIDFromContext(r.Context())
+		if !ok || uid == 0 {
+			render.Forbidden(w, errors.New("anonymous users cannot edit"))
+			return
+		}
+		if uid == 1 {
+			next.ServeHTTP(w, r)
+			return
+		}
+		track, ok := trackFrom(r.Context())
+		if !ok {
+			render.BadRequest(w, errors.New("no track in context"))
+			return
+		}
+		member, _, err := h.store.isMember(uid, track.Id)
+		if err != nil {
+			log.Error().Err(err).Msg("requireEditPermission isMember")
+			render.InternalError(w, err)
+			return
+		}
+		if !member {
+			render.Forbidden(w, errors.New("not a track member"))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // ----------------------------------------------------------------------
 // Track
 
 // ListTracks godoc
-// @Summary      List all tracks
-// @Description  Return all registered tracks
+// @Summary      List tracks for current user
+// @Description  Return tracks owned, edited, or liked by the current user
 // @Tags         track
 // @Success      200  {object}  track.ListTracksResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Router       /api/track [get]
 func (h *trackHandler) listTracks(w http.ResponseWriter, r *http.Request) {
-	tracks, err := h.store.listTracks()
+	uid, ok := UserIDFromContext(r.Context())
+	if !ok {
+		render.JSON(w, ListTracksResponse{Tracks: []TrackResponse{}}, http.StatusOK)
+		return
+	}
+
+	tracks, err := h.store.listTracks(uid)
 	if err != nil {
 		log.Error().Err(err).Msg("track.handler.listTracks")
 		render.InternalError(w, err)
 		return
 	}
 
-	resp := ListTracksResponse{
-		Tracks: tracks,
-	}
-
-	render.JSON(w, resp, http.StatusOK)
+	render.JSON(w, ListTracksResponse{Tracks: tracks}, http.StatusOK)
 }
 
 // CreateTrack godoc
 // @Summary      Create a track
-// @Description  Add a new track. The name must be unique.
+// @Description  Add a new track. The name must be unique. Creator becomes owner.
 // @Tags         track
 // @Accept       json
 // @Produce      json
@@ -181,8 +226,14 @@ func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uid, ok := UserIDFromContext(r.Context())
+	if !ok {
+		render.Forbidden(w, errors.New("anonymous users cannot create tracks"))
+		return
+	}
+
 	track := TrackModel{Name: req.Name}
-	err = h.store.addTrack(&track)
+	err = h.store.addTrack(&track, uid)
 	if err != nil {
 		log.Warn().Err(err).Msg("addTrack")
 		render.BadRequest(w, errors.New("failed to create track"))
@@ -200,6 +251,7 @@ func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/track/{trackId} [delete]
 func (h *trackHandler) deleteTrack(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +308,7 @@ func (h *trackHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 // @Success      201  {object}  track.SeriesModel
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/track/{trackId}/series [post]
 func (h *trackHandler) createSeries(w http.ResponseWriter, r *http.Request) {
@@ -309,6 +362,7 @@ func (h *trackHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/track/{trackId}/series/{seriesId} [delete]
 func (h *trackHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
@@ -380,6 +434,7 @@ func (h *trackHandler) listValues(w http.ResponseWriter, r *http.Request) {
 // @Success      201  {object}  track.ValueModel
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/track/{trackId}/series/{seriesId}/values [post]
 func (h *trackHandler) createValue(w http.ResponseWriter, r *http.Request) {
@@ -424,6 +479,7 @@ func (h *trackHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/track/{trackId}/series/{seriesId}/values [delete]
 func (h *trackHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
@@ -435,6 +491,61 @@ func (h *trackHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	renderNoContent(w)
+}
+
+// ----------------------------------------------------------------------
+// Like
+
+// LikeTrack godoc
+// @Summary      Like a track
+// @Description  Add a like to the specified track for the current user
+// @Tags         track
+// @Param        trackId  path  int  true  "Track ID"
+// @Success      201
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/track/{trackId}/like [post]
+func (h *trackHandler) likeTrack(w http.ResponseWriter, r *http.Request) {
+	uid, ok := UserIDFromContext(r.Context())
+	if !ok {
+		render.Forbidden(w, errors.New("anonymous users cannot like"))
+		return
+	}
+	track, _ := trackFrom(r.Context())
+	err := h.store.addLike(uid, track.Id)
+	if err != nil {
+		log.Error().Err(err).Msg("likeTrack")
+		render.InternalError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+// UnlikeTrack godoc
+// @Summary      Unlike a track
+// @Description  Remove a like from the specified track for the current user
+// @Tags         track
+// @Param        trackId  path  int  true  "Track ID"
+// @Success      204
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/track/{trackId}/like [delete]
+func (h *trackHandler) unlikeTrack(w http.ResponseWriter, r *http.Request) {
+	uid, ok := UserIDFromContext(r.Context())
+	if !ok {
+		render.Forbidden(w, errors.New("anonymous users cannot unlike"))
+		return
+	}
+	track, _ := trackFrom(r.Context())
+	err := h.store.removeLike(uid, track.Id)
+	if err != nil {
+		log.Error().Err(err).Msg("unlikeTrack")
+		render.InternalError(w, err)
+		return
+	}
 	renderNoContent(w)
 }
 
@@ -508,20 +619,22 @@ func newHandler(store *trackStore, apiKey string) http.Handler {
 
 		r.Route("/{trackId}", func(r chi.Router) {
 			r.Use(h.injectTrack)
-			r.Delete("/", h.deleteTrack)
+			r.With(h.requireEditPermission).Delete("/", h.deleteTrack)
+			r.Post("/like", h.likeTrack)
+			r.Delete("/like", h.unlikeTrack)
 
 			r.Route("/series", func(r chi.Router) {
 				r.Get("/", h.listSeries)
-				r.Post("/", h.createSeries)
+				r.With(h.requireEditPermission).Post("/", h.createSeries)
 
 				r.Route("/{seriesId}", func(r chi.Router) {
 					r.Use(h.injectSeries)
-					r.Delete("/", h.deleteSeries)
+					r.With(h.requireEditPermission).Delete("/", h.deleteSeries)
 
 					r.Route("/values", func(r chi.Router) {
 						r.Get("/", h.listValues)
-						r.Post("/", h.createValue)
-						r.Delete("/", h.deleteValues)
+						r.With(h.requireEditPermission).Post("/", h.createValue)
+						r.With(h.requireEditPermission).Delete("/", h.deleteValues)
 					})
 				})
 			})

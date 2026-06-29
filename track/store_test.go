@@ -1,6 +1,7 @@
 package track
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,6 +15,28 @@ func initTestStore(t *testing.T) *trackStore {
 	require.NoError(t, err)
 
 	db.MustExec("PRAGMA foreign_keys = ON")
+
+	// Create user table and seed superuser for FK
+	db.MustExec(`
+		CREATE TABLE user (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			provider TEXT NOT NULL,
+			provider_user_id TEXT NOT NULL,
+			username TEXT NOT NULL,
+			avatar_url TEXT NOT NULL DEFAULT '',
+			created_at TEXT NOT NULL DEFAULT (datetime('now')),
+			updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+			UNIQUE(provider, provider_user_id)
+		)
+	`)
+	db.MustExec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url)
+		VALUES (1, 'system', 'superuser', 'admin', '')`)
+
+	// seed additional test users for FK constraints
+	for _, uid := range []int64{2, 3, 888, 999} {
+		db.MustExec(`INSERT OR IGNORE INTO user (id, provider, provider_user_id, username, avatar_url)
+			VALUES (?, 'test', ?, ?, '')`, uid, fmt.Sprintf("user%d", uid), fmt.Sprintf("user%d", uid))
+	}
 
 	s := newTrackStore(db)
 
@@ -35,9 +58,15 @@ func TestStoreTrack(t *testing.T) {
 			Name: "test_track",
 		}
 
-		err := s.addTrack(track)
+		err := s.addTrack(track, 1)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), track.Id)
+
+		// Creator should be member with role=owner
+		member, role, err := s.isMember(1, track.Id)
+		require.NoError(t, err)
+		require.True(t, member)
+		require.Equal(t, "owner", role)
 	})
 
 	t.Run("duplicate name", func(t *testing.T) {
@@ -45,7 +74,7 @@ func TestStoreTrack(t *testing.T) {
 			Name: "test_track",
 		}
 
-		err := s.addTrack(track)
+		err := s.addTrack(track, 1)
 		require.Error(t, err)
 	})
 }
@@ -56,7 +85,7 @@ func TestStoreFindTrack(t *testing.T) {
 	}
 
 	s := initTestStore(t)
-	err := s.addTrack(track)
+	err := s.addTrack(track, 1)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), track.Id)
 
@@ -71,10 +100,19 @@ func TestStoreFindTrack(t *testing.T) {
 		require.ErrorIs(t, err, errorTrackNotFound)
 	})
 
-	t.Run("list all", func(t *testing.T) {
-		tracks, err := s.listTracks()
+	t.Run("list for non-member user returns empty", func(t *testing.T) {
+		tracks, err := s.listTracks(999)
 		require.NoError(t, err)
-		require.Equal(t, []TrackModel{*track}, tracks)
+		require.Empty(t, tracks)
+	})
+
+	t.Run("list for owner user returns track", func(t *testing.T) {
+		tracks, err := s.listTracks(1)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(tracks))
+		require.Equal(t, track.Id, tracks[0].Id)
+		require.Equal(t, "owner", tracks[0].Role)
+		require.Equal(t, false, tracks[0].Liked)
 	})
 }
 
@@ -87,7 +125,7 @@ func TestStoreDeleteTrack(t *testing.T) {
 	}
 
 	for _, tr := range tracks {
-		err := s.addTrack(tr)
+		err := s.addTrack(tr, 1)
 		require.NoError(t, err)
 	}
 
@@ -106,7 +144,7 @@ func TestStoreSeries(t *testing.T) {
 	track := &TrackModel{Name: "test_track"}
 
 	s := initTestStore(t)
-	err := s.addTrack(track)
+	err := s.addTrack(track, 1)
 	require.NoError(t, err)
 
 	t.Run("add series with existing track", func(t *testing.T) {
@@ -148,7 +186,7 @@ func TestStoreFindSeries(t *testing.T) {
 	track := &TrackModel{Name: "test_track"}
 
 	s := initTestStore(t)
-	err := s.addTrack(track)
+	err := s.addTrack(track, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -189,7 +227,7 @@ func TestStoreDeleteSeries(t *testing.T) {
 	track := &TrackModel{Name: "test_track"}
 
 	s := initTestStore(t)
-	err := s.addTrack(track)
+	err := s.addTrack(track, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -216,7 +254,7 @@ func TestStoreValue(t *testing.T) {
 	track := &TrackModel{Name: "test_track"}
 
 	s := initTestStore(t)
-	err := s.addTrack(track)
+	err := s.addTrack(track, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -270,7 +308,7 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackModel{Name: "test_track"}
-	err := s.addTrack(tr)
+	err := s.addTrack(tr, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{TrackId: tr.Id, Name: "test_series", DataType: "float"}
@@ -291,7 +329,7 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 
 	// Delete track should cascade delete series
 	tr2 := &TrackModel{Name: "test_track2"}
-	err = s.addTrack(tr2)
+	err = s.addTrack(tr2, 1)
 	require.NoError(t, err)
 
 	series2 := &SeriesModel{TrackId: tr2.Id, Name: "test_series2", DataType: "float"}
@@ -314,4 +352,115 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	values2, err := s.listValues(series2.Id, 0)
 	require.NoError(t, err)
 	require.Empty(t, values2)
+}
+
+func TestStoreMember(t *testing.T) {
+	s := initTestStore(t)
+
+	tr := &TrackModel{Name: "test_track"}
+	err := s.addTrack(tr, 1)
+	require.NoError(t, err)
+
+	t.Run("non-member", func(t *testing.T) {
+		ok, role, err := s.isMember(999, tr.Id)
+		require.NoError(t, err)
+		require.False(t, ok)
+		require.Empty(t, role)
+	})
+
+	t.Run("owner member", func(t *testing.T) {
+		ok, role, err := s.isMember(1, tr.Id)
+		require.NoError(t, err)
+		require.True(t, ok)
+		require.Equal(t, "owner", role)
+	})
+}
+
+func TestStoreLike(t *testing.T) {
+	s := initTestStore(t)
+
+	tr := &TrackModel{Name: "test_track"}
+	err := s.addTrack(tr, 1)
+	require.NoError(t, err)
+
+	t.Run("add like", func(t *testing.T) {
+		err := s.addLike(999, tr.Id)
+		require.NoError(t, err)
+
+		tracks, err := s.listTracks(999)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(tracks))
+		require.True(t, tracks[0].Liked)
+		require.Empty(t, tracks[0].Role)
+	})
+
+	t.Run("remove like", func(t *testing.T) {
+		err := s.removeLike(999, tr.Id)
+		require.NoError(t, err)
+
+		tracks, err := s.listTracks(999)
+		require.NoError(t, err)
+		require.Empty(t, tracks)
+	})
+
+	t.Run("remove non-existing like", func(t *testing.T) {
+		err := s.removeLike(999, tr.Id)
+		require.NoError(t, err)
+	})
+
+	t.Run("duplicate like is idempotent", func(t *testing.T) {
+		err := s.addLike(888, tr.Id)
+		require.NoError(t, err)
+		err = s.addLike(888, tr.Id)
+		require.NoError(t, err)
+
+		tracks, err := s.listTracks(888)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(tracks))
+	})
+}
+
+func TestStoreTrackListUserScoped(t *testing.T) {
+	s := initTestStore(t)
+
+	// Create tracks owned by user 1
+	tr1 := &TrackModel{Name: "track1"}
+	require.NoError(t, s.addTrack(tr1, 1))
+
+	tr2 := &TrackModel{Name: "track2"}
+	require.NoError(t, s.addTrack(tr2, 1))
+
+	// User 2 likes track1
+	require.NoError(t, s.addLike(2, tr1.Id))
+
+	t.Run("user 1 sees owned tracks with liked flag", func(t *testing.T) {
+		tracks, err := s.listTracks(1)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(tracks))
+		for _, tr := range tracks {
+			require.Equal(t, "owner", tr.Role)
+		}
+	})
+
+	t.Run("user 2 sees liked tracks only", func(t *testing.T) {
+		tracks, err := s.listTracks(2)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(tracks))
+		require.Equal(t, tr1.Id, tracks[0].Id)
+		require.True(t, tracks[0].Liked)
+		require.Empty(t, tracks[0].Role)
+	})
+
+	t.Run("user 3 sees nothing", func(t *testing.T) {
+		tracks, err := s.listTracks(3)
+		require.NoError(t, err)
+		require.Empty(t, tracks)
+	})
+
+	t.Run("track delete cascades to member and like", func(t *testing.T) {
+		require.NoError(t, s.deleteTrack(tr1.Id))
+		tracks, err := s.listTracks(2)
+		require.NoError(t, err)
+		require.Empty(t, tracks)
+	})
 }

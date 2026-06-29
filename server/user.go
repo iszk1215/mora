@@ -51,6 +51,15 @@ func (s *userStore) Init() error {
 			UNIQUE(provider, provider_user_id)
 		)
 	`)
+	if err != nil {
+		return err
+	}
+
+	// seed superuser (id=1) for API key auth
+	_, err = s.db.Exec(
+		`INSERT OR IGNORE INTO user (id, provider, provider_user_id, username, avatar_url)
+		 VALUES (1, 'system', 'superuser', 'admin', '')`,
+	)
 	return err
 }
 
