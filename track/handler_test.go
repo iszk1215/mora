@@ -125,7 +125,7 @@ func TestRequireAuth(t *testing.T) {
 func TestHandlerCreateTrack(t *testing.T) {
 	t.Run("valid name with auth", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "test_track"})
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "test_track", Visibility: "private"})
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusCreated, h, r)
 
@@ -137,20 +137,34 @@ func TestHandlerCreateTrack(t *testing.T) {
 
 	t.Run("duplicate name", func(t *testing.T) {
 		h := newTestHandler(t)
-		r1 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "dup"})
+		r1 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "dup", Visibility: "private"})
 		r1 = r1.WithContext(superuserCtx())
 		getResponse(t, http.StatusCreated, h, r1)
 
-		r2 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "dup"})
+		r2 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "dup", Visibility: "private"})
 		r2 = r2.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r2)
 	})
 
 	t.Run("forbidden without auth", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "no_auth"})
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "no_auth", Visibility: "private"})
 		// no auth context → anonymous user
 		getResponse(t, http.StatusForbidden, h, r)
+	})
+
+	t.Run("missing visibility", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "test", Visibility: ""})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("invalid visibility", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "test", Visibility: "invalid"})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
 	})
 }
 

@@ -2,6 +2,7 @@
 
 - **v7**: 二重認証（Session + API Key）設計 + フロントエンド設計を追加
 - **v8**: ユーザー権限管理（track_member/track_like）、スーパーユーザー、フロントエンド閲覧/編集分離
+- **v9**: トラック作成ページ（TrackCreate）+ visibility 作成時指定必須化、アバタードロップダウンに Create Track 追加
 
 ## 概要
 
@@ -278,22 +279,26 @@ Response 200:
 func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 ```
 
-Request:
+Request (v9: visibility 必須):
 ```json
-{ "name": "build_metrics" }
+{ "name": "build_metrics", "visibility": "private" }
 ```
 
 Response 201:
 ```json
-{ "id": 1, "name": "build_metrics" }
+{ "id": 1, "name": "build_metrics", "visibility": "private", "role": "owner", "liked": false }
 ```
 
-CreateTrackRequest 型（swaggo 用に公開）:
+CreateTrackRequest 型（swaggo 用に公開、v9: visibility 追加）:
 ```go
 type CreateTrackRequest struct {
-    Name string `json:"name"`
+    Name       string `json:"name"`       // required
+    Visibility string `json:"visibility"` // required: "public"|"unlisted"|"private"
 }
 ```
+
+- `visibility` は必須。不正な値の場合は 400 Bad Request
+- 今後拡張: `description` フィールド追加予定
 
 リクエストボディ 1MB 制限（`MaxBytesReader`）。
 
@@ -856,6 +861,7 @@ top-level (`/track`、repo 非依存、`/scms` と同列):
 | Path | Page | 説明 | 編集権限 |
 |------|------|------|---------|
 | `/track` | TrackListView | 「My Tracks」「Liked Tracks」セクション分け一覧 | なし |
+| `/track/new` | TrackCreate | トラック作成フォーム（name + visibility） | 認証必須 |
 | `/track/:trackId` | TrackDetailView | トラック詳細（閲覧のみ＋Likeボタン） | なし |
 | `/track/:trackId/edit` | TrackDetailEdit | トラック詳細（編集用） | role 必須 |
 
@@ -864,6 +870,7 @@ top-level (`/track`、repo 非依存、`/scms` と同列):
 ```typescript
 export const trackRoute = [
   { index: true, element: <TrackListView />, loader: loadTrackList },
+  { path: 'new', element: <TrackCreate /> },               // v9: TrackCreate ページ
   {
     path: ':trackId',
     loader: loadTrackDetail,
@@ -893,13 +900,13 @@ interface ValueModel  { time: string; value: number }
 
 #### API 関数
 
-| 関数 | Method | Path | v8変更 |
-|------|--------|------|--------|
-| `listTracks()` | GET | `/api/track` | 戻り値に role/liked 追加 |
-| `createTrack(name)` | POST | `/api/track` | 変更なし |
-| `deleteTrack(id)` | DELETE | `/api/track/{id}` | 変更なし |
-| `likeTrack(trackId)` | POST | `/api/track/{id}/like` | **新規** |
-| `unlikeTrack(trackId)` | DELETE | `/api/track/{id}/like` | **新規** |
+| 関数 | Method | Path | 変更 |
+|------|--------|------|------|
+| `listTracks()` | GET | `/api/track` | v8: 戻り値に role/liked 追加 |
+| `createTrack(name, visibility)` | POST | `/api/track` | v9: visibility 必須 |
+| `deleteTrack(id)` | DELETE | `/api/track/{id}` | v8: 権限チェック |
+| `likeTrack(trackId)` | POST | `/api/track/{id}/like` | v8: 新規 |
+| `unlikeTrack(trackId)` | DELETE | `/api/track/{id}/like` | v8: 新規 |
 | その他 series/value系 | — | — | 変更なし |
 
 #### TrackListView (`/track`)
@@ -931,6 +938,16 @@ interface ValueModel  { time: string; value: number }
 - `role != ""` の場合: 「Edit」リンク表示 → `/track/:trackId/edit`
 - Loader: `loadTrackDetail`（既存の `listSeries`）
 
+#### TrackCreate (`/track/new`) (v9)
+
+- トラック作成専用ページ
+- Form: name (text input, required) + visibility (select, default `private`)
+- Create 成功 → `navigate(/track/:id)`（詳細画面へ）
+- Create 失敗 → エラーメッセージ表示
+- Cancel → `<Link to="/track">`
+- TrackListView のインライン form を廃止し、代わりに「Create Track」リンクを配置
+- アバタードロップダウンメニューにも「Create Track」リンクを追加
+
 #### TrackDetailEdit (`/track/:trackId/edit`)
 
 - パンくず: Top > Track > `track.name` > Edit
@@ -939,22 +956,16 @@ interface ValueModel  { time: string; value: number }
 
 ---
 
-## 実装順序 (v8)
+## 実装順序 (v9)
 
 ### バックエンド
 
-1. `server/user.go` — `Init()` に superuser (id=1) seed を追加
-2. `track/store.go` — `track_member`/`track_like` スキーマ追加、`TrackResponse` 型追加、既存メソッド変更 + 新規メソッド追加
-3. `track/store_test.go` — 新規メソッドのテスト追加
-4. `track/handler.go` — `ContextWithAuth` シグネチャ変更、`requireAuth` に userID 設定追加、編集権限チェック追加、`likeTrack`/`unlikeTrack` 追加、ルーター更新
-5. `track/handler_test.go` — 権限チェック/Like のテスト追加
-6. `server/server.go` — `requireTrackAuth` に userID 受け渡し追加
-7. `server/server_test.go` — 統合テスト更新
-8. `go build ./... && make test`
+1. `track/handler.go` — `CreateTrackRequest` に `Visibility` 追加 + 必須バリデーション
+2. `track/handler_test.go` — visibility 必須テスト追加
 
 ### フロントエンド
 
-9. `frontend/src/track.tsx` — `TrackListView`/`TrackDetailView`/`TrackDetailEdit` に分割、like/unlike API 追加
-10. `frontend/src/main.tsx` — ルート定義更新（view/edit 分離 + パンくず）
-11. `frontend/src/track.test.tsx` — テスト更新
-12. `make frontend-test && go build ./...`
+3. `frontend/src/track.tsx` — `TrackCreate` コンポーネント追加、`createTrack` に visibility パラメータ追加、ルート追加、TrackListView の inline form → Create Track リンク置換
+4. `frontend/src/main.tsx` — アバタードロップダウンに「Create Track」リンク追加
+5. `frontend/src/track.test.tsx` — TrackCreate テスト追加 + TrackListView テスト更新
+6. `make test-all && go build ./...`

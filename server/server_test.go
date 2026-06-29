@@ -814,7 +814,7 @@ func TestTrackEndpointIsMounted(t *testing.T) {
 	})
 
 	t.Run("POST /api/track requires auth", func(t *testing.T) {
-		body := `{"name":"integration_test"}`
+		body := `{"name":"integration_test","visibility":"private"}`
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/api/track", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")

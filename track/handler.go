@@ -41,7 +41,8 @@ type (
 	}
 
 	CreateTrackRequest struct {
-		Name string `json:"name"`
+		Name       string `json:"name"`
+		Visibility string `json:"visibility"` // required: "public"|"unlisted"|"private"
 	}
 
 	CreateSeriesRequest struct {
@@ -265,13 +266,22 @@ func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Name == "" {
+		render.BadRequest(w, errors.New("name is required"))
+		return
+	}
+	if req.Visibility != "public" && req.Visibility != "unlisted" && req.Visibility != "private" {
+		render.BadRequest(w, errors.New("visibility must be one of: public, unlisted, private"))
+		return
+	}
+
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
 		render.Forbidden(w, errors.New("anonymous users cannot create tracks"))
 		return
 	}
 
-	track := TrackModel{Name: req.Name, Visibility: "private"}
+	track := TrackModel{Name: req.Name, Visibility: req.Visibility}
 	err = h.store.addTrack(&track, uid)
 	if err != nil {
 		log.Warn().Err(err).Msg("addTrack")

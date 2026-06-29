@@ -9,6 +9,7 @@ import {
   LoaderFunctionArgs,
   Params,
   useLoaderData,
+  useNavigate,
 } from 'react-router'
 
 import { Button } from '@/components/ui/button'
@@ -62,11 +63,11 @@ async function listTracks(): Promise<TrackResponse[]> {
   return data.tracks ?? []
 }
 
-async function createTrack(name: string): Promise<TrackResponse> {
+async function createTrack(name: string, visibility: string): Promise<TrackResponse> {
   const resp = await fetch('/api/track', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, visibility }),
   })
   if (!resp.ok) throw resp
   return resp.json()
@@ -179,18 +180,6 @@ const TrackChart = (params: TrackChartProps): React.JSX.Element => {
 export const TrackListView = (): React.JSX.Element => {
   const initial = useLoaderData() as TrackResponse[]
   const [tracks, setTracks] = useState<TrackResponse[]>(initial)
-  const [newName, setNewName] = useState('')
-
-  const handleCreate = async () => {
-    if (!newName.trim()) return
-    try {
-      const created = await createTrack(newName.trim())
-      setTracks((prev) => [...prev, created])
-      setNewName('')
-    } catch {
-      // ignore
-    }
-  }
 
   const handleDelete = async (id: number) => {
     try {
@@ -203,8 +192,6 @@ export const TrackListView = (): React.JSX.Element => {
 
   const myTracks = tracks.filter((t) => t.role !== '')
   const likedTracks = tracks.filter((t) => t.liked)
-
-  const userCanCreate = tracks.some((t) => t.role !== '' || t.liked)
 
   const renderTrackTable = (rows: TrackResponse[], showActions: boolean) => (
     <Table>
@@ -251,19 +238,9 @@ export const TrackListView = (): React.JSX.Element => {
     <div>
       <h1 className="text-3xl my-4">Tracks</h1>
 
-      {userCanCreate && (
-        <div className="flex items-center gap-2 mb-4">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="New track name"
-            className="border rounded px-2 py-1"
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
-          />
-          <Button onClick={handleCreate} disabled={!newName.trim()}>Add Track</Button>
-        </div>
-      )}
+      <div className="mb-4">
+        <Button asChild><Link to="/track/new">Create Track</Link></Button>
+      </div>
 
       {myTracks.length > 0 && (
         <div className="mb-6">
@@ -664,11 +641,89 @@ export const TrackDetailEdit = (): React.JSX.Element => {
   )
 }
 
+export const TrackCreate = (): React.JSX.Element => {
+  const navigate = useNavigate()
+  const [name, setName] = useState('')
+  const [visibility, setVisibility] = useState('private')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const handleCreate = async () => {
+    if (!name.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const created = await createTrack(name.trim(), visibility)
+      navigate(`/track/${created.id}`)
+    } catch {
+      setError('Failed to create track. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <Link to="/track" className="text-blue-600 dark:text-blue-500 hover:underline">
+          &larr; Back to Tracks
+        </Link>
+      </div>
+
+      <h1 className="text-3xl my-4">Create Track</h1>
+
+      {error && <p className="text-red-500 mb-2">{error}</p>}
+
+      <div className="flex flex-col gap-4 max-w-md">
+        <div>
+          <label className="block mb-1">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Track name"
+            className="border rounded px-2 py-1 w-full"
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
+            disabled={loading}
+          />
+        </div>
+
+        <div>
+          <label className="block mb-1">Visibility</label>
+          <select
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value)}
+            className="border rounded px-2 py-1 w-full"
+            disabled={loading}
+          >
+            <option value="private">Private</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/track">Cancel</Link>
+          </Button>
+          <Button onClick={handleCreate} disabled={!name.trim() || loading}>
+            Create
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export const trackRoute = [
   {
     index: true,
     element: <TrackListView />,
     loader: loadTrackList,
+  },
+  {
+    path: 'new',
+    element: <TrackCreate />,
   },
   {
     path: ':trackId',

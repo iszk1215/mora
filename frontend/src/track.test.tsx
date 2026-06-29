@@ -2,11 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
-import { TrackListView, TrackDetailView, TrackDetailEdit, loadTrackList, loadTrackDetail, patchTrack } from './track'
+import { TrackCreate, TrackListView, TrackDetailView, TrackDetailEdit, loadTrackList, loadTrackDetail, patchTrack } from './track'
 
+const mockNavigate = vi.fn()
 vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
-  return { ...actual, useLoaderData: vi.fn() }
+  return { ...actual, useLoaderData: vi.fn(), useNavigate: () => mockNavigate }
 })
 
 vi.mock('echarts-for-react', () => ({
@@ -130,13 +131,11 @@ describe('TrackListView', () => {
     expect(screen.getByText('Tracks')).toBeInTheDocument()
   })
 
-  it('shows add track input when user has tracks', () => {
-    vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, name: 'track-a', visibility: 'private', role: 'owner', liked: false },
-    ])
+  it('shows Create Track link', () => {
+    vi.mocked(useLoaderData).mockReturnValue([])
     render(<MemoryRouter><TrackListView /></MemoryRouter>)
-    expect(screen.getByPlaceholderText('New track name')).toBeInTheDocument()
-    expect(screen.getByText('Add Track')).toBeInTheDocument()
+    const link = screen.getByText('Create Track').closest('a')
+    expect(link).toHaveAttribute('href', '/track/new')
   })
 
   it('shows My Tracks and Liked Tracks sections', () => {
@@ -156,11 +155,74 @@ describe('TrackListView', () => {
     render(<MemoryRouter><TrackListView /></MemoryRouter>)
     expect(screen.getByText('\u2665')).toBeInTheDocument()
   })
+})
 
-  it('hides add track form for anonymous users', () => {
-    vi.mocked(useLoaderData).mockReturnValue([])
-    render(<MemoryRouter><TrackListView /></MemoryRouter>)
-    expect(screen.queryByPlaceholderText('New track name')).not.toBeInTheDocument()
+describe('TrackCreate', () => {
+  beforeEach(() => {
+    mockNavigate.mockReset()
+    globalThis.fetch = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('renders form with name input, visibility select, and buttons', () => {
+    render(<MemoryRouter><TrackCreate /></MemoryRouter>)
+    expect(screen.getByPlaceholderText('Track name')).toBeInTheDocument()
+    expect(screen.getByText('Create Track')).toBeInTheDocument()
+    expect(screen.getByText('Cancel')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Private')).toBeInTheDocument()
+    const cancelLink = screen.getByText('Cancel').closest('a')
+    expect(cancelLink).toHaveAttribute('href', '/track')
+  })
+
+  it('creates track and navigates on submit', async () => {
+    const created = { id: 42, name: 'new-track', visibility: 'private', role: 'owner', liked: false }
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(created),
+    } as Response)
+
+    render(<MemoryRouter><TrackCreate /></MemoryRouter>)
+    const input = screen.getByPlaceholderText('Track name')
+    const createBtn = screen.getByText('Create')
+
+    input.focus()
+    // Simulate typing
+    input.setAttribute('value', 'new-track')
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+
+    createBtn.click()
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'new-track', visibility: 'private' }),
+      })
+      expect(mockNavigate).toHaveBeenCalledWith('/track/42')
+    })
+  })
+
+  it('shows error on API failure', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: false,
+      status: 400,
+    } as Response)
+
+    render(<MemoryRouter><TrackCreate /></MemoryRouter>)
+    const input = screen.getByPlaceholderText('Track name')
+    const createBtn = screen.getByText('Create')
+
+    input.setAttribute('value', 'fail-track')
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+
+    createBtn.click()
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('Failed to create track. Please try again.')).toBeInTheDocument()
+    })
   })
 })
 

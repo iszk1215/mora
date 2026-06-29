@@ -209,6 +209,9 @@ export const Header = (): React.JSX.Element => {
                     <a href="/track"
                        className="block px-4 py-2 hover:bg-gray-100 text-sm"
                        onClick={() => setMenuOpen(false)}>My tracks</a>
+                    <a href="/track/new"
+                       className="block px-4 py-2 hover:bg-gray-100 text-sm"
+                       onClick={() => setMenuOpen(false)}>Create Track</a>
                   </div>
                 )}
               </div>
