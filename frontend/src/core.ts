@@ -40,6 +40,7 @@ export interface UserData {
 export interface TrackResponse {
   id: number
   name: string
+  visibility: string
   role: string
   liked: boolean
 }

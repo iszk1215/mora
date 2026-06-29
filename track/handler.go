@@ -21,8 +21,9 @@ type (
 	}
 
 	TrackModel struct {
-		Id   int64  `json:"id"   db:"id"`
-		Name string `json:"name" db:"name"`
+		Id         int64  `json:"id"         db:"id"`
+		Name       string `json:"name"       db:"name"`
+		Visibility string `json:"visibility" db:"visibility"`
 	}
 
 	SeriesModel struct {
@@ -51,6 +52,10 @@ type (
 	CreateValueRequest struct {
 		Timestamp time.Time `json:"time"`
 		Value     float64   `json:"value"`
+	}
+
+	PatchTrackRequest struct {
+		Visibility string `json:"visibility"`
 	}
 
 	ListTracksResponse struct {
@@ -172,6 +177,40 @@ func (h *trackHandler) requireEditPermission(next http.Handler) http.Handler {
 	})
 }
 
+func (h *trackHandler) requireReadPermission(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		track, ok := trackFrom(r.Context())
+		if !ok {
+			render.BadRequest(w, errors.New("no track in context"))
+			return
+		}
+		if track.Visibility == "public" || track.Visibility == "unlisted" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		uid, ok := UserIDFromContext(r.Context())
+		if !ok {
+			render.Forbidden(w, errors.New("this track is private"))
+			return
+		}
+		if uid == 1 {
+			next.ServeHTTP(w, r)
+			return
+		}
+		member, _, err := h.store.isMember(uid, track.Id)
+		if err != nil {
+			log.Error().Err(err).Msg("requireReadPermission isMember")
+			render.InternalError(w, err)
+			return
+		}
+		if !member {
+			render.Forbidden(w, errors.New("this track is private"))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // ----------------------------------------------------------------------
 // Track
 
@@ -232,7 +271,7 @@ func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	track := TrackModel{Name: req.Name}
+	track := TrackModel{Name: req.Name, Visibility: "private"}
 	err = h.store.addTrack(&track, uid)
 	if err != nil {
 		log.Warn().Err(err).Msg("addTrack")
@@ -240,7 +279,14 @@ func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	render.JSON(w, track, http.StatusCreated)
+	resp := TrackResponse{
+		Id:         track.Id,
+		Name:       track.Name,
+		Visibility: track.Visibility,
+		Role:       "owner",
+		Liked:      false,
+	}
+	render.JSON(w, resp, http.StatusCreated)
 }
 
 // DeleteTrack godoc
@@ -267,6 +313,71 @@ func (h *trackHandler) deleteTrack(w http.ResponseWriter, r *http.Request) {
 }
 
 // ----------------------------------------------------------------------
+// Track (mutation)
+
+// PatchTrack godoc
+// @Summary      Update a track
+// @Description  Update track fields (e.g. visibility). Requires edit permission.
+// @Tags         track
+// @Accept       json
+// @Produce      json
+// @Param        trackId  path  int                    true  "Track ID"
+// @Param        body     body  track.PatchTrackRequest  true  "Fields to update"
+// @Success      200  {object}  track.TrackResponse
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/track/{trackId} [patch]
+func (h *trackHandler) patchTrack(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			log.Error().Err(err).Msg("Body.Close")
+		}
+	}()
+
+	var req PatchTrackRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		log.Warn().Err(err).Msg("invalid patch body")
+		render.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	valid := req.Visibility == "public" || req.Visibility == "unlisted" || req.Visibility == "private"
+	if !valid {
+		render.BadRequest(w, errors.New("visibility must be 'public', 'unlisted', or 'private'"))
+		return
+	}
+
+	track, _ := trackFrom(r.Context())
+	err = h.store.updateVisibility(track.Id, req.Visibility)
+	if err != nil {
+		log.Error().Err(err).Msg("patchTrack updateVisibility")
+		render.InternalError(w, err)
+		return
+	}
+
+	uid, _ := UserIDFromContext(r.Context())
+	track.Visibility = req.Visibility
+
+	resp := TrackResponse{
+		Id:         track.Id,
+		Name:       track.Name,
+		Visibility: track.Visibility,
+	}
+	if member, role, err := h.store.isMember(uid, track.Id); err == nil && member {
+		resp.Role = role
+	}
+	if liked, err := h.store.isLiked(uid, track.Id); err == nil {
+		resp.Liked = liked
+	}
+
+	render.JSON(w, resp, http.StatusOK)
+}
+
+// ----------------------------------------------------------------------
 // Series
 
 // ListSeries godoc
@@ -289,7 +400,7 @@ func (h *trackHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trackResp := TrackResponse{Id: track.Id, Name: track.Name}
+	trackResp := TrackResponse{Id: track.Id, Name: track.Name, Visibility: track.Visibility}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		_, role, err := h.store.isMember(uid, track.Id)
 		if err == nil {
@@ -631,7 +742,9 @@ func newHandler(store *trackStore, apiKey string) http.Handler {
 
 		r.Route("/{trackId}", func(r chi.Router) {
 			r.Use(h.injectTrack)
+			r.Use(h.requireReadPermission)
 			r.With(h.requireEditPermission).Delete("/", h.deleteTrack)
+			r.With(h.requireEditPermission).Patch("/", h.patchTrack)
 			r.Post("/like", h.likeTrack)
 			r.Delete("/like", h.unlikeTrack)
 

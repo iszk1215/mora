@@ -16,7 +16,8 @@ var (
 var schemaTrack = `
 CREATE TABLE IF NOT EXISTS track (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE
+    name TEXT NOT NULL UNIQUE,
+    visibility TEXT NOT NULL DEFAULT 'private'
 )`
 
 var schemaSeries = `
@@ -60,10 +61,11 @@ type (
 
 // TrackResponse is returned in track lists and includes user-specific flags.
 type TrackResponse struct {
-	Id    int64  `json:"id"    db:"id"`
-	Name  string `json:"name"  db:"name"`
-	Role  string `json:"role"`  // "" | "owner" | "editor"
-	Liked bool   `json:"liked"`
+	Id         int64  `json:"id"    db:"id"`
+	Name       string `json:"name"  db:"name"`
+	Visibility string `json:"visibility"` // "public" | "unlisted" | "private"
+	Role       string `json:"role"`       // "" | "owner" | "editor"
+	Liked      bool   `json:"liked"`
 }
 
 func newTrackStore(db *sqlx.DB) *trackStore {
@@ -74,9 +76,12 @@ func newTrackStore(db *sqlx.DB) *trackStore {
 // Track
 
 func (s *trackStore) addTrack(track *TrackModel, userID int64) error {
-	query := "INSERT INTO track (name) VALUES (?)"
+	if track.Visibility == "" {
+		track.Visibility = "private"
+	}
+	query := "INSERT INTO track (name, visibility) VALUES (?, ?)"
 
-	res, err := s.db.Exec(query, track.Name)
+	res, err := s.db.Exec(query, track.Name, track.Visibility)
 	if err != nil {
 		return fmt.Errorf("addTrack insert: %w", err)
 	}
@@ -98,7 +103,7 @@ func (s *trackStore) addTrack(track *TrackModel, userID int64) error {
 
 func (s *trackStore) listTracks(userID int64) ([]TrackResponse, error) {
 	query := `
-		SELECT t.id, t.name,
+		SELECT t.id, t.name, t.visibility,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked
 		FROM track t
@@ -117,7 +122,7 @@ func (s *trackStore) listTracks(userID int64) ([]TrackResponse, error) {
 }
 
 func (s *trackStore) findTrackById(id int64) (*TrackModel, error) {
-	query := "SELECT id, name FROM track WHERE id = ?"
+	query := "SELECT id, name, visibility FROM track WHERE id = ?"
 
 	rows := []TrackModel{}
 	err := s.db.Select(&rows, query, id)
@@ -137,6 +142,22 @@ func (s *trackStore) deleteTrack(id int64) error {
 	_, err := s.db.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("deleteTrack delete: %w", err)
+	}
+	return nil
+}
+
+func (s *trackStore) updateVisibility(id int64, visibility string) error {
+	query := "UPDATE track SET visibility = ? WHERE id = ?"
+	res, err := s.db.Exec(query, visibility, id)
+	if err != nil {
+		return fmt.Errorf("updateVisibility exec: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("updateVisibility RowsAffected: %w", err)
+	}
+	if n == 0 {
+		return errorTrackNotFound
 	}
 	return nil
 }

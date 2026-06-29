@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
-import { TrackListView, TrackDetailView, TrackDetailEdit, loadTrackList, loadTrackDetail } from './track'
+import { TrackListView, TrackDetailView, TrackDetailEdit, loadTrackList, loadTrackDetail, patchTrack } from './track'
 
 vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
@@ -28,8 +28,8 @@ describe('loadTrackList', () => {
 
   it('returns tracks array from successful API response', async () => {
     const mockTracks = [
-      { id: 1, name: 'track-a', role: 'owner', liked: false },
-      { id: 2, name: 'track-b', role: '', liked: true },
+      { id: 1, name: 'track-a', visibility: 'private', role: 'owner', liked: false },
+      { id: 2, name: 'track-b', visibility: 'public', role: '', liked: true },
     ]
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
@@ -62,7 +62,7 @@ describe('loadTrackDetail', () => {
 
   it('returns track detail from API response', async () => {
     const mockResponse = {
-      track: { id: 1, name: 'test', role: 'owner', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: 'owner', liked: false },
       series: [{ id: 1, track_id: 1, name: 's1', data_type: 'float' }],
     }
     vi.mocked(globalThis.fetch).mockResolvedValue({
@@ -84,6 +84,41 @@ describe('loadTrackDetail', () => {
   })
 })
 
+describe('patchTrack', () => {
+  beforeEach(() => {
+    globalThis.fetch = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('sends PATCH request with visibility and returns updated track', async () => {
+    const updated = { id: 1, name: 'test', visibility: 'public', role: 'owner', liked: false }
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(updated),
+    } as Response)
+
+    const result = await patchTrack(1, 'public')
+    expect(result).toEqual(updated)
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/track/1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visibility: 'public' }),
+    })
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: false,
+      status: 403,
+    } as Response)
+
+    await expect(patchTrack(1, 'public')).rejects.toBeDefined()
+  })
+})
+
 describe('TrackListView', () => {
   beforeEach(() => {
     vi.mocked(useLoaderData).mockReset()
@@ -97,7 +132,7 @@ describe('TrackListView', () => {
 
   it('shows add track input when user has tracks', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, name: 'track-a', role: 'owner', liked: false },
+      { id: 1, name: 'track-a', visibility: 'private', role: 'owner', liked: false },
     ])
     render(<MemoryRouter><TrackListView /></MemoryRouter>)
     expect(screen.getByPlaceholderText('New track name')).toBeInTheDocument()
@@ -106,8 +141,8 @@ describe('TrackListView', () => {
 
   it('shows My Tracks and Liked Tracks sections', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, name: 'my-track', role: 'owner', liked: false },
-      { id: 2, name: 'liked-track', role: '', liked: true },
+      { id: 1, name: 'my-track', visibility: 'private', role: 'owner', liked: false },
+      { id: 2, name: 'liked-track', visibility: 'public', role: '', liked: true },
     ])
     render(<MemoryRouter><TrackListView /></MemoryRouter>)
     expect(screen.getByText('My Tracks')).toBeInTheDocument()
@@ -116,7 +151,7 @@ describe('TrackListView', () => {
 
   it('shows liked indicator on liked tracks', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, name: 'liked-track', role: '', liked: true },
+      { id: 1, name: 'liked-track', visibility: 'public', role: '', liked: true },
     ])
     render(<MemoryRouter><TrackListView /></MemoryRouter>)
     expect(screen.getByText('\u2665')).toBeInTheDocument()
@@ -144,7 +179,7 @@ describe('TrackDetailView', () => {
 
   it('renders track name', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test-track', role: '', liked: false },
+      track: { id: 1, name: 'test-track', visibility: 'private', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackDetailView /></MemoryRouter>)
@@ -153,7 +188,7 @@ describe('TrackDetailView', () => {
 
   it('renders Like button', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: '', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackDetailView /></MemoryRouter>)
@@ -162,7 +197,7 @@ describe('TrackDetailView', () => {
 
   it('renders Unlike button when liked', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: '', liked: true },
+      track: { id: 1, name: 'test', visibility: 'private', role: '', liked: true },
       series: [],
     })
     render(<MemoryRouter><TrackDetailView /></MemoryRouter>)
@@ -171,7 +206,7 @@ describe('TrackDetailView', () => {
 
   it('shows Edit button when user has role', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: 'owner', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackDetailView /></MemoryRouter>)
@@ -180,7 +215,7 @@ describe('TrackDetailView', () => {
 
   it('hides Edit button when user has no role', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: '', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackDetailView /></MemoryRouter>)
@@ -189,7 +224,7 @@ describe('TrackDetailView', () => {
 
   it('renders datepickers', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: '', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackDetailView /></MemoryRouter>)
@@ -199,7 +234,7 @@ describe('TrackDetailView', () => {
 
   it('renders series table with name and data type', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: '', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: '', liked: false },
       series: [{ id: 1, track_id: 1, name: 'series-a', data_type: 'float' }],
     })
     render(<MemoryRouter><TrackDetailView /></MemoryRouter>)
@@ -223,7 +258,7 @@ describe('TrackDetailEdit', () => {
 
   it('renders edit heading with track name', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'edit-track', role: 'owner', liked: false },
+      track: { id: 1, name: 'edit-track', visibility: 'private', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackDetailEdit /></MemoryRouter>)
@@ -232,7 +267,7 @@ describe('TrackDetailEdit', () => {
 
   it('renders Add Series form', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: 'owner', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackDetailEdit /></MemoryRouter>)
@@ -242,7 +277,7 @@ describe('TrackDetailEdit', () => {
 
   it('renders Add Value form', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: 'owner', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: 'owner', liked: false },
       series: [{ id: 1, track_id: 1, name: 's1', data_type: 'float' }],
     })
     render(<MemoryRouter><TrackDetailEdit /></MemoryRouter>)
@@ -251,11 +286,22 @@ describe('TrackDetailEdit', () => {
 
   it('back link goes to track detail', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      track: { id: 1, name: 'test', role: 'owner', liked: false },
+      track: { id: 1, name: 'test', visibility: 'private', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackDetailEdit /></MemoryRouter>)
     const backLink = screen.getByText(/Back to Track/).closest('a')
     expect(backLink).toHaveAttribute('href', '/track/1')
+  })
+
+  it('renders visibility selector', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      track: { id: 1, name: 'test', visibility: 'unlisted', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><TrackDetailEdit /></MemoryRouter>)
+    expect(screen.getByText('Visibility')).toBeInTheDocument()
+    const select = screen.getByDisplayValue('Unlisted')
+    expect(select).toBeInTheDocument()
   })
 })

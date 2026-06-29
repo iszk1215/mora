@@ -140,6 +140,45 @@ func TestStoreDeleteTrack(t *testing.T) {
 	})
 }
 
+func TestStoreUpdateVisibility(t *testing.T) {
+	s := initTestStore(t)
+
+	track := &TrackModel{Name: "vis_test"}
+	require.NoError(t, s.addTrack(track, 1))
+
+	t.Run("update to public", func(t *testing.T) {
+		err := s.updateVisibility(track.Id, "public")
+		require.NoError(t, err)
+
+		got, err := s.findTrackById(track.Id)
+		require.NoError(t, err)
+		require.Equal(t, "public", got.Visibility)
+	})
+
+	t.Run("update to unlisted", func(t *testing.T) {
+		err := s.updateVisibility(track.Id, "unlisted")
+		require.NoError(t, err)
+
+		got, err := s.findTrackById(track.Id)
+		require.NoError(t, err)
+		require.Equal(t, "unlisted", got.Visibility)
+	})
+
+	t.Run("update to private", func(t *testing.T) {
+		err := s.updateVisibility(track.Id, "private")
+		require.NoError(t, err)
+
+		got, err := s.findTrackById(track.Id)
+		require.NoError(t, err)
+		require.Equal(t, "private", got.Visibility)
+	})
+
+	t.Run("non-existing track returns error", func(t *testing.T) {
+		err := s.updateVisibility(99999, "public")
+		require.ErrorIs(t, err, errorTrackNotFound)
+	})
+}
+
 func TestStoreSeries(t *testing.T) {
 	track := &TrackModel{Name: "test_track"}
 

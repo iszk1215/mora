@@ -122,6 +122,16 @@ async function unlikeTrack(trackId: number): Promise<void> {
   if (!resp.ok) throw resp
 }
 
+export async function patchTrack(trackId: number, visibility: string): Promise<TrackResponse> {
+  const resp = await fetch(`/api/track/${trackId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ visibility }),
+  })
+  if (!resp.ok) throw resp
+  return resp.json()
+}
+
 export async function loadTrackList(): Promise<TrackResponse[]> {
   return listTracks()
 }
@@ -418,6 +428,17 @@ export const TrackDetailEdit = (): React.JSX.Element => {
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
 
+  const [visibility, setVisibility] = useState(track.visibility)
+
+  const handleVisibilityChange = async (newVisibility: string) => {
+    try {
+      await patchTrack(track.id, newVisibility)
+      setVisibility(newVisibility)
+    } catch {
+      // ignore
+    }
+  }
+
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
@@ -627,6 +648,18 @@ export const TrackDetailEdit = (): React.JSX.Element => {
           Add
         </Button>
       </div>
+
+      {/* Visibility */}
+      <h2 className="text-xl my-2">Visibility</h2>
+      <select
+        value={visibility}
+        onChange={(e) => handleVisibilityChange(e.target.value)}
+        className="border rounded px-2 py-1 mb-4"
+      >
+        <option value="private">Private</option>
+        <option value="unlisted">Unlisted</option>
+        <option value="public">Public</option>
+      </select>
     </div>
   )
 }

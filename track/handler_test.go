@@ -237,6 +237,102 @@ func TestHandlerDeleteTrack(t *testing.T) {
 	})
 }
 
+func TestHandlerPatchTrack(t *testing.T) {
+	t.Run("owner changes visibility to public", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := PatchTrackRequest{Visibility: "public"}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got TrackResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, "public", got.Visibility)
+		require.Equal(t, "owner", got.Role)
+	})
+
+	t.Run("non-member cannot change visibility", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := PatchTrackRequest{Visibility: "public"}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		var uid int64 = 2
+		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
+		getResponse(t, http.StatusForbidden, h, r)
+	})
+
+	t.Run("invalid visibility value", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d", tr.Id)
+		type badBody struct {
+			Visibility string `json:"visibility"`
+		}
+		r := newRequestWithJSON(t, http.MethodPatch, path, badBody{Visibility: "invalid"})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+}
+
+func TestHandlerRequireReadPermission(t *testing.T) {
+	t.Run("public track accessible by anonymous", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test", Visibility: "public"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/series", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		getResponse(t, http.StatusOK, h, r)
+	})
+
+	t.Run("unlisted track accessible by anonymous", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test", Visibility: "unlisted"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/series", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		getResponse(t, http.StatusOK, h, r)
+	})
+
+	t.Run("private track blocked for anonymous", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test", Visibility: "private"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/series", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		getResponse(t, http.StatusForbidden, h, r)
+	})
+
+	t.Run("private track accessible by member", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackModel{Name: "test", Visibility: "private"}
+		require.NoError(t, store.addTrack(tr, 1))
+
+		h := newHandler(store, "")
+		path := fmt.Sprintf("/%d/series", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusOK, h, r)
+	})
+}
+
 func TestHandlerInjectTrackDBError(t *testing.T) {
 	store := initTestStore(t)
 	tr := &TrackModel{Name: "test_track"}
@@ -354,6 +450,7 @@ func TestHandlerListSeries(t *testing.T) {
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
 		var got ListSeriesResponse
@@ -373,6 +470,7 @@ func TestHandlerListSeries(t *testing.T) {
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
 		var got ListSeriesResponse
@@ -512,6 +610,7 @@ func TestHandlerListValues(t *testing.T) {
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
 		var got ListValuesResponse
@@ -536,6 +635,7 @@ func TestHandlerListValues(t *testing.T) {
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
 		var got ListValuesResponse
@@ -559,6 +659,7 @@ func TestHandlerListValues(t *testing.T) {
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series/%d/values?limit=3", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
 		var got ListValuesResponse
@@ -576,6 +677,7 @@ func TestHandlerListValues(t *testing.T) {
 		h := newHandler(store, "")
 		path := fmt.Sprintf("/%d/series/%d/values?limit=abc", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
 }
