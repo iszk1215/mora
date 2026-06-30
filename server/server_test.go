@@ -17,7 +17,7 @@ import (
 	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/mockscm"
-	"github.com/iszk1215/mora/track"
+	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -145,8 +145,8 @@ func (b *MoraServerBuilder) WithSessionManager() *MoraServerBuilder {
 	return b
 }
 
-func (b *MoraServerBuilder) WithTrack(trackService *track.Service) *MoraServerBuilder {
-	b.Server.track = trackService
+func (b *MoraServerBuilder) WithTracker(trackerService *tracker.Service) *MoraServerBuilder {
+	b.Server.tracker = trackerService
 	return b
 }
 
@@ -783,23 +783,23 @@ func TestHandleMe_LoggedIn(t *testing.T) {
 	require.Equal(t, "https://example.com/avatar.jpg", got.AvatarURL)
 }
 
-func TestTrackEndpointIsMounted(t *testing.T) {
+func TestTrackerEndpointIsMounted(t *testing.T) {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
 
-	trackService, err := track.NewService(db)
+	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).
 		WithSessionManager().
-		WithTrack(trackService).
+		WithTracker(trackerService).
 		Finish()
 
 	handler := server.Handler()
 
-	t.Run("GET /api/track returns 200", func(t *testing.T) {
+	t.Run("GET /api/tracker returns 200", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, "/api/track", nil)
+		r := httptest.NewRequest(http.MethodGet, "/api/tracker", nil)
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()
@@ -809,22 +809,22 @@ func TestTrackEndpointIsMounted(t *testing.T) {
 		body, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
 
-		var resp track.ListTracksResponse
+		var resp tracker.ListTrackersResponse
 		err = json.Unmarshal(body, &resp)
 		require.NoError(t, err)
-		require.Empty(t, resp.Tracks)
+		require.Empty(t, resp.Trackers)
 	})
 
-	t.Run("POST /api/track requires auth", func(t *testing.T) {
+	t.Run("POST /api/tracker requires auth", func(t *testing.T) {
 		body := `{"name":"integration_test","visibility":"private"}`
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/api/track", strings.NewReader(body))
+		r := httptest.NewRequest(http.MethodPost, "/api/tracker", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
-		// anonymous users cannot create tracks
+		// anonymous users cannot create trackers
 		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
 }

@@ -1,4 +1,4 @@
-package track
+package tracker
 
 import (
 	"bytes"
@@ -89,81 +89,81 @@ func TestRequireAuth(t *testing.T) {
 }
 
 // ----------------------------------------------------------------------
-// Track
+// Tracker
 
-func TestHandlerCreateTrack(t *testing.T) {
+func TestHandlerCreateTracker(t *testing.T) {
 	t.Run("valid name with auth", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "test_track", Visibility: "private"})
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{Name: "test_tracker", Visibility: "private"})
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusCreated, h, r)
 
-		var got TrackModel
+		var got TrackerModel
 		unmarshalResponse(t, res, &got)
 		require.Equal(t, int64(1), got.Id)
-		require.Equal(t, "test_track", got.Name)
+		require.Equal(t, "test_tracker", got.Name)
 	})
 
 	t.Run("duplicate name", func(t *testing.T) {
 		h := newTestHandler(t)
-		r1 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "dup", Visibility: "private"})
+		r1 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{Name: "dup", Visibility: "private"})
 		r1 = r1.WithContext(superuserCtx())
 		getResponse(t, http.StatusCreated, h, r1)
 
-		r2 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "dup", Visibility: "private"})
+		r2 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{Name: "dup", Visibility: "private"})
 		r2 = r2.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r2)
 	})
 
 	t.Run("forbidden without auth", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "no_auth", Visibility: "private"})
-		// no auth context → anonymous user
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{Name: "no_auth", Visibility: "private"})
+		// no auth context -> anonymous user
 		getResponse(t, http.StatusForbidden, h, r)
 	})
 
 	t.Run("missing visibility", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "test", Visibility: ""})
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{Name: "test", Visibility: ""})
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
 
 	t.Run("invalid visibility", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackRequest{Name: "test", Visibility: "invalid"})
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{Name: "test", Visibility: "invalid"})
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
 }
 
-func TestHandlerListTracks(t *testing.T) {
+func TestHandlerListTrackers(t *testing.T) {
 	t.Run("empty for authenticated user", func(t *testing.T) {
 		h := newTestHandler(t)
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
-		var got ListTracksResponse
+		var got ListTrackersResponse
 		unmarshalResponse(t, res, &got)
-		require.Empty(t, got.Tracks)
+		require.Empty(t, got.Trackers)
 	})
 
-	t.Run("with tracks", func(t *testing.T) {
+	t.Run("with trackers", func(t *testing.T) {
 		store := initTestStore(t)
-		tr1 := &TrackModel{Name: "track1"}
-		tr2 := &TrackModel{Name: "track2"}
-		require.NoError(t, store.addTrack(tr1, 1))
-		require.NoError(t, store.addTrack(tr2, 1))
+		tr1 := &TrackerModel{Name: "tracker1"}
+		tr2 := &TrackerModel{Name: "tracker2"}
+		require.NoError(t, store.addTracker(tr1, 1))
+		require.NoError(t, store.addTracker(tr2, 1))
 
 		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
-		var got ListTracksResponse
+		var got ListTrackersResponse
 		unmarshalResponse(t, res, &got)
-		require.Equal(t, 2, len(got.Tracks))
+		require.Equal(t, 2, len(got.Trackers))
 	})
 
 	t.Run("returns empty for anonymous", func(t *testing.T) {
@@ -171,17 +171,17 @@ func TestHandlerListTracks(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		res := getResponse(t, http.StatusOK, h, r)
 
-		var got ListTracksResponse
+		var got ListTrackersResponse
 		unmarshalResponse(t, res, &got)
-		require.Empty(t, got.Tracks)
+		require.Empty(t, got.Trackers)
 	})
 }
 
-func TestHandlerDeleteTrack(t *testing.T) {
-	t.Run("delete existing track as member", func(t *testing.T) {
+func TestHandlerDeleteTracker(t *testing.T) {
+	t.Run("delete existing tracker as member", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
@@ -192,13 +192,13 @@ func TestHandlerDeleteTrack(t *testing.T) {
 
 	t.Run("delete forbidden without edit permission", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
-		// anonymous user, no context set → requireAuth sets ContextWithAuth(ctx, nil)
+		// anonymous user, no context set -> requireAuth sets ContextWithAuth(ctx, nil)
 		r = r.WithContext(ContextWithAuth(context.Background(), nil))
 		getResponse(t, http.StatusForbidden, h, r)
 	})
@@ -211,7 +211,7 @@ func TestHandlerDeleteTrack(t *testing.T) {
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
 
-	t.Run("delete non existing track", func(t *testing.T) {
+	t.Run("delete non existing tracker", func(t *testing.T) {
 		store := initTestStore(t)
 		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodDelete, "/99999", nil)
@@ -220,20 +220,20 @@ func TestHandlerDeleteTrack(t *testing.T) {
 	})
 }
 
-func TestHandlerPatchTrack(t *testing.T) {
+func TestHandlerPatchTracker(t *testing.T) {
 	t.Run("owner changes visibility to public", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
-		body := PatchTrackRequest{Visibility: "public"}
+		body := PatchTrackerRequest{Visibility: "public"}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
 
-		var got TrackResponse
+		var got TrackerResponse
 		unmarshalResponse(t, res, &got)
 		require.Equal(t, "public", got.Visibility)
 		require.Equal(t, "owner", got.Role)
@@ -241,12 +241,12 @@ func TestHandlerPatchTrack(t *testing.T) {
 
 	t.Run("non-member cannot change visibility", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
-		body := PatchTrackRequest{Visibility: "public"}
+		body := PatchTrackerRequest{Visibility: "public"}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		var uid int64 = 2
 		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
@@ -255,8 +255,8 @@ func TestHandlerPatchTrack(t *testing.T) {
 
 	t.Run("invalid visibility value", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
@@ -270,10 +270,10 @@ func TestHandlerPatchTrack(t *testing.T) {
 }
 
 func TestHandlerRequireReadPermission(t *testing.T) {
-	t.Run("public track accessible by anonymous", func(t *testing.T) {
+	t.Run("public tracker accessible by anonymous", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test", Visibility: "public"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test", Visibility: "public"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -281,10 +281,10 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 		getResponse(t, http.StatusOK, h, r)
 	})
 
-	t.Run("unlisted track accessible by anonymous", func(t *testing.T) {
+	t.Run("unlisted tracker accessible by anonymous", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test", Visibility: "unlisted"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test", Visibility: "unlisted"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -292,10 +292,10 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 		getResponse(t, http.StatusOK, h, r)
 	})
 
-	t.Run("private track blocked for anonymous", func(t *testing.T) {
+	t.Run("private tracker blocked for anonymous", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test", Visibility: "private"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test", Visibility: "private"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -303,10 +303,10 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 		getResponse(t, http.StatusForbidden, h, r)
 	})
 
-	t.Run("private track accessible by member", func(t *testing.T) {
+	t.Run("private tracker accessible by member", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test", Visibility: "private"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test", Visibility: "private"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -316,10 +316,10 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 	})
 }
 
-func TestHandlerInjectTrackDBError(t *testing.T) {
+func TestHandlerInjectTrackerDBError(t *testing.T) {
 	store := initTestStore(t)
-	tr := &TrackModel{Name: "test_track"}
-	require.NoError(t, store.addTrack(tr, 1))
+	tr := &TrackerModel{Name: "test_tracker"}
+	require.NoError(t, store.addTracker(tr, 1))
 
 	require.NoError(t, store.db.Close())
 
@@ -344,8 +344,8 @@ func TestHandlerInjectTrackDBError(t *testing.T) {
 func TestHandlerCreateSeries(t *testing.T) {
 	t.Run("success with data_type float", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -361,8 +361,8 @@ func TestHandlerCreateSeries(t *testing.T) {
 
 	t.Run("success with data_type int", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -377,8 +377,8 @@ func TestHandlerCreateSeries(t *testing.T) {
 
 	t.Run("default data_type is float", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -393,8 +393,8 @@ func TestHandlerCreateSeries(t *testing.T) {
 
 	t.Run("invalid data_type", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -403,7 +403,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
 
-	t.Run("non existing track", func(t *testing.T) {
+	t.Run("non existing tracker", func(t *testing.T) {
 		store := initTestStore(t)
 		h := newHandler(store)
 		r := newRequestWithJSON(t, http.MethodPost, "/99999/series", CreateSeriesRequest{Name: "s1", DataType: "float"})
@@ -413,8 +413,8 @@ func TestHandlerCreateSeries(t *testing.T) {
 
 	t.Run("forbidden without auth", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -427,8 +427,8 @@ func TestHandlerCreateSeries(t *testing.T) {
 func TestHandlerListSeries(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
@@ -438,16 +438,16 @@ func TestHandlerListSeries(t *testing.T) {
 
 		var got ListSeriesResponse
 		unmarshalResponse(t, res, &got)
-		require.Equal(t, tr.Id, got.Track.Id)
+		require.Equal(t, tr.Id, got.Tracker.Id)
 		require.Empty(t, got.Series)
 	})
 
 	t.Run("with series", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
-		s1 := &SeriesModel{TrackId: tr.Id, Name: "series1", DataType: "float"}
+		s1 := &SeriesModel{TrackerId: tr.Id, Name: "series1", DataType: "float"}
 		require.NoError(t, store.addSeries(s1))
 
 		h := newHandler(store)
@@ -466,10 +466,10 @@ func TestHandlerListSeries(t *testing.T) {
 func TestHandlerDeleteSeries(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
@@ -481,8 +481,8 @@ func TestHandlerDeleteSeries(t *testing.T) {
 
 	t.Run("non existing series", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/99999", tr.Id)
@@ -491,14 +491,14 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		getResponse(t, http.StatusNotFound, h, r)
 	})
 
-	t.Run("series from different track", func(t *testing.T) {
+	t.Run("series from different tracker", func(t *testing.T) {
 		store := initTestStore(t)
-		tr1 := &TrackModel{Name: "track1"}
-		tr2 := &TrackModel{Name: "track2"}
-		require.NoError(t, store.addTrack(tr1, 1))
-		require.NoError(t, store.addTrack(tr2, 1))
+		tr1 := &TrackerModel{Name: "tracker1"}
+		tr2 := &TrackerModel{Name: "tracker2"}
+		require.NoError(t, store.addTracker(tr1, 1))
+		require.NoError(t, store.addTracker(tr2, 1))
 
-		s := &SeriesModel{TrackId: tr2.Id, Name: "s1", DataType: "float"}
+		s := &SeriesModel{TrackerId: tr2.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
@@ -515,9 +515,9 @@ func TestHandlerDeleteSeries(t *testing.T) {
 func TestHandlerCreateValue(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
@@ -535,9 +535,9 @@ func TestHandlerCreateValue(t *testing.T) {
 
 	t.Run("duplicate time", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
@@ -554,9 +554,9 @@ func TestHandlerCreateValue(t *testing.T) {
 
 	t.Run("invalid JSON", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
@@ -568,9 +568,9 @@ func TestHandlerCreateValue(t *testing.T) {
 
 	t.Run("forbidden without auth", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
@@ -585,9 +585,9 @@ func TestHandlerCreateValue(t *testing.T) {
 func TestHandlerListValues(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
@@ -604,9 +604,9 @@ func TestHandlerListValues(t *testing.T) {
 
 	t.Run("with values", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		now := time.Now().Round(0)
@@ -628,9 +628,9 @@ func TestHandlerListValues(t *testing.T) {
 
 	t.Run("with limit", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		now := time.Now().Round(0)
@@ -652,9 +652,9 @@ func TestHandlerListValues(t *testing.T) {
 
 	t.Run("invalid limit", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
-		s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
@@ -667,9 +667,9 @@ func TestHandlerListValues(t *testing.T) {
 
 func TestHandlerDeleteValues(t *testing.T) {
 	store := initTestStore(t)
-	tr := &TrackModel{Name: "test"}
-	require.NoError(t, store.addTrack(tr, 1))
-	s := &SeriesModel{TrackId: tr.Id, Name: "s1", DataType: "float"}
+	tr := &TrackerModel{Name: "test"}
+	require.NoError(t, store.addTracker(tr, 1))
+	s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 	require.NoError(t, store.addSeries(s))
 
 	now := time.Now().Round(0)
@@ -689,10 +689,10 @@ func TestHandlerDeleteValues(t *testing.T) {
 // Like
 
 func TestHandlerLike(t *testing.T) {
-	t.Run("like and unlike track", func(t *testing.T) {
+	t.Run("like and unlike tracker", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/like", tr.Id)
@@ -706,10 +706,10 @@ func TestHandlerLike(t *testing.T) {
 		listR := httptest.NewRequest(http.MethodGet, "/", nil)
 		listR = listR.WithContext(superuserCtx())
 		listRes := getResponse(t, http.StatusOK, h, listR)
-		var list ListTracksResponse
+		var list ListTrackersResponse
 		unmarshalResponse(t, listRes, &list)
-		require.Len(t, list.Tracks, 1)
-		require.True(t, list.Tracks[0].Liked)
+		require.Len(t, list.Trackers, 1)
+		require.True(t, list.Trackers[0].Liked)
 
 		// Unlike
 		r2 := httptest.NewRequest(http.MethodDelete, path, nil)
@@ -720,15 +720,15 @@ func TestHandlerLike(t *testing.T) {
 		listR2 := httptest.NewRequest(http.MethodGet, "/", nil)
 		listR2 = listR2.WithContext(superuserCtx())
 		listRes2 := getResponse(t, http.StatusOK, h, listR2)
-		var list2 ListTracksResponse
+		var list2 ListTrackersResponse
 		unmarshalResponse(t, listRes2, &list2)
-		require.False(t, list2.Tracks[0].Liked)
+		require.False(t, list2.Trackers[0].Liked)
 	})
 
 	t.Run("like requires auth", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/like", tr.Id)
@@ -738,8 +738,8 @@ func TestHandlerLike(t *testing.T) {
 
 	t.Run("unlike requires auth", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/like", tr.Id)
@@ -747,7 +747,7 @@ func TestHandlerLike(t *testing.T) {
 		getResponse(t, http.StatusForbidden, h, r)
 	})
 
-	t.Run("like non-existing track", func(t *testing.T) {
+	t.Run("like non-existing tracker", func(t *testing.T) {
 		h := newTestHandler(t)
 		r := httptest.NewRequest(http.MethodPost, "/99999/like", nil)
 		r = r.WithContext(superuserCtx())
@@ -756,8 +756,8 @@ func TestHandlerLike(t *testing.T) {
 
 	t.Run("duplicate like is idempotent", func(t *testing.T) {
 		store := initTestStore(t)
-		tr := &TrackModel{Name: "test"}
-		require.NoError(t, store.addTrack(tr, 1))
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/like", tr.Id)

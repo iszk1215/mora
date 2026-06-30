@@ -37,7 +37,7 @@ export interface UserData {
   avatar_url: string
 }
 
-export interface TrackResponse {
+export interface TrackerResponse {
   id: number
   name: string
   visibility: string

@@ -19,7 +19,7 @@ import './index.css'
 import { Repo, UserData } from './core'
 import { coverageRoute } from './coverage'
 import { udmRoute, loadUdmMetrics } from './udm'
-import { trackRoute } from './track'
+import { trackerRoute } from './tracker'
 import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
 import { DefaultLink, HeaderLink, ExternalLink } from './util'
@@ -208,12 +208,12 @@ export const Header = (): React.JSX.Element => {
                 )}
                 {menuOpen && (
                   <div className="absolute right-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
-                    <a href="/track"
+                    <a href="/tracker"
                        className="block px-4 py-2 hover:bg-gray-100 text-sm"
-                       onClick={() => setMenuOpen(false)}>My tracks</a>
-                    <a href="/track/new"
+                       onClick={() => setMenuOpen(false)}>My Trackers</a>
+                    <a href="/tracker/new"
                        className="block px-4 py-2 hover:bg-gray-100 text-sm"
-                       onClick={() => setMenuOpen(false)}>Create Track</a>
+                       onClick={() => setMenuOpen(false)}>Create Tracker</a>
                     <a href="/settings/api-keys"
                        className="block px-4 py-2 hover:bg-gray-100 text-sm"
                        onClick={() => setMenuOpen(false)}>API Keys</a>
@@ -361,11 +361,11 @@ const router = createBrowserRouter([
         children: [apiKeyRoute],
       },
       {
-        path: '/track',
+        path: '/tracker',
         handle: {
-          crumb: (_params: Params, _data: any) => ({ label: "Track", link: "/track" }),
+          crumb: (_params: Params, _data: any) => ({ label: "Tracker", link: "/tracker" }),
         },
-        children: trackRoute,
+        children: trackerRoute,
       },
       {
         path: '/repos/:repo_id',

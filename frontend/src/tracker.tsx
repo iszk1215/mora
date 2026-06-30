@@ -21,11 +21,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { TrackResponse } from './core'
+import { TrackerResponse } from './core'
 
 interface SeriesModel {
   id: number
-  track_id: number
+  tracker_id: number
   name: string
   data_type: string
 }
@@ -45,26 +45,26 @@ interface Dataset {
   label: string
 }
 
-interface TrackChartProps {
+interface TrackerChartProps {
   data?: { datasets: Dataset[] }
   min?: Date | null
   max?: Date | null
 }
 
-interface TrackDetailData {
-  track: TrackResponse
+interface TrackerDetailData {
+  tracker: TrackerResponse
   series: SeriesModel[]
 }
 
-async function listTracks(): Promise<TrackResponse[]> {
-  const resp = await fetch('/api/track')
+async function listTrackers(): Promise<TrackerResponse[]> {
+  const resp = await fetch('/api/tracker')
   if (!resp.ok) throw resp
   const data = await resp.json()
-  return data.tracks ?? []
+  return data.trackers ?? []
 }
 
-async function createTrack(name: string, visibility: string): Promise<TrackResponse> {
-  const resp = await fetch('/api/track', {
+async function createTracker(name: string, visibility: string): Promise<TrackerResponse> {
+  const resp = await fetch('/api/tracker', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, visibility }),
@@ -73,19 +73,19 @@ async function createTrack(name: string, visibility: string): Promise<TrackRespo
   return resp.json()
 }
 
-async function deleteTrack(id: number): Promise<void> {
-  const resp = await fetch(`/api/track/${id}`, { method: 'DELETE' })
+async function deleteTracker(id: number): Promise<void> {
+  const resp = await fetch(`/api/tracker/${id}`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-async function listSeries(trackId: number): Promise<TrackDetailData> {
-  const resp = await fetch(`/api/track/${trackId}/series`)
+async function listSeries(trackerId: number): Promise<TrackerDetailData> {
+  const resp = await fetch(`/api/tracker/${trackerId}/series`)
   if (!resp.ok) throw resp
   return resp.json()
 }
 
-async function createSeries(trackId: number, name: string, dataType: string): Promise<SeriesModel> {
-  const resp = await fetch(`/api/track/${trackId}/series`, {
+async function createSeries(trackerId: number, name: string, dataType: string): Promise<SeriesModel> {
+  const resp = await fetch(`/api/tracker/${trackerId}/series`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, data_type: dataType }),
@@ -94,13 +94,13 @@ async function createSeries(trackId: number, name: string, dataType: string): Pr
   return resp.json()
 }
 
-async function deleteSeries(trackId: number, seriesId: number): Promise<void> {
-  const resp = await fetch(`/api/track/${trackId}/series/${seriesId}`, { method: 'DELETE' })
+async function deleteSeries(trackerId: number, seriesId: number): Promise<void> {
+  const resp = await fetch(`/api/tracker/${trackerId}/series/${seriesId}`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-async function createValue(trackId: number, seriesId: number, time: string, value: number): Promise<void> {
-  const resp = await fetch(`/api/track/${trackId}/series/${seriesId}/values`, {
+async function createValue(trackerId: number, seriesId: number, time: string, value: number): Promise<void> {
+  const resp = await fetch(`/api/tracker/${trackerId}/series/${seriesId}/values`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ time, value }),
@@ -108,23 +108,23 @@ async function createValue(trackId: number, seriesId: number, time: string, valu
   if (!resp.ok) throw resp
 }
 
-async function deleteValues(trackId: number, seriesId: number): Promise<void> {
-  const resp = await fetch(`/api/track/${trackId}/series/${seriesId}/values`, { method: 'DELETE' })
+async function deleteValues(trackerId: number, seriesId: number): Promise<void> {
+  const resp = await fetch(`/api/tracker/${trackerId}/series/${seriesId}/values`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-async function likeTrack(trackId: number): Promise<void> {
-  const resp = await fetch(`/api/track/${trackId}/like`, { method: 'POST' })
+async function likeTracker(trackerId: number): Promise<void> {
+  const resp = await fetch(`/api/tracker/${trackerId}/like`, { method: 'POST' })
   if (!resp.ok) throw resp
 }
 
-async function unlikeTrack(trackId: number): Promise<void> {
-  const resp = await fetch(`/api/track/${trackId}/like`, { method: 'DELETE' })
+async function unlikeTracker(trackerId: number): Promise<void> {
+  const resp = await fetch(`/api/tracker/${trackerId}/like`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-export async function patchTrack(trackId: number, visibility: string): Promise<TrackResponse> {
-  const resp = await fetch(`/api/track/${trackId}`, {
+export async function patchTracker(trackerId: number, visibility: string): Promise<TrackerResponse> {
+  const resp = await fetch(`/api/tracker/${trackerId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ visibility }),
@@ -133,16 +133,16 @@ export async function patchTrack(trackId: number, visibility: string): Promise<T
   return resp.json()
 }
 
-export async function loadTrackList(): Promise<TrackResponse[]> {
-  return listTracks()
+export async function loadTrackerList(): Promise<TrackerResponse[]> {
+  return listTrackers()
 }
 
-export async function loadTrackDetail({ params }: LoaderFunctionArgs): Promise<TrackDetailData> {
-  if (!params.trackId) throw new Error('trackId is required')
-  return listSeries(parseInt(params.trackId))
+export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise<TrackerDetailData> {
+  if (!params.trackerId) throw new Error('trackerId is required')
+  return listSeries(parseInt(params.trackerId))
 }
 
-const TrackChart = (params: TrackChartProps): React.JSX.Element => {
+const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   const datasets = params.data?.datasets ?? []
 
   const option: any = {
@@ -177,23 +177,23 @@ const TrackChart = (params: TrackChartProps): React.JSX.Element => {
   )
 }
 
-export const TrackListView = (): React.JSX.Element => {
-  const initial = useLoaderData() as TrackResponse[]
-  const [tracks, setTracks] = useState<TrackResponse[]>(initial)
+export const TrackerView = (): React.JSX.Element => {
+  const initial = useLoaderData() as TrackerResponse[]
+  const [trackers, setTrackers] = useState<TrackerResponse[]>(initial)
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteTrack(id)
-      setTracks((prev) => prev.filter((t) => t.id !== id))
+      await deleteTracker(id)
+      setTrackers((prev) => prev.filter((t) => t.id !== id))
     } catch {
       // ignore
     }
   }
 
-  const myTracks = tracks.filter((t) => t.role !== '')
-  const likedTracks = tracks.filter((t) => t.liked)
+  const myTrackers = trackers.filter((t) => t.role !== '')
+  const likedTrackers = trackers.filter((t) => t.liked)
 
-  const renderTrackTable = (rows: TrackResponse[], showActions: boolean) => (
+  const renderTrackerTable = (rows: TrackerResponse[], showActions: boolean) => (
     <Table>
       <TableHeader>
         <TableRow>
@@ -213,7 +213,7 @@ export const TrackListView = (): React.JSX.Element => {
             <TableRow key={t.id}>
               <TableCell>
                 <Link
-                  to={`/track/${t.id}`}
+                  to={`/tracker/${t.id}`}
                   className="text-blue-600 dark:text-blue-500 hover:underline"
                 >
                   {t.name}
@@ -236,33 +236,33 @@ export const TrackListView = (): React.JSX.Element => {
 
   return (
     <div>
-      <h1 className="text-3xl my-4">Tracks</h1>
+      <h1 className="text-3xl my-4">Trackers</h1>
 
       <div className="mb-4">
-        <Button asChild><Link to="/track/new">Create Track</Link></Button>
+        <Button asChild><Link to="/tracker/new">Create Tracker</Link></Button>
       </div>
 
-      {myTracks.length > 0 && (
+      {myTrackers.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-xl my-2">My Tracks</h2>
-          {renderTrackTable(myTracks, true)}
+          <h2 className="text-xl my-2">My Trackers</h2>
+          {renderTrackerTable(myTrackers, true)}
         </div>
       )}
 
       <div>
-        <h2 className="text-xl my-2">Liked Tracks</h2>
-        {renderTrackTable(likedTracks, false)}
+        <h2 className="text-xl my-2">Liked Trackers</h2>
+        {renderTrackerTable(likedTrackers, false)}
       </div>
     </div>
   )
 }
 
-export const TrackDetailView = (): React.JSX.Element => {
-  const data = useLoaderData() as TrackDetailData
-  const { track } = data
+export const TrackerDetailView = (): React.JSX.Element => {
+  const data = useLoaderData() as TrackerDetailData
+  const { tracker } = data
   const [seriesList] = useState<SeriesModel[]>(data.series)
   const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
-  const [liked, setLiked] = useState(track.liked)
+  const [liked, setLiked] = useState(tracker.liked)
   const [likeLoading, setLikeLoading] = useState(false)
 
   const [startDate, setStartDate] = useState<Date | null>(null)
@@ -271,21 +271,21 @@ export const TrackDetailView = (): React.JSX.Element => {
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
-        fetch(`/api/track/${track.id}/series/${s.id}/values`)
+        fetch(`/api/tracker/${tracker.id}/series/${s.id}/values`)
           .then((r) => r.json() as Promise<{ values: ValueModel[] }>)
           .then((d) => ({ series: s, values: d.values ?? [] }))
       )
     ).then(setSeriesValues).catch(() => {})
-  }, [seriesList, track.id])
+  }, [seriesList, tracker.id])
 
   const handleLikeToggle = async () => {
     setLikeLoading(true)
     try {
       if (liked) {
-        await unlikeTrack(track.id)
+        await unlikeTracker(tracker.id)
         setLiked(false)
       } else {
-        await likeTrack(track.id)
+        await likeTracker(tracker.id)
         setLiked(true)
       }
     } catch {
@@ -305,13 +305,13 @@ export const TrackDetailView = (): React.JSX.Element => {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <Link to="/track" className="text-blue-600 dark:text-blue-500 hover:underline">
-          &larr; Back to Tracks
+        <Link to="/tracker" className="text-blue-600 dark:text-blue-500 hover:underline">
+          &larr; Back to Trackers
         </Link>
       </div>
 
       <div className="flex items-center gap-3 my-4">
-        <h1 className="text-3xl">{track.name}</h1>
+        <h1 className="text-3xl">{tracker.name}</h1>
         <Button
           variant={liked ? 'default' : 'secondary'}
           size="sm"
@@ -320,9 +320,9 @@ export const TrackDetailView = (): React.JSX.Element => {
         >
           {liked ? 'Unlike' : 'Like'}
         </Button>
-        {track.role !== '' && (
+        {tracker.role !== '' && (
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/track/${track.id}/edit`}>Edit</Link>
+            <Link to={`/tracker/${tracker.id}/edit`}>Edit</Link>
           </Button>
         )}
       </div>
@@ -354,7 +354,7 @@ export const TrackDetailView = (): React.JSX.Element => {
       </div>
 
       {datasets.length > 0 ? (
-        <TrackChart data={{ datasets }} min={startDate} max={endDate} />
+        <TrackerChart data={{ datasets }} min={startDate} max={endDate} />
       ) : (
         <p className="text-muted-foreground">No data to display</p>
       )}
@@ -390,9 +390,9 @@ export const TrackDetailView = (): React.JSX.Element => {
   )
 }
 
-export const TrackDetailEdit = (): React.JSX.Element => {
-  const data = useLoaderData() as TrackDetailData
-  const { track } = data
+export const TrackerDetailEdit = (): React.JSX.Element => {
+  const data = useLoaderData() as TrackerDetailData
+  const { tracker } = data
   const [seriesList, setSeriesList] = useState<SeriesModel[]>(data.series)
   const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
   const [newSeriesName, setNewSeriesName] = useState('')
@@ -405,11 +405,11 @@ export const TrackDetailEdit = (): React.JSX.Element => {
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
 
-  const [visibility, setVisibility] = useState(track.visibility)
+  const [visibility, setVisibility] = useState(tracker.visibility)
 
   const handleVisibilityChange = async (newVisibility: string) => {
     try {
-      await patchTrack(track.id, newVisibility)
+      await patchTracker(tracker.id, newVisibility)
       setVisibility(newVisibility)
     } catch {
       // ignore
@@ -419,17 +419,17 @@ export const TrackDetailEdit = (): React.JSX.Element => {
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
-        fetch(`/api/track/${track.id}/series/${s.id}/values`)
+        fetch(`/api/tracker/${tracker.id}/series/${s.id}/values`)
           .then((r) => r.json() as Promise<{ values: ValueModel[] }>)
           .then((d) => ({ series: s, values: d.values ?? [] }))
       )
     ).then(setSeriesValues).catch(() => {})
-  }, [seriesList, track.id])
+  }, [seriesList, tracker.id])
 
   const handleCreateSeries = async () => {
     if (!newSeriesName.trim()) return
     try {
-      const created = await createSeries(track.id, newSeriesName.trim(), newSeriesDataType)
+      const created = await createSeries(tracker.id, newSeriesName.trim(), newSeriesDataType)
       setSeriesList((prev) => [...prev, created])
       setNewSeriesName('')
     } catch {
@@ -439,7 +439,7 @@ export const TrackDetailEdit = (): React.JSX.Element => {
 
   const handleDeleteSeries = async (seriesId: number) => {
     try {
-      await deleteSeries(track.id, seriesId)
+      await deleteSeries(tracker.id, seriesId)
       setSeriesList((prev) => prev.filter((s) => s.id !== seriesId))
       setSeriesValues((prev) => prev.filter((sv) => sv.series.id !== seriesId))
     } catch {
@@ -450,10 +450,10 @@ export const TrackDetailEdit = (): React.JSX.Element => {
   const handleAddValue = async () => {
     if (selectedSeriesId === null || !newValueTime || !newValueNumber) return
     try {
-      await createValue(track.id, selectedSeriesId, new Date(newValueTime).toISOString(), parseFloat(newValueNumber))
+      await createValue(tracker.id, selectedSeriesId, new Date(newValueTime).toISOString(), parseFloat(newValueNumber))
       setNewValueTime('')
       setNewValueNumber('')
-      const resp = await fetch(`/api/track/${track.id}/series/${selectedSeriesId}/values`)
+      const resp = await fetch(`/api/tracker/${tracker.id}/series/${selectedSeriesId}/values`)
       const data = await resp.json()
       setSeriesValues((prev) =>
         prev.map((sv) =>
@@ -467,7 +467,7 @@ export const TrackDetailEdit = (): React.JSX.Element => {
 
   const handleDeleteValues = async (seriesId: number) => {
     try {
-      await deleteValues(track.id, seriesId)
+      await deleteValues(tracker.id, seriesId)
       setSeriesValues((prev) =>
         prev.map((sv) =>
           sv.series.id === seriesId ? { ...sv, values: [] } : sv
@@ -488,12 +488,12 @@ export const TrackDetailEdit = (): React.JSX.Element => {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <Link to={`/track/${track.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
-          &larr; Back to Track
+        <Link to={`/tracker/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
+          &larr; Back to Tracker
         </Link>
       </div>
 
-      <h1 className="text-3xl my-4">{track.name} (Edit)</h1>
+      <h1 className="text-3xl my-4">{tracker.name} (Edit)</h1>
 
       {/* Series list */}
       <h2 className="text-xl my-2">Series</h2>
@@ -586,7 +586,7 @@ export const TrackDetailEdit = (): React.JSX.Element => {
       </div>
 
       {datasets.length > 0 ? (
-        <TrackChart data={{ datasets }} min={startDate} max={endDate} />
+        <TrackerChart data={{ datasets }} min={startDate} max={endDate} />
       ) : (
         <p className="text-muted-foreground">No data to display</p>
       )}
@@ -641,7 +641,7 @@ export const TrackDetailEdit = (): React.JSX.Element => {
   )
 }
 
-export const TrackCreate = (): React.JSX.Element => {
+export const TrackerCreate = (): React.JSX.Element => {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [visibility, setVisibility] = useState('private')
@@ -653,10 +653,10 @@ export const TrackCreate = (): React.JSX.Element => {
     setLoading(true)
     setError(null)
     try {
-      const created = await createTrack(name.trim(), visibility)
-      navigate(`/track/${created.id}`)
+      const created = await createTracker(name.trim(), visibility)
+      navigate(`/tracker/${created.id}`)
     } catch {
-      setError('Failed to create track. Please try again.')
+      setError('Failed to create tracker. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -665,12 +665,12 @@ export const TrackCreate = (): React.JSX.Element => {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <Link to="/track" className="text-blue-600 dark:text-blue-500 hover:underline">
-          &larr; Back to Tracks
+        <Link to="/tracker" className="text-blue-600 dark:text-blue-500 hover:underline">
+          &larr; Back to Trackers
         </Link>
       </div>
 
-      <h1 className="text-3xl my-4">Create Track</h1>
+      <h1 className="text-3xl my-4">Create Tracker</h1>
 
       {error && <p className="text-red-500 mb-2">{error}</p>}
 
@@ -681,7 +681,7 @@ export const TrackCreate = (): React.JSX.Element => {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Track name"
+            placeholder="Tracker name"
             className="border rounded px-2 py-1 w-full"
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
             disabled={loading}
@@ -704,7 +704,7 @@ export const TrackCreate = (): React.JSX.Element => {
 
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link to="/track">Cancel</Link>
+            <Link to="/tracker">Cancel</Link>
           </Button>
           <Button onClick={handleCreate} disabled={!name.trim() || loading}>
             Create
@@ -715,30 +715,30 @@ export const TrackCreate = (): React.JSX.Element => {
   )
 }
 
-export const trackRoute = [
+export const trackerRoute = [
   {
     index: true,
-    element: <TrackListView />,
-    loader: loadTrackList,
+    element: <TrackerView />,
+    loader: loadTrackerList,
   },
   {
     path: 'new',
-    element: <TrackCreate />,
+    element: <TrackerCreate />,
   },
   {
-    path: ':trackId',
+    path: ':trackerId',
     handle: {
-      crumb: (params: Params, data: any) => ({ label: data?.track?.name ?? 'Track' }),
+      crumb: (params: Params, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }),
     },
-    loader: loadTrackDetail,
-    element: <TrackDetailView />,
+    loader: loadTrackerDetail,
+    element: <TrackerDetailView />,
   },
   {
-    path: ':trackId/edit',
+    path: ':trackerId/edit',
     handle: {
-      crumb: (params: Params, data: any) => ({ label: data?.track?.name ?? 'Track' }),
+      crumb: (params: Params, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }),
     },
-    loader: loadTrackDetail,
-    element: <TrackDetailEdit />,
+    loader: loadTrackerDetail,
+    element: <TrackerDetailEdit />,
   },
 ]

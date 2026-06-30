@@ -92,21 +92,21 @@ describe('Header', () => {
     expect(screen.queryByText('Login')).not.toBeInTheDocument()
   })
 
-  it('opens menu with My tracks link on avatar click', async () => {
+  it('opens menu with My Trackers link on avatar click', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
     )
     render(<MemoryRouter><Header /></MemoryRouter>)
     const img = await screen.findByRole('img')
-    expect(screen.queryByText('My tracks')).not.toBeInTheDocument()
+    expect(screen.queryByText('My Trackers')).not.toBeInTheDocument()
     await img.click()
-    const link = screen.getByText('My tracks')
+    const link = screen.getByText('My Trackers')
     expect(link).toBeInTheDocument()
-    expect(link.closest('a')).toHaveAttribute('href', '/track')
+    expect(link.closest('a')).toHaveAttribute('href', '/tracker')
   })
 
-  it('closes menu when clicking My tracks', async () => {
+  it('closes menu when clicking My Trackers', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -114,10 +114,10 @@ describe('Header', () => {
     render(<MemoryRouter><Header /></MemoryRouter>)
     const img = await screen.findByRole('img')
     await img.click()
-    expect(screen.getByText('My tracks')).toBeInTheDocument()
-    const link = screen.getByText('My tracks')
+    expect(screen.getByText('My Trackers')).toBeInTheDocument()
+    const link = screen.getByText('My Trackers')
     await link.click()
-    expect(screen.queryByText('My tracks')).not.toBeInTheDocument()
+    expect(screen.queryByText('My Trackers')).not.toBeInTheDocument()
   })
 
   it('renders nothing when avatar_url is empty', async () => {

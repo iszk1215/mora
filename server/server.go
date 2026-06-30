@@ -19,7 +19,7 @@ import (
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage"
 	"github.com/iszk1215/mora/render"
-	"github.com/iszk1215/mora/track"
+	"github.com/iszk1215/mora/tracker"
 	"github.com/iszk1215/mora/udm"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -71,7 +71,7 @@ type (
 		userStore          UserStore
 		coverage           *coverage.CoverageService
 		udm                *udm.Service
-		track              *track.Service
+		tracker              *tracker.Service
 		apiKey             string
 
 		sessionManager     *MoraSessionManager
@@ -262,11 +262,11 @@ func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 	})
 }
 
-func (s *MoraServer) requireTrackAuth(next http.Handler) http.Handler {
+func (s *MoraServer) requireTrackerAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sess, ok := MoraSessionFrom(r.Context())
 		if ok && sess.IsLoggedIn() {
-			r = r.WithContext(track.ContextWithAuth(r.Context(), sess.UserID()))
+			r = r.WithContext(tracker.ContextWithAuth(r.Context(), sess.UserID()))
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -274,7 +274,7 @@ func (s *MoraServer) requireTrackAuth(next http.Handler) http.Handler {
 		if token != "" && token != r.Header.Get("Authorization") {
 			user, err := s.userStore.FindUserByAPIKey(token)
 			if err == nil && user != nil {
-				r = r.WithContext(track.ContextWithAuth(r.Context(), &user.ID))
+				r = r.WithContext(tracker.ContextWithAuth(r.Context(), &user.ID))
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -312,8 +312,8 @@ func (s *MoraServer) Handler() http.Handler {
 		})
 	})
 
-	if s.track != nil {
-		r.With(s.requireTrackAuth).Mount("/api/track", s.track.Handler())
+	if s.tracker != nil {
+		r.With(s.requireTrackerAuth).Mount("/api/tracker", s.tracker.Handler())
 	}
 
 	// login/logout
@@ -480,7 +480,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	trackService, err := track.NewService(db)
+	trackerService, err := tracker.NewService(db)
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +494,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		frontendFileServer: frontendFileServer,
 		coverage:           coverage,
 		udm:                udm,
-		track:              trackService,
+		tracker:              trackerService,
 		apiKey:             os.Getenv("MORA_API_KEY"),
 	}
 

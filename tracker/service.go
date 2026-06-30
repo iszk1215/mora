@@ -1,4 +1,4 @@
-package track
+package tracker
 
 import (
 	"fmt"
@@ -9,15 +9,15 @@ import (
 )
 
 type Service struct {
-	store *trackStore
+	store *trackerStore
 }
 
 func NewService(db *sqlx.DB) (*Service, error) {
-	log.Print("track.NewService")
-	store := newTrackStore(db)
+	log.Print("tracker.NewService")
+	store := newTrackerStore(db)
 	err := store.initialize()
 	if err != nil {
-		return nil, fmt.Errorf("track store initialize: %w", err)
+		return nil, fmt.Errorf("tracker store initialize: %w", err)
 	}
 	return &Service{store: store}, nil
 }

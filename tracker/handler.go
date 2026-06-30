@@ -1,4 +1,4 @@
-package track
+package tracker
 
 import (
 	"context"
@@ -14,21 +14,21 @@ import (
 )
 
 type (
-	trackHandler struct {
-		store *trackStore
+	trackerHandler struct {
+		store *trackerStore
 	}
 
-	TrackModel struct {
+	TrackerModel struct {
 		Id         int64  `json:"id"         db:"id"`
 		Name       string `json:"name"       db:"name"`
 		Visibility string `json:"visibility" db:"visibility"`
 	}
 
 	SeriesModel struct {
-		Id       int64  `json:"id"        db:"id"`
-		TrackId  int64  `json:"track_id"  db:"track_id"`
-		Name     string `json:"name"      db:"name"`
-		DataType string `json:"data_type" db:"data_type"`
+		Id        int64  `json:"id"         db:"id"`
+		TrackerId int64  `json:"tracker_id" db:"tracker_id"`
+		Name      string `json:"name"       db:"name"`
+		DataType  string `json:"data_type"  db:"data_type"`
 	}
 
 	ValueModel struct {
@@ -38,7 +38,7 @@ type (
 		Value     float64   `json:"value" db:"value"`
 	}
 
-	CreateTrackRequest struct {
+	CreateTrackerRequest struct {
 		Name       string `json:"name"`
 		Visibility string `json:"visibility"` // required: "public"|"unlisted"|"private"
 	}
@@ -53,17 +53,17 @@ type (
 		Value     float64   `json:"value"`
 	}
 
-	PatchTrackRequest struct {
+	PatchTrackerRequest struct {
 		Visibility string `json:"visibility"`
 	}
 
-	ListTracksResponse struct {
-		Tracks []TrackResponse `json:"tracks"`
+	ListTrackersResponse struct {
+		Trackers []TrackerResponse `json:"trackers"`
 	}
 
 	ListSeriesResponse struct {
-		Track  TrackResponse `json:"track"`
-		Series []SeriesModel `json:"series"`
+		Tracker TrackerResponse `json:"tracker"`
+		Series  []SeriesModel   `json:"series"`
 	}
 
 	ListValuesResponse struct {
@@ -75,18 +75,18 @@ type (
 type contextKey int
 
 const (
-	trackContextKey contextKey = iota
+	trackerContextKey contextKey = iota
 	seriesContextKey
 	authCtxKey
 	userIDCtxKey
 )
 
-func withTrack(ctx context.Context, track TrackModel) context.Context {
-	return context.WithValue(ctx, trackContextKey, track)
+func withTracker(ctx context.Context, tracker TrackerModel) context.Context {
+	return context.WithValue(ctx, trackerContextKey, tracker)
 }
 
-func trackFrom(ctx context.Context) (TrackModel, bool) {
-	m, ok := ctx.Value(trackContextKey).(TrackModel)
+func trackerFrom(ctx context.Context) (TrackerModel, bool) {
+	m, ok := ctx.Value(trackerContextKey).(TrackerModel)
 	return m, ok
 }
 
@@ -124,7 +124,7 @@ func renderNoContent(w http.ResponseWriter) {
 // ----------------------------------------------------------------------
 // Auth
 
-func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
+func (h *trackerHandler) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isAuthenticated(r.Context()) {
 			next.ServeHTTP(w, r)
@@ -135,7 +135,7 @@ func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
 	})
 }
 
-func (h *trackHandler) requireEditPermission(next http.Handler) http.Handler {
+func (h *trackerHandler) requireEditPermission(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		uid, ok := UserIDFromContext(r.Context())
 		if !ok || uid == 0 {
@@ -146,53 +146,53 @@ func (h *trackHandler) requireEditPermission(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		track, ok := trackFrom(r.Context())
+		tracker, ok := trackerFrom(r.Context())
 		if !ok {
-			render.BadRequest(w, errors.New("no track in context"))
+			render.BadRequest(w, errors.New("no tracker in context"))
 			return
 		}
-		member, _, err := h.store.isMember(uid, track.Id)
+		member, _, err := h.store.isMember(uid, tracker.Id)
 		if err != nil {
 			log.Error().Err(err).Msg("requireEditPermission isMember")
 			render.InternalError(w, err)
 			return
 		}
 		if !member {
-			render.Forbidden(w, errors.New("not a track member"))
+			render.Forbidden(w, errors.New("not a tracker member"))
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-func (h *trackHandler) requireReadPermission(next http.Handler) http.Handler {
+func (h *trackerHandler) requireReadPermission(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		track, ok := trackFrom(r.Context())
+		tracker, ok := trackerFrom(r.Context())
 		if !ok {
-			render.BadRequest(w, errors.New("no track in context"))
+			render.BadRequest(w, errors.New("no tracker in context"))
 			return
 		}
-		if track.Visibility == "public" || track.Visibility == "unlisted" {
+		if tracker.Visibility == "public" || tracker.Visibility == "unlisted" {
 			next.ServeHTTP(w, r)
 			return
 		}
 		uid, ok := UserIDFromContext(r.Context())
 		if !ok {
-			render.Forbidden(w, errors.New("this track is private"))
+			render.Forbidden(w, errors.New("this tracker is private"))
 			return
 		}
 		if uid == 1 {
 			next.ServeHTTP(w, r)
 			return
 		}
-		member, _, err := h.store.isMember(uid, track.Id)
+		member, _, err := h.store.isMember(uid, tracker.Id)
 		if err != nil {
 			log.Error().Err(err).Msg("requireReadPermission isMember")
 			render.InternalError(w, err)
 			return
 		}
 		if !member {
-			render.Forbidden(w, errors.New("this track is private"))
+			render.Forbidden(w, errors.New("this tracker is private"))
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -200,44 +200,44 @@ func (h *trackHandler) requireReadPermission(next http.Handler) http.Handler {
 }
 
 // ----------------------------------------------------------------------
-// Track
+// Tracker
 
-// ListTracks godoc
-// @Summary      List tracks for current user
-// @Description  Return tracks owned, edited, or liked by the current user
-// @Tags         track
-// @Success      200  {object}  track.ListTracksResponse
+// ListTrackers godoc
+// @Summary      List trackers for current user
+// @Description  Return trackers owned, edited, or liked by the current user
+// @Tags         tracker
+// @Success      200  {object}  tracker.ListTrackersResponse
 // @Failure      401  {object}  core.ErrorResponse
-// @Router       /api/track [get]
-func (h *trackHandler) listTracks(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker [get]
+func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
-		render.JSON(w, ListTracksResponse{Tracks: []TrackResponse{}}, http.StatusOK)
+		render.JSON(w, ListTrackersResponse{Trackers: []TrackerResponse{}}, http.StatusOK)
 		return
 	}
 
-	tracks, err := h.store.listTracks(uid)
+	trackers, err := h.store.listTrackers(uid)
 	if err != nil {
-		log.Error().Err(err).Msg("track.handler.listTracks")
+		log.Error().Err(err).Msg("tracker.handler.listTrackers")
 		render.InternalError(w, err)
 		return
 	}
 
-	render.JSON(w, ListTracksResponse{Tracks: tracks}, http.StatusOK)
+	render.JSON(w, ListTrackersResponse{Trackers: trackers}, http.StatusOK)
 }
 
-// CreateTrack godoc
-// @Summary      Create a track
-// @Description  Add a new track. The name must be unique. Creator becomes owner.
-// @Tags         track
+// CreateTracker godoc
+// @Summary      Create a tracker
+// @Description  Add a new tracker. The name must be unique. Creator becomes owner.
+// @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        body  body      track.CreateTrackRequest  true  "Track information"
-// @Success      201   {object}  track.TrackModel
+// @Param        body  body      tracker.CreateTrackerRequest  true  "Tracker information"
+// @Success      201   {object}  tracker.TrackerModel
 // @Failure      400   {object}  core.ErrorResponse
 // @Failure      401   {object}  core.ErrorResponse
-// @Router       /api/track [post]
-func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker [post]
+func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
 		if err := r.Body.Close(); err != nil {
@@ -245,10 +245,10 @@ func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	var req CreateTrackRequest
+	var req CreateTrackerRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		log.Warn().Err(err).Msg("invalid track request body")
+		log.Warn().Err(err).Msg("invalid tracker request body")
 		render.BadRequest(w, errors.New("invalid request body"))
 		return
 	}
@@ -264,44 +264,44 @@ func (h *trackHandler) createTrack(w http.ResponseWriter, r *http.Request) {
 
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
-		render.Forbidden(w, errors.New("anonymous users cannot create tracks"))
+		render.Forbidden(w, errors.New("anonymous users cannot create trackers"))
 		return
 	}
 
-	track := TrackModel{Name: req.Name, Visibility: req.Visibility}
-	err = h.store.addTrack(&track, uid)
+	tracker := TrackerModel{Name: req.Name, Visibility: req.Visibility}
+	err = h.store.addTracker(&tracker, uid)
 	if err != nil {
-		log.Warn().Err(err).Msg("addTrack")
-		render.BadRequest(w, errors.New("failed to create track"))
+		log.Warn().Err(err).Msg("addTracker")
+		render.BadRequest(w, errors.New("failed to create tracker"))
 		return
 	}
 
-	resp := TrackResponse{
-		Id:         track.Id,
-		Name:       track.Name,
-		Visibility: track.Visibility,
+	resp := TrackerResponse{
+		Id:         tracker.Id,
+		Name:       tracker.Name,
+		Visibility: tracker.Visibility,
 		Role:       "owner",
 		Liked:      false,
 	}
 	render.JSON(w, resp, http.StatusCreated)
 }
 
-// DeleteTrack godoc
-// @Summary      Delete a track
-// @Description  Delete the specified track. Child series and values are also cascade-deleted.
-// @Tags         track
-// @Param        trackId  path  int  true  "Track ID"
+// DeleteTracker godoc
+// @Summary      Delete a tracker
+// @Description  Delete the specified tracker. Child series and values are also cascade-deleted.
+// @Tags         tracker
+// @Param        trackerId  path  int  true  "Tracker ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId} [delete]
-func (h *trackHandler) deleteTrack(w http.ResponseWriter, r *http.Request) {
-	track, _ := trackFrom(r.Context())
-	err := h.store.deleteTrack(track.Id)
+// @Router       /api/tracker/{trackerId} [delete]
+func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
+	tracker, _ := trackerFrom(r.Context())
+	err := h.store.deleteTracker(tracker.Id)
 	if err != nil {
-		log.Error().Err(err).Msg("deleteTrack")
+		log.Error().Err(err).Msg("deleteTracker")
 		render.InternalError(w, err)
 		return
 	}
@@ -310,23 +310,23 @@ func (h *trackHandler) deleteTrack(w http.ResponseWriter, r *http.Request) {
 }
 
 // ----------------------------------------------------------------------
-// Track (mutation)
+// Tracker (mutation)
 
-// PatchTrack godoc
-// @Summary      Update a track
-// @Description  Update track fields (e.g. visibility). Requires edit permission.
-// @Tags         track
+// PatchTracker godoc
+// @Summary      Update a tracker
+// @Description  Update tracker fields (e.g. visibility). Requires edit permission.
+// @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        trackId  path  int                    true  "Track ID"
-// @Param        body     body  track.PatchTrackRequest  true  "Fields to update"
-// @Success      200  {object}  track.TrackResponse
+// @Param        trackerId  path  int                      true  "Tracker ID"
+// @Param        body       body  tracker.PatchTrackerRequest  true  "Fields to update"
+// @Success      200  {object}  tracker.TrackerResponse
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId} [patch]
-func (h *trackHandler) patchTrack(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker/{trackerId} [patch]
+func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
 		if err := r.Body.Close(); err != nil {
@@ -334,7 +334,7 @@ func (h *trackHandler) patchTrack(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	var req PatchTrackRequest
+	var req PatchTrackerRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		log.Warn().Err(err).Msg("invalid patch body")
@@ -348,26 +348,26 @@ func (h *trackHandler) patchTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	track, _ := trackFrom(r.Context())
-	err = h.store.updateVisibility(track.Id, req.Visibility)
+	tracker, _ := trackerFrom(r.Context())
+	err = h.store.updateVisibility(tracker.Id, req.Visibility)
 	if err != nil {
-		log.Error().Err(err).Msg("patchTrack updateVisibility")
+		log.Error().Err(err).Msg("patchTracker updateVisibility")
 		render.InternalError(w, err)
 		return
 	}
 
 	uid, _ := UserIDFromContext(r.Context())
-	track.Visibility = req.Visibility
+	tracker.Visibility = req.Visibility
 
-	resp := TrackResponse{
-		Id:         track.Id,
-		Name:       track.Name,
-		Visibility: track.Visibility,
+	resp := TrackerResponse{
+		Id:         tracker.Id,
+		Name:       tracker.Name,
+		Visibility: tracker.Visibility,
 	}
-	if member, role, err := h.store.isMember(uid, track.Id); err == nil && member {
+	if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
 		resp.Role = role
 	}
-	if liked, err := h.store.isLiked(uid, track.Id); err == nil {
+	if liked, err := h.store.isLiked(uid, tracker.Id); err == nil {
 		resp.Liked = liked
 	}
 
@@ -379,39 +379,39 @@ func (h *trackHandler) patchTrack(w http.ResponseWriter, r *http.Request) {
 
 // ListSeries godoc
 // @Summary      List all series
-// @Description  Return all series belonging to the specified track
-// @Tags         track
-// @Param        trackId  path  int  true  "Track ID"
-// @Success      200  {object}  track.ListSeriesResponse
+// @Description  Return all series belonging to the specified tracker
+// @Tags         tracker
+// @Param        trackerId  path  int  true  "Tracker ID"
+// @Success      200  {object}  tracker.ListSeriesResponse
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId}/series [get]
-func (h *trackHandler) listSeries(w http.ResponseWriter, r *http.Request) {
-	track, _ := trackFrom(r.Context())
+// @Router       /api/tracker/{trackerId}/series [get]
+func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
+	tracker, _ := trackerFrom(r.Context())
 
-	series, err := h.store.listSeries(track.Id)
+	series, err := h.store.listSeries(tracker.Id)
 	if err != nil {
-		log.Error().Err(err).Msg("track.handler.listSeries")
+		log.Error().Err(err).Msg("tracker.handler.listSeries")
 		render.InternalError(w, err)
 		return
 	}
 
-	trackResp := TrackResponse{Id: track.Id, Name: track.Name, Visibility: track.Visibility}
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
-		_, role, err := h.store.isMember(uid, track.Id)
+		_, role, err := h.store.isMember(uid, tracker.Id)
 		if err == nil {
-			trackResp.Role = role
+			trackerResp.Role = role
 		}
-		liked, err := h.store.isLiked(uid, track.Id)
+		liked, err := h.store.isLiked(uid, tracker.Id)
 		if err == nil {
-			trackResp.Liked = liked
+			trackerResp.Liked = liked
 		}
 	}
 
 	resp := ListSeriesResponse{
-		Track:  trackResp,
-		Series: series,
+		Tracker: trackerResp,
+		Series:  series,
 	}
 
 	render.JSON(w, resp, http.StatusOK)
@@ -419,19 +419,19 @@ func (h *trackHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 
 // CreateSeries godoc
 // @Summary      Create a series
-// @Description  Add a new series under a track. data_type must be "int" or "float" (defaults to "float").
-// @Tags         track
+// @Description  Add a new series under a tracker. data_type must be "int" or "float" (defaults to "float").
+// @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        trackId  path  int                     true  "Track ID"
-// @Param        body     body  track.CreateSeriesRequest  true  "Series information"
-// @Success      201  {object}  track.SeriesModel
+// @Param        trackerId  path  int                       true  "Tracker ID"
+// @Param        body       body  tracker.CreateSeriesRequest  true  "Series information"
+// @Success      201  {object}  tracker.SeriesModel
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId}/series [post]
-func (h *trackHandler) createSeries(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker/{trackerId}/series [post]
+func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
 		if err := r.Body.Close(); err != nil {
@@ -442,7 +442,7 @@ func (h *trackHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 	var req CreateSeriesRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		log.Warn().Err(err).Msg("track.handler.createSeries")
+		log.Warn().Err(err).Msg("tracker.handler.createSeries")
 		render.BadRequest(w, errors.New("invalid request body"))
 		return
 	}
@@ -456,11 +456,11 @@ func (h *trackHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	track, _ := trackFrom(r.Context())
+	tracker, _ := trackerFrom(r.Context())
 	series := SeriesModel{
-		TrackId:  track.Id,
-		Name:     req.Name,
-		DataType: dataType,
+		TrackerId: tracker.Id,
+		Name:      req.Name,
+		DataType:  dataType,
 	}
 
 	err = h.store.addSeries(&series)
@@ -476,16 +476,16 @@ func (h *trackHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 // DeleteSeries godoc
 // @Summary      Delete a series
 // @Description  Delete the specified series. Child values are also cascade-deleted.
-// @Tags         track
-// @Param        trackId   path  int  true  "Track ID"
-// @Param        seriesId  path  int  true  "Series ID"
+// @Tags         tracker
+// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        seriesId   path  int  true  "Series ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId}/series/{seriesId} [delete]
-func (h *trackHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker/{trackerId}/series/{seriesId} [delete]
+func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 	series, _ := seriesFrom(r.Context())
 
 	err := h.store.deleteSeries(series.Id)
@@ -504,16 +504,16 @@ func (h *trackHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 // ListValues godoc
 // @Summary      List all values
 // @Description  Return time-series data for the specified series. The limit parameter restricts the maximum number of results.
-// @Tags         track
-// @Param        trackId   path  int     true   "Track ID"
-// @Param        seriesId  path  int     true   "Series ID"
-// @Param        limit     query int     false  "Maximum number of results"
-// @Success      200  {object}  track.ListValuesResponse
+// @Tags         tracker
+// @Param        trackerId  path  int     true   "Tracker ID"
+// @Param        seriesId   path  int     true   "Series ID"
+// @Param        limit      query int     false  "Maximum number of results"
+// @Success      200  {object}  tracker.ListValuesResponse
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId}/series/{seriesId}/values [get]
-func (h *trackHandler) listValues(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [get]
+func (h *trackerHandler) listValues(w http.ResponseWriter, r *http.Request) {
 	series, _ := seriesFrom(r.Context())
 
 	limitStr := r.URL.Query().Get("limit")
@@ -529,7 +529,7 @@ func (h *trackHandler) listValues(w http.ResponseWriter, r *http.Request) {
 
 	values, err := h.store.listValues(series.Id, limit)
 	if err != nil {
-		log.Error().Err(err).Msg("track.handler.listValues")
+		log.Error().Err(err).Msg("tracker.handler.listValues")
 		render.InternalError(w, err)
 		return
 	}
@@ -545,19 +545,19 @@ func (h *trackHandler) listValues(w http.ResponseWriter, r *http.Request) {
 // CreateValue godoc
 // @Summary      Add a value
 // @Description  Add time-series data to a series. Duplicate timestamps within the same series are not allowed.
-// @Tags         track
+// @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        trackId   path  int                   true  "Track ID"
-// @Param        seriesId  path  int                   true  "Series ID"
-// @Param        body      body  track.CreateValueRequest  true  "Value data"
-// @Success      201  {object}  track.ValueModel
+// @Param        trackerId  path  int                     true  "Tracker ID"
+// @Param        seriesId   path  int                     true  "Series ID"
+// @Param        body       body  tracker.CreateValueRequest  true  "Value data"
+// @Success      201  {object}  tracker.ValueModel
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId}/series/{seriesId}/values [post]
-func (h *trackHandler) createValue(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [post]
+func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
 		if err := r.Body.Close(); err != nil {
@@ -593,16 +593,16 @@ func (h *trackHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // DeleteValues godoc
 // @Summary      Delete all values
 // @Description  Delete all time-series data for the specified series
-// @Tags         track
-// @Param        trackId   path  int  true  "Track ID"
-// @Param        seriesId  path  int  true  "Series ID"
+// @Tags         tracker
+// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        seriesId   path  int  true  "Series ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId}/series/{seriesId}/values [delete]
-func (h *trackHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [delete]
+func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 	series, _ := seriesFrom(r.Context())
 	err := h.store.deleteValues(series.Id)
 	if err != nil {
@@ -617,52 +617,52 @@ func (h *trackHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 // ----------------------------------------------------------------------
 // Like
 
-// LikeTrack godoc
-// @Summary      Like a track
-// @Description  Add a like to the specified track for the current user
-// @Tags         track
-// @Param        trackId  path  int  true  "Track ID"
+// LikeTracker godoc
+// @Summary      Like a tracker
+// @Description  Add a like to the specified tracker for the current user
+// @Tags         tracker
+// @Param        trackerId  path  int  true  "Tracker ID"
 // @Success      201
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId}/like [post]
-func (h *trackHandler) likeTrack(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker/{trackerId}/like [post]
+func (h *trackerHandler) likeTracker(w http.ResponseWriter, r *http.Request) {
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
 		render.Forbidden(w, errors.New("anonymous users cannot like"))
 		return
 	}
-	track, _ := trackFrom(r.Context())
-	err := h.store.addLike(uid, track.Id)
+	tracker, _ := trackerFrom(r.Context())
+	err := h.store.addLike(uid, tracker.Id)
 	if err != nil {
-		log.Error().Err(err).Msg("likeTrack")
+		log.Error().Err(err).Msg("likeTracker")
 		render.InternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
 }
 
-// UnlikeTrack godoc
-// @Summary      Unlike a track
-// @Description  Remove a like from the specified track for the current user
-// @Tags         track
-// @Param        trackId  path  int  true  "Track ID"
+// UnlikeTracker godoc
+// @Summary      Unlike a tracker
+// @Description  Remove a like from the specified tracker for the current user
+// @Tags         tracker
+// @Param        trackerId  path  int  true  "Tracker ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/track/{trackId}/like [delete]
-func (h *trackHandler) unlikeTrack(w http.ResponseWriter, r *http.Request) {
+// @Router       /api/tracker/{trackerId}/like [delete]
+func (h *trackerHandler) unlikeTracker(w http.ResponseWriter, r *http.Request) {
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
 		render.Forbidden(w, errors.New("anonymous users cannot unlike"))
 		return
 	}
-	track, _ := trackFrom(r.Context())
-	err := h.store.removeLike(uid, track.Id)
+	tracker, _ := trackerFrom(r.Context())
+	err := h.store.removeLike(uid, tracker.Id)
 	if err != nil {
-		log.Error().Err(err).Msg("unlikeTrack")
+		log.Error().Err(err).Msg("unlikeTracker")
 		render.InternalError(w, err)
 		return
 	}
@@ -672,31 +672,31 @@ func (h *trackHandler) unlikeTrack(w http.ResponseWriter, r *http.Request) {
 // ----------------------------------------------------------------------
 // Middleware
 
-func (h *trackHandler) injectTrack(next http.Handler) http.Handler {
+func (h *trackerHandler) injectTracker(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(chi.URLParam(r, "trackId"), 10, 64)
+		id, err := strconv.ParseInt(chi.URLParam(r, "trackerId"), 10, 64)
 		if err != nil {
-			log.Warn().Err(err).Msg("track.handler.injectTrack")
-			render.BadRequest(w, errors.New("invalid track id"))
+			log.Warn().Err(err).Msg("tracker.handler.injectTracker")
+			render.BadRequest(w, errors.New("invalid tracker id"))
 			return
 		}
 
-		track, err := h.store.findTrackById(id)
-		if err == errorTrackNotFound {
-			render.NotFound(w, errors.New("track not found"))
+		tracker, err := h.store.findTrackerById(id)
+		if err == errorTrackerNotFound {
+			render.NotFound(w, errors.New("tracker not found"))
 			return
 		} else if err != nil {
-			log.Warn().Err(err).Msg("track.handler.injectTrack")
+			log.Warn().Err(err).Msg("tracker.handler.injectTracker")
 			render.InternalError(w, err)
 			return
 		}
 
-		r = r.WithContext(withTrack(r.Context(), *track))
+		r = r.WithContext(withTracker(r.Context(), *tracker))
 		next.ServeHTTP(w, r)
 	})
 }
 
-func (h *trackHandler) injectSeries(next http.Handler) http.Handler {
+func (h *trackerHandler) injectSeries(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seriesId, err := strconv.ParseInt(chi.URLParam(r, "seriesId"), 10, 64)
 		if err != nil {
@@ -710,14 +710,14 @@ func (h *trackHandler) injectSeries(next http.Handler) http.Handler {
 			render.NotFound(w, errors.New("series not found"))
 			return
 		} else if err != nil {
-			log.Warn().Err(err).Msg("track.handler.injectSeries")
+			log.Warn().Err(err).Msg("tracker.handler.injectSeries")
 			render.InternalError(w, err)
 			return
 		}
 
-		// Verify series belongs to the track in URL
-		track, _ := trackFrom(r.Context())
-		if series.TrackId != track.Id {
+		// Verify series belongs to the tracker in URL
+		tracker, _ := trackerFrom(r.Context())
+		if series.TrackerId != tracker.Id {
 			render.NotFound(w, errors.New("series not found"))
 			return
 		}
@@ -727,23 +727,23 @@ func (h *trackHandler) injectSeries(next http.Handler) http.Handler {
 	})
 }
 
-func newHandler(store *trackStore) http.Handler {
-	h := &trackHandler{store: store}
+func newHandler(store *trackerStore) http.Handler {
+	h := &trackerHandler{store: store}
 	r := chi.NewRouter()
 
 	r.Use(h.requireAuth)
 
 	r.Route("/", func(r chi.Router) {
-		r.Get("/", h.listTracks)
-		r.Post("/", h.createTrack)
+		r.Get("/", h.listTrackers)
+		r.Post("/", h.createTracker)
 
-		r.Route("/{trackId}", func(r chi.Router) {
-			r.Use(h.injectTrack)
+		r.Route("/{trackerId}", func(r chi.Router) {
+			r.Use(h.injectTracker)
 			r.Use(h.requireReadPermission)
-			r.With(h.requireEditPermission).Delete("/", h.deleteTrack)
-			r.With(h.requireEditPermission).Patch("/", h.patchTrack)
-			r.Post("/like", h.likeTrack)
-			r.Delete("/like", h.unlikeTrack)
+			r.With(h.requireEditPermission).Delete("/", h.deleteTracker)
+			r.With(h.requireEditPermission).Patch("/", h.patchTracker)
+			r.Post("/like", h.likeTracker)
+			r.Delete("/like", h.unlikeTracker)
 
 			r.Route("/series", func(r chi.Router) {
 				r.Get("/", h.listSeries)

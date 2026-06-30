@@ -1,4 +1,4 @@
-package track
+package tracker
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func initTestStore(t *testing.T) *trackStore {
+func initTestStore(t *testing.T) *trackerStore {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
 
@@ -38,7 +38,7 @@ func initTestStore(t *testing.T) *trackStore {
 			VALUES (?, 'test', ?, ?, '')`, uid, fmt.Sprintf("user%d", uid), fmt.Sprintf("user%d", uid))
 	}
 
-	s := newTrackStore(db)
+	s := newTrackerStore(db)
 
 	err = s.initialize()
 	require.NoError(t, err)
@@ -46,96 +46,96 @@ func initTestStore(t *testing.T) *trackStore {
 	return s
 }
 
-func TestTrackStoreNew(t *testing.T) {
+func TestTrackerStoreNew(t *testing.T) {
 	initTestStore(t)
 }
 
-func TestStoreTrack(t *testing.T) {
+func TestStoreTracker(t *testing.T) {
 	s := initTestStore(t)
 
-	t.Run("store track", func(t *testing.T) {
-		track := &TrackModel{
-			Name: "test_track",
+	t.Run("store tracker", func(t *testing.T) {
+		tracker := &TrackerModel{
+			Name: "test_tracker",
 		}
 
-		err := s.addTrack(track, 1)
+		err := s.addTracker(tracker, 1)
 		require.NoError(t, err)
-		require.Equal(t, int64(1), track.Id)
+		require.Equal(t, int64(1), tracker.Id)
 
 		// Creator should be member with role=owner
-		member, role, err := s.isMember(1, track.Id)
+		member, role, err := s.isMember(1, tracker.Id)
 		require.NoError(t, err)
 		require.True(t, member)
 		require.Equal(t, "owner", role)
 	})
 
 	t.Run("duplicate name", func(t *testing.T) {
-		track := &TrackModel{
-			Name: "test_track",
+		tracker := &TrackerModel{
+			Name: "test_tracker",
 		}
 
-		err := s.addTrack(track, 1)
+		err := s.addTracker(tracker, 1)
 		require.Error(t, err)
 	})
 }
 
-func TestStoreFindTrack(t *testing.T) {
-	track := &TrackModel{
-		Name: "test_track",
+func TestStoreFindTracker(t *testing.T) {
+	tracker := &TrackerModel{
+		Name: "test_tracker",
 	}
 
 	s := initTestStore(t)
-	err := s.addTrack(track, 1)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), track.Id)
+	require.Equal(t, int64(1), tracker.Id)
 
 	t.Run("find by existing id", func(t *testing.T) {
-		got, err := s.findTrackById(track.Id)
+		got, err := s.findTrackerById(tracker.Id)
 		require.NoError(t, err)
-		require.Equal(t, track, got)
+		require.Equal(t, tracker, got)
 	})
 
 	t.Run("find by non existing id", func(t *testing.T) {
-		_, err := s.findTrackById(1976)
-		require.ErrorIs(t, err, errorTrackNotFound)
+		_, err := s.findTrackerById(1976)
+		require.ErrorIs(t, err, errorTrackerNotFound)
 	})
 
 	t.Run("list for non-member user returns empty", func(t *testing.T) {
-		tracks, err := s.listTracks(999)
+		trackers, err := s.listTrackers(999)
 		require.NoError(t, err)
-		require.Empty(t, tracks)
+		require.Empty(t, trackers)
 	})
 
-	t.Run("list for owner user returns track", func(t *testing.T) {
-		tracks, err := s.listTracks(1)
+	t.Run("list for owner user returns tracker", func(t *testing.T) {
+		trackers, err := s.listTrackers(1)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(tracks))
-		require.Equal(t, track.Id, tracks[0].Id)
-		require.Equal(t, "owner", tracks[0].Role)
-		require.Equal(t, false, tracks[0].Liked)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, tracker.Id, trackers[0].Id)
+		require.Equal(t, "owner", trackers[0].Role)
+		require.Equal(t, false, trackers[0].Liked)
 	})
 }
 
-func TestStoreDeleteTrack(t *testing.T) {
+func TestStoreDeleteTracker(t *testing.T) {
 	s := initTestStore(t)
 
-	tracks := []*TrackModel{
-		{Name: "track0"},
-		{Name: "track1"},
+	trackers := []*TrackerModel{
+		{Name: "tracker0"},
+		{Name: "tracker1"},
 	}
 
-	for _, tr := range tracks {
-		err := s.addTrack(tr, 1)
+	for _, tr := range trackers {
+		err := s.addTracker(tr, 1)
 		require.NoError(t, err)
 	}
 
-	t.Run("delete existing track", func(t *testing.T) {
-		err := s.deleteTrack(tracks[0].Id)
+	t.Run("delete existing tracker", func(t *testing.T) {
+		err := s.deleteTracker(trackers[0].Id)
 		require.NoError(t, err)
 	})
 
-	t.Run("delete non existing track", func(t *testing.T) {
-		err := s.deleteTrack(1976)
+	t.Run("delete non existing tracker", func(t *testing.T) {
+		err := s.deleteTracker(1976)
 		require.NoError(t, err)
 	})
 }
@@ -143,54 +143,54 @@ func TestStoreDeleteTrack(t *testing.T) {
 func TestStoreUpdateVisibility(t *testing.T) {
 	s := initTestStore(t)
 
-	track := &TrackModel{Name: "vis_test"}
-	require.NoError(t, s.addTrack(track, 1))
+	tracker := &TrackerModel{Name: "vis_test"}
+	require.NoError(t, s.addTracker(tracker, 1))
 
 	t.Run("update to public", func(t *testing.T) {
-		err := s.updateVisibility(track.Id, "public")
+		err := s.updateVisibility(tracker.Id, "public")
 		require.NoError(t, err)
 
-		got, err := s.findTrackById(track.Id)
+		got, err := s.findTrackerById(tracker.Id)
 		require.NoError(t, err)
 		require.Equal(t, "public", got.Visibility)
 	})
 
 	t.Run("update to unlisted", func(t *testing.T) {
-		err := s.updateVisibility(track.Id, "unlisted")
+		err := s.updateVisibility(tracker.Id, "unlisted")
 		require.NoError(t, err)
 
-		got, err := s.findTrackById(track.Id)
+		got, err := s.findTrackerById(tracker.Id)
 		require.NoError(t, err)
 		require.Equal(t, "unlisted", got.Visibility)
 	})
 
 	t.Run("update to private", func(t *testing.T) {
-		err := s.updateVisibility(track.Id, "private")
+		err := s.updateVisibility(tracker.Id, "private")
 		require.NoError(t, err)
 
-		got, err := s.findTrackById(track.Id)
+		got, err := s.findTrackerById(tracker.Id)
 		require.NoError(t, err)
 		require.Equal(t, "private", got.Visibility)
 	})
 
-	t.Run("non-existing track returns error", func(t *testing.T) {
+	t.Run("non-existing tracker returns error", func(t *testing.T) {
 		err := s.updateVisibility(99999, "public")
-		require.ErrorIs(t, err, errorTrackNotFound)
+		require.ErrorIs(t, err, errorTrackerNotFound)
 	})
 }
 
 func TestStoreSeries(t *testing.T) {
-	track := &TrackModel{Name: "test_track"}
+	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTrack(track, 1)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 
-	t.Run("add series with existing track", func(t *testing.T) {
+	t.Run("add series with existing tracker", func(t *testing.T) {
 		series := &SeriesModel{
-			TrackId:  track.Id,
-			Name:     "test_series",
-			DataType: "float",
+			TrackerId: tracker.Id,
+			Name:      "test_series",
+			DataType:  "float",
 		}
 
 		err = s.addSeries(series)
@@ -198,22 +198,22 @@ func TestStoreSeries(t *testing.T) {
 		require.Equal(t, int64(1), series.Id)
 	})
 
-	t.Run("add series with non existing track", func(t *testing.T) {
+	t.Run("add series with non existing tracker", func(t *testing.T) {
 		series := &SeriesModel{
-			TrackId:  track.Id + 1,
-			Name:     "test_series",
-			DataType: "float",
+			TrackerId: tracker.Id + 1,
+			Name:      "test_series",
+			DataType:  "float",
 		}
 
 		err = s.addSeries(series)
 		require.Error(t, err)
 	})
 
-	t.Run("duplicate series name in same track", func(t *testing.T) {
+	t.Run("duplicate series name in same tracker", func(t *testing.T) {
 		series := &SeriesModel{
-			TrackId:  track.Id,
-			Name:     "test_series",
-			DataType: "float",
+			TrackerId: tracker.Id,
+			Name:      "test_series",
+			DataType:  "float",
 		}
 
 		err = s.addSeries(series)
@@ -222,16 +222,16 @@ func TestStoreSeries(t *testing.T) {
 }
 
 func TestStoreFindSeries(t *testing.T) {
-	track := &TrackModel{Name: "test_track"}
+	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTrack(track, 1)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
-		TrackId:  track.Id,
-		Name:     "test_series",
-		DataType: "int",
+		TrackerId: tracker.Id,
+		Name:      "test_series",
+		DataType:  "int",
 	}
 
 	err = s.addSeries(series)
@@ -249,13 +249,13 @@ func TestStoreFindSeries(t *testing.T) {
 		require.ErrorIs(t, err, errorSeriesNotFound)
 	})
 
-	t.Run("list by existing track id", func(t *testing.T) {
-		items, err := s.listSeries(series.TrackId)
+	t.Run("list by existing tracker id", func(t *testing.T) {
+		items, err := s.listSeries(series.TrackerId)
 		require.NoError(t, err)
 		require.Equal(t, []SeriesModel{*series}, items)
 	})
 
-	t.Run("list by non existing track id", func(t *testing.T) {
+	t.Run("list by non existing tracker id", func(t *testing.T) {
 		items, err := s.listSeries(1215)
 		require.NoError(t, err)
 		require.Empty(t, items)
@@ -263,16 +263,16 @@ func TestStoreFindSeries(t *testing.T) {
 }
 
 func TestStoreDeleteSeries(t *testing.T) {
-	track := &TrackModel{Name: "test_track"}
+	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTrack(track, 1)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
-		TrackId:  track.Id,
-		Name:     "test_series",
-		DataType: "float",
+		TrackerId: tracker.Id,
+		Name:      "test_series",
+		DataType:  "float",
 	}
 
 	err = s.addSeries(series)
@@ -290,16 +290,16 @@ func TestStoreDeleteSeries(t *testing.T) {
 }
 
 func TestStoreValue(t *testing.T) {
-	track := &TrackModel{Name: "test_track"}
+	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTrack(track, 1)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
-		TrackId:  track.Id,
-		Name:     "test_series",
-		DataType: "float",
+		TrackerId: tracker.Id,
+		Name:      "test_series",
+		DataType:  "float",
 	}
 
 	err = s.addSeries(series)
@@ -346,11 +346,11 @@ func TestStoreValue(t *testing.T) {
 func TestStoreDeleteValueCascade(t *testing.T) {
 	s := initTestStore(t)
 
-	tr := &TrackModel{Name: "test_track"}
-	err := s.addTrack(tr, 1)
+	tr := &TrackerModel{Name: "test_tracker"}
+	err := s.addTracker(tr, 1)
 	require.NoError(t, err)
 
-	series := &SeriesModel{TrackId: tr.Id, Name: "test_series", DataType: "float"}
+	series := &SeriesModel{TrackerId: tr.Id, Name: "test_series", DataType: "float"}
 	err = s.addSeries(series)
 	require.NoError(t, err)
 
@@ -366,12 +366,12 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, values)
 
-	// Delete track should cascade delete series
-	tr2 := &TrackModel{Name: "test_track2"}
-	err = s.addTrack(tr2, 1)
+	// Delete tracker should cascade delete series
+	tr2 := &TrackerModel{Name: "test_tracker2"}
+	err = s.addTracker(tr2, 1)
 	require.NoError(t, err)
 
-	series2 := &SeriesModel{TrackId: tr2.Id, Name: "test_series2", DataType: "float"}
+	series2 := &SeriesModel{TrackerId: tr2.Id, Name: "test_series2", DataType: "float"}
 	err = s.addSeries(series2)
 	require.NoError(t, err)
 
@@ -379,11 +379,11 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	err = s.addValue(value2)
 	require.NoError(t, err)
 
-	err = s.deleteTrack(tr2.Id)
+	err = s.deleteTracker(tr2.Id)
 	require.NoError(t, err)
 
-	_, err = s.findTrackById(tr2.Id)
-	require.ErrorIs(t, err, errorTrackNotFound)
+	_, err = s.findTrackerById(tr2.Id)
+	require.ErrorIs(t, err, errorTrackerNotFound)
 
 	_, err = s.findSeriesById(series2.Id)
 	require.ErrorIs(t, err, errorSeriesNotFound)
@@ -396,8 +396,8 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 func TestStoreMember(t *testing.T) {
 	s := initTestStore(t)
 
-	tr := &TrackModel{Name: "test_track"}
-	err := s.addTrack(tr, 1)
+	tr := &TrackerModel{Name: "test_tracker"}
+	err := s.addTracker(tr, 1)
 	require.NoError(t, err)
 
 	t.Run("non-member", func(t *testing.T) {
@@ -418,28 +418,28 @@ func TestStoreMember(t *testing.T) {
 func TestStoreLike(t *testing.T) {
 	s := initTestStore(t)
 
-	tr := &TrackModel{Name: "test_track"}
-	err := s.addTrack(tr, 1)
+	tr := &TrackerModel{Name: "test_tracker"}
+	err := s.addTracker(tr, 1)
 	require.NoError(t, err)
 
 	t.Run("add like", func(t *testing.T) {
 		err := s.addLike(999, tr.Id)
 		require.NoError(t, err)
 
-		tracks, err := s.listTracks(999)
+		trackers, err := s.listTrackers(999)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(tracks))
-		require.True(t, tracks[0].Liked)
-		require.Empty(t, tracks[0].Role)
+		require.Equal(t, 1, len(trackers))
+		require.True(t, trackers[0].Liked)
+		require.Empty(t, trackers[0].Role)
 	})
 
 	t.Run("remove like", func(t *testing.T) {
 		err := s.removeLike(999, tr.Id)
 		require.NoError(t, err)
 
-		tracks, err := s.listTracks(999)
+		trackers, err := s.listTrackers(999)
 		require.NoError(t, err)
-		require.Empty(t, tracks)
+		require.Empty(t, trackers)
 	})
 
 	t.Run("remove non-existing like", func(t *testing.T) {
@@ -453,53 +453,53 @@ func TestStoreLike(t *testing.T) {
 		err = s.addLike(888, tr.Id)
 		require.NoError(t, err)
 
-		tracks, err := s.listTracks(888)
+		trackers, err := s.listTrackers(888)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(tracks))
+		require.Equal(t, 1, len(trackers))
 	})
 }
 
-func TestStoreTrackListUserScoped(t *testing.T) {
+func TestStoreTrackerListUserScoped(t *testing.T) {
 	s := initTestStore(t)
 
-	// Create tracks owned by user 1
-	tr1 := &TrackModel{Name: "track1"}
-	require.NoError(t, s.addTrack(tr1, 1))
+	// Create trackers owned by user 1
+	tr1 := &TrackerModel{Name: "tracker1"}
+	require.NoError(t, s.addTracker(tr1, 1))
 
-	tr2 := &TrackModel{Name: "track2"}
-	require.NoError(t, s.addTrack(tr2, 1))
+	tr2 := &TrackerModel{Name: "tracker2"}
+	require.NoError(t, s.addTracker(tr2, 1))
 
-	// User 2 likes track1
+	// User 2 likes tracker1
 	require.NoError(t, s.addLike(2, tr1.Id))
 
-	t.Run("user 1 sees owned tracks with liked flag", func(t *testing.T) {
-		tracks, err := s.listTracks(1)
+	t.Run("user 1 sees owned trackers with liked flag", func(t *testing.T) {
+		trackers, err := s.listTrackers(1)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(tracks))
-		for _, tr := range tracks {
+		require.Equal(t, 2, len(trackers))
+		for _, tr := range trackers {
 			require.Equal(t, "owner", tr.Role)
 		}
 	})
 
-	t.Run("user 2 sees liked tracks only", func(t *testing.T) {
-		tracks, err := s.listTracks(2)
+	t.Run("user 2 sees liked trackers only", func(t *testing.T) {
+		trackers, err := s.listTrackers(2)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(tracks))
-		require.Equal(t, tr1.Id, tracks[0].Id)
-		require.True(t, tracks[0].Liked)
-		require.Empty(t, tracks[0].Role)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, tr1.Id, trackers[0].Id)
+		require.True(t, trackers[0].Liked)
+		require.Empty(t, trackers[0].Role)
 	})
 
 	t.Run("user 3 sees nothing", func(t *testing.T) {
-		tracks, err := s.listTracks(3)
+		trackers, err := s.listTrackers(3)
 		require.NoError(t, err)
-		require.Empty(t, tracks)
+		require.Empty(t, trackers)
 	})
 
-	t.Run("track delete cascades to member and like", func(t *testing.T) {
-		require.NoError(t, s.deleteTrack(tr1.Id))
-		tracks, err := s.listTracks(2)
+	t.Run("tracker delete cascades to member and like", func(t *testing.T) {
+		require.NoError(t, s.deleteTracker(tr1.Id))
+		trackers, err := s.listTrackers(2)
 		require.NoError(t, err)
-		require.Empty(t, tracks)
+		require.Empty(t, trackers)
 	})
 }
