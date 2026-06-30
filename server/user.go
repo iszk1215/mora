@@ -296,12 +296,7 @@ func fetchRawUser(apiURL, accessToken string) (*rawUserResponse, error) {
 	return &ru, nil
 }
 
-func fetchGitHubUserInfo(accessToken string) (*providerUserInfo, error) {
-	ru, err := fetchRawUser("https://api.github.com/user", accessToken)
-	if err != nil {
-		return nil, err
-	}
-
+func githubUserInfoFromRaw(ru *rawUserResponse) *providerUserInfo {
 	username := ru.Login
 	if username == "" {
 		username = ru.Username
@@ -312,7 +307,15 @@ func fetchGitHubUserInfo(accessToken string) (*providerUserInfo, error) {
 		ProviderUserID: fmt.Sprintf("%d", ru.ID),
 		Username:       username,
 		AvatarURL:      ru.AvatarURL,
-	}, nil
+	}
+}
+
+func fetchGitHubUserInfo(accessToken string) (*providerUserInfo, error) {
+	ru, err := fetchRawUser("https://api.github.com/user", accessToken)
+	if err != nil {
+		return nil, err
+	}
+	return githubUserInfoFromRaw(ru), nil
 }
 
 func fetchGiteaUserInfo(baseURL, accessToken string) (*providerUserInfo, error) {
