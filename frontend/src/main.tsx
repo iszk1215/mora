@@ -21,6 +21,7 @@ import { coverageRoute } from './coverage'
 import { udmRoute, loadUdmMetrics } from './udm'
 import { trackRoute } from './track'
 import { signupRoute } from './signup'
+import { apiKeyRoute } from './apikey'
 import { DefaultLink, HeaderLink, ExternalLink } from './util'
 import { Button } from '@/components/ui/button'
 import {
@@ -213,6 +214,9 @@ export const Header = (): React.JSX.Element => {
                     <a href="/track/new"
                        className="block px-4 py-2 hover:bg-gray-100 text-sm"
                        onClick={() => setMenuOpen(false)}>Create Track</a>
+                    <a href="/settings/api-keys"
+                       className="block px-4 py-2 hover:bg-gray-100 text-sm"
+                       onClick={() => setMenuOpen(false)}>API Keys</a>
                     <form method="POST" action="/logout/"
                           onSubmit={(e) => {
                             const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
@@ -348,6 +352,13 @@ const router = createBrowserRouter([
           crumb: (_params: Params, _data: any) => ({ label: "Sign Up", link: "/signup" }),
         },
         children: [signupRoute],
+      },
+      {
+        path: '/settings/api-keys',
+        handle: {
+          crumb: (_params: Params, _data: any) => ({ label: "API Keys", link: "/settings/api-keys" }),
+        },
+        children: [apiKeyRoute],
       },
       {
         path: '/track',

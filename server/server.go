@@ -267,6 +267,17 @@ func (s *MoraServer) requireTrackAuth(next http.Handler) http.Handler {
 		sess, ok := MoraSessionFrom(r.Context())
 		if ok && sess.IsLoggedIn() {
 			r = r.WithContext(track.ContextWithAuth(r.Context(), sess.UserID()))
+			next.ServeHTTP(w, r)
+			return
+		}
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if token != "" && token != r.Header.Get("Authorization") {
+			user, err := s.userStore.FindUserByAPIKey(token)
+			if err == nil && user != nil {
+				r = r.WithContext(track.ContextWithAuth(r.Context(), &user.ID))
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -282,6 +293,10 @@ func (s *MoraServer) Handler() http.Handler {
 
 	r.Get("/api/scms", s.handleRepositoryManagerList)
 	r.Get("/api/me", s.handleMe)
+
+	if s.userStore != nil {
+		r.Mount("/api/user/me/api-keys", APIKeyHandler(s.userStore))
+	}
 
 	r.Route("/api/repos", func(r chi.Router) {
 		r.Get("/", s.handleRepoList)
@@ -465,7 +480,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	trackService, err := track.NewService(db, os.Getenv("MORA_API_KEY"))
+	trackService, err := track.NewService(db)
 	if err != nil {
 		return nil, err
 	}

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -16,8 +15,7 @@ import (
 
 type (
 	trackHandler struct {
-		store  *trackStore
-		apiKey string
+		store *trackStore
 	}
 
 	TrackModel struct {
@@ -132,19 +130,8 @@ func (h *trackHandler) requireAuth(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if h.apiKey == "" {
-			r = r.WithContext(ContextWithAuth(r.Context(), nil))
-			next.ServeHTTP(w, r)
-			return
-		}
-		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if token == h.apiKey {
-			var uid int64 = 1
-			r = r.WithContext(ContextWithAuth(r.Context(), &uid))
-			next.ServeHTTP(w, r)
-			return
-		}
-		render.Unauthorized(w, render.ErrInvalidToken)
+		r = r.WithContext(ContextWithAuth(r.Context(), nil))
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -740,8 +727,8 @@ func (h *trackHandler) injectSeries(next http.Handler) http.Handler {
 	})
 }
 
-func newHandler(store *trackStore, apiKey string) http.Handler {
-	h := &trackHandler{store: store, apiKey: apiKey}
+func newHandler(store *trackStore) http.Handler {
+	h := &trackHandler{store: store}
 	r := chi.NewRouter()
 
 	r.Use(h.requireAuth)

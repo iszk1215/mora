@@ -31,6 +31,9 @@ func verifyCSRF(r *http.Request) bool {
 	}
 	bodyToken := r.FormValue(csrfCookieName)
 	if bodyToken == "" {
+		bodyToken = r.Header.Get("X-CSRF-Token")
+	}
+	if bodyToken == "" {
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(bodyToken)) == 1
