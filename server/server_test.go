@@ -372,8 +372,9 @@ func TestServerRepositoryManagerList(t *testing.T) {
 
 	expected := []RepositoryManagerResponse{
 		{
-			ID:      rm.ID(),
-			URL:     rm.URL().String(),
+			ID:       rm.ID(),
+			URL:      rm.URL().String(),
+			Name:     "Mock",
 			LoggedIn: true,
 		},
 	}

@@ -22,7 +22,7 @@ import { udmRoute, loadUdmMetrics } from './udm'
 import { trackerRoute } from './tracker'
 import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
-import { DefaultLink, HeaderLink, ExternalLink } from './util'
+import { DefaultLink, HeaderLink } from './util'
 import { Button } from '@/components/ui/button'
 import {
   Breadcrumb,
@@ -98,6 +98,7 @@ export const RepoList = (): React.JSX.Element => {
 interface SCMData {
   id: number
   url: string
+  name: string
   logined: boolean
 }
 
@@ -109,16 +110,55 @@ async function loadSCMList(): Promise<Response> {
   return resp
 }
 
+const GitHubIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
+    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+  </svg>
+)
+
+const GiteaIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
+    <path d="M8.5 2C4.9 2 2 4.9 2 8.5v7C2 19.1 4.9 22 8.5 22h7c3.6 0 6.5-2.9 6.5-6.5v-7C22 4.9 19.1 2 15.5 2h-7zm2.7 5.2c.7-.3 1.5-.5 2.3-.6l1.3-.2c.2 0 .3.1.5.2 1.6.7 2.7 2.3 2.7 4.2 0 3.7-4.2 5.4-8 5.4s-8-1.8-8-5.4c0-1.9 1.1-3.5 2.7-4.2.2-.1.3-.1.5-.2l1.3.2c.8.1 1.6.3 2.3.6.7.3 1.3.7 1.9 1.2.4.4.8.9 1 1.4l.1.3.1-.3c.2-.5.5-1 1-1.4.5-.5 1.1-.9 1.8-1.2z"/>
+  </svg>
+)
+
+function scmIcon(name: string) {
+  switch (name) {
+    case 'GitHub':
+      return <GitHubIcon />
+    case 'Gitea':
+      return <GiteaIcon />
+    default:
+      return null
+  }
+}
+
+function scmBrandStyle(name: string): React.CSSProperties {
+  switch (name) {
+    case 'GitHub':
+      return { backgroundColor: '#24292f', color: '#fff' }
+    case 'Gitea':
+      return { backgroundColor: '#609926', color: '#fff' }
+    default:
+      return {}
+  }
+}
+
 export const SCMList = (): React.JSX.Element => {
   const scmList = useLoaderData() as SCMData[]
   const items: React.JSX.Element[] = []
   scmList.forEach((scm: SCMData, i: number) => {
-    let buttons: React.JSX.Element
+    let card: React.JSX.Element
     if (scm.logined) {
-      buttons = (
-        <div className="flex mb-2">
-          <Button variant="ghost" disabled>login</Button>
-          <form method="POST" action={'/logout/' + scm.id}
+      card = (
+        <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+          <span className="text-sm text-green-600 flex items-center gap-1">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+            Connected
+          </span>
+          <form method="POST" action={'/logout/' + scm.id} className="ml-auto"
                 onSubmit={(e) => {
                   const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
                   if (match) {
@@ -129,34 +169,29 @@ export const SCMList = (): React.JSX.Element => {
                     e.currentTarget.appendChild(input)
                   }
                 }}>
-            <Button variant="secondary" type="submit">logout</Button>
+            <Button variant="outline" type="submit" size="sm">Logout</Button>
           </form>
         </div>
       )
     } else {
-      buttons = (
-        <div className="flex mb-2">
-          <Button variant="secondary" asChild>
-            <a href={'/login/' + scm.id}>login</a>
-          </Button>
-          <Button variant="ghost" disabled>logout</Button>
+      card = (
+        <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+          <a href={'/login/' + scm.id}
+             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90 ml-auto no-underline"
+             style={scmBrandStyle(scm.name)}>
+            {scmIcon(scm.name)}
+            Login with {scm.name}
+          </a>
         </div>
       )
     }
-    const item: React.JSX.Element = (
-      <div key={i}>
-        <ExternalLink href={scm.url}>{scm.url}</ExternalLink>
-        {buttons}
-      </div>
-    )
-
-    items.push(item)
+    items.push(card)
   })
 
   return (
-    <div>
-      <h1 className="text-3xl my-2">Login</h1>
-      <div>
+    <div className="max-w-md mx-auto mt-8">
+      <h1 className="text-3xl font-bold mb-6">Login</h1>
+      <div className="space-y-4">
         {items}
       </div>
     </div>

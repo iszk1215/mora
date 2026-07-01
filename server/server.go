@@ -47,7 +47,8 @@ type (
 	RepositoryManagerResponse struct {
 		ID      int64  `json:"id"`
 		URL     string `json:"url"`
-		LoggedIn bool   `json:"logined"`
+		Name    string `json:"name"`
+		LoggedIn bool  `json:"logined"`
 	}
 
 	RepositoryManagerStore interface {
@@ -149,11 +150,24 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 		resp = append(resp, RepositoryManagerResponse{
 			ID:      rm.ID(),
 			URL:     rm.URL().String(),
+			Name:    providerName(rm.URL()),
 			LoggedIn: ok,
 		})
 	}
 
 	render.JSON(w, resp, http.StatusOK)
+}
+
+func providerName(u *url.URL) string {
+	host := u.Host
+	if strings.EqualFold(host, "github.com") {
+		return "GitHub"
+	}
+	name := strings.SplitN(host, ".", 2)[0]
+	if len(name) > 0 {
+		return strings.ToUpper(name[:1]) + name[1:]
+	}
+	return host
 }
 
 func (s *MoraServer) handleMe(w http.ResponseWriter, r *http.Request) {
