@@ -151,14 +151,14 @@ export const SCMList = (): React.JSX.Element => {
     let card: React.JSX.Element
     if (scm.logined) {
       card = (
-        <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
+        <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
           <span className="text-sm text-green-600 flex items-center gap-1">
             <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
             </svg>
             Connected
           </span>
-          <form method="POST" action={'/logout/' + scm.id} className="ml-auto"
+          <form method="POST" action={'/logout/' + scm.id}
                 onSubmit={(e) => {
                   const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
                   if (match) {
@@ -175,14 +175,12 @@ export const SCMList = (): React.JSX.Element => {
       )
     } else {
       card = (
-        <div key={i} className="flex items-center gap-4 p-4 border rounded-lg">
-          <a href={'/login/' + scm.id}
-             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90 ml-auto no-underline"
-             style={scmBrandStyle(scm.name)}>
-            {scmIcon(scm.name)}
-            Login with {scm.name}
-          </a>
-        </div>
+        <a key={i} href={'/login/' + scm.id}
+           className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-semibold transition-colors hover:opacity-90 no-underline"
+           style={scmBrandStyle(scm.name)}>
+          {scmIcon(scm.name)}
+          Login with {scm.name}
+        </a>
       )
     }
     items.push(card)
@@ -191,7 +189,7 @@ export const SCMList = (): React.JSX.Element => {
   return (
     <div className="max-w-md mx-auto mt-8">
       <h1 className="text-3xl font-bold mb-6">Login</h1>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {items}
       </div>
     </div>
