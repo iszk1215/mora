@@ -77,7 +77,7 @@ export const APIKeyPage = (): React.JSX.Element => {
         const data = await listAPIKeys()
         if (!cancelled) setKeys(data)
       } catch {
-        if (!cancelled) navigate('/scms', { replace: true })
+        if (!cancelled) navigate('/auth', { replace: true })
       } finally {
         if (!cancelled) setLoading(false)
       }

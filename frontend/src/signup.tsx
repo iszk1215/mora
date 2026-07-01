@@ -23,7 +23,7 @@ export const SignupPage = (): React.JSX.Element => {
 
   useEffect(() => {
     if (!pending) {
-      navigate('/scms', { replace: true })
+      navigate('/auth', { replace: true })
     }
   }, [pending, navigate])
 
@@ -91,7 +91,7 @@ export const SignupPage = (): React.JSX.Element => {
           {submitting ? 'Creating...' : 'Create Account'}
         </Button>
         <Button variant="secondary" asChild>
-          <DefaultLink to="/scms">Cancel</DefaultLink>
+          <DefaultLink to="/auth">Cancel</DefaultLink>
         </Button>
       </div>
     </div>

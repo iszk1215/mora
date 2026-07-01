@@ -279,7 +279,7 @@ export const Header = (): React.JSX.Element => {
                 )}
               </div>
             ) : (
-              <HeaderLink to={'/scms'}>Login</HeaderLink>
+              <HeaderLink to={'/auth'}>Login</HeaderLink>
             )}
           </div>
         </nav>
@@ -381,11 +381,11 @@ const router = createBrowserRouter([
         loader: loadRepoList,
       },
       {
-        path: '/scms',
+        path: '/auth',
         element: <SCMList />,
         loader: loadSCMList,
         handle: {
-          crumb: (_params: Params, _data: any) => ({ label: "login", link: "/scms" }),
+          crumb: (_params: Params, _data: any) => ({ label: "login", link: "/auth" }),
         }
       },
       {

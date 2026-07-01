@@ -60,11 +60,11 @@ describe('SignupPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows redirecting and navigates to /scms when pending is null', () => {
+  it('shows redirecting and navigates to /auth when pending is null', () => {
     vi.mocked(useLoaderData).mockReturnValue(null)
     render(<MemoryRouter><SignupPage /></MemoryRouter>)
     expect(screen.getByText('Redirecting...')).toBeInTheDocument()
-    expect(mockNavigate).toHaveBeenCalledWith('/scms', { replace: true })
+    expect(mockNavigate).toHaveBeenCalledWith('/auth', { replace: true })
   })
 
   it('renders signup form with user info from pending data', () => {
@@ -93,7 +93,7 @@ describe('SignupPage', () => {
     expect(img.className).toContain('rounded-full')
   })
 
-  it('shows Cancel link to /scms', () => {
+  it('shows Cancel link to /auth', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       provider: 'github',
       username: 'test',
@@ -101,7 +101,7 @@ describe('SignupPage', () => {
     })
     render(<MemoryRouter><SignupPage /></MemoryRouter>)
     const cancelLink = screen.getByText('Cancel').closest('a')
-    expect(cancelLink).toHaveAttribute('href', '/scms')
+    expect(cancelLink).toHaveAttribute('href', '/auth')
   })
 
   it('shows error when CSRF cookie is missing on confirm', async () => {

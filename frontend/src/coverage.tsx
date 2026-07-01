@@ -98,7 +98,7 @@ async function loadCoverageEntry({ params }: LoaderFunctionArgs): Promise<Respon
   const url = `/api/${makeEntryPath(params)}/files`
   const resp = await fetch(url)
   if (resp.status == 403) {
-    return redirect("/scms")
+    return redirect("/auth")
   }
   if (!resp.ok)
     throw resp
@@ -141,7 +141,7 @@ async function loadCoverageList({ params }: { params: Params }): Promise<Respons
   const url = `/api/repos/${params.repo_id}/coverages`
   const resp = await fetch(url)
   if (resp.status == 403) {
-    return redirect("/scms")
+    return redirect("/auth")
   }
   if (!resp.ok)
     throw resp

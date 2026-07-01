@@ -293,8 +293,8 @@ describe('Breadcrumbs', () => {
         handle: { crumb: () => ({ label: 'Top', link: '/' }) },
       },
       {
-        id: '1', pathname: '/scms', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'login', link: '/scms' }) },
+        id: '1', pathname: '/auth', params: {}, data: undefined, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'login', link: '/auth' }) },
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
@@ -313,8 +313,8 @@ describe('Breadcrumbs', () => {
         handle: {},
       },
       {
-        id: '2', pathname: '/scms', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'login', link: '/scms' }) },
+        id: '2', pathname: '/auth', params: {}, data: undefined, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'login', link: '/auth' }) },
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
