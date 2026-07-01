@@ -135,6 +135,13 @@ function scmIcon(name: string) {
   return <LoginIcon />
 }
 
+function displayName(name: string): string {
+  const lower = name.toLowerCase()
+  if (lower === 'github') return 'GitHub'
+  if (lower === 'gitea') return 'Gitea'
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
 function scmBrandStyle(name: string): React.CSSProperties {
   const lower = name.toLowerCase()
   if (lower.includes('github')) {
@@ -181,7 +188,7 @@ export const SCMList = (): React.JSX.Element => {
            className="flex items-center justify-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-semibold transition-colors hover:opacity-90 no-underline"
            style={scmBrandStyle(scm.name)}>
           {scmIcon(scm.name)}
-          Login with {scm.name}
+           Login with {displayName(scm.name)}
         </a>
       )
     }
