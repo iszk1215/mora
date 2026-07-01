@@ -16,6 +16,7 @@ type ClientConfig struct {
 type ServerConfig struct {
 	URL  string
 	Port int
+	SiteName string
 }
 
 type RepositoryManagerConfig struct {
@@ -31,7 +32,6 @@ type MoraConfig struct {
 	Client             ClientConfig
 	Debug              bool
 	DatabaseFilename   string
-	SiteName           string
 }
 
 func ReadMoraConfig(filename string) (MoraConfig, error) {
@@ -49,8 +49,8 @@ func ReadMoraConfig(filename string) (MoraConfig, error) {
 		config.DatabaseFilename = "mora.db"
 	}
 
-	if config.SiteName == "" {
-		config.SiteName = "Mora"
+	if config.Server.SiteName == "" {
+		config.Server.SiteName = "Mora"
 	}
 
 	return config, nil

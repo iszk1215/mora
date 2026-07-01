@@ -511,7 +511,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		udm:                udm,
 		tracker:              trackerService,
 		apiKey:             os.Getenv("MORA_API_KEY"),
-		siteName:           cfg.SiteName,
+		siteName:           cfg.Server.SiteName,
 	}
 
 	return s, err

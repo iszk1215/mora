@@ -54,6 +54,7 @@ Debug = true
 [server]
 url = "http://localhost:9090"
 port = 9090
+sitename = "My Mora"
 
 [client]
 server = "http://localhost:9090"
@@ -82,6 +83,7 @@ secret_file = "/tmp/github.conf"
 
 	require.Equal(t, "http://localhost:9090", cfg.Server.URL)
 	require.Equal(t, 9090, cfg.Server.Port)
+	require.Equal(t, "My Mora", cfg.Server.SiteName)
 
 	require.Len(t, cfg.RepositoryManagers, 2)
 	require.Equal(t, "gitea", cfg.RepositoryManagers[0].Driver)
