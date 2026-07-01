@@ -31,6 +31,7 @@ type MoraConfig struct {
 	Client             ClientConfig
 	Debug              bool
 	DatabaseFilename   string
+	SiteName           string
 }
 
 func ReadMoraConfig(filename string) (MoraConfig, error) {
@@ -46,6 +47,10 @@ func ReadMoraConfig(filename string) (MoraConfig, error) {
 
 	if config.DatabaseFilename == "" {
 		config.DatabaseFilename = "mora.db"
+	}
+
+	if config.SiteName == "" {
+		config.SiteName = "Mora"
 	}
 
 	return config, nil

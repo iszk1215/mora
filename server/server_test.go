@@ -381,6 +381,49 @@ func TestServerRepositoryManagerList(t *testing.T) {
 	require.Equal(t, expected, got)
 }
 
+func TestServerAPIConfig(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithSessionManager().Finish()
+	server.siteName = "My Mora"
+	handler := server.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	var got map[string]string
+	err = json.Unmarshal(body, &got)
+	require.NoError(t, err)
+	require.Equal(t, "My Mora", got["site_name"])
+}
+
+func TestServerAPIConfig_Default(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithSessionManager().Finish()
+	handler := server.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	var got map[string]string
+	err = json.Unmarshal(body, &got)
+	require.NoError(t, err)
+	require.Equal(t, "Mora", got["site_name"])
+}
+
 func TestServerRepoList(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()

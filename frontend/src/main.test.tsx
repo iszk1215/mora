@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData, useRouteError, useMatches, isRouteErrorResponse } from 'react-router'
-import { RepoList, SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs } from './main'
+import { RepoList, SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache } from './main'
 import { loadUdmMetrics } from './udm'
 
 vi.mock('react-dom/client', () => ({
@@ -62,13 +62,21 @@ describe('makeBredcrumbs', () => {
 describe('Header', () => {
   beforeEach(() => {
     vi.spyOn(globalThis, 'fetch')
+    resetConfigCache()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
+  function mockConfig() {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ site_name: 'Mora' }), { headers: { 'Content-Type': 'application/json' } })
+    )
+  }
+
   it('renders Login link for anonymous user', async () => {
+    mockConfig()
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(null, { status: 204 })
     )
@@ -81,6 +89,7 @@ describe('Header', () => {
 
   it('renders avatar with Open menu tooltip for logged-in user', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
+    mockConfig()
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
     )
@@ -94,6 +103,7 @@ describe('Header', () => {
 
   it('opens menu with My Trackers link on avatar click', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
+    mockConfig()
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
     )
@@ -108,6 +118,7 @@ describe('Header', () => {
 
   it('closes menu when clicking My Trackers', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
+    mockConfig()
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
     )
@@ -122,6 +133,7 @@ describe('Header', () => {
 
   it('renders nothing when avatar_url is empty', async () => {
     const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
+    mockConfig()
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
     )

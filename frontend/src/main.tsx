@@ -204,11 +204,30 @@ export const SCMList = (): React.JSX.Element => {
   )
 }
 
+let configCache: { site_name: string } | null = null
+let configPromise: Promise<{ site_name: string }> | null = null
+
+export function resetConfigCache() {
+  configCache = null
+  configPromise = null
+}
+
 export const Header = (): React.JSX.Element => {
   const [user, setUser] = useState<UserData | null>(null)
+  const [siteName, setSiteName] = useState('Mora')
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
+
+  useEffect(() => {
+    if (!configPromise) {
+      configPromise = fetch('/api/config')
+        .then(r => r.json())
+        .then(cfg => { configCache = cfg; return cfg })
+        .catch(() => ({ site_name: 'Mora' }))
+    }
+    configPromise.then(cfg => setSiteName(cfg.site_name))
+  }, [])
 
   useEffect(() => {
     fetch('/api/me')
@@ -238,7 +257,7 @@ export const Header = (): React.JSX.Element => {
     <header className="sticky top-0 mb-2 bg-black text-white py-1">
       <div className="w-8/12 m-auto">
         <nav className="flex justify-between">
-          <HeaderLink to={'/'}>Mora</HeaderLink>
+          <HeaderLink to={'/'}>{siteName}</HeaderLink>
           <div className="flex items-center gap-2">
             {user ? (
               <div ref={menuRef} className="relative">

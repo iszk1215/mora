@@ -75,6 +75,7 @@ type (
 		udm                *udm.Service
 		tracker              *tracker.Service
 		apiKey             string
+		siteName           string
 
 		sessionManager     *MoraSessionManager
 		frontendFileServer http.Handler
@@ -174,6 +175,16 @@ func (s *MoraServer) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.JSON(w, user, http.StatusOK)
+}
+
+func (s *MoraServer) handleConfig(w http.ResponseWriter, r *http.Request) {
+	name := s.siteName
+	if name == "" {
+		name = "Mora"
+	}
+	render.JSON(w, map[string]string{
+		"site_name": name,
+	}, http.StatusOK)
 }
 
 func checkRepoAccessByRepositoryManager(session *MoraSession, rm RepositoryManager, owner, name string) error {
@@ -296,6 +307,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	r.Get("/api/scms", s.handleRepositoryManagerList)
 	r.Get("/api/me", s.handleMe)
+	r.Get("/api/config", s.handleConfig)
 
 	if s.userStore != nil {
 		r.Mount("/api/user/me/api-keys", APIKeyHandler(s.userStore))
@@ -499,6 +511,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		udm:                udm,
 		tracker:              trackerService,
 		apiKey:             os.Getenv("MORA_API_KEY"),
+		siteName:           cfg.SiteName,
 	}
 
 	return s, err
