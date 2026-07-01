@@ -17,14 +17,20 @@ type BaseRepositoryManager struct {
 	client       *scm.Client
 	url          *url.URL
 	oauthHandler *OAuthHandler
+	driver       string
 }
 
 func (s *BaseRepositoryManager) Init(id int64, url *url.URL, client *scm.Client,
-	oauthHandler *OAuthHandler) {
+	oauthHandler *OAuthHandler, driver string) {
 	s.id = id
 	s.url = url
 	s.client = client
 	s.oauthHandler = oauthHandler
+	s.driver = driver
+}
+
+func (s *BaseRepositoryManager) Driver() string {
+	return s.driver
 }
 
 func (s *BaseRepositoryManager) SetupTransport(source scm.TokenSource, scheme string) {

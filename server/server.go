@@ -40,6 +40,7 @@ type (
 		Client() *scm.Client
 		RevisionURL(baseURL string, revision string) string
 		LoginHandler(next http.Handler) http.Handler
+		Driver() string
 	}
 
 	// Protocols
@@ -150,28 +151,12 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 		resp = append(resp, RepositoryManagerResponse{
 			ID:      rm.ID(),
 			URL:     rm.URL().String(),
-			Name:    providerName(rm.URL()),
+			Name:    rm.Driver(),
 			LoggedIn: ok,
 		})
 	}
 
 	render.JSON(w, resp, http.StatusOK)
-}
-
-func providerName(u *url.URL) string {
-	host := u.Host
-	hostLower := strings.ToLower(host)
-	if strings.Contains(hostLower, "github") {
-		return "GitHub"
-	}
-	if strings.Contains(hostLower, "gitea") {
-		return "Gitea"
-	}
-	name := strings.SplitN(host, ".", 2)[0]
-	if len(name) > 0 {
-		return strings.ToUpper(name[:1]) + name[1:]
-	}
-	return host
 }
 
 func (s *MoraServer) handleMe(w http.ResponseWriter, r *http.Request) {

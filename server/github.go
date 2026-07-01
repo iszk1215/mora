@@ -33,7 +33,7 @@ func NewGithub(id int64, urlstr string, clientID, clientSecret, redirectURL stri
 	}
 
 	github := new(Github)
-	github.Init(id, u, driver.NewDefault(), NewOAuthHandler(oauthCfg))
+	github.Init(id, u, driver.NewDefault(), NewOAuthHandler(oauthCfg), "github")
 
 	github.SetupTransport(
 		&oauth2.Refresher{

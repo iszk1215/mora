@@ -374,7 +374,7 @@ func TestServerRepositoryManagerList(t *testing.T) {
 		{
 			ID:       rm.ID(),
 			URL:      rm.URL().String(),
-			Name:     "Mock",
+			Name:     "mock",
 			LoggedIn: true,
 		},
 	}

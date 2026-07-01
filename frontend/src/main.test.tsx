@@ -224,18 +224,18 @@ describe('SCMList', () => {
     expect(screen.getByText('Login')).toBeInTheDocument()
   })
 
-  it('renders Login with GitHub link for unauthenticated SCM', () => {
+  it('renders Login with github link for unauthenticated SCM', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://github.com', name: 'GitHub', logined: false },
+      { id: 1, url: 'https://github.com', name: 'github', logined: false },
     ])
     render(<MemoryRouter><SCMList /></MemoryRouter>)
-    const loginEl = screen.getByText('Login with GitHub')
+    const loginEl = screen.getByText('Login with github')
     expect(loginEl.closest('a')).toHaveAttribute('href', '/login/1')
   })
 
   it('renders Logout button for authenticated SCM', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://github.com', name: 'GitHub', logined: true },
+      { id: 1, url: 'https://github.com', name: 'github', logined: true },
     ])
     render(<MemoryRouter><SCMList /></MemoryRouter>)
     const logoutBtn = screen.getByText('Logout')
@@ -245,7 +245,7 @@ describe('SCMList', () => {
 
   it('shows Connected for authenticated SCM', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://github.com', name: 'GitHub', logined: true },
+      { id: 1, url: 'https://github.com', name: 'github', logined: true },
     ])
     render(<MemoryRouter><SCMList /></MemoryRouter>)
     expect(screen.getByText('Connected')).toBeInTheDocument()
@@ -253,30 +253,30 @@ describe('SCMList', () => {
 
   it('renders provider name in login buttons for each SCM entry', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://github.com', name: 'GitHub', logined: false },
-      { id: 2, url: 'https://gitea.example.com', name: 'Gitea', logined: false },
+      { id: 1, url: 'https://github.com', name: 'github', logined: false },
+      { id: 2, url: 'https://gitea.example.com', name: 'gitea', logined: false },
     ])
     render(<MemoryRouter><SCMList /></MemoryRouter>)
-    expect(screen.getByText('Login with GitHub')).toBeInTheDocument()
-    expect(screen.getByText('Login with Gitea')).toBeInTheDocument()
+    expect(screen.getByText('Login with github')).toBeInTheDocument()
+    expect(screen.getByText('Login with gitea')).toBeInTheDocument()
   })
 
   it('renders multiple SCM entries with different states', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://github.com', name: 'GitHub', logined: true },
-      { id: 2, url: 'https://gitea.example.com', name: 'Gitea', logined: false },
+      { id: 1, url: 'https://github.com', name: 'github', logined: true },
+      { id: 2, url: 'https://gitea.example.com', name: 'gitea', logined: false },
     ])
     render(<MemoryRouter><SCMList /></MemoryRouter>)
-    expect(screen.getByText('Login with Gitea')).toBeInTheDocument()
+    expect(screen.getByText('Login with gitea')).toBeInTheDocument()
     expect(screen.getByText('Logout')).toBeInTheDocument()
   })
 
-  it('renders Login with Gitea for Gitea provider with brand style', () => {
+  it('renders Login with gitea for Gitea provider with brand style', () => {
     vi.mocked(useLoaderData).mockReturnValue([
-      { id: 2, url: 'https://gitea.example.com', name: 'Gitea', logined: false },
+      { id: 2, url: 'https://gitea.example.com', name: 'gitea', logined: false },
     ])
     render(<MemoryRouter><SCMList /></MemoryRouter>)
-    const link = screen.getByText('Login with Gitea')
+    const link = screen.getByText('Login with gitea')
     expect(link.closest('a')).toHaveAttribute('href', '/login/2')
   })
 })

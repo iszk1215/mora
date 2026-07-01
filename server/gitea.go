@@ -44,7 +44,7 @@ func NewGitea(id int64, serverURL, clientID, clientSecret, redirectURL string, i
 	}
 
 	gitea := new(Gitea)
-	gitea.Init(id, client.BaseURL, client, NewOAuthHandler(oauthCfg))
+	gitea.Init(id, client.BaseURL, client, NewOAuthHandler(oauthCfg), "gitea")
 
 	gitea.client.Client = &http.Client{
 		Timeout: 30 * time.Second,
