@@ -118,30 +118,26 @@ const GitHubIcon = () => (
 
 const GiteaIcon = () => (
   <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
-    <path d="M8.5 2C4.9 2 2 4.9 2 8.5v7C2 19.1 4.9 22 8.5 22h7c3.6 0 6.5-2.9 6.5-6.5v-7C22 4.9 19.1 2 15.5 2h-7zm2.7 5.2c.7-.3 1.5-.5 2.3-.6l1.3-.2c.2 0 .3.1.5.2 1.6.7 2.7 2.3 2.7 4.2 0 3.7-4.2 5.4-8 5.4s-8-1.8-8-5.4c0-1.9 1.1-3.5 2.7-4.2.2-.1.3-.1.5-.2l1.3.2c.8.1 1.6.3 2.3.6.7.3 1.3.7 1.9 1.2.4.4.8.9 1 1.4l.1.3.1-.3c.2-.5.5-1 1-1.4.5-.5 1.1-.9 1.8-1.2z"/>
+    <path d="M8 4h10a2 2 0 012 2v8a4 4 0 01-4 4H8a4 4 0 01-4-4V6a2 2 0 012-2zm0 2v8a2 2 0 002 2h6a2 2 0 002-2V6H8zm10 4h2a1 1 0 011 1v2a1 1 0 01-1 1h-2v-4z"/>
   </svg>
 )
 
 function scmIcon(name: string) {
-  switch (name) {
-    case 'GitHub':
-      return <GitHubIcon />
-    case 'Gitea':
-      return <GiteaIcon />
-    default:
-      return null
-  }
+  const lower = name.toLowerCase()
+  if (lower === 'github') return <GitHubIcon />
+  if (lower.includes('gitea') || lower.includes('tea')) return <GiteaIcon />
+  return null
 }
 
 function scmBrandStyle(name: string): React.CSSProperties {
-  switch (name) {
-    case 'GitHub':
-      return { backgroundColor: '#24292f', color: '#fff' }
-    case 'Gitea':
-      return { backgroundColor: '#609926', color: '#fff' }
-    default:
-      return {}
+  const lower = name.toLowerCase()
+  if (lower === 'github') {
+    return { backgroundColor: '#24292f', color: '#fff' }
   }
+  if (lower.includes('gitea') || lower.includes('tea')) {
+    return { backgroundColor: '#609926', color: '#fff', border: '1px solid #4a7a1e' }
+  }
+  return {}
 }
 
 export const SCMList = (): React.JSX.Element => {
