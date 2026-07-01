@@ -289,44 +289,44 @@ describe('Breadcrumbs', () => {
   it('renders breadcrumbs from route matches', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
-        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'Top', link: '/' }) },
+        id: '1', pathname: '/signup', params: {}, data: undefined, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'Sign Up', link: '/signup' }) },
       },
       {
-        id: '1', pathname: '/auth', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'login', link: '/auth' }) },
+        id: '2', pathname: '/settings/api-keys', params: {}, data: undefined, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'API Keys', link: '/settings/api-keys' }) },
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
-    expect(screen.getByText('Top')).toBeInTheDocument()
-    expect(screen.getByText('login')).toBeInTheDocument()
+    expect(screen.getByText('Sign Up')).toBeInTheDocument()
+    expect(screen.getByText('API Keys')).toBeInTheDocument()
   })
 
   it('filters out matches without crumb handle', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
-        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'Top', link: '/' }) },
+        id: '0', pathname: '/signup', params: {}, data: undefined, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'Sign Up', link: '/signup' }) },
       },
       {
         id: '1', pathname: '/no-crumb', params: {}, data: undefined, loaderData: undefined,
         handle: {},
       },
       {
-        id: '2', pathname: '/auth', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'login', link: '/auth' }) },
+        id: '2', pathname: '/settings/api-keys', params: {}, data: undefined, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'API Keys', link: '/settings/api-keys' }) },
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
-    expect(screen.getByText('Top')).toBeInTheDocument()
-    expect(screen.getByText('login')).toBeInTheDocument()
+    expect(screen.getByText('Sign Up')).toBeInTheDocument()
+    expect(screen.getByText('API Keys')).toBeInTheDocument()
   })
 
   it('filters out crumbs with undefined label', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
-        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'Top', link: '/' }) },
+        id: '0', pathname: '/signup', params: {}, data: undefined, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'Sign Up', link: '/signup' }) },
       },
       {
         id: '1', pathname: '/hidden', params: {}, data: undefined, loaderData: undefined,
@@ -334,7 +334,7 @@ describe('Breadcrumbs', () => {
       },
     ])
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
-    expect(screen.getByText('Top')).toBeInTheDocument()
+    expect(screen.getByText('Sign Up')).toBeInTheDocument()
     expect(screen.queryByText('hidden')).toBeNull()
   })
 })

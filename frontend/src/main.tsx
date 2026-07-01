@@ -371,9 +371,6 @@ const router = createBrowserRouter([
     path: '/',
     element: <Root />,
     errorElement: <ErrorPage />,
-    handle: {
-      crumb: () => ({ label: "Top", link: "/" }),
-    },
     children: [
       {
         index: true,
@@ -384,9 +381,6 @@ const router = createBrowserRouter([
         path: '/auth',
         element: <SCMList />,
         loader: loadSCMList,
-        handle: {
-          crumb: (_params: Params, _data: any) => ({ label: "login", link: "/auth" }),
-        }
       },
       {
         path: '/signup',
