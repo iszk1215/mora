@@ -30,10 +30,13 @@ import (
 var indent bool
 
 func init() {
-	var err error
-	indent, err = strconv.ParseBool(os.Getenv("HTTP_JSON_INDENT"))
-	if err != nil {
-		log.Warn().Err(err).Msg("render.init: invalid HTTP_JSON_INDENT value")
+	env := os.Getenv("HTTP_JSON_INDENT")
+	if env != "" {
+		var err error
+		indent, err = strconv.ParseBool(env)
+		if err != nil {
+			log.Warn().Err(err).Msg("render.init: invalid HTTP_JSON_INDENT value")
+		}
 	}
 }
 
