@@ -122,22 +122,28 @@ const GiteaIcon = () => (
   </svg>
 )
 
+const LoginIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" aria-hidden="true">
+    <path d="M10 17l5-5-5-5v3H3v4h7v3zm9-14H5a2 2 0 00-2 2v3h2V5h14v14H5v-3H3v3a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z"/>
+  </svg>
+)
+
 function scmIcon(name: string) {
   const lower = name.toLowerCase()
-  if (lower === 'github') return <GitHubIcon />
+  if (lower.includes('github')) return <GitHubIcon />
   if (lower.includes('gitea') || lower.includes('tea')) return <GiteaIcon />
-  return null
+  return <LoginIcon />
 }
 
 function scmBrandStyle(name: string): React.CSSProperties {
   const lower = name.toLowerCase()
-  if (lower === 'github') {
+  if (lower.includes('github')) {
     return { backgroundColor: '#24292f', color: '#fff' }
   }
   if (lower.includes('gitea') || lower.includes('tea')) {
     return { backgroundColor: '#609926', color: '#fff', border: '1px solid #4a7a1e' }
   }
-  return {}
+  return { backgroundColor: '#6366f1', color: '#fff' }
 }
 
 export const SCMList = (): React.JSX.Element => {

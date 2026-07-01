@@ -160,8 +160,12 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 
 func providerName(u *url.URL) string {
 	host := u.Host
-	if strings.EqualFold(host, "github.com") {
+	hostLower := strings.ToLower(host)
+	if strings.Contains(hostLower, "github") {
 		return "GitHub"
+	}
+	if strings.Contains(hostLower, "gitea") {
+		return "Gitea"
 	}
 	name := strings.SplitN(host, ".", 2)[0]
 	if len(name) > 0 {
