@@ -162,12 +162,6 @@ describe('RepoList', () => {
     vi.mocked(loadUdmMetrics).mockReset()
   })
 
-  it('renders repositories heading with empty list', () => {
-    vi.mocked(useLoaderData).mockReturnValue([])
-    render(<MemoryRouter><RepoList /></MemoryRouter>)
-    expect(screen.getByText('Repositories')).toBeInTheDocument()
-  })
-
   it('renders repo URLs', () => {
     vi.mocked(useLoaderData).mockReturnValue([
       { id: 1, url: 'https://example.com/repo', namespace: 'ns', name: 'repo' },

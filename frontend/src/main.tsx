@@ -87,7 +87,6 @@ export const RepoList = (): React.JSX.Element => {
 
   return (
     <div>
-      <h2 className="text-3xl my-4">Repositories</h2>
       <ul className="list-inside">{elems}</ul>
     </div>
   )
