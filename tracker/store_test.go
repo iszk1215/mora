@@ -101,18 +101,31 @@ func TestStoreFindTracker(t *testing.T) {
 	})
 
 	t.Run("list for non-member user returns empty", func(t *testing.T) {
-		trackers, err := s.listTrackers(999)
+		trackers, total, err := s.listTrackers(999, 0, 0)
 		require.NoError(t, err)
 		require.Empty(t, trackers)
+		require.Equal(t, 0, total)
 	})
 
 	t.Run("list for owner user returns tracker", func(t *testing.T) {
-		trackers, err := s.listTrackers(1)
+		trackers, total, err := s.listTrackers(1, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
+		require.Equal(t, 1, total)
 		require.Equal(t, tracker.Id, trackers[0].Id)
 		require.Equal(t, "owner", trackers[0].Role)
 		require.Equal(t, false, trackers[0].Liked)
+	})
+
+	t.Run("list with pagination", func(t *testing.T) {
+		for i := 0; i < 5; i++ {
+			tr := &TrackerModel{Name: fmt.Sprintf("paginate_%d", i)}
+			require.NoError(t, s.addTracker(tr, 1))
+		}
+		trackers, total, err := s.listTrackers(1, 1, 3)
+		require.NoError(t, err)
+		require.Equal(t, 3, len(trackers))
+		require.Equal(t, 6, total)
 	})
 }
 
@@ -343,6 +356,45 @@ func TestStoreValue(t *testing.T) {
 	})
 }
 
+func TestStoreListLatestValues(t *testing.T) {
+	s := initTestStore(t)
+
+	tr := &TrackerModel{Name: "test_tracker"}
+	require.NoError(t, s.addTracker(tr, 1))
+
+	series := &SeriesModel{TrackerId: tr.Id, Name: "test_series", DataType: "float"}
+	require.NoError(t, s.addSeries(series))
+
+	now := time.Now().Round(0)
+	for i := 0; i < 10; i++ {
+		v := &ValueModel{SeriesId: series.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i)}
+		require.NoError(t, s.addValue(v))
+	}
+
+	t.Run("latest values returns most recent first in ASC order", func(t *testing.T) {
+		values, err := s.listLatestValues(series.Id, 3)
+		require.NoError(t, err)
+		require.Equal(t, 3, len(values))
+		require.Equal(t, 7.0, values[0].Value)
+		require.Equal(t, 8.0, values[1].Value)
+		require.Equal(t, 9.0, values[2].Value)
+	})
+
+	t.Run("no limit returns all in ASC order", func(t *testing.T) {
+		values, err := s.listLatestValues(series.Id, 0)
+		require.NoError(t, err)
+		require.Equal(t, 10, len(values))
+		require.Equal(t, 0.0, values[0].Value)
+		require.Equal(t, 9.0, values[9].Value)
+	})
+
+	t.Run("no values returns empty", func(t *testing.T) {
+		values, err := s.listLatestValues(999, 5)
+		require.NoError(t, err)
+		require.Empty(t, values)
+	})
+}
+
 func TestStoreDeleteValueCascade(t *testing.T) {
 	s := initTestStore(t)
 
@@ -426,7 +478,7 @@ func TestStoreLike(t *testing.T) {
 		err := s.addLike(999, tr.Id)
 		require.NoError(t, err)
 
-		trackers, err := s.listTrackers(999)
+		trackers, _, err := s.listTrackers(999, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
 		require.True(t, trackers[0].Liked)
@@ -437,7 +489,7 @@ func TestStoreLike(t *testing.T) {
 		err := s.removeLike(999, tr.Id)
 		require.NoError(t, err)
 
-		trackers, err := s.listTrackers(999)
+		trackers, _, err := s.listTrackers(999, 0, 0)
 		require.NoError(t, err)
 		require.Empty(t, trackers)
 	})
@@ -453,7 +505,7 @@ func TestStoreLike(t *testing.T) {
 		err = s.addLike(888, tr.Id)
 		require.NoError(t, err)
 
-		trackers, err := s.listTrackers(888)
+		trackers, _, err := s.listTrackers(888, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
 	})
@@ -473,33 +525,37 @@ func TestStoreTrackerListUserScoped(t *testing.T) {
 	require.NoError(t, s.addLike(2, tr1.Id))
 
 	t.Run("user 1 sees owned trackers with liked flag", func(t *testing.T) {
-		trackers, err := s.listTrackers(1)
+		trackers, total, err := s.listTrackers(1, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(trackers))
+		require.Equal(t, 2, total)
 		for _, tr := range trackers {
 			require.Equal(t, "owner", tr.Role)
 		}
 	})
 
 	t.Run("user 2 sees liked trackers only", func(t *testing.T) {
-		trackers, err := s.listTrackers(2)
+		trackers, total, err := s.listTrackers(2, 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
+		require.Equal(t, 1, total)
 		require.Equal(t, tr1.Id, trackers[0].Id)
 		require.True(t, trackers[0].Liked)
 		require.Empty(t, trackers[0].Role)
 	})
 
 	t.Run("user 3 sees nothing", func(t *testing.T) {
-		trackers, err := s.listTrackers(3)
+		trackers, total, err := s.listTrackers(3, 0, 0)
 		require.NoError(t, err)
 		require.Empty(t, trackers)
+		require.Equal(t, 0, total)
 	})
 
 	t.Run("tracker delete cascades to member and like", func(t *testing.T) {
 		require.NoError(t, s.deleteTracker(tr1.Id))
-		trackers, err := s.listTrackers(2)
+		trackers, total, err := s.listTrackers(2, 0, 0)
 		require.NoError(t, err)
 		require.Empty(t, trackers)
+		require.Equal(t, 0, total)
 	})
 }

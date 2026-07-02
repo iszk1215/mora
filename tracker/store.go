@@ -101,7 +101,20 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 	return nil
 }
 
-func (s *trackerStore) listTrackers(userID int64) ([]TrackerResponse, error) {
+func (s *trackerStore) listTrackers(userID int64, page, perPage int) ([]TrackerResponse, int, error) {
+	countQuery := `
+		SELECT COUNT(*)
+		FROM tracker t
+		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
+		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
+		WHERE m.user_id IS NOT NULL OR l.user_id IS NOT NULL`
+
+	var total int
+	err := s.db.Get(&total, countQuery, userID, userID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("listTrackers count: %w", err)
+	}
+
 	query := `
 		SELECT t.id, t.name, t.visibility,
 		       COALESCE(m.role, '') AS role,
@@ -113,12 +126,18 @@ func (s *trackerStore) listTrackers(userID int64) ([]TrackerResponse, error) {
 		ORDER BY t.name`
 
 	rows := []TrackerResponse{}
-	err := s.db.Select(&rows, query, userID, userID)
+	if perPage > 0 {
+		query += " LIMIT ? OFFSET ?"
+		offset := (page - 1) * perPage
+		err = s.db.Select(&rows, query, userID, userID, perPage, offset)
+	} else {
+		err = s.db.Select(&rows, query, userID, userID)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("listTrackers select: %w", err)
+		return nil, 0, fmt.Errorf("listTrackers select: %w", err)
 	}
 
-	return rows, nil
+	return rows, total, nil
 }
 
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
@@ -263,6 +282,30 @@ func (s *trackerStore) listValues(seriesId int64, limit int) ([]ValueModel, erro
 
 	if err != nil {
 		return nil, fmt.Errorf("listValues select: %w", err)
+	}
+
+	return rows, nil
+}
+
+func (s *trackerStore) listLatestValues(seriesId int64, limit int) ([]ValueModel, error) {
+	query := "SELECT id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time DESC"
+
+	var rows []ValueModel
+	var err error
+
+	if limit > 0 {
+		query += " LIMIT ?"
+		err = s.db.Select(&rows, query, seriesId, limit)
+	} else {
+		err = s.db.Select(&rows, query, seriesId)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("listLatestValues select: %w", err)
+	}
+
+	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+		rows[i], rows[j] = rows[j], rows[i]
 	}
 
 	return rows, nil
