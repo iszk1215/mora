@@ -22,6 +22,7 @@ import { udmRoute, loadUdmMetrics } from './udm'
 import { trackerRoute } from './tracker'
 import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
+import { PasswordLoginForm } from './auth'
 import { DefaultLink, HeaderLink } from './util'
 import { Button } from '@/components/ui/button'
 import {
@@ -152,6 +153,17 @@ function scmBrandStyle(name: string): React.CSSProperties {
   return { backgroundColor: '#6366f1', color: '#fff' }
 }
 
+export const AuthPage = (): React.JSX.Element => {
+  return (
+    <div>
+      <SCMList />
+      <div className="max-w-md mx-auto">
+        <PasswordLoginForm />
+      </div>
+    </div>
+  )
+}
+
 export const SCMList = (): React.JSX.Element => {
   const scmList = useLoaderData() as SCMData[]
   const items: React.JSX.Element[] = []
@@ -261,10 +273,16 @@ export const Header = (): React.JSX.Element => {
           <div className="flex items-center gap-2">
             {user ? (
               <div ref={menuRef} className="relative">
-                {user.avatar_url && (
+                {user.avatar_url ? (
                   <img src={user.avatar_url} className="w-6 h-6 rounded-full cursor-pointer"
                        title="Open menu" alt={user.username}
                        onClick={() => setMenuOpen(!menuOpen)} />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-blue-500 cursor-pointer flex items-center justify-center text-xs font-bold text-white select-none"
+                       title="Open menu"
+                       onClick={() => setMenuOpen(!menuOpen)}>
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
                 )}
                 {menuOpen && (
                   <div className="absolute right-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
@@ -397,7 +415,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/auth',
-        element: <SCMList />,
+        element: <AuthPage />,
         loader: loadSCMList,
       },
       {

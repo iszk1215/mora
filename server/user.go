@@ -16,14 +16,16 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
-	ID        int64  `db:"id" json:"id"`
-	Username  string `db:"username" json:"username"`
-	AvatarURL string `db:"avatar_url" json:"avatar_url"`
-	CreatedAt string `db:"created_at" json:"-"`
-	UpdatedAt string `db:"updated_at" json:"-"`
+	ID           int64   `db:"id" json:"id"`
+	Username     string  `db:"username" json:"username"`
+	AvatarURL    string  `db:"avatar_url" json:"avatar_url"`
+	PasswordHash *string `db:"password_hash" json:"-"`
+	CreatedAt    string  `db:"created_at" json:"-"`
+	UpdatedAt    string  `db:"updated_at" json:"-"`
 }
 
 type UserAuth struct {
@@ -45,7 +47,10 @@ type UserAPIKey struct {
 type UserStore interface {
 	Init() error
 	FindByProvider(provider, providerUserID string) (*User, error)
+	FindByUsername(username string) (*User, error)
 	CreateUser(username, avatarURL string) (*User, error)
+	CreateUserWithPassword(username, password string) (*User, error)
+	SetPassword(userID int64, passwordHash string) error
 	LinkAuth(userID int64, provider, providerUserID string) error
 	FindByID(id int64) (*User, error)
 	CreateAPIKey(userID int64, name string) (string, error)
@@ -103,11 +108,30 @@ func (s *userStore) Init() error {
 		return err
 	}
 
+	// migration: add password_hash column (safe to run on existing tables)
+	_, _ = s.db.Exec(`ALTER TABLE user ADD COLUMN password_hash TEXT`)
+
+	adminPassHash, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("generate admin password hash: %w", err)
+	}
+
 	_, err = s.db.Exec(
-		`INSERT OR IGNORE INTO user (id, username, avatar_url)
-		 VALUES (1, 'admin', '')`,
+		`INSERT OR IGNORE INTO user (id, username, avatar_url, password_hash)
+		 VALUES (1, 'admin', '', ?)`,
+		string(adminPassHash),
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// ensure admin has password even if user already existed without one
+	_, _ = s.db.Exec(
+		`UPDATE user SET password_hash = ? WHERE id = 1 AND password_hash IS NULL`,
+		string(adminPassHash),
+	)
+
+	return nil
 }
 
 func (s *userStore) FindByProvider(provider, providerUserID string) (*User, error) {
@@ -141,6 +165,53 @@ func (s *userStore) CreateUser(username, avatarURL string) (*User, error) {
 		Username:  username,
 		AvatarURL: avatarURL,
 	}, nil
+}
+
+func (s *userStore) FindByUsername(username string) (*User, error) {
+	var user User
+	err := s.db.Get(&user,
+		"SELECT * FROM user WHERE username = ?", username)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (s *userStore) CreateUserWithPassword(username, password string) (*User, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+	hashStr := string(hash)
+
+	result, err := s.db.Exec(
+		"INSERT INTO user (username, avatar_url, password_hash) VALUES (?, '', ?)",
+		username, hashStr)
+	if err != nil {
+		return nil, fmt.Errorf("create user with password: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("last insert id: %w", err)
+	}
+
+	return &User{
+		ID:           id,
+		Username:     username,
+		AvatarURL:    "",
+		PasswordHash: &hashStr,
+	}, nil
+}
+
+func (s *userStore) SetPassword(userID int64, passwordHash string) error {
+	_, err := s.db.Exec(
+		"UPDATE user SET password_hash = ? WHERE id = ?",
+		passwordHash, userID)
+	if err != nil {
+		return fmt.Errorf("set password: %w", err)
+	}
+	return nil
 }
 
 func (s *userStore) LinkAuth(userID int64, provider, providerUserID string) error {

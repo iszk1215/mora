@@ -343,6 +343,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	if s.userStore != nil {
 		r.Mount("/api/signup", SignupHandler(s.userStore))
+		r.Mount("/api/auth", PasswordAuthHandler(s.userStore))
 	}
 
 	// frontend
