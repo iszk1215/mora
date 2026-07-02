@@ -35,19 +35,24 @@ describe('loadTrackerList', () => {
     vi.restoreAllMocks()
   })
 
-  it('returns trackers array from successful API response', async () => {
-    const mockTrackers = [
-      { id: 1, name: 'tracker-a', visibility: 'private', role: 'owner', liked: false },
-      { id: 2, name: 'tracker-b', visibility: 'public', role: '', liked: true },
-    ]
+  it('returns paginated trackers from successful API response', async () => {
+    const mockResponse = {
+      trackers: [
+        { id: 1, name: 'tracker-a', visibility: 'private', role: 'owner', liked: false },
+        { id: 2, name: 'tracker-b', visibility: 'public', role: '', liked: true },
+      ],
+      total: 2,
+      page: 1,
+      per_page: 12,
+    }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ trackers: mockTrackers }),
+      json: () => Promise.resolve(mockResponse),
     } as Response)
 
     const result = await loadTrackerList()
-    expect(result).toEqual(mockTrackers)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker')
+    expect(result).toEqual(mockResponse)
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker?page=1&per_page=12')
   })
 
   it('throws on non-ok response', async () => {
@@ -131,37 +136,77 @@ describe('patchTracker', () => {
 describe('TrackerView', () => {
   beforeEach(() => {
     vi.mocked(useLoaderData).mockReset()
+    globalThis.fetch = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('renders Trackers heading', () => {
-    vi.mocked(useLoaderData).mockReturnValue([])
+    vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
     render(<MemoryRouter><TrackerView /></MemoryRouter>)
     expect(screen.getByText('Trackers')).toBeInTheDocument()
   })
 
   it('shows Create Tracker link', () => {
-    vi.mocked(useLoaderData).mockReturnValue([])
+    vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
     render(<MemoryRouter><TrackerView /></MemoryRouter>)
     const link = screen.getByText('Create Tracker').closest('a')
     expect(link).toHaveAttribute('href', '/tracker/new')
   })
 
-  it('shows My Trackers and Liked Trackers sections', () => {
-    vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, name: 'my-tracker', visibility: 'private', role: 'owner', liked: false },
-      { id: 2, name: 'liked-tracker', visibility: 'public', role: '', liked: true },
-    ])
+  it('renders tracker cards', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      trackers: [
+        { id: 1, name: 'tracker-a', visibility: 'private', role: 'owner', liked: false },
+        { id: 2, name: 'tracker-b', visibility: 'public', role: '', liked: true },
+      ],
+      total: 2,
+      page: 1,
+      per_page: 12,
+    })
     render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('My Trackers')).toBeInTheDocument()
-    expect(screen.getByText('Liked Trackers')).toBeInTheDocument()
+    expect(screen.getByText('tracker-a')).toBeInTheDocument()
+    expect(screen.getByText('tracker-b')).toBeInTheDocument()
   })
 
-  it('shows liked indicator on liked trackers', () => {
-    vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, name: 'liked-tracker', visibility: 'public', role: '', liked: true },
-    ])
+  it('shows role badge for owned trackers', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      trackers: [
+        { id: 1, name: 'my-tracker', visibility: 'private', role: 'owner', liked: false },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 12,
+    })
     render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('\u2665')).toBeInTheDocument()
+    expect(screen.getByText('owner')).toBeInTheDocument()
+  })
+
+  it('shows empty state when no trackers', () => {
+    vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
+    render(<MemoryRouter><TrackerView /></MemoryRouter>)
+    expect(screen.getByText('No trackers yet.')).toBeInTheDocument()
+  })
+
+  it('renders pagination controls when multiple pages', () => {
+    const trackers = Array.from({ length: 12 }, (_, i) => ({
+      id: i + 1,
+      name: `tracker-${i}`,
+      visibility: 'private' as const,
+      role: 'owner' as const,
+      liked: false,
+    }))
+    vi.mocked(useLoaderData).mockReturnValue({
+      trackers,
+      total: 24,
+      page: 1,
+      per_page: 12,
+    })
+    render(<MemoryRouter><TrackerView /></MemoryRouter>)
+    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
+    expect(screen.getByText('Next')).toBeInTheDocument()
   })
 })
 

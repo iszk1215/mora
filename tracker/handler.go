@@ -59,6 +59,19 @@ type (
 
 	ListTrackersResponse struct {
 		Trackers []TrackerResponse `json:"trackers"`
+		Total    int               `json:"total"`
+		Page     int               `json:"page"`
+		PerPage  int               `json:"per_page"`
+	}
+
+	PreviewSeriesValues struct {
+		Series SeriesModel  `json:"series"`
+		Values []ValueModel `json:"values"`
+	}
+
+	PreviewResponse struct {
+		Tracker TrackerResponse      `json:"tracker"`
+		Series  []PreviewSeriesValues `json:"series"`
 	}
 
 	ListSeriesResponse struct {
@@ -212,18 +225,37 @@ func (h *trackerHandler) requireReadPermission(next http.Handler) http.Handler {
 func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
-		render.JSON(w, ListTrackersResponse{Trackers: []TrackerResponse{}}, http.StatusOK)
+		render.JSON(w, ListTrackersResponse{Trackers: []TrackerResponse{}, Total: 0, Page: 1, PerPage: 0}, http.StatusOK)
 		return
 	}
 
-	trackers, err := h.store.listTrackers(uid)
+	page := 1
+	perPage := 0
+
+	if p := r.URL.Query().Get("page"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 {
+			page = n
+		}
+	}
+	if pp := r.URL.Query().Get("per_page"); pp != "" {
+		if n, err := strconv.Atoi(pp); err == nil && n > 0 {
+			perPage = n
+		}
+	}
+
+	trackers, total, err := h.store.listTrackers(uid, page, perPage)
 	if err != nil {
 		log.Error().Err(err).Msg("tracker.handler.listTrackers")
 		render.InternalError(w, err)
 		return
 	}
 
-	render.JSON(w, ListTrackersResponse{Trackers: trackers}, http.StatusOK)
+	render.JSON(w, ListTrackersResponse{
+		Trackers: trackers,
+		Total:    total,
+		Page:     page,
+		PerPage:  perPage,
+	}, http.StatusOK)
 }
 
 // CreateTracker godoc
@@ -372,6 +404,55 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.JSON(w, resp, http.StatusOK)
+}
+
+// ----------------------------------------------------------------------
+// Preview
+
+// PreviewTracker godoc
+// @Summary      Preview tracker data
+// @Description  Return tracker info, all series, and latest values (up to 20 per series) for card previews
+// @Tags         tracker
+// @Param        trackerId  path  int  true  "Tracker ID"
+// @Success      200  {object}  tracker.PreviewResponse
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/tracker/{trackerId}/preview [get]
+func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) {
+	tracker, _ := trackerFrom(r.Context())
+
+	series, err := h.store.listSeries(tracker.Id)
+	if err != nil {
+		log.Error().Err(err).Msg("tracker.handler.previewTracker listSeries")
+		render.InternalError(w, err)
+		return
+	}
+
+	previews := make([]PreviewSeriesValues, 0, len(series))
+	for _, s := range series {
+		values, err := h.store.listLatestValues(s.Id, 20)
+		if err != nil {
+			log.Error().Err(err).Msg("tracker.handler.previewTracker listLatestValues")
+			continue
+		}
+		previews = append(previews, PreviewSeriesValues{
+			Series: s,
+			Values: values,
+		})
+	}
+
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility}
+	if uid, ok := UserIDFromContext(r.Context()); ok {
+		if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
+			trackerResp.Role = role
+		}
+		if liked, err := h.store.isLiked(uid, tracker.Id); err == nil {
+			trackerResp.Liked = liked
+		}
+	}
+
+	render.JSON(w, PreviewResponse{Tracker: trackerResp, Series: previews}, http.StatusOK)
 }
 
 // ----------------------------------------------------------------------
@@ -744,6 +825,7 @@ func newHandler(store *trackerStore) http.Handler {
 			r.With(h.requireEditPermission).Patch("/", h.patchTracker)
 			r.Post("/like", h.likeTracker)
 			r.Delete("/like", h.unlikeTracker)
+			r.Get("/preview", h.previewTracker)
 
 			r.Route("/series", func(r chi.Router) {
 				r.Get("/", h.listSeries)

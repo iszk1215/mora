@@ -147,6 +147,9 @@ func TestHandlerListTrackers(t *testing.T) {
 		var got ListTrackersResponse
 		unmarshalResponse(t, res, &got)
 		require.Empty(t, got.Trackers)
+		require.Equal(t, 0, got.Total)
+		require.Equal(t, 1, got.Page)
+		require.Equal(t, 0, got.PerPage)
 	})
 
 	t.Run("with trackers", func(t *testing.T) {
@@ -164,6 +167,27 @@ func TestHandlerListTrackers(t *testing.T) {
 		var got ListTrackersResponse
 		unmarshalResponse(t, res, &got)
 		require.Equal(t, 2, len(got.Trackers))
+		require.Equal(t, 2, got.Total)
+	})
+
+	t.Run("with pagination", func(t *testing.T) {
+		store := initTestStore(t)
+		for i := 0; i < 5; i++ {
+			tr := &TrackerModel{Name: fmt.Sprintf("tracker_%d", i)}
+			require.NoError(t, store.addTracker(tr, 1))
+		}
+
+		h := newHandler(store)
+		r := httptest.NewRequest(http.MethodGet, "/?page=1&per_page=2", nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListTrackersResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, 2, len(got.Trackers))
+		require.Equal(t, 5, got.Total)
+		require.Equal(t, 1, got.Page)
+		require.Equal(t, 2, got.PerPage)
 	})
 
 	t.Run("returns empty for anonymous", func(t *testing.T) {
@@ -174,6 +198,7 @@ func TestHandlerListTrackers(t *testing.T) {
 		var got ListTrackersResponse
 		unmarshalResponse(t, res, &got)
 		require.Empty(t, got.Trackers)
+		require.Equal(t, 0, got.Total)
 	})
 }
 
@@ -769,5 +794,65 @@ func TestHandlerLike(t *testing.T) {
 		r2 := httptest.NewRequest(http.MethodPost, path, nil)
 		r2 = r2.WithContext(superuserCtx())
 		getResponse(t, http.StatusCreated, h, r2)
+	})
+}
+
+// ----------------------------------------------------------------------
+// Preview
+
+func TestHandlerPreviewTracker(t *testing.T) {
+	t.Run("returns preview with latest values", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		s1 := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s1))
+
+		now := time.Now().Round(0)
+		for i := 0; i < 5; i++ {
+			v := &ValueModel{SeriesId: s1.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i)}
+			require.NoError(t, store.addValue(v))
+		}
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/preview", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got PreviewResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, tr.Id, got.Tracker.Id)
+		require.Equal(t, "owner", got.Tracker.Role)
+		require.Len(t, got.Series, 1)
+		require.Equal(t, s1.Id, got.Series[0].Series.Id)
+		require.Len(t, got.Series[0].Values, 5)
+		// Values should be in chronological order (latest first reversed to ASC)
+		require.Equal(t, 0.0, got.Series[0].Values[0].Value)
+		require.Equal(t, 4.0, got.Series[0].Values[4].Value)
+	})
+
+	t.Run("returns empty series for tracker without series", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "empty"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/preview", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got PreviewResponse
+		unmarshalResponse(t, res, &got)
+		require.Len(t, got.Series, 0)
+	})
+
+	t.Run("returns 404 for non-existing tracker", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := httptest.NewRequest(http.MethodGet, "/99999/preview", nil)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 }

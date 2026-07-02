@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import DatePicker from 'react-datepicker'
 
@@ -56,13 +56,37 @@ interface TrackerDetailData {
   series: SeriesModel[]
 }
 
-async function listTrackers(): Promise<TrackerResponse[]> {
-  const resp = await fetch('/api/tracker')
-  if (!resp.ok) throw resp
-  const data = await resp.json()
-  return data.trackers ?? []
+interface PaginatedTrackers {
+  trackers: TrackerResponse[]
+  total: number
+  page: number
+  per_page: number
 }
 
+interface PreviewData {
+  tracker: TrackerResponse
+  series: Array<{
+    series: SeriesModel
+    values: ValueModel[]
+  }>
+}
+
+async function listTrackers(page?: number, perPage?: number): Promise<PaginatedTrackers> {
+  const params = new URLSearchParams()
+  if (page) params.set('page', String(page))
+  if (perPage) params.set('per_page', String(perPage))
+  const qs = params.toString()
+  const url = qs ? `/api/tracker?${qs}` : '/api/tracker'
+  const resp = await fetch(url)
+  if (!resp.ok) throw resp
+  return resp.json()
+}
+
+async function fetchPreview(trackerId: number): Promise<PreviewData> {
+  const resp = await fetch(`/api/tracker/${trackerId}/preview`)
+  if (!resp.ok) throw resp
+  return resp.json()
+}
 async function createTracker(name: string, visibility: string): Promise<TrackerResponse> {
   const resp = await fetch('/api/tracker', {
     method: 'POST',
@@ -71,11 +95,6 @@ async function createTracker(name: string, visibility: string): Promise<TrackerR
   })
   if (!resp.ok) throw resp
   return resp.json()
-}
-
-async function deleteTracker(id: number): Promise<void> {
-  const resp = await fetch(`/api/tracker/${id}`, { method: 'DELETE' })
-  if (!resp.ok) throw resp
 }
 
 async function listSeries(trackerId: number): Promise<TrackerDetailData> {
@@ -133,8 +152,8 @@ export async function patchTracker(trackerId: number, visibility: string): Promi
   return resp.json()
 }
 
-export async function loadTrackerList(): Promise<TrackerResponse[]> {
-  return listTrackers()
+export async function loadTrackerList(): Promise<PaginatedTrackers> {
+  return listTrackers(1, 12)
 }
 
 export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise<TrackerDetailData> {
@@ -177,62 +196,101 @@ const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   )
 }
 
-export const TrackerView = (): React.JSX.Element => {
-  const initial = useLoaderData() as TrackerResponse[]
-  const [trackers, setTrackers] = useState<TrackerResponse[]>(initial)
+const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean }): React.JSX.Element => {
+  const option = useMemo(() => {
+    const datasets = preview?.series?.map((sv) => ({
+      label: sv.series.name,
+      data: sv.values.map((v) => ({ x: v.time, y: String(v.value) })),
+    })) ?? []
 
-  const handleDelete = async (id: number) => {
+    return {
+      grid: { left: 5, right: 5, top: 5, bottom: 5 },
+      xAxis: { type: 'time' as const, show: false },
+      yAxis: { type: 'value' as const, show: false },
+      series: datasets.map((ds) => ({
+        name: ds.label,
+        type: 'line' as const,
+        data: ds.data.map((p) => [p.x, Number(p.y)]),
+        smooth: true,
+        lineStyle: { width: 1.5 },
+        symbol: 'none',
+      })),
+      tooltip: { trigger: 'axis' as const },
+    }
+  }, [preview])
+
+  return (
+    <Link to={`/tracker/${tracker.id}`} className="block border rounded-lg p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-center gap-2 mb-2">
+        <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
+        {tracker.role && (
+          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tracker.role}</span>
+        )}
+      </div>
+      <div className="h-[120px]">
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
+        ) : option.series.length > 0 ? (
+          <ReactECharts option={option} style={{ width: '100%', height: 120 }} />
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
+        )}
+      </div>
+    </Link>
+  )
+}
+
+export const TrackerView = (): React.JSX.Element => {
+  const initial = useLoaderData() as PaginatedTrackers
+  const [trackers, setTrackers] = useState<TrackerResponse[]>(initial.trackers)
+  const [page, setPage] = useState(initial.page)
+  const [total, setTotal] = useState(initial.total)
+  const perPage = initial.per_page
+  const totalPages = perPage > 0 ? Math.ceil(total / perPage) : 1
+
+  const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
+  const [loadingPreviews, setLoadingPreviews] = useState(false)
+  const [loadingPage, setLoadingPage] = useState(false)
+
+  const loadPreviews = useCallback(async () => {
+    if (trackers.length === 0) {
+      setPreviews(new Map())
+      return
+    }
+    setLoadingPreviews(true)
     try {
-      await deleteTracker(id)
-      setTrackers((prev) => prev.filter((t) => t.id !== id))
+      const results = await Promise.all(
+        trackers.map((t) =>
+          fetchPreview(t.id).then((data) => ({ id: t.id, data } as const)),
+        ),
+      )
+      const map = new Map<number, PreviewData>()
+      results.forEach((r) => map.set(r.id, r.data))
+      setPreviews(map)
+    } catch {
+      // ignore individual preview failures
+    } finally {
+      setLoadingPreviews(false)
+    }
+  }, [trackers])
+
+  useEffect(() => {
+    void loadPreviews()
+  }, [loadPreviews])
+
+  const handlePageChange = async (newPage: number) => {
+    setLoadingPage(true)
+    try {
+      const data = await listTrackers(newPage, perPage)
+      setTrackers(data.trackers)
+      setPage(data.page)
+      setTotal(data.total)
     } catch {
       // ignore
+    } finally {
+      setLoadingPage(false)
     }
   }
-
-  const myTrackers = trackers.filter((t) => t.role !== '')
-  const likedTrackers = trackers.filter((t) => t.liked)
-
-  const renderTrackerTable = (rows: TrackerResponse[], showActions: boolean) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          {showActions && <TableHead className="w-24">Actions</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={showActions ? 2 : 1} className="text-center text-muted-foreground">
-              None
-            </TableCell>
-          </TableRow>
-        ) : (
-          rows.map((t) => (
-            <TableRow key={t.id}>
-              <TableCell>
-                <Link
-                  to={`/tracker/${t.id}`}
-                  className="text-blue-600 dark:text-blue-500 hover:underline"
-                >
-                  {t.name}
-                </Link>
-                {t.liked && <span className="ml-2 text-sm text-muted-foreground">&#9829;</span>}
-              </TableCell>
-              {showActions && (
-                <TableCell>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(t.id)}>
-                    Delete
-                  </Button>
-                </TableCell>
-              )}
-            </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
-  )
 
   return (
     <div>
@@ -242,17 +300,28 @@ export const TrackerView = (): React.JSX.Element => {
         <Button asChild><Link to="/tracker/new">Create Tracker</Link></Button>
       </div>
 
-      {myTrackers.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-xl my-2">My Trackers</h2>
-          {renderTrackerTable(myTrackers, true)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {trackers.map((t) => (
+          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} loading={loadingPreviews} />
+        ))}
+        {trackers.length === 0 && !loadingPage && (
+          <p className="col-span-full text-center text-muted-foreground py-8">No trackers yet.</p>
+        )}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-6">
+          <Button variant="outline" size="sm" disabled={page <= 1 || loadingPage} onClick={() => handlePageChange(page - 1)}>
+            Prev
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages || loadingPage} onClick={() => handlePageChange(page + 1)}>
+            Next
+          </Button>
         </div>
       )}
-
-      <div>
-        <h2 className="text-xl my-2">Liked Trackers</h2>
-        {renderTrackerTable(likedTrackers, false)}
-      </div>
     </div>
   )
 }
