@@ -22,6 +22,7 @@ import { udmRoute, loadUdmMetrics } from './udm'
 import { trackerRoute } from './tracker'
 import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
+import { PasswordLoginForm } from './auth'
 import { DefaultLink, HeaderLink } from './util'
 import { Button } from '@/components/ui/button'
 import {
@@ -150,6 +151,17 @@ function scmBrandStyle(name: string): React.CSSProperties {
     return { backgroundColor: '#609926', color: '#fff', border: '1px solid #4a7a1e' }
   }
   return { backgroundColor: '#6366f1', color: '#fff' }
+}
+
+export const AuthPage = (): React.JSX.Element => {
+  return (
+    <div>
+      <SCMList />
+      <div className="max-w-md mx-auto">
+        <PasswordLoginForm />
+      </div>
+    </div>
+  )
 }
 
 export const SCMList = (): React.JSX.Element => {
@@ -397,7 +409,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/auth',
-        element: <SCMList />,
+        element: <AuthPage />,
         loader: loadSCMList,
       },
       {

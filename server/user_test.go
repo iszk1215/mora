@@ -10,6 +10,7 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func newTestUserStore(t *testing.T) UserStore {
@@ -133,6 +134,9 @@ func TestUserStore_SuperuserSeed(t *testing.T) {
 	admin, err := store.FindByID(1)
 	require.NoError(t, err)
 	require.Equal(t, "admin", admin.Username)
+	require.NotNil(t, admin.PasswordHash)
+	err = bcrypt.CompareHashAndPassword([]byte(*admin.PasswordHash), []byte("admin"))
+	require.NoError(t, err)
 }
 
 func TestUserStore_CreateUser_EmptyAvatar(t *testing.T) {

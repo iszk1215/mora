@@ -19,8 +19,6 @@ github.com/cyphar/filepath-securejoin v0.6.1/go.mod h1:A8hd4EnAeyujCJRrICiOWqjS1
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/drone/go-login v1.1.0 h1:anQFRh2Z5ketEJ/LvL6SJ6rIwDdfysGXK5bSXkFLInI=
-github.com/drone/go-login v1.1.0/go.mod h1:FLxy9vRzLbyBxoCJYxGbG9R0WGn6OyuvBmAtYNt43uw=
 github.com/drone/go-scm v1.42.3 h1:i16M9yKKjXSWz2pVCxxmJ9yvew1WbT/uM6bSOAWm47M=
 github.com/drone/go-scm v1.42.3/go.mod h1:DFIJJjhMj0TSXPz+0ni4nyZ9gtTtC40Vh/TGRugtyWw=
 github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o=
