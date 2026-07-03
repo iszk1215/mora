@@ -76,6 +76,7 @@ type (
 		tracker              *tracker.Service
 		apiKey             string
 		siteName           string
+		demo               bool
 
 		sessionManager     *MoraSessionManager
 		frontendFileServer http.Handler
@@ -177,13 +178,19 @@ func (s *MoraServer) handleMe(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, user, http.StatusOK)
 }
 
+type ConfigResponse struct {
+	SiteName string `json:"site_name"`
+	Demo     bool   `json:"demo"`
+}
+
 func (s *MoraServer) handleConfig(w http.ResponseWriter, r *http.Request) {
 	name := s.siteName
 	if name == "" {
 		name = "Mora"
 	}
-	render.JSON(w, map[string]string{
-		"site_name": name,
+	render.JSON(w, ConfigResponse{
+		SiteName: name,
+		Demo:     s.demo,
 	}, http.StatusOK)
 }
 
@@ -477,7 +484,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(repositoryManagers) == 0 {
+	if !cfg.Demo && len(repositoryManagers) == 0 {
 		return nil, fmt.Errorf("ConfigError: no RepositoryManager is configured")
 	}
 
@@ -513,6 +520,13 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		tracker:              trackerService,
 		apiKey:             os.Getenv("MORA_API_KEY"),
 		siteName:           cfg.Server.SiteName,
+		demo:               cfg.Demo,
+	}
+
+	if s.demo {
+		if err := s.seedDemoData(); err != nil {
+			return nil, fmt.Errorf("seed demo data: %w", err)
+		}
 	}
 
 	return s, err

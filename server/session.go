@@ -95,7 +95,7 @@ func (s *MoraSession) WithToken(ctx context.Context, rmID int64) (context.Contex
 func (s *MoraSession) IsLoggedIn() bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	return len(s.tokenMap) > 0
+	return s.userID != nil
 }
 
 func (s *MoraSession) SetUserID(id int64) {

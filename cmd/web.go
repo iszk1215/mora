@@ -40,6 +40,10 @@ func NewWebCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to get port flag: %w", err)
 			}
+			demo, err := cmd.Flags().GetBool("demo")
+			if err != nil {
+				return fmt.Errorf("failed to get demo flag: %w", err)
+			}
 
 			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 			if debug {
@@ -52,6 +56,10 @@ func NewWebCommand() *cobra.Command {
 			}
 			config.Debug = debug
 			config.Server.Port = port
+			config.Demo = demo
+			if demo {
+				config.DatabaseFilename = ":memory:?_loc=auto"
+			}
 
 			server, err := server.NewMoraServerFromConfig(config)
 			if err != nil {
@@ -103,6 +111,7 @@ func NewWebCommand() *cobra.Command {
 	webCmd.Flags().BoolP("debug", "d", false, "Enable debug")
 	webCmd.Flags().IntP("port", "p", 4000, "port")
 	webCmd.Flags().StringP("config", "c", "mora.conf", "Config filename")
+	webCmd.Flags().Bool("demo", false, "Start in demo mode with seed data")
 
 	return webCmd
 }

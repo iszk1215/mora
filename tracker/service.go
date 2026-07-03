@@ -3,6 +3,7 @@ package tracker
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
@@ -24,4 +25,28 @@ func NewService(db *sqlx.DB) (*Service, error) {
 
 func (s *Service) Handler() http.Handler {
 	return newHandler(s.store)
+}
+
+func (s *Service) CreateTracker(name, visibility string, userID int64) (*TrackerModel, error) {
+	t := &TrackerModel{Name: name, Visibility: visibility}
+	if err := s.store.addTracker(t, userID); err != nil {
+		return nil, fmt.Errorf("CreateTracker: %w", err)
+	}
+	return t, nil
+}
+
+func (s *Service) CreateSeries(trackerID int64, name, dataType string) (*SeriesModel, error) {
+	se := &SeriesModel{TrackerId: trackerID, Name: name, DataType: dataType}
+	if err := s.store.addSeries(se); err != nil {
+		return nil, fmt.Errorf("CreateSeries: %w", err)
+	}
+	return se, nil
+}
+
+func (s *Service) CreateValue(seriesID int64, timestamp time.Time, value float64) (*ValueModel, error) {
+	v := &ValueModel{SeriesId: seriesID, Timestamp: timestamp, Value: value}
+	if err := s.store.addValue(v); err != nil {
+		return nil, fmt.Errorf("CreateValue: %w", err)
+	}
+	return v, nil
 }

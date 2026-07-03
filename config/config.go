@@ -32,6 +32,7 @@ type MoraConfig struct {
 	Client             ClientConfig
 	Debug              bool
 	DatabaseFilename   string
+	Demo               bool
 }
 
 func ReadMoraConfig(filename string) (MoraConfig, error) {

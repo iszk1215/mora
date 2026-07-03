@@ -397,10 +397,11 @@ func TestServerAPIConfig(t *testing.T) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var got map[string]string
+	var got ConfigResponse
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
-	require.Equal(t, "My Mora", got["site_name"])
+	require.Equal(t, "My Mora", got.SiteName)
+	require.False(t, got.Demo)
 }
 
 func TestServerAPIConfig_Default(t *testing.T) {
@@ -418,10 +419,11 @@ func TestServerAPIConfig_Default(t *testing.T) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 
-	var got map[string]string
+	var got ConfigResponse
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
-	require.Equal(t, "Mora", got["site_name"])
+	require.Equal(t, "Mora", got.SiteName)
+	require.False(t, got.Demo)
 }
 
 func TestServerRepoList(t *testing.T) {
