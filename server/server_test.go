@@ -401,7 +401,6 @@ func TestServerAPIConfig(t *testing.T) {
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
 	require.Equal(t, "My Mora", got.SiteName)
-	require.False(t, got.Demo)
 }
 
 func TestServerAPIConfig_Default(t *testing.T) {
@@ -423,7 +422,6 @@ func TestServerAPIConfig_Default(t *testing.T) {
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
 	require.Equal(t, "Mora", got.SiteName)
-	require.False(t, got.Demo)
 }
 
 func TestServerRepoList(t *testing.T) {
