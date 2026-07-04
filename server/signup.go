@@ -37,6 +37,31 @@ func SignupHandler(userStore UserStore) http.Handler {
 		}, http.StatusOK)
 	})
 
+	r.Post("/cancel", func(w http.ResponseWriter, r *http.Request) {
+		sess, ok := MoraSessionFrom(r.Context())
+		if !ok {
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
+		p := sess.PendingSignup()
+		if p == nil {
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+
+		if !verifyCSRF(r) {
+			log.Warn().Msg("CSRF token mismatch on signup cancel")
+			render.Forbidden(w, render.ErrForbidden)
+			return
+		}
+
+		sess.Remove(p.rmID)
+		sess.ClearPendingSignup()
+		sess.ClearUserID()
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	r.Post("/confirm", func(w http.ResponseWriter, r *http.Request) {
 		sess, ok := MoraSessionFrom(r.Context())
 		if !ok {

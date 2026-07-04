@@ -1,7 +1,6 @@
 import { useLoaderData, useNavigate } from 'react-router'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { DefaultLink } from './util'
 
 interface PendingSignupData {
   provider: string
@@ -29,6 +28,16 @@ export const SignupPage = (): React.JSX.Element => {
 
   if (!pending) {
     return <div>Redirecting...</div>
+  }
+
+  const handleCancel = async () => {
+    const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
+    if (match) {
+      const formData = new FormData()
+      formData.append('csrf_token', match[1])
+      await fetch('/api/signup/cancel', { method: 'POST', body: formData })
+    }
+    navigate('/auth', { replace: true })
   }
 
   const handleConfirm = async () => {
@@ -90,9 +99,7 @@ export const SignupPage = (): React.JSX.Element => {
         <Button onClick={handleConfirm} disabled={submitting}>
           {submitting ? 'Creating...' : 'Create Account'}
         </Button>
-        <Button variant="secondary" asChild>
-          <DefaultLink to="/auth">Cancel</DefaultLink>
-        </Button>
+        <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
       </div>
     </div>
   )

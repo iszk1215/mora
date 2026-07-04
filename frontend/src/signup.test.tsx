@@ -58,6 +58,7 @@ describe('SignupPage', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    document.cookie = 'csrf_token=; max-age=0; path=/'
   })
 
   it('shows redirecting and navigates to /auth when pending is null', () => {
@@ -93,15 +94,26 @@ describe('SignupPage', () => {
     expect(img.className).toContain('rounded-full')
   })
 
-  it('shows Cancel link to /auth', () => {
+  it('posts to cancel API and navigates to /auth on Cancel', async () => {
+    document.cookie = 'csrf_token=abc123; path=/'
     vi.mocked(useLoaderData).mockReturnValue({
       provider: 'github',
       username: 'test',
       avatar_url: '',
     })
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 204 } as Response)
+
     render(<MemoryRouter><SignupPage /></MemoryRouter>)
-    const cancelLink = screen.getByText('Cancel').closest('a')
-    expect(cancelLink).toHaveAttribute('href', '/auth')
+
+    screen.getByRole('button', { name: 'Cancel' }).click()
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/signup/cancel', {
+        method: 'POST',
+        body: expect.any(FormData),
+      })
+      expect(mockNavigate).toHaveBeenCalledWith('/auth', { replace: true })
+    })
   })
 
   it('shows error when CSRF cookie is missing on confirm', async () => {
