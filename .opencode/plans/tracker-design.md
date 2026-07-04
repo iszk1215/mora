@@ -1148,3 +1148,112 @@ func (s *MoraSession) ClearPendingSignup()               { ... }
 - `render` パッケージのエラーレスポンス型は流用
 - CSRF トークンは既存の仕組み（`csrfCookieName` + `verifyCSRF`）を流用
 - プロバイダの判別は `rm.URL()` の文字列に `"github.com"` が含まれるかで行う（既存と同様）
+
+---
+
+## v11: user_password テーブル分割
+
+### 動機
+
+- ほとんどのユーザーは IdP (SCM OAuth) 経由でログインし、パスワードを持たない
+- `user` テーブルに `password_hash TEXT NULL` カラムがあるのは正規化として不適切
+- `SELECT * FROM user` にパスワードハッシュが含まれるのがセキュリティ上好ましくない
+
+### スキーマ
+
+`user` テーブルから `password_hash` を分離し、新規 `user_password` テーブルに移動:
+
+```sql
+CREATE TABLE IF NOT EXISTS user_password (
+    user_id       INTEGER PRIMARY KEY REFERENCES user(id) ON DELETE CASCADE,
+    password_hash TEXT    NOT NULL,
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+- `PRIMARY KEY` = `user_id` により、1ユーザー1パスワード（1対1）
+- `ON DELETE CASCADE` でユーザー削除時に自動削除
+- パスワードを持たないユーザーは行が存在しない（`user` テーブルに `NULL` カラムを持たない）
+
+### データモデル比較 (v10 → v11)
+
+| 項目 | v10 | v11 |
+|------|-----|-----|
+| password 保存先 | `user.password_hash TEXT NULL` | `user_password.password_hash TEXT NOT NULL` |
+| password 有無の判定 | `user.PasswordHash == nil` | `user_password` に行が存在するか |
+| User 構造体 | `PasswordHash *string` フィールドあり | フィールドなし（完全に分離） |
+| 認証時のクエリ | `SELECT * FROM user` で一度に取得 | `FindByUsername` + `GetPasswordHash(userID)` の2クエリ |
+
+### UserStore インターフェース変更
+
+```go
+type UserStore interface {
+    // ... 既存メソッド ...
+    CreateUserWithPassword(username, password string) (*User, error) // 引数変更なし、内部で user_password に INSERT
+    SetPassword(userID int64, passwordHash string) error             // UPDATE user → INSERT OR REPLACE INTO user_password
+    GetPasswordHash(userID int64) (*string, error)                  // 新規: user_password から hash 取得
+}
+```
+
+`User` 構造体から `PasswordHash` フィールドを削除:
+
+```go
+type User struct {
+    ID        int64  `db:"id" json:"id"`
+    Username  string `db:"username" json:"username"`
+    AvatarURL string `db:"avatar_url" json:"avatar_url"`
+    // PasswordHash は削除
+    CreatedAt string `db:"created_at" json:"-"`
+    UpdatedAt string `db:"updated_at" json:"-"`
+}
+```
+
+### 認証フロー変更
+
+パスワードログイン時:
+
+```
+FindByUsername(username)       // user 取得（PasswordHash なし）
+  ↓
+GetPasswordHash(user.ID)       // user_password から hash を取得
+  ↓
+hash == nil → "password not set" error
+  ↓
+bcrypt.CompareHashAndPassword([]byte(*hash), ...)
+```
+
+### マイグレーション
+
+既存 DB からの移行 (`userStore.Init()` 内):
+
+```go
+// 1. 新テーブル作成
+db.Exec(`CREATE TABLE IF NOT EXISTS user_password (...)`)
+// 2. 既存データ移行
+db.Exec(`INSERT OR IGNORE INTO user_password (user_id, password_hash)
+         SELECT id, password_hash FROM user WHERE password_hash IS NOT NULL`)
+// 3. 旧カラム削除 (3.35.0+). 新規インストール時はエラーになるが無視
+_, _ = db.Exec(`ALTER TABLE user DROP COLUMN password_hash`)
+```
+
+従来の `ALTER TABLE user ADD COLUMN password_hash TEXT` 行は削除（v11 では不要）。
+
+Admin seeding (`id=1 admin`) は:
+1. `INSERT INTO user (id, username, avatar_url) VALUES (1, 'admin', '')`
+2. `INSERT INTO user_password (user_id, password_hash) VALUES (1, ?)`（bcrypt hash of "admin"）
+
+### フロントエンドへの影響
+
+フロントエンドは `User` JSON に `password_hash` を含めておらず（`json:"-"`）、変更なし。
+
+### ファイル変更一覧
+
+| File | 変更内容 |
+|------|---------|
+| `server/user.go` | `User` から `PasswordHash` 削除、`Init()` に `user_password` テーブル作成 + 移行 + 旧カラム削除、`CreateUserWithPassword`/`SetPassword` を `user_password` に変更、`GetPasswordHash` 追加 |
+| `server/user_test.go` | `PasswordHash` 参照 → `GetPasswordHash()` に変更 |
+| `server/password.go` | login 処理: `user.PasswordHash` → `store.GetPasswordHash(user.ID)` に変更 |
+| `server/password_test.go` | 同上 |
+| `server/demo.go` | 変更なし（`CreateUserWithPassword` 経由） |
+| フロントエンド | 変更なし |

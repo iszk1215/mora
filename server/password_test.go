@@ -38,12 +38,15 @@ func TestCreateUserWithPassword(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, user.ID)
 	require.Equal(t, "passuser", user.Username)
-	require.NotNil(t, user.PasswordHash)
 
-	err = bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte("supersecret"))
+	passwordHash, err := store.GetPasswordHash(user.ID)
+	require.NoError(t, err)
+	require.NotNil(t, passwordHash)
+
+	err = bcrypt.CompareHashAndPassword([]byte(*passwordHash), []byte("supersecret"))
 	require.NoError(t, err)
 
-	err = bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte("wrongpassword"))
+	err = bcrypt.CompareHashAndPassword([]byte(*passwordHash), []byte("wrongpassword"))
 	require.Error(t, err)
 }
 
@@ -52,9 +55,12 @@ func TestCreateUserWithPassword_EmptyPassword(t *testing.T) {
 
 	user, err := store.CreateUserWithPassword("emptypass", "")
 	require.NoError(t, err)
-	require.NotNil(t, user.PasswordHash)
 
-	err = bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(""))
+	passwordHash, err := store.GetPasswordHash(user.ID)
+	require.NoError(t, err)
+	require.NotNil(t, passwordHash)
+
+	err = bcrypt.CompareHashAndPassword([]byte(*passwordHash), []byte(""))
 	require.NoError(t, err)
 }
 
@@ -70,11 +76,11 @@ func TestSetPassword(t *testing.T) {
 	err = store.SetPassword(user.ID, string(hash))
 	require.NoError(t, err)
 
-	fetched, err := store.FindByID(user.ID)
+	passwordHash, err := store.GetPasswordHash(user.ID)
 	require.NoError(t, err)
-	require.NotNil(t, fetched.PasswordHash)
+	require.NotNil(t, passwordHash)
 
-	err = bcrypt.CompareHashAndPassword([]byte(*fetched.PasswordHash), []byte("newpassword"))
+	err = bcrypt.CompareHashAndPassword([]byte(*passwordHash), []byte("newpassword"))
 	require.NoError(t, err)
 }
 
@@ -87,8 +93,11 @@ func TestCreateUserWithPassword_NoSideEffectOnFindByUsername(t *testing.T) {
 	found, err := store.FindByUsername("sideuser")
 	require.NoError(t, err)
 	require.Equal(t, "sideuser", found.Username)
-	require.NotNil(t, found.PasswordHash)
 	require.Empty(t, found.AvatarURL)
+
+	passwordHash, err := store.GetPasswordHash(found.ID)
+	require.NoError(t, err)
+	require.NotNil(t, passwordHash)
 }
 
 // HTTP handler tests using httptest.ResponseRecorder with manual cookie tracking

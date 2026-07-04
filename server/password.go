@@ -69,13 +69,20 @@ func PasswordAuthHandler(userStore UserStore) http.Handler {
 			return
 		}
 
-		if user.PasswordHash == nil {
+		passwordHash, err := userStore.GetPasswordHash(user.ID)
+		if err != nil {
+			log.Error().Err(err).Int64("user_id", user.ID).Msg("failed to get password hash")
+			render.InternalError(w, err)
+			return
+		}
+
+		if passwordHash == nil {
 			log.Warn().Int64("user_id", user.ID).Msg("user has no password set")
 			render.Forbidden(w, errors.New("invalid username or password"))
 			return
 		}
 
-		if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
+		if err := bcrypt.CompareHashAndPassword([]byte(*passwordHash), []byte(req.Password)); err != nil {
 			log.Warn().Int64("user_id", user.ID).Msg("password mismatch")
 			render.Forbidden(w, errors.New("invalid username or password"))
 			return

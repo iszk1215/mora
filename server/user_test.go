@@ -134,8 +134,11 @@ func TestUserStore_SuperuserSeed(t *testing.T) {
 	admin, err := store.FindByID(1)
 	require.NoError(t, err)
 	require.Equal(t, "admin", admin.Username)
-	require.NotNil(t, admin.PasswordHash)
-	err = bcrypt.CompareHashAndPassword([]byte(*admin.PasswordHash), []byte("admin"))
+
+	passwordHash, err := store.GetPasswordHash(admin.ID)
+	require.NoError(t, err)
+	require.NotNil(t, passwordHash)
+	err = bcrypt.CompareHashAndPassword([]byte(*passwordHash), []byte("admin"))
 	require.NoError(t, err)
 }
 

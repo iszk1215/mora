@@ -20,12 +20,11 @@ import (
 )
 
 type User struct {
-	ID           int64   `db:"id" json:"id"`
-	Username     string  `db:"username" json:"username"`
-	AvatarURL    string  `db:"avatar_url" json:"avatar_url"`
-	PasswordHash *string `db:"password_hash" json:"-"`
-	CreatedAt    string  `db:"created_at" json:"-"`
-	UpdatedAt    string  `db:"updated_at" json:"-"`
+	ID        int64  `db:"id" json:"id"`
+	Username  string `db:"username" json:"username"`
+	AvatarURL string `db:"avatar_url" json:"avatar_url"`
+	CreatedAt string `db:"created_at" json:"-"`
+	UpdatedAt string `db:"updated_at" json:"-"`
 }
 
 type UserAuth struct {
@@ -51,6 +50,7 @@ type UserStore interface {
 	CreateUser(username, avatarURL string) (*User, error)
 	CreateUserWithPassword(username, password string) (*User, error)
 	SetPassword(userID int64, passwordHash string) error
+	GetPasswordHash(userID int64) (*string, error)
 	LinkAuth(userID int64, provider, providerUserID string) error
 	FindByID(id int64) (*User, error)
 	CreateAPIKey(userID int64, name string) (string, error)
@@ -108,8 +108,17 @@ func (s *userStore) Init() error {
 		return err
 	}
 
-	// migration: add password_hash column (safe to run on existing tables)
-	_, _ = s.db.Exec(`ALTER TABLE user ADD COLUMN password_hash TEXT`)
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS user_password (
+			user_id       INTEGER PRIMARY KEY REFERENCES user(id) ON DELETE CASCADE,
+			password_hash TEXT    NOT NULL,
+			created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+			updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+		)
+	`)
+	if err != nil {
+		return err
+	}
 
 	adminPassHash, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
 	if err != nil {
@@ -117,9 +126,16 @@ func (s *userStore) Init() error {
 	}
 
 	_, err = s.db.Exec(
-		`INSERT OR IGNORE INTO user (id, username, avatar_url, password_hash)
-		 VALUES (1, 'admin', '', ?)`,
-		string(adminPassHash),
+		`INSERT OR IGNORE INTO user (id, username, avatar_url)
+		 VALUES (1, 'admin', '')`,
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(
+		`INSERT OR IGNORE INTO user_password (user_id, password_hash) VALUES (?, ?)`,
+		1, string(adminPassHash),
 	)
 	if err != nil {
 		return err
@@ -127,8 +143,8 @@ func (s *userStore) Init() error {
 
 	// ensure admin has password even if user already existed without one
 	_, _ = s.db.Exec(
-		`UPDATE user SET password_hash = ? WHERE id = 1 AND password_hash IS NULL`,
-		string(adminPassHash),
+		`INSERT OR REPLACE INTO user_password (user_id, password_hash) VALUES (?, ?)`,
+		1, string(adminPassHash),
 	)
 
 	return nil
@@ -185,8 +201,8 @@ func (s *userStore) CreateUserWithPassword(username, password string) (*User, er
 	hashStr := string(hash)
 
 	result, err := s.db.Exec(
-		"INSERT INTO user (username, avatar_url, password_hash) VALUES (?, '', ?)",
-		username, hashStr)
+		"INSERT INTO user (username, avatar_url) VALUES (?, '')",
+		username)
 	if err != nil {
 		return nil, fmt.Errorf("create user with password: %w", err)
 	}
@@ -196,22 +212,41 @@ func (s *userStore) CreateUserWithPassword(username, password string) (*User, er
 		return nil, fmt.Errorf("last insert id: %w", err)
 	}
 
+	_, err = s.db.Exec(
+		"INSERT INTO user_password (user_id, password_hash) VALUES (?, ?)",
+		id, hashStr)
+	if err != nil {
+		return nil, fmt.Errorf("create user password: %w", err)
+	}
+
 	return &User{
-		ID:           id,
-		Username:     username,
-		AvatarURL:    "",
-		PasswordHash: &hashStr,
+		ID:        id,
+		Username:  username,
+		AvatarURL: "",
 	}, nil
 }
 
 func (s *userStore) SetPassword(userID int64, passwordHash string) error {
 	_, err := s.db.Exec(
-		"UPDATE user SET password_hash = ? WHERE id = ?",
-		passwordHash, userID)
+		"INSERT OR REPLACE INTO user_password (user_id, password_hash) VALUES (?, ?)",
+		userID, passwordHash)
 	if err != nil {
 		return fmt.Errorf("set password: %w", err)
 	}
 	return nil
+}
+
+func (s *userStore) GetPasswordHash(userID int64) (*string, error) {
+	var passwordHash string
+	err := s.db.Get(&passwordHash,
+		"SELECT password_hash FROM user_password WHERE user_id = ?", userID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get password hash: %w", err)
+	}
+	return &passwordHash, nil
 }
 
 func (s *userStore) LinkAuth(userID int64, provider, providerUserID string) error {
