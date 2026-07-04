@@ -207,6 +207,7 @@ const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; 
     })) ?? []
 
     return {
+      animation: false,
       grid: { left: 50, right: 10, top: 10, bottom: 25 },
       xAxis: {
         type: 'time' as const,

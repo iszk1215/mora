@@ -328,7 +328,7 @@ func (s *trackerStore) listValues(seriesId int64, limit int) ([]ValueModel, erro
 func (s *trackerStore) listLatestValues(seriesId int64, limit int) ([]ValueModel, error) {
 	query := "SELECT id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time DESC"
 
-	var rows []ValueModel
+	rows := make([]ValueModel, 0)
 	var err error
 
 	if limit > 0 {
