@@ -1,4 +1,4 @@
-# `/api/tracker` 設計書 (v11+)
+# `/api/tracker` 設計書 (v12)
 
 - **v7**: 二重認証（Session + API Key）設計 + フロントエンド設計を追加
 - **v8**: ユーザー権限管理（track_member/track_like）、スーパーユーザー、フロントエンド閲覧/編集分離
@@ -6,15 +6,16 @@
 - **v10**: ユーザー認証再設計 — `user` + `user_auth` テーブル分割、login/signup フロー分離、`FindOrCreate` 廃止、raw API によるプロバイダユーザー情報取得
 - **v11**: `user_password` テーブル分割
 - **v11+ (current)**: visibility による読み取り権限追加、PATCH/preview エンドポイント追加、ページネーション対応、API Key 認証を server パッケージに移管、編集/読み取りミドルウェア分離
+- **v12**: tracker type 導入（`tracker`/`coverage`）、`tracker_coverage` テーブル追加、カバレッジ統合、フロントエンド表示分岐
 
 ## 概要
 
 リポジトリに依存しない時系列データ追跡エンドポイント。既存の UDM (User Defined Metrics) と同様の概念だが、`repo_id` を持たずグローバルに利用できる。
 
 - **パッケージ**: `tracker`（新規作成）
-- **テーブル**: `tracker`, `tracker_series`, `tracker_value`（新規作成）
-- **ファイル**: `tracker/store.go`, `tracker/handler.go`, `tracker/service.go`（計3ファイル）
-- **既存ファイルの変更**: `server/server.go`（マウント + middleware 追加）, `server/session.go`（`IsLoggedIn()` 追加）
+- **テーブル**: `tracker`, `tracker_series`, `tracker_value`, `tracker_coverage`
+- **ファイル**: `tracker/store.go`, `tracker/handler.go`, `tracker/service.go`, `tracker/provider.go`
+- **既存ファイルの変更**: `server/server.go`（マウント + middleware）, `server/session.go`, `coverage/coverage_store.go`（`Timeline()` 追加）
 - **CLIは実装しない**（今回のスコープ外）
 - **OpenAPI**: swaggo コメントを実装時から記述。レスポンス型は公開（exported）
 
@@ -28,7 +29,8 @@
 CREATE TABLE IF NOT EXISTS tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
-    visibility TEXT NOT NULL DEFAULT 'private'
+    visibility TEXT NOT NULL DEFAULT 'private',
+    type TEXT NOT NULL DEFAULT 'tracker'   -- 'tracker' | 'coverage'
 );
 
 CREATE TABLE IF NOT EXISTS tracker_series (
@@ -61,6 +63,12 @@ CREATE TABLE IF NOT EXISTS tracker_like (
     tracker_id INTEGER NOT NULL REFERENCES tracker(id) ON DELETE CASCADE,
     PRIMARY KEY (user_id, tracker_id)
 );
+
+-- v12: カバレッジトラッカー用リンク
+CREATE TABLE IF NOT EXISTS tracker_coverage (
+    tracker_id INTEGER PRIMARY KEY REFERENCES tracker(id) ON DELETE CASCADE,
+    repo_id INTEGER NOT NULL
+);
 ```
 
 ### 時刻精度について
@@ -75,10 +83,14 @@ CREATE TABLE IF NOT EXISTS tracker_like (
 user
   ├── tracker_member (user_id, tracker_id, role)     — ON DELETE CASCADE
   ├── tracker_like   (user_id, tracker_id)           — ON DELETE CASCADE
-  └── tracker (id, name, visibility)
-        └── tracker_series (id, tracker_id, name, data_type)   — ON DELETE CASCADE
-             └── tracker_value (id, series_id, time, value)  — ON DELETE CASCADE
+  └── tracker (id, name, visibility, type)
+        ├── tracker_series (id, tracker_id, name, data_type)   — ON DELETE CASCADE
+        │    └── tracker_value (id, series_id, time, value)  — ON DELETE CASCADE
+        └── tracker_coverage (tracker_id PK, repo_id)          — ON DELETE CASCADE
 ```
+
+type=`tracker`: tracker → series → values の通常の時系列データ
+type=`coverage`: tracker → tracker_coverage（repo 参照）。series/values は持たない。preview は coverage store から取得
 
 ### 初期化時の移行
 
@@ -104,6 +116,7 @@ type TrackerModel struct {
     Id         int64  `json:"id"         db:"id"`
     Name       string `json:"name"       db:"name"`
     Visibility string `json:"visibility" db:"visibility"`
+    Type       string `json:"type"       db:"type"` // "tracker" | "coverage"
 }
 
 type SeriesModel struct {
@@ -125,8 +138,10 @@ type ValueModel struct {
 
 ```go
 type CreateTrackerRequest struct {
-    Name       string `json:"name"`
-    Visibility string `json:"visibility"` // required: "public"|"unlisted"|"private"
+    Name       string  `json:"name"`
+    Visibility string  `json:"visibility"` // required: "public"|"unlisted"|"private"
+    Type       string  `json:"type"`       // 省略可、デフォルト "tracker"
+    RepoID     *int64  `json:"repo_id"`    // type="coverage" の場合は必須
 }
 
 type CreateSeriesRequest struct {
@@ -151,7 +166,8 @@ type TrackerResponse struct {
     Id         int64  `json:"id"`
     Name       string `json:"name"`
     Visibility string `json:"visibility"` // "public" | "unlisted" | "private"
-    Role       string `json:"role"`       // "" | "owner" | "editor"（空文字=権限なし）
+    Type       string `json:"type"`       // "tracker" | "coverage"
+    Role       string `json:"role"`       // "" | "owner" | "editor"
     Liked      bool   `json:"liked"`
 }
 
@@ -160,16 +176,6 @@ type ListTrackersResponse struct {
     Total    int               `json:"total"`
     Page     int               `json:"page"`
     PerPage  int               `json:"per_page"`
-}
-
-type PreviewSeriesValues struct {
-    Series SeriesModel  `json:"series"`
-    Values []ValueModel `json:"values"`
-}
-
-type PreviewResponse struct {
-    Tracker TrackerResponse      `json:"tracker"`
-    Series  []PreviewSeriesValues `json:"series"`
 }
 
 type ListSeriesResponse struct {
@@ -182,6 +188,8 @@ type ListValuesResponse struct {
     Values []ValueModel `json:"values"`
 }
 ```
+
+`PreviewResponse` は type 不問で同一フォーマット（`series[]` にマッピング）。coverage type の場合は entry 名が series 名、% が value になる。
 
 ### Context Key & アクセサ
 
@@ -314,6 +322,7 @@ Response 200:
 // CreateTracker godoc
 // @Summary      Create a tracker
 // @Description  Add a new tracker. The name must be unique. Creator becomes owner.
+//              type="coverage" requires repo_id to reference repository coverage data.
 // @Tags         tracker
 // @Accept       json
 // @Produce      json
@@ -327,18 +336,24 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 
 Request:
 ```json
+{ "name": "mora coverage", "visibility": "public", "type": "coverage", "repo_id": 1 }
+```
+
+or (type省略 = tracker):
+
+```json
 { "name": "build_metrics", "visibility": "private" }
 ```
 
 Response 201:
 ```json
-{ "id": 1, "name": "build_metrics", "visibility": "private", "role": "owner", "liked": false }
+{ "id": 1, "name": "mora coverage", "visibility": "public", "type": "coverage", "role": "owner", "liked": false }
 ```
 
-- `visibility` は必須。"public" / "unlisted" / "private" のいずれか
-- 不正な値の場合は 400 Bad Request
-- 匿名ユーザーは 403 Forbidden
-- 今後拡張: `description` フィールド追加予定
+- `type` 省略時は `"tracker"`（互換性維持）
+- type=`"coverage"` で `repo_id` が無い → 400
+- type=`"tracker"` で `repo_id` が非nil → 400
+- type=`"coverage"` で常に series/values は空
 - リクエストボディ 1MB 制限（`MaxBytesReader`）
 
 #### DELETE /api/tracker/{trackerId} — トラッカー削除
@@ -399,7 +414,8 @@ Response 200:
 ```go
 // PreviewTracker godoc
 // @Summary      Preview tracker data
-// @Description  Return tracker info, all series, and latest values (up to 20 per series) for card previews
+// @Description  Return tracker info and preview data. For type="tracker": all series + latest 20 values per series.
+//               For type="coverage": entry percentages mapped as series (total, go, ts, ...).
 // @Tags         tracker
 // @Param        trackerId  path  int  true  "Tracker ID"
 // @Success      200  {object}  tracker.PreviewResponse
@@ -410,24 +426,32 @@ Response 200:
 func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) {
 ```
 
-Response 200:
+type=`tracker`:
+各系列の最新20件の値を DESC で取得し ASC に反転して返す（従来通り）。
+
+type=`coverage`:
+`tracker_coverage.repo_id` から repository を特定し、`CoverageTimelineProvider.Timeline(repoID, 20)` で全 entry の過去20件の % を取得。entry 名 ("total", "go", "ts", ...) を series 名、% を value として `PreviewResponse.series[]` にマッピング（series.id=0, data_type="float"）。
+
+Response 200 (coverage例):
 ```json
 {
-    "tracker": { "id": 1, "name": "build_metrics", "visibility": "public", "role": "owner", "liked": false },
+    "tracker": { "id": 5, "name": "mora", "type": "coverage", "role": "owner", "liked": false },
     "series": [
-        {
-            "series": { "id": 1, "tracker_id": 1, "name": "frontend_time", "data_type": "float" },
-            "values": [
-                { "time": "2024-01-01T00:00:00Z", "value": 45.0 },
-                { "time": "2024-01-02T00:00:00Z", "value": 42.5 }
-            ]
-        }
+        { "series": { "id": 0, "tracker_id": 5, "name": "total", "data_type": "float" },
+          "values": [
+            { "time": "2024-05-01T00:00:00Z", "value": 71.2 },
+            { "time": "2024-06-01T00:00:00Z", "value": 76.5 }
+          ] },
+        { "series": { "id": 0, "tracker_id": 5, "name": "go", "data_type": "float" },
+          "values": [
+            { "time": "2024-05-01T00:00:00Z", "value": 75.0 },
+            { "time": "2024-06-01T00:00:00Z", "value": 80.0 }
+          ] }
     ]
 }
 ```
 
-- 各系列の最新20件の値を DESC で取得し ASC に反転して返す
-- トラッカーカード一覧画面でのプレビュー表示に使用
+フロントエンドは type に依存せず同一フォーマットで描画可能。
 
 ---
 
@@ -477,10 +501,13 @@ func (h *trackerHandler) unlikeTracker(w http.ResponseWriter, r *http.Request) {
 
 #### GET /api/tracker/{trackerId}/series — シリーズ一覧
 
+type=`tracker`: 指定されたトラッカーに属する全シリーズを返す（従来通り）。
+type=`coverage`: 空配列 `[]` を返す。
+
 ```go
 // ListSeries godoc
 // @Summary      List all series
-// @Description  Return all series belonging to the specified tracker
+// @Description  Return all series belonging to the specified tracker. Returns empty for coverage-type trackers.
 // @Tags         tracker
 // @Param        trackerId  path  int  true  "Tracker ID"
 // @Success      200  {object}  tracker.ListSeriesResponse
@@ -491,10 +518,10 @@ func (h *trackerHandler) unlikeTracker(w http.ResponseWriter, r *http.Request) {
 func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 ```
 
-Response 200:
+Response 200 (tracker):
 ```json
 {
-    "tracker": { "id": 1, "name": "build_metrics", "visibility": "private", "role": "owner", "liked": false },
+    "tracker": { "id": 1, "name": "build_metrics", "visibility": "private", "type": "tracker", "role": "owner", "liked": false },
     "series": [
         { "id": 1, "tracker_id": 1, "name": "frontend_time", "data_type": "float" },
         { "id": 2, "tracker_id": 1, "name": "build_count",   "data_type": "int" }
@@ -535,6 +562,7 @@ Response 201:
 - `data_type` 省略時はデフォルト `"float"`
 - Handler 層で `"int"` / `"float"` 以外は 400 Bad Request
 - `requireEditPermission` ミドルウェアにより権限チェック
+- type=`coverage` のトラッカーに対しては 400 Bad Request（`"cannot modify series for coverage tracker"`）
 
 #### DELETE /api/tracker/{trackerId}/series/{seriesId} — シリーズ削除
 
@@ -643,6 +671,42 @@ func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 ```
 
 - `requireEditPermission` ミドルウェアにより権限チェック
+
+---
+
+### Coverage type
+
+coverage type のトラッカーは series/values を直接持たず、`tracker_coverage` テーブルで紐づいた repository の coverage データを表示する。
+
+#### プレビュー (preview endpoint)
+
+preview ハンドラは `tracker_coverage.repo_id` を取得し、`CoverageTimelineProvider.Timeline(repoID, 20)` を呼び出す。返ってきた coverage entry 名ごとの % を `PreviewResponse.series[]` にマッピングする:
+
+| coverage entry | → Preview series name | data_type |
+|---------------|----------------------|-----------|
+| total | `"total"` | float |
+| go | `"go"` | float |
+| ts | `"ts"` | float |
+
+#### series/values エンドポイントの動作
+
+| Endpoint | type=`tracker` | type=`coverage` |
+|----------|---------------|-----------------|
+| GET /series | 一覧を返す | 空配列 `[]` を返す |
+| POST /series | series 作成 | 400 "cannot modify..." |
+| DELETE /series | series 削除 | 400 "cannot modify..." |
+| GET /values | 値を返す | —（series が空なのでアクセス不可）|
+| POST /values | 値追加 | 400 "cannot modify..." |
+| DELETE /values | 値削除 | 400 "cannot modify..." |
+
+#### フロントエンド遷移
+
+| 要素 | type=`tracker` | type=`coverage` |
+|------|---------------|-----------------|
+| カードクリック | `/tracker/{id}` | `/repos/{repo_id}/coverages` |
+| detail view | 通常の series/values 管理 | チャート + リンクのみ |
+
+detail view では、coverage tracker の詳細ページに「カバレッジ詳細を見る」リンクを表示し、クリックで coverage ページに遷移する。URL 直接アクセス時もエラーにはせず、情報ページとして ECharts チャートを表示する。
 
 ---
 
@@ -885,15 +949,16 @@ var (
 )
 ```
 
-Store メソッド一覧:
+Store メソッド一覧 (v12):
 
 ```go
 // Tracker
-addTracker(tracker *TrackerModel, userID int64) error       // 作成者を tracker_member(role=owner) に追加
+addTracker(tracker *TrackerModel, userID int64, repoID *int64) error  // 作成者を tracker_member(role=owner) に追加、repoID は type=coverage のみ
 listTrackers(userID int64, page, perPage int) ([]TrackerResponse, int, error)  // ページネーション対応、total も返す
 findTrackerById(id int64) (*TrackerModel, error)
+findRepoIDByTrackerID(trackerID int64) (*int64, error)                // tracker_coverage から repo_id 取得
 deleteTracker(id int64) error
-updateVisibility(id int64, visibility string) error          // PATCH 用
+updateVisibility(id int64, visibility string) error                    // PATCH 用（type, repo_id は不変）
 
 // Series
 addSeries(series *SeriesModel) error
@@ -916,9 +981,52 @@ removeLike(userID, trackerID int64) error
 isLiked(userID, trackerID int64) (bool, error)
 ```
 
-### `tracker/handler.go` — HTTP ハンドラ
+テーブルスキーマ拡張（v12 coverage type）:
 
-- `trackerHandler` struct: `store *trackerStore`（apiKey は保持しない）
+```sql
+CREATE TABLE IF NOT EXISTS tracker (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL UNIQUE,
+    visibility TEXT    NOT NULL DEFAULT 'public',
+    type       TEXT    NOT NULL DEFAULT 'tracker',
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS tracker_coverage (
+    tracker_id INTEGER PRIMARY KEY,
+    repo_id    INTEGER NOT NULL,
+    FOREIGN KEY (tracker_id) REFERENCES tracker(id) ON DELETE CASCADE,
+    FOREIGN KEY (repo_id)    REFERENCES repository(id) ON DELETE CASCADE
+);
+```
+
+### `tracker/provider.go` — CoverageTimelineProvider インターフェイス
+
+```go
+package tracker
+
+import "time"
+
+type CoverageTimelinePoint struct {
+    Time  time.Time `json:"time"`
+    Value float64   `json:"value"`
+}
+
+type CoverageTimelineProvider interface {
+    Timeline(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error)
+}
+```
+
+- tracker パッケージは coverage パッケージに依存しない（循環依存回避）
+- server パッケージが coverage store の実装を tracker service に注入する
+- `Timeline` は repoID ごとに entry 名 ("total","go","ts",...) → []CoverageTimelinePoint のマップを返す
+- limit: 各 entry の最新 N 件を取得
+
+### `tracker/handler.go` — HTTP ハンドラ (v12)
+
+- `trackerHandler` struct: `store *trackerStore`, `coverageProvider CoverageTimelineProvider`
+- `newHandler(store *trackerStore, cp CoverageTimelineProvider) *trackerHandler` — coverageProvider を受け取る
 - `requireAuth` ミドルウェア（pass-through、サーバー側の認証結果を尊重）
 - `requireEditPermission` ミドルウェア（編集権限制御）
 - `requireReadPermission` ミドルウェア（visibility に応じた読み取り制御）
@@ -929,6 +1037,7 @@ isLiked(userID, trackerID int64) (bool, error)
 - モデル: `TrackerModel`, `SeriesModel`, `ValueModel`（公開）
 - Context Key とアクセサ: `authCtxKey` 追加（`ContextWithAuth` は exported, `isAuthenticated` は非公開）
 - GET values で `?limit=N` パース
+- **coverage type**: preview ハンドラで `CoverageTimelineProvider` からデータ取得、createTracker で type/repoID バリデーション、series/values ハンドラで coverage type を拒否
 
 ### `server/session.go` — MoraSession.IsLoggedIn()
 
@@ -972,34 +1081,71 @@ func (s *MoraServer) requireTrackerAuth(next http.Handler) http.Handler {
 - Session auth 優先。Bearer token は session がない場合のみ検証
 - `FindUserByAPIKey` は `api_keys` テーブルから検索（token 直値比較ではない）
 
-### `tracker/service.go` — Service wrapper
+### `tracker/service.go` — Service wrapper (v12)
 
 ```go
 type Service struct {
-    store *trackerStore
+    store               *trackerStore
+    coverageProvider    CoverageTimelineProvider
 }
 
-func NewService(db *sqlx.DB) (*Service, error) {
+func NewService(db *sqlx.DB, cp CoverageTimelineProvider) (*Service, error) {
     store := newTrackerStore(db)
     err := store.initialize()
     if err != nil {
         return nil, fmt.Errorf("tracker store initialize: %w", err)
     }
-    return &Service{store: store}, nil
+    return &Service{store: store, coverageProvider: cp}, nil
 }
 
 func (s *Service) Handler() http.Handler {
-    return newHandler(s.store)
+    return newHandler(s.store, s.coverageProvider)
 }
 
 // Convenience methods for demo data seeding
-func (s *Service) CreateTracker(name, visibility string, userID int64) (*TrackerModel, error)
+func (s *Service) CreateTracker(name, visibility string, userID int64, trackerType string, repoID *int64) (*TrackerModel, error)
 func (s *Service) CreateSeries(trackerID int64, name, dataType string) (*SeriesModel, error)
 func (s *Service) CreateValue(seriesID int64, timestamp time.Time, value float64) (*ValueModel, error)
 ```
 
 - `NewService` は `apiKey` を受け取らない（認証は server パッケージで完結）
+- `CoverageTimelineProvider` は `tracker/provider.go` で定義されたインターフェイス
+- server パッケージは `coverage.Store`（`*coverage.Store` が暗黙的にインターフェイスを満たす）を渡す
 - Convenience メソッドは `server/demo.go` のシードデータ作成で使用
+
+### `coverage/coverage_store.go` — Timeline メソッド追加 (v12)
+
+coverage store が `tracker.CoverageTimelineProvider` インターフェイスを実装する:
+
+```go
+import "github.com/iszk1215/mora/tracker"
+
+func (s *Store) Timeline(repoID int64, limit int) (map[string][]tracker.CoverageTimelinePoint, error)
+```
+
+- tracker パッケージに依存するが、tracker → coverage の依存はない（循環なし）
+- 引数: repoID, limit（各 entry の最大件数）
+- 戻り値: entry 名 ("total", "go", "ts", ...) をキー、時系列ポイント配列を値とするマップ
+- 実装: `coverage_entry` テーブルから repo_id と LIMIT で検索、日時降順で取得後昇順に反転
+- Go 側で entry 名ごとにグルーピングして返す
+
+### `server/demo.go` — Seed データ追加 (v12)
+
+既存の repository に対して coverage type の tracker を作成:
+
+```go
+for _, repo := range repos {
+    s.tracker.CreateTracker(repo.Name+" coverage", "public", adminID, "coverage", &repo.ID)
+}
+```
+
+### `server/server.go` — CoverageTimelineProvider の依存注入 (v12)
+
+```go
+trackerService, err := tracker.NewService(db, s.coverageStore)
+```
+
+- `s.coverageStore` は `*coverage.Store` 型だが、`CoverageTimelineProvider` インターフェイスを満たす
 
 ---
 
@@ -1052,9 +1198,9 @@ top-level (`/tracker`、repo 非依存、`/scms` と同列):
 | Path | Page | 説明 | 編集権限 |
 |------|------|------|---------|
 | `/tracker` | TrackerView | カードグリッド一覧（ページネーション + プレビューチャート） | なし |
-| `/tracker/new` | TrackerCreate | トラッカー作成フォーム（name + visibility） | 認証必須 |
-| `/tracker/:trackerId` | TrackerDetailView | トラッカー詳細（閲覧のみ＋Likeボタン + ECharts） | なし |
-| `/tracker/:trackerId/edit` | TrackerDetailEdit | トラッカー詳細（編集用） | role 必須 |
+| `/tracker/new` | TrackerCreate | トラッカー作成フォーム（name + visibility + type/repoID） | 認証必須 |
+| `/tracker/:trackerId` | TrackerDetailView | トラッカー詳細（type=tracker: 閲覧+Like+ECharts / type=coverage: 情報表示+coverage link） | なし |
+| `/tracker/:trackerId/edit` | TrackerDetailEdit | トラッカー詳細編集（type=trackerのみ、type=coverageは非対応） | role 必須 |
 
 `main.tsx` に `trackerRoute` として登録:
 
@@ -1084,7 +1230,7 @@ export const trackerRoute = [
 
 ```typescript
 // core.ts（共有）
-interface TrackerResponse { id: number; name: string; visibility: string; role: string; liked: boolean }
+interface TrackerResponse { id: number; name: string; visibility: string; type: string; role: string; liked: boolean }
 
 // tracker.tsx（内部）
 interface SeriesModel { id: number; tracker_id: number; name: string; data_type: string }
@@ -1107,15 +1253,15 @@ interface PreviewData {
 | 関数 | Method | Path | 説明 |
 |------|--------|------|------|
 | `listTrackers(page?, perPage?)` | GET | `/api/tracker` | ページネーション対応一覧 |
-| `fetchPreview(trackerId)` | GET | `/api/tracker/{id}/preview` | カードプレビュー |
-| `createTracker(name, visibility)` | POST | `/api/tracker` | トラッカー作成 |
-| `patchTracker(trackerId, visibility)` | PATCH | `/api/tracker/{id}` | visibility 更新 |
+| `fetchPreview(trackerId)` | GET | `/api/tracker/{id}/preview` | カードプレビュー（type=coverageも同一フォーマット） |
+| `createTracker(name, visibility, type?, repoId?)` | POST | `/api/tracker` | トラッカー作成（type=coverage時はrepoId必須） |
+| `patchTracker(trackerId, visibility)` | PATCH | `/api/tracker/{id}` | visibility 更新（typeもrepoIdも変更不可） |
 | `deleteTracker` はフロントエンド未実装 | — | — | — |
-| `listSeries(trackerId)` | GET | `/api/tracker/{id}/series` | 系列一覧 |
-| `createSeries(trackerId, name, dataType)` | POST | `/api/tracker/{id}/series` | 系列作成 |
-| `deleteSeries(trackerId, seriesId)` | DELETE | `/api/tracker/{id}/series/{sid}` | 系列削除 |
-| `createValue(trackerId, seriesId, time, value)` | POST | `/api/tracker/{id}/series/{sid}/values` | 値追加 |
-| `deleteValues(trackerId, seriesId)` | DELETE | `/api/tracker/{id}/series/{sid}/values` | 値全削除 |
+| `listSeries(trackerId)` | GET | `/api/tracker/{id}/series` | 系列一覧（coverageは空配列） |
+| `createSeries(trackerId, name, dataType)` | POST | `/api/tracker/{id}/series` | 系列作成（coverageは不可） |
+| `deleteSeries(trackerId, seriesId)` | DELETE | `/api/tracker/{id}/series/{sid}` | 系列削除（coverageは不可） |
+| `createValue(trackerId, seriesId, time, value)` | POST | `/api/tracker/{id}/series/{sid}/values` | 値追加（coverageは不可） |
+| `deleteValues(trackerId, seriesId)` | DELETE | `/api/tracker/{id}/series/{sid}/values` | 値全削除（coverageは不可） |
 | `likeTracker(trackerId)` | POST | `/api/tracker/{id}/like` | いいね |
 | `unlikeTracker(trackerId)` | DELETE | `/api/tracker/{id}/like` | いいね解除 |
 
@@ -1142,21 +1288,28 @@ interface PreviewData {
 
 - `role != ""` → "My Tracks"、`liked=true && role==""` → "Liked Tracks"
 - 各カードに mini ECharts プレビュー表示（`GET /api/tracker/{id}/preview` を並列 fetch）
+- カードクリック: type=`tracker` → `/tracker/{id}`、type=`coverage` → `/repos/{repo_id}/coverages`
 - Loader: `loadTrackerList` = `listTrackers(1, 12)`
 
 #### TrackerDetailView (`/tracker/:trackerId`)
 
 - パンくず: Top > Tracker > `tracker.name`
 - tracker 名の横に Like/Unlike ボタン、visibility バッジ
-- Edit ボタン（`role != ""` の場合のみ表示）
-- `react-datepicker` による日付範囲フィルター + ECharts 折れ線チャート
-- 系列一覧テーブル（表示のみ）
+- type バッジ（"tracker" または "coverage"）
+- Edit ボタン（`role != ""` かつ type=`tracker` の場合のみ表示）
+- **type=`coverage`**: カバレッジデータを ECharts で表示 + 「カバレッジ詳細を見る」リンク（`/repos/{repo_id}/coverages`）。series/values 管理 UI は非表示。Like は可能。Edit ボタン非表示。
+- **type=`tracker`**: `react-datepicker` による日付範囲フィルター + ECharts 折れ線チャート。系列一覧テーブル（表示のみ）。
 - Loader: `loadTrackerDetail` = `listSeries(trackerId)`
 
 #### TrackerCreate (`/tracker/new`)
 
 - トラッカー作成専用ページ
-- Form: name (text input, required) + visibility (select, options: public/unlisted/private)
+- Form:
+  - name (text input, required)
+  - visibility (select, options: public/unlisted/private)
+  - type (select, options: tracker/coverage, default: tracker)
+  - repo_id (number input, type=coverage 時のみ表示、必須)
+- type 切替時に repo_id 欄の表示/非表示をトグル
 - Create 成功 → `navigate(/tracker/:id)`（詳細画面へ）
 - Create 失敗 → エラーメッセージ表示
 - Cancel → `<Link to="/tracker">`
@@ -1165,10 +1318,10 @@ interface PreviewData {
 #### TrackerDetailEdit (`/tracker/:trackerId/edit`)
 
 - パンくず: Top > Tracker > `tracker.name` > Edit
-- 系列作成・削除、値追加・全削除
+- 系列作成・削除、値追加・全削除（type=`coverage` の場合は非対応、アクセス時にメッセージ表示）
 - visibility 変更セレクター
 - ECharts チャート（日付範囲フィルター付き）
-- `role == ""` でアクセス: Edit ボタンが表示されない（URL 直アクセス時はエラーにはならない）
+- `role == ""` でアクセス: Edit ボタンが表示されない（URL 直アクセス時はエラーにはならないが、coverage type の場合は Edit ボタンも表示しない）
 
 ---
 
@@ -1176,7 +1329,9 @@ interface PreviewData {
 
 現在の実装は v11+ の状態にあり、以下の機能が完了している:
 
-### バックエンド
+### v11 (完了)
+
+#### バックエンド
 
 1. テーブル: `tracker`（visibility カラム含む）, `tracker_series`, `tracker_value`, `tracker_member`, `tracker_like`
 2. 全 CRUD エンドポイント（11個）
@@ -1186,13 +1341,27 @@ interface PreviewData {
 6. Session + API Key 二重認証（server パッケージで完結）
 7. テスト: store_test.go（561行）, handler_test.go（858行）, server_test.go（統合テスト）
 
-### フロントエンド
+#### フロントエンド
 
 1. TrackerView（カードグリッド + ページネーション + プレビューチャート）
 2. TrackerCreate（作成フォーム）
 3. TrackerDetailView（ECharts + 日付範囲フィルター + Like）
 4. TrackerDetailEdit（系列/値のCRUD + visibility 変更）
 5. テスト: tracker.test.tsx（421行）
+
+### v12 (進行中) — Coverage type 統合
+
+- `tracker` テーブルに `type` カラム追加（DEFAULT 'tracker'）
+- `tracker_coverage` テーブル追加（tracker_id → repo_id 紐づけ）
+- createTracker で type/RepoID バリデーション
+- POST series/values、DELETE series/values で coverage type を 400 で拒否
+- GET series で coverage type は空配列を返す
+- preview で CoverageTimelineProvider からデータ取得
+- CoverageTimelineProvider インターフェイス定義（tracker/provider.go）
+- coverage store に Timeline(repoID, limit) メソッド追加
+- server パッケージでの依存注入
+- demo.go の seed データ追加
+- フロントエンド: type 表示、coverage カード→/repos/{repo_id}/coverages 遷移、detail view で情報表示
 
 ---
 

@@ -61,7 +61,7 @@ func (s *MoraServer) seedDemoData() error {
 			visibilities := []string{"public", "unlisted", "private"}
 			visibility := visibilities[rng.Intn(len(visibilities))]
 
-			tracker, err := s.tracker.CreateTracker(tname, visibility, user.ID)
+			tracker, err := s.tracker.CreateTracker(tname, visibility, user.ID, "tracker", nil)
 			if err != nil {
 				return fmt.Errorf("create demo tracker %s: %w", tname, err)
 			}
@@ -111,6 +111,18 @@ func (s *MoraServer) seedDemoData() error {
 						return fmt.Errorf("create demo value: %w", err)
 					}
 				}
+			}
+		}
+	}
+
+	repos, err := s.repos.ListAll()
+	if err == nil && len(repos) > 0 {
+		adminID := int64(1)
+		for _, repo := range repos {
+			repoID := repo.Id
+			_, err := s.tracker.CreateTracker(repo.Name+" coverage", "public", adminID, "coverage", &repoID)
+			if err != nil {
+				log.Warn().Err(err).Str("repo", repo.Name).Msg("Failed to create coverage tracker")
 			}
 		}
 	}

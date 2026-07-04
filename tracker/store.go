@@ -17,7 +17,8 @@ var schemaTracker = `
 CREATE TABLE IF NOT EXISTS tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
-    visibility TEXT NOT NULL DEFAULT 'private'
+    visibility TEXT NOT NULL DEFAULT 'private',
+    type TEXT NOT NULL DEFAULT 'tracker'
 )`
 
 var schemaSeries = `
@@ -53,6 +54,14 @@ CREATE TABLE IF NOT EXISTS tracker_like (
     PRIMARY KEY (user_id, tracker_id)
 )`
 
+var schemaTrackerCoverage = `
+CREATE TABLE IF NOT EXISTS tracker_coverage (
+    tracker_id INTEGER PRIMARY KEY,
+    repo_id    INTEGER NOT NULL,
+    FOREIGN KEY (tracker_id) REFERENCES tracker(id) ON DELETE CASCADE,
+    FOREIGN KEY (repo_id)    REFERENCES repository(id) ON DELETE CASCADE
+)`
+
 type (
 	trackerStore struct {
 		db *sqlx.DB
@@ -64,6 +73,8 @@ type TrackerResponse struct {
 	Id         int64  `json:"id"    db:"id"`
 	Name       string `json:"name"  db:"name"`
 	Visibility string `json:"visibility"` // "public" | "unlisted" | "private"
+	Type       string `json:"type"`
+	RepoID     *int64 `json:"repo_id,omitempty" db:"repo_id"`
 	Role       string `json:"role"`       // "" | "owner" | "editor"
 	Liked      bool   `json:"liked"`
 }
@@ -75,13 +86,13 @@ func newTrackerStore(db *sqlx.DB) *trackerStore {
 // ----------------------------------------------------------------------
 // Tracker
 
-func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
+func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64, repoID *int64) error {
 	if tracker.Visibility == "" {
 		tracker.Visibility = "private"
 	}
-	query := "INSERT INTO tracker (name, visibility) VALUES (?, ?)"
+	query := "INSERT INTO tracker (name, visibility, type) VALUES (?, ?, ?)"
 
-	res, err := s.db.Exec(query, tracker.Name, tracker.Visibility)
+	res, err := s.db.Exec(query, tracker.Name, tracker.Visibility, tracker.Type)
 	if err != nil {
 		return fmt.Errorf("addTracker insert: %w", err)
 	}
@@ -96,6 +107,15 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 		userID, tracker.Id)
 	if err != nil {
 		return fmt.Errorf("addTracker addMember: %w", err)
+	}
+
+	if repoID != nil {
+		_, err = s.db.Exec(
+			"INSERT INTO tracker_coverage (tracker_id, repo_id) VALUES (?, ?)",
+			tracker.Id, *repoID)
+		if err != nil {
+			return fmt.Errorf("addTracker addCoverage: %w", err)
+		}
 	}
 
 	return nil
@@ -116,10 +136,12 @@ func (s *trackerStore) listTrackers(userID int64, page, perPage int) ([]TrackerR
 	}
 
 	query := `
-		SELECT t.id, t.name, t.visibility,
+		SELECT t.id, t.name, t.visibility, t.type,
+		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked
 		FROM tracker t
+		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
 		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
 		WHERE m.user_id IS NOT NULL OR l.user_id IS NOT NULL
@@ -141,7 +163,10 @@ func (s *trackerStore) listTrackers(userID int64, page, perPage int) ([]TrackerR
 }
 
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
-	query := "SELECT id, name, visibility FROM tracker WHERE id = ?"
+	query := `SELECT t.id, t.name, t.visibility, t.type, tc.repo_id
+		FROM tracker t
+		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
+		WHERE t.id = ?`
 
 	rows := []TrackerModel{}
 	err := s.db.Select(&rows, query, id)
@@ -154,6 +179,19 @@ func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
 	}
 
 	return &rows[0], nil
+}
+
+func (s *trackerStore) findRepoIDByTrackerID(trackerID int64) (*int64, error) {
+	query := "SELECT repo_id FROM tracker_coverage WHERE tracker_id = ?"
+	var repoID int64
+	err := s.db.Get(&repoID, query, trackerID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("findRepoIDByTrackerID select: %w", err)
+	}
+	return &repoID, nil
 }
 
 func (s *trackerStore) deleteTracker(id int64) error {
@@ -418,6 +456,11 @@ func (s *trackerStore) initialize() error {
 	_, err = s.db.Exec(schemaLike)
 	if err != nil {
 		return fmt.Errorf("initialize schemaLike: %w", err)
+	}
+
+	_, err = s.db.Exec(schemaTrackerCoverage)
+	if err != nil {
+		return fmt.Errorf("initialize schemaTrackerCoverage: %w", err)
 	}
 
 	return nil

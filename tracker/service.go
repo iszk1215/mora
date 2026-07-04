@@ -10,26 +10,27 @@ import (
 )
 
 type Service struct {
-	store *trackerStore
+	store            *trackerStore
+	coverageProvider CoverageTimelineProvider
 }
 
-func NewService(db *sqlx.DB) (*Service, error) {
+func NewService(db *sqlx.DB, cp CoverageTimelineProvider) (*Service, error) {
 	log.Print("tracker.NewService")
 	store := newTrackerStore(db)
 	err := store.initialize()
 	if err != nil {
 		return nil, fmt.Errorf("tracker store initialize: %w", err)
 	}
-	return &Service{store: store}, nil
+	return &Service{store: store, coverageProvider: cp}, nil
 }
 
 func (s *Service) Handler() http.Handler {
-	return newHandler(s.store)
+	return newHandler(s.store, s.coverageProvider)
 }
 
-func (s *Service) CreateTracker(name, visibility string, userID int64) (*TrackerModel, error) {
-	t := &TrackerModel{Name: name, Visibility: visibility}
-	if err := s.store.addTracker(t, userID); err != nil {
+func (s *Service) CreateTracker(name, visibility string, userID int64, trackerType string, repoID *int64) (*TrackerModel, error) {
+	t := &TrackerModel{Name: name, Visibility: visibility, Type: trackerType}
+	if err := s.store.addTracker(t, userID, repoID); err != nil {
 		return nil, fmt.Errorf("CreateTracker: %w", err)
 	}
 	return t, nil

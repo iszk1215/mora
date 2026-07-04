@@ -7,6 +7,7 @@ import (
 
 	"github.com/elliotchance/pie/v2"
 	"github.com/iszk1215/mora/coverage/profile"
+	"github.com/iszk1215/mora/tracker"
 )
 
 type (
@@ -31,6 +32,7 @@ type (
 		FindRevision(id int64, revision string) (*Coverage, error)
 		List(id int64) ([]*Coverage, error)
 		Put(*Coverage) (int64, error)
+		Timeline(repoID int64, limit int) (map[string][]tracker.CoverageTimelinePoint, error)
 	}
 )
 

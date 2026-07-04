@@ -15,13 +15,16 @@ import (
 
 type (
 	trackerHandler struct {
-		store *trackerStore
+		store            *trackerStore
+		coverageProvider CoverageTimelineProvider
 	}
 
 	TrackerModel struct {
 		Id         int64  `json:"id"         db:"id"`
 		Name       string `json:"name"       db:"name"`
 		Visibility string `json:"visibility" db:"visibility"`
+		Type       string `json:"type"       db:"type"`
+		RepoID     *int64 `json:"repo_id,omitempty" db:"repo_id"`
 	}
 
 	SeriesModel struct {
@@ -41,6 +44,8 @@ type (
 	CreateTrackerRequest struct {
 		Name       string `json:"name"`
 		Visibility string `json:"visibility"` // required: "public"|"unlisted"|"private"
+		Type       string `json:"type"`       // "tracker" or "coverage", defaults to "tracker"
+		RepoID     *int64 `json:"repo_id"`    // required if type="coverage"
 	}
 
 	CreateSeriesRequest struct {
@@ -293,6 +298,21 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		render.BadRequest(w, errors.New("visibility must be one of: public, unlisted, private"))
 		return
 	}
+	if req.Type == "" {
+		req.Type = "tracker"
+	}
+	if req.Type != "tracker" && req.Type != "coverage" {
+		render.BadRequest(w, errors.New("type must be 'tracker' or 'coverage'"))
+		return
+	}
+	if req.Type == "coverage" && req.RepoID == nil {
+		render.BadRequest(w, errors.New("repo_id is required for coverage type"))
+		return
+	}
+	if req.Type == "tracker" && req.RepoID != nil {
+		render.BadRequest(w, errors.New("repo_id is not allowed for tracker type"))
+		return
+	}
 
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
@@ -300,8 +320,8 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tracker := TrackerModel{Name: req.Name, Visibility: req.Visibility}
-	err = h.store.addTracker(&tracker, uid)
+	tracker := TrackerModel{Name: req.Name, Visibility: req.Visibility, Type: req.Type}
+	err = h.store.addTracker(&tracker, uid, req.RepoID)
 	if err != nil {
 		log.Warn().Err(err).Msg("addTracker")
 		render.BadRequest(w, errors.New("failed to create tracker"))
@@ -312,6 +332,8 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		Id:         tracker.Id,
 		Name:       tracker.Name,
 		Visibility: tracker.Visibility,
+		Type:       tracker.Type,
+		RepoID:     req.RepoID,
 		Role:       "owner",
 		Liked:      false,
 	}
@@ -395,6 +417,8 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 		Id:         tracker.Id,
 		Name:       tracker.Name,
 		Visibility: tracker.Visibility,
+		Type:       tracker.Type,
+		RepoID:     tracker.RepoID,
 	}
 	if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
 		resp.Role = role
@@ -422,27 +446,62 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 
-	series, err := h.store.listSeries(tracker.Id)
-	if err != nil {
-		log.Error().Err(err).Msg("tracker.handler.previewTracker listSeries")
-		render.InternalError(w, err)
-		return
-	}
+	var previews []PreviewSeriesValues
 
-	previews := make([]PreviewSeriesValues, 0, len(series))
-	for _, s := range series {
-		values, err := h.store.listLatestValues(s.Id, 20)
+	if tracker.Type == "coverage" {
+		repoID, err := h.store.findRepoIDByTrackerID(tracker.Id)
 		if err != nil {
-			log.Error().Err(err).Msg("tracker.handler.previewTracker listLatestValues")
-			continue
+			log.Error().Err(err).Msg("tracker.handler.previewTracker findRepoID")
+			render.InternalError(w, err)
+			return
 		}
-		previews = append(previews, PreviewSeriesValues{
-			Series: s,
-			Values: values,
-		})
+		if repoID != nil && h.coverageProvider != nil {
+			timeline, err := h.coverageProvider.Timeline(*repoID, 20)
+			if err != nil {
+				log.Error().Err(err).Msg("tracker.handler.previewTracker Timeline")
+				render.InternalError(w, err)
+				return
+			}
+			for name, points := range timeline {
+				values := make([]ValueModel, len(points))
+				for i, p := range points {
+					values[i] = ValueModel{Timestamp: p.Time, Value: p.Value}
+				}
+				previews = append(previews, PreviewSeriesValues{
+					Series: SeriesModel{
+						Id:        0,
+						TrackerId: tracker.Id,
+						Name:      name,
+						DataType:  "float",
+					},
+					Values: values,
+				})
+			}
+		}
+	} else {
+		series, err := h.store.listSeries(tracker.Id)
+		if err != nil {
+			log.Error().Err(err).Msg("tracker.handler.previewTracker listSeries")
+			render.InternalError(w, err)
+			return
+		}
+
+		for _, s := range series {
+			values, err := h.store.listLatestValues(s.Id, 20)
+			if err != nil {
+				log.Error().Err(err).Msg("tracker.handler.previewTracker listLatestValues")
+				continue
+			}
+			previews = append(previews, PreviewSeriesValues{
+				Series: s,
+				Values: values,
+			})
+		}
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility}
+	trackerResp := TrackerResponse{
+		Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID,
+	}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
 			trackerResp.Role = role
@@ -471,14 +530,18 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 
-	series, err := h.store.listSeries(tracker.Id)
-	if err != nil {
-		log.Error().Err(err).Msg("tracker.handler.listSeries")
-		render.InternalError(w, err)
-		return
+	var series []SeriesModel
+	if tracker.Type != "coverage" {
+		var err error
+		series, err = h.store.listSeries(tracker.Id)
+		if err != nil {
+			log.Error().Err(err).Msg("tracker.handler.listSeries")
+			render.InternalError(w, err)
+			return
+		}
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility}
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		_, role, err := h.store.isMember(uid, tracker.Id)
 		if err == nil {
@@ -520,6 +583,12 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	tracker, _ := trackerFrom(r.Context())
+	if tracker.Type == "coverage" {
+		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
+		return
+	}
+
 	var req CreateSeriesRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -537,7 +606,6 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tracker, _ := trackerFrom(r.Context())
 	series := SeriesModel{
 		TrackerId: tracker.Id,
 		Name:      req.Name,
@@ -567,6 +635,12 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/tracker/{trackerId}/series/{seriesId} [delete]
 func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
+	tracker, _ := trackerFrom(r.Context())
+	if tracker.Type == "coverage" {
+		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
+		return
+	}
+
 	series, _ := seriesFrom(r.Context())
 
 	err := h.store.deleteSeries(series.Id)
@@ -646,6 +720,12 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	tracker, _ := trackerFrom(r.Context())
+	if tracker.Type == "coverage" {
+		render.BadRequest(w, errors.New("cannot modify values for coverage tracker"))
+		return
+	}
+
 	var req CreateValueRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -684,6 +764,12 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/tracker/{trackerId}/series/{seriesId}/values [delete]
 func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
+	tracker, _ := trackerFrom(r.Context())
+	if tracker.Type == "coverage" {
+		render.BadRequest(w, errors.New("cannot modify values for coverage tracker"))
+		return
+	}
+
 	series, _ := seriesFrom(r.Context())
 	err := h.store.deleteValues(series.Id)
 	if err != nil {
@@ -808,8 +894,8 @@ func (h *trackerHandler) injectSeries(next http.Handler) http.Handler {
 	})
 }
 
-func newHandler(store *trackerStore) http.Handler {
-	h := &trackerHandler{store: store}
+func newHandler(store *trackerStore, cp CoverageTimelineProvider) http.Handler {
+	h := &trackerHandler{store: store, coverageProvider: cp}
 	r := chi.NewRouter()
 
 	r.Use(h.requireAuth)

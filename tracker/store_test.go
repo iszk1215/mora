@@ -38,6 +38,13 @@ func initTestStore(t *testing.T) *trackerStore {
 			VALUES (?, 'test', ?, ?, '')`, uid, fmt.Sprintf("user%d", uid), fmt.Sprintf("user%d", uid))
 	}
 
+	// Create repository table for tracker_coverage FK
+	db.MustExec(`
+		CREATE TABLE IF NOT EXISTS repository (
+			id INTEGER PRIMARY KEY AUTOINCREMENT
+		)
+	`)
+
 	s := newTrackerStore(db)
 
 	err = s.initialize()
@@ -58,7 +65,7 @@ func TestStoreTracker(t *testing.T) {
 			Name: "test_tracker",
 		}
 
-		err := s.addTracker(tracker, 1)
+		err := s.addTracker(tracker, 1, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), tracker.Id)
 
@@ -74,7 +81,7 @@ func TestStoreTracker(t *testing.T) {
 			Name: "test_tracker",
 		}
 
-		err := s.addTracker(tracker, 1)
+		err := s.addTracker(tracker, 1, nil)
 		require.Error(t, err)
 	})
 }
@@ -85,7 +92,7 @@ func TestStoreFindTracker(t *testing.T) {
 	}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1)
+	err := s.addTracker(tracker, 1, nil)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), tracker.Id)
 
@@ -120,7 +127,7 @@ func TestStoreFindTracker(t *testing.T) {
 	t.Run("list with pagination", func(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			tr := &TrackerModel{Name: fmt.Sprintf("paginate_%d", i)}
-			require.NoError(t, s.addTracker(tr, 1))
+			require.NoError(t, s.addTracker(tr, 1, nil))
 		}
 		trackers, total, err := s.listTrackers(1, 1, 3)
 		require.NoError(t, err)
@@ -138,7 +145,7 @@ func TestStoreDeleteTracker(t *testing.T) {
 	}
 
 	for _, tr := range trackers {
-		err := s.addTracker(tr, 1)
+		err := s.addTracker(tr, 1, nil)
 		require.NoError(t, err)
 	}
 
@@ -157,7 +164,7 @@ func TestStoreUpdateVisibility(t *testing.T) {
 	s := initTestStore(t)
 
 	tracker := &TrackerModel{Name: "vis_test"}
-	require.NoError(t, s.addTracker(tracker, 1))
+	require.NoError(t, s.addTracker(tracker, 1, nil))
 
 	t.Run("update to public", func(t *testing.T) {
 		err := s.updateVisibility(tracker.Id, "public")
@@ -196,7 +203,7 @@ func TestStoreSeries(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1)
+	err := s.addTracker(tracker, 1, nil)
 	require.NoError(t, err)
 
 	t.Run("add series with existing tracker", func(t *testing.T) {
@@ -238,7 +245,7 @@ func TestStoreFindSeries(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1)
+	err := s.addTracker(tracker, 1, nil)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -279,7 +286,7 @@ func TestStoreDeleteSeries(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1)
+	err := s.addTracker(tracker, 1, nil)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -306,7 +313,7 @@ func TestStoreValue(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1)
+	err := s.addTracker(tracker, 1, nil)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -360,7 +367,7 @@ func TestStoreListLatestValues(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackerModel{Name: "test_tracker"}
-	require.NoError(t, s.addTracker(tr, 1))
+	require.NoError(t, s.addTracker(tr, 1, nil))
 
 	series := &SeriesModel{TrackerId: tr.Id, Name: "test_series", DataType: "float"}
 	require.NoError(t, s.addSeries(series))
@@ -399,7 +406,7 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackerModel{Name: "test_tracker"}
-	err := s.addTracker(tr, 1)
+	err := s.addTracker(tr, 1, nil)
 	require.NoError(t, err)
 
 	series := &SeriesModel{TrackerId: tr.Id, Name: "test_series", DataType: "float"}
@@ -420,7 +427,7 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 
 	// Delete tracker should cascade delete series
 	tr2 := &TrackerModel{Name: "test_tracker2"}
-	err = s.addTracker(tr2, 1)
+	err = s.addTracker(tr2, 1, nil)
 	require.NoError(t, err)
 
 	series2 := &SeriesModel{TrackerId: tr2.Id, Name: "test_series2", DataType: "float"}
@@ -449,7 +456,7 @@ func TestStoreMember(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackerModel{Name: "test_tracker"}
-	err := s.addTracker(tr, 1)
+	err := s.addTracker(tr, 1, nil)
 	require.NoError(t, err)
 
 	t.Run("non-member", func(t *testing.T) {
@@ -471,7 +478,7 @@ func TestStoreLike(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackerModel{Name: "test_tracker"}
-	err := s.addTracker(tr, 1)
+	err := s.addTracker(tr, 1, nil)
 	require.NoError(t, err)
 
 	t.Run("add like", func(t *testing.T) {
@@ -516,10 +523,10 @@ func TestStoreTrackerListUserScoped(t *testing.T) {
 
 	// Create trackers owned by user 1
 	tr1 := &TrackerModel{Name: "tracker1"}
-	require.NoError(t, s.addTracker(tr1, 1))
+	require.NoError(t, s.addTracker(tr1, 1, nil))
 
 	tr2 := &TrackerModel{Name: "tracker2"}
-	require.NoError(t, s.addTracker(tr2, 1))
+	require.NoError(t, s.addTracker(tr2, 1, nil))
 
 	// User 2 likes tracker1
 	require.NoError(t, s.addLike(2, tr1.Id))

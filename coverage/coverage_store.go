@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/iszk1215/mora/coverage/profile"
+	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -310,6 +311,51 @@ func (s *coverageStoreImpl) Put(cov *Coverage) (int64, error) {
 	}
 
 	return id, s.replaceEntries(id, cov.Entries)
+}
+
+func (s *coverageStoreImpl) Timeline(repoID int64, limit int) (map[string][]tracker.CoverageTimelinePoint, error) {
+	type row struct {
+		Time  time.Time `db:"time"`
+		Name  string    `db:"name"`
+		Hits  int       `db:"hits"`
+		Lines int       `db:"lines"`
+	}
+
+	query := `
+		SELECT c.time, e.name, e.hits, e.lines
+		FROM coverage c
+		JOIN coverage_entry e ON e.coverage_id = c.id
+		WHERE c.repo_id = ?
+		ORDER BY c.time DESC`
+
+	var rows []row
+	if err := s.db.Select(&rows, query, repoID); err != nil {
+		return nil, fmt.Errorf("Timeline select: %w", err)
+	}
+
+	result := make(map[string][]tracker.CoverageTimelinePoint)
+	counts := make(map[string]int)
+	for _, r := range rows {
+		if limit > 0 && counts[r.Name] >= limit {
+			continue
+		}
+		pct := 0.0
+		if r.Lines > 0 {
+			pct = float64(r.Hits) / float64(r.Lines) * 100
+		}
+		result[r.Name] = append(result[r.Name], tracker.CoverageTimelinePoint{Time: r.Time, Value: pct})
+		counts[r.Name]++
+	}
+
+	// Reverse each entry to ascending time order
+	for name, points := range result {
+		for i, j := 0, len(points)-1; i < j; i, j = i+1, j-1 {
+			points[i], points[j] = points[j], points[i]
+		}
+		result[name] = points
+	}
+
+	return result, nil
 }
 
 func (s *coverageStoreImpl) replaceEntries(coverageID int64, entries []*CoverageEntry) error {

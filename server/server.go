@@ -501,7 +501,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	trackerService, err := tracker.NewService(db)
+	trackerService, err := tracker.NewService(db, coverage.Store())
 	if err != nil {
 		return nil, err
 	}

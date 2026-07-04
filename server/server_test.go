@@ -831,7 +831,7 @@ func TestTrackerEndpointIsMounted(t *testing.T) {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db)
+	trackerService, err := tracker.NewService(db, nil)
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).

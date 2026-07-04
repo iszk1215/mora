@@ -87,11 +87,14 @@ async function fetchPreview(trackerId: number): Promise<PreviewData> {
   if (!resp.ok) throw resp
   return resp.json()
 }
-async function createTracker(name: string, visibility: string): Promise<TrackerResponse> {
+async function createTracker(name: string, visibility: string, type_?: string, repoId?: number): Promise<TrackerResponse> {
+  const body: Record<string, unknown> = { name, visibility }
+  if (type_) body.type = type_
+  if (repoId !== undefined) body.repo_id = repoId
   const resp = await fetch('/api/tracker', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, visibility }),
+    body: JSON.stringify(body),
   })
   if (!resp.ok) throw resp
   return resp.json()
@@ -221,12 +224,19 @@ const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; 
     }
   }, [preview])
 
+  const linkTo = tracker.type === 'coverage' && tracker.repo_id != null
+    ? `/repos/${tracker.repo_id}/coverages`
+    : `/tracker/${tracker.id}`
+
   return (
-    <Link to={`/tracker/${tracker.id}`} className="block border rounded-lg p-4 hover:shadow-md transition-shadow">
+    <Link to={linkTo} className="block border rounded-lg p-4 hover:shadow-md transition-shadow">
       <div className="flex items-center gap-2 mb-2">
         <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
         {tracker.role && (
           <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tracker.role}</span>
+        )}
+        {tracker.type === 'coverage' && (
+          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
         )}
       </div>
       <div className="h-[120px]">
@@ -339,6 +349,22 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
 
+  const [coverageTimeline, setCoverageTimeline] = useState<Array<{ time: string; value: number; entry_name: string }>>([])
+
+  const isCoverage = tracker.type === 'coverage'
+
+  useEffect(() => {
+    if (isCoverage && tracker.repo_id != null) {
+      fetch(`/api/repos/${tracker.repo_id}/coverage/timeline?limit=30`)
+        .then((r) => r.json())
+        .then((d: { timeline: Array<{ time: string; value: number; entry_name: string }> }) => {
+          setCoverageTimeline(d.timeline ?? [])
+          return undefined
+        })
+        .catch(() => {})
+    }
+  }, [isCoverage, tracker.repo_id])
+
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
@@ -373,6 +399,27 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
   const datasets: Dataset[] = seriesValues.map(valuesToDataset)
 
+  const coverageOption = useMemo(() => {
+    if (!isCoverage) return null
+    const entryNames = [...new Set(coverageTimeline.map((p) => p.entry_name))]
+    return {
+      grid: { left: 60, right: 20, top: 30, bottom: 40 },
+      xAxis: { type: 'time' as const },
+      yAxis: { type: 'value' as const, min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
+      series: entryNames.map((name) => ({
+        name,
+        type: 'line' as const,
+        data: coverageTimeline
+          .filter((p) => p.entry_name === name)
+          .map((p) => [p.time, p.value]),
+      })),
+      tooltip: {
+        trigger: 'axis' as const,
+        valueFormatter: (value: number) => value.toFixed(1) + '%',
+      },
+    }
+  }, [isCoverage, coverageTimeline])
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
@@ -383,6 +430,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
       <div className="flex items-center gap-3 my-4">
         <h1 className="text-3xl">{tracker.name}</h1>
+        {tracker.type === 'coverage' && (
+          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
+        )}
         <Button
           variant={liked ? 'default' : 'secondary'}
           size="sm"
@@ -391,72 +441,92 @@ export const TrackerDetailView = (): React.JSX.Element => {
         >
           {liked ? 'Unlike' : 'Like'}
         </Button>
-        {tracker.role !== '' && (
+        {tracker.role !== '' && !isCoverage && (
           <Button variant="outline" size="sm" asChild>
             <Link to={`/tracker/${tracker.id}/edit`}>Edit</Link>
           </Button>
         )}
       </div>
 
-      {/* Chart */}
-      <h2 className="text-xl my-2">Chart</h2>
-
-      <div className="pt-2 flex items-center mb-2">
-        <span className="mr-1">From</span>
-        <div className="w-1/4">
-          <DatePicker
-            selected={startDate}
-            onChange={(d: Date | null) => setStartDate(d)}
-            className="border rounded px-2 py-1 w-full"
-            placeholderText="Select date"
-            dateFormat="yyyy-MM-dd"
-          />
-        </div>
-        <span className="px-2">To</span>
-        <div className="w-1/4">
-          <DatePicker
-            selected={endDate}
-            onChange={(d: Date | null) => setEndDate(d)}
-            className="border rounded px-2 py-1 w-full"
-            placeholderText="Select date"
-            dateFormat="yyyy-MM-dd"
-          />
-        </div>
-      </div>
-
-      {datasets.length > 0 ? (
-        <TrackerChart data={{ datasets }} min={startDate} max={endDate} />
-      ) : (
-        <p className="text-muted-foreground">No data to display</p>
-      )}
-
-      {/* Series list (read-only) */}
-      <h2 className="text-xl my-2">Series</h2>
-
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Data Type</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {seriesList.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={2} className="text-center text-muted-foreground">
-                No series yet
-              </TableCell>
-            </TableRow>
+      {isCoverage ? (
+        <>
+          <h2 className="text-xl my-2">Coverage Timeline</h2>
+          {coverageTimeline.length > 0 ? (
+            <ReactECharts option={coverageOption} style={{ width: '100%', height: 300 }} />
           ) : (
-            seriesList.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell>{s.name}</TableCell>
-                <TableCell>{s.data_type}</TableCell>
-              </TableRow>
-            ))
+            <p className="text-muted-foreground">No coverage data</p>
           )}
-        </TableBody>
-      </Table>
+          {tracker.repo_id != null && (
+            <div className="mt-4">
+              <Button asChild>
+                <Link to={`/repos/${tracker.repo_id}/coverages`}>View Coverage Details</Link>
+              </Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Chart */}
+          <h2 className="text-xl my-2">Chart</h2>
+
+          <div className="pt-2 flex items-center mb-2">
+            <span className="mr-1">From</span>
+            <div className="w-1/4">
+              <DatePicker
+                selected={startDate}
+                onChange={(d: Date | null) => setStartDate(d)}
+                className="border rounded px-2 py-1 w-full"
+                placeholderText="Select date"
+                dateFormat="yyyy-MM-dd"
+              />
+            </div>
+            <span className="px-2">To</span>
+            <div className="w-1/4">
+              <DatePicker
+                selected={endDate}
+                onChange={(d: Date | null) => setEndDate(d)}
+                className="border rounded px-2 py-1 w-full"
+                placeholderText="Select date"
+                dateFormat="yyyy-MM-dd"
+              />
+            </div>
+          </div>
+
+          {datasets.length > 0 ? (
+            <TrackerChart data={{ datasets }} min={startDate} max={endDate} />
+          ) : (
+            <p className="text-muted-foreground">No data to display</p>
+          )}
+
+          {/* Series list (read-only) */}
+          <h2 className="text-xl my-2">Series</h2>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Data Type</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {seriesList.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} className="text-center text-muted-foreground">
+                    No series yet
+                  </TableCell>
+                </TableRow>
+              ) : (
+                seriesList.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell>{s.name}</TableCell>
+                    <TableCell>{s.data_type}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </>
+      )}
     </div>
   )
 }
@@ -477,6 +547,8 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [endDate, setEndDate] = useState<Date | null>(null)
 
   const [visibility, setVisibility] = useState(tracker.visibility)
+
+  const isCoverage = tracker.type === 'coverage'
 
   const handleVisibilityChange = async (newVisibility: string) => {
     try {
@@ -555,6 +627,38 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   })
 
   const datasets: Dataset[] = seriesValues.map(valuesToDataset)
+
+  if (isCoverage) {
+    return (
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Link to={`/tracker/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
+            &larr; Back to Tracker
+          </Link>
+        </div>
+
+        <h1 className="text-3xl my-4">{tracker.name} (Edit)</h1>
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6">
+          <p className="text-yellow-800">
+            This tracker is linked to coverage data and cannot be edited directly.
+          </p>
+        </div>
+
+        {/* Visibility */}
+        <h2 className="text-xl my-2">Visibility</h2>
+        <select
+          value={visibility}
+          onChange={(e) => handleVisibilityChange(e.target.value)}
+          className="border rounded px-2 py-1 mb-4"
+        >
+          <option value="private">Private</option>
+          <option value="unlisted">Unlisted</option>
+          <option value="public">Public</option>
+        </select>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -716,6 +820,8 @@ export const TrackerCreate = (): React.JSX.Element => {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [visibility, setVisibility] = useState('private')
+  const [type, setType] = useState('tracker')
+  const [repoId, setRepoId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -724,7 +830,12 @@ export const TrackerCreate = (): React.JSX.Element => {
     setLoading(true)
     setError(null)
     try {
-      const created = await createTracker(name.trim(), visibility)
+      const created = await createTracker(
+        name.trim(),
+        visibility,
+        type,
+        type === 'coverage' ? (repoId ? parseInt(repoId) : undefined) : undefined,
+      )
       navigate(`/tracker/${created.id}`)
     } catch {
       setError('Failed to create tracker. Please try again.')
@@ -772,6 +883,33 @@ export const TrackerCreate = (): React.JSX.Element => {
             <option value="public">Public</option>
           </select>
         </div>
+
+        <div>
+          <label className="block mb-1">Type</label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="border rounded px-2 py-1 w-full"
+            disabled={loading}
+          >
+            <option value="tracker">Tracker</option>
+            <option value="coverage">Coverage</option>
+          </select>
+        </div>
+
+        {type === 'coverage' && (
+          <div>
+            <label className="block mb-1">Repository ID</label>
+            <input
+              type="number"
+              value={repoId}
+              onChange={(e) => setRepoId(e.target.value)}
+              placeholder="Repository ID"
+              className="border rounded px-2 py-1 w-full"
+              disabled={loading}
+            />
+          </div>
+        )}
 
         <div className="flex gap-2">
           <Button variant="outline" asChild>
