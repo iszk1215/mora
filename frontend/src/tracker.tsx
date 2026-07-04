@@ -204,14 +204,16 @@ const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; 
     })) ?? []
 
     return {
-      grid: { left: 5, right: 5, top: 5, bottom: 5 },
-      xAxis: { type: 'time' as const, show: false },
-      yAxis: { type: 'value' as const, show: false },
+      grid: { left: 50, right: 10, top: 10, bottom: 25 },
+      xAxis: {
+        type: 'time' as const,
+        axisLabel: { hideOverlap: true },
+      },
+      yAxis: { type: 'value' as const },
       series: datasets.map((ds) => ({
         name: ds.label,
         type: 'line' as const,
         data: ds.data.map((p) => [p.x, Number(p.y)]),
-        smooth: true,
         lineStyle: { width: 1.5 },
         symbol: 'none',
       })),
