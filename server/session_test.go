@@ -165,6 +165,28 @@ func TestMoraSessionDirectRace(t *testing.T) {
 	wg.Wait()
 }
 
+func TestMoraSessionManager_GC(t *testing.T) {
+	m := newTestSessionManager()
+	m.lifetime = time.Hour
+
+	now := time.Now()
+	sess1 := NewMoraSession()
+	sess1.timestamp = now.Add(-2 * time.Hour) // expired
+	m.store["sid1"] = sess1
+
+	sess2 := NewMoraSession()
+	sess2.timestamp = now.Add(-30 * time.Minute) // still valid
+	m.store["sid2"] = sess2
+
+	m.GC()
+
+	require.Len(t, m.store, 1)
+	_, ok := m.store["sid1"]
+	require.False(t, ok, "expired session should be removed")
+	_, ok = m.store["sid2"]
+	require.True(t, ok, "valid session should remain")
+}
+
 func TestMoraSessionConcurrentHTTPRace(t *testing.T) {
 	t.Parallel()
 	m := newTestSessionManager()

@@ -139,3 +139,13 @@ func TestRepoStore_ListAll_Empty(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, got)
 }
+
+func TestRepoStore_Init_DBError(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	s := NewRepositoryStore(db)
+	err = s.Init()
+	require.Error(t, err)
+}

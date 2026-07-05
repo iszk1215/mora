@@ -150,6 +150,11 @@ func (b *MoraServerBuilder) WithTracker(trackerService *tracker.Service) *MoraSe
 	return b
 }
 
+func (b *MoraServerBuilder) WithUserStore(u UserStore) *MoraServerBuilder {
+	b.Server.userStore = u
+	return b
+}
+
 func (b *MoraServerBuilder) Finish() *MoraServer {
 	return b.Server
 }
@@ -871,4 +876,120 @@ func TestTrackerEndpointIsMounted(t *testing.T) {
 		// anonymous users cannot create trackers
 		require.Equal(t, http.StatusForbidden, res.StatusCode)
 	})
+}
+
+// ----------------------------------------------------------------------
+// requireTrackerAuth
+
+func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	trackerService, err := tracker.NewService(db, nil)
+	require.NoError(t, err)
+
+	server := NewMoraServerBuilder(t).
+		WithSessionManager().
+		WithTracker(trackerService).
+		Finish()
+
+	// Pre-populate a session in the store
+	sess := NewMoraSession()
+	sess.SetUserID(42)
+	sid := "test-session-id"
+	server.sessionManager.store[sid] = sess
+
+	handler := server.Handler()
+
+	body := `{"name":"test","visibility":"private"}`
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api/tracker", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
+	handler.ServeHTTP(w, r)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.NotEqual(t, http.StatusForbidden, res.StatusCode)
+}
+
+func TestRequireTrackerAuth_APIKey(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	userStore := newTestUserStore(t)
+	_, err = userStore.CreateUser("apiuser", "")
+	require.NoError(t, err)
+
+	key, err := userStore.CreateAPIKey(1, "test-key")
+	require.NoError(t, err)
+
+	trackerService, err := tracker.NewService(db, nil)
+	require.NoError(t, err)
+
+	server := NewMoraServerBuilder(t).
+		WithSessionManager().
+		WithTracker(trackerService).
+		WithUserStore(userStore).
+		Finish()
+
+	handler := server.Handler()
+
+	body := `{"name":"api_test","visibility":"private"}`
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api/tracker", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+key)
+	handler.ServeHTTP(w, r)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.NotEqual(t, http.StatusForbidden, res.StatusCode)
+}
+
+func TestRequireTrackerAuth_AnonymousFallback(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	trackerService, err := tracker.NewService(db, nil)
+	require.NoError(t, err)
+
+	server := NewMoraServerBuilder(t).
+		WithSessionManager().
+		WithTracker(trackerService).
+		Finish()
+
+	handler := server.Handler()
+
+	body := `{"name":"anon_test","visibility":"private"}`
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/api/tracker", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(w, r)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusForbidden, res.StatusCode)
+}
+
+// ----------------------------------------------------------------------
+// handleMe
+
+func TestHandleMe_UserNotFound(t *testing.T) {
+	userStore := newTestUserStore(t)
+	server := NewMoraServerBuilder(t).
+		WithSessionManager().
+		Finish()
+	server.userStore = userStore
+
+	sess := NewMoraSession()
+	sess.SetUserID(999) // non-existing user
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	r = r.WithContext(WithMoraSession(r.Context(), sess))
+	server.handleMe(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusNoContent, res.StatusCode)
 }

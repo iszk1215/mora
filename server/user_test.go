@@ -428,6 +428,17 @@ func TestFetchGenericUserInfo_NoUsername(t *testing.T) {
 	require.Contains(t, err.Error(), "no username")
 }
 
+func TestUserStore_CreateUserWithPassword_DBError(t *testing.T) {
+	store := newTestUserStore(t)
+
+	// Close the DB to cause CreateUserWithPassword to fail on INSERT
+	impl := store.(*userStore)
+	require.NoError(t, impl.db.Close())
+
+	_, err := store.CreateUserWithPassword("any", "pass")
+	require.Error(t, err)
+}
+
 func TestFetchProviderUserInfo_Generic(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -444,6 +455,12 @@ func TestFetchProviderUserInfo_Generic(t *testing.T) {
 	require.Equal(t, srv.URL, info.Provider)
 	require.Equal(t, "genericroute", info.Username)
 	require.Equal(t, "100", info.ProviderUserID)
+}
+
+func TestFetchGitHubUserInfo_NetworkError(t *testing.T) {
+	// No network to api.github.com in tests, so this should fail with a network error.
+	_, err := fetchGitHubUserInfo("invalid-token")
+	require.Error(t, err)
 }
 
 func TestFetchProviderUserInfo_Gitea(t *testing.T) {

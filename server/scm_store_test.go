@@ -61,6 +61,16 @@ func TestScmStore_FindURL_AfterInsert(t *testing.T) {
 	require.Equal(t, "gitea", driver)
 }
 
+func TestScmStore_Init_DBError(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	s := NewRepositoryManagerStore(db)
+	err = s.Init()
+	require.Error(t, err)
+}
+
 func TestScmStore_FindURL_MultipleEntries(t *testing.T) {
 	s := setupScmStore(t)
 
