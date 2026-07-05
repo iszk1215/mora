@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -854,5 +855,205 @@ func TestHandlerPreviewTracker(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/99999/preview", nil)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
+	})
+}
+
+// ----------------------------------------------------------------------
+// Coverage type rejection
+
+func TestHandlerCreateTrackerCoverageType(t *testing.T) {
+	t.Run("coverage type with repo_id", func(t *testing.T) {
+		store := initTestStore(t)
+		store.db.MustExec("INSERT INTO repository (id) VALUES (100)")
+
+		h := newHandler(store, nil)
+		repoID := int64(100)
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{
+			Name:       "cov_tracker",
+			Visibility: "public",
+			Type:       "coverage",
+			RepoID:     &repoID,
+		})
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusCreated, h, r)
+
+		var got TrackerResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, "coverage", got.Type)
+		require.NotNil(t, got.RepoID)
+		require.Equal(t, int64(100), *got.RepoID)
+	})
+
+	t.Run("coverage type without repo_id", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{
+			Name:       "bad_cov",
+			Visibility: "public",
+			Type:       "coverage",
+		})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("tracker type with repo_id", func(t *testing.T) {
+		h := newTestHandler(t)
+		repoID := int64(1)
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{
+			Name:       "bad_tracker",
+			Visibility: "public",
+			Type:       "tracker",
+			RepoID:     &repoID,
+		})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("invalid type", func(t *testing.T) {
+		h := newTestHandler(t)
+		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{
+			Name:       "bad",
+			Visibility: "public",
+			Type:       "invalid",
+		})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+}
+
+func TestHandlerCreateSeriesCoverageTracker(t *testing.T) {
+	store := initTestStore(t)
+	tr := &TrackerModel{Name: "cov", Type: "coverage"}
+	require.NoError(t, store.addTracker(tr, 1, nil))
+
+	h := newHandler(store, nil)
+	path := fmt.Sprintf("/%d/series", tr.Id)
+	r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "float"})
+	r = r.WithContext(superuserCtx())
+	getResponse(t, http.StatusBadRequest, h, r)
+}
+
+func TestHandlerDeleteSeriesCoverageTracker(t *testing.T) {
+	store := initTestStore(t)
+	tr := &TrackerModel{Name: "cov", Type: "coverage"}
+	require.NoError(t, store.addTracker(tr, 1, nil))
+	s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+	require.NoError(t, store.addSeries(s))
+
+	h := newHandler(store, nil)
+	path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
+	r := httptest.NewRequest(http.MethodDelete, path, nil)
+	r = r.WithContext(superuserCtx())
+	getResponse(t, http.StatusBadRequest, h, r)
+}
+
+func TestHandlerCreateValueCoverageTracker(t *testing.T) {
+	store := initTestStore(t)
+	tr := &TrackerModel{Name: "cov", Type: "coverage"}
+	require.NoError(t, store.addTracker(tr, 1, nil))
+	s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+	require.NoError(t, store.addSeries(s))
+
+	h := newHandler(store, nil)
+	path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
+	now := time.Now().Round(0)
+	r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 1.0})
+	r = r.WithContext(superuserCtx())
+	getResponse(t, http.StatusBadRequest, h, r)
+}
+
+func TestHandlerDeleteValuesCoverageTracker(t *testing.T) {
+	store := initTestStore(t)
+	tr := &TrackerModel{Name: "cov", Type: "coverage"}
+	require.NoError(t, store.addTracker(tr, 1, nil))
+	s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+	require.NoError(t, store.addSeries(s))
+
+	h := newHandler(store, nil)
+	path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
+	r := httptest.NewRequest(http.MethodDelete, path, nil)
+	r = r.WithContext(superuserCtx())
+	getResponse(t, http.StatusBadRequest, h, r)
+}
+
+// ----------------------------------------------------------------------
+// Preview coverage tracker
+
+type mockCoverageProvider struct {
+	timelineFn func(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error)
+}
+
+func (m *mockCoverageProvider) Timeline(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error) {
+	return m.timelineFn(repoID, limit)
+}
+
+func TestHandlerPreviewCoverageTracker(t *testing.T) {
+	t.Run("coverage tracker with timeline data", func(t *testing.T) {
+		store := initTestStore(t)
+		store.db.MustExec("INSERT INTO repository (id) VALUES (100)")
+		repoID := int64(100)
+		tr := &TrackerModel{Name: "cov", Type: "coverage"}
+		require.NoError(t, store.addTracker(tr, 1, &repoID))
+
+		now := time.Now().Round(0)
+		provider := &mockCoverageProvider{
+			timelineFn: func(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error) {
+				return map[string][]CoverageTimelinePoint{
+					"overall": {
+						{Time: now.Add(-2 * time.Hour), Value: 70.0},
+						{Time: now.Add(-time.Hour), Value: 80.0},
+						{Time: now, Value: 90.0},
+					},
+				}, nil
+			},
+		}
+
+		h := newHandler(store, provider)
+		path := fmt.Sprintf("/%d/preview", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got PreviewResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, tr.Id, got.Tracker.Id)
+		require.Len(t, got.Series, 1)
+		require.Equal(t, "overall", got.Series[0].Series.Name)
+	})
+
+	t.Run("coverage tracker without repoID", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "cov", Type: "coverage"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d/preview", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got PreviewResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, tr.Id, got.Tracker.Id)
+		require.Empty(t, got.Series)
+	})
+
+	t.Run("coverage tracker with provider error", func(t *testing.T) {
+		store := initTestStore(t)
+		store.db.MustExec("INSERT INTO repository (id) VALUES (200)")
+		repoID := int64(200)
+		tr := &TrackerModel{Name: "cov", Type: "coverage"}
+		require.NoError(t, store.addTracker(tr, 1, &repoID))
+
+		provider := &mockCoverageProvider{
+			timelineFn: func(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error) {
+				return nil, errors.New("timeline error")
+			},
+		}
+
+		h := newHandler(store, provider)
+		path := fmt.Sprintf("/%d/preview", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusInternalServerError, h, r)
 	})
 }

@@ -716,3 +716,44 @@ func TestHandlerDeleteValues(t *testing.T) {
 	h := newHandler(store)
 	getReponseWithRepo(t, http.StatusNoContent, h, r, repo)
 }
+
+// ----------------------------------------------------------------------
+// Error paths
+
+func TestHandlerAssertRepoNoRepo(t *testing.T) {
+	h := newTestHandler(t)
+	t.Run("GET /metrics without repo", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		res := getResponseWithoutRepo(t, h, r)
+		assertResponseMessage(t, res, "not found")
+	})
+	t.Run("POST /metrics without repo", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodPost, "/metrics", bytes.NewBufferString(`{}`))
+		res := getResponseWithoutRepo(t, h, r)
+		assertResponseMessage(t, res, "not found")
+	})
+}
+
+func getResponseWithoutRepo(t *testing.T, h http.Handler, r *http.Request) *http.Response {
+	t.Helper()
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	return w.Result()
+}
+
+func TestHandlerListMetricsDBError(t *testing.T) {
+	store := initTestStore(t)
+	require.NoError(t, store.db.Close())
+
+	h := newHandler(store)
+	r := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	r = r.WithContext(core.WithRepo(r.Context(), core.Repository{Id: 1}))
+	w := httptest.NewRecorder()
+
+	require.NotPanics(t, func() {
+		h.ServeHTTP(w, r)
+	})
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusInternalServerError, res.StatusCode)
+}

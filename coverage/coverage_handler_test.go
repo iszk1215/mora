@@ -747,6 +747,99 @@ func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 	})
 }
 
+func TestInjectCoverageNotFound(t *testing.T) {
+	store := setupCoverageStore(t)
+	s := newCoverageHandler(store)
+
+	r := httptest.NewRequest(http.MethodGet, "/99999/go/files", nil)
+	r = r.WithContext(core.WithRepo(r.Context(), core.Repository{Url: "link"}))
+	w := httptest.NewRecorder()
+
+	s.Handler().ServeHTTP(w, r)
+
+	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+}
+
+func TestInjectCoverageEntryEntryNotFound(t *testing.T) {
+	cov := &Coverage{
+		RepoID:    1215,
+		Revision:  "abcdef",
+		Timestamp: time.Now().Round(0),
+		Entries:   []*CoverageEntry{},
+	}
+
+	store := setupCoverageStore(t, cov)
+	s := newCoverageHandler(store)
+
+	r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d/nonexistent/files", cov.ID), nil)
+	r = r.WithContext(core.WithRepo(r.Context(), core.Repository{Url: "link"}))
+	w := httptest.NewRecorder()
+
+	s.Handler().ServeHTTP(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
+func TestHandlerCoverageListDBError(t *testing.T) {
+	store := setupCoverageStore(t)
+
+	impl, ok := store.(*coverageStoreImpl)
+	require.True(t, ok)
+	require.NoError(t, impl.db.Close())
+
+	rm := NewMockRepositoryClient()
+	repo := core.Repository{Id: 1215}
+
+	s := newCoverageHandler(store)
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r = r.WithContext(core.WithRepo(core.WithRepositoryClient(r.Context(), rm), repo))
+	w := httptest.NewRecorder()
+
+	require.NotPanics(t, func() {
+		s.Handler().ServeHTTP(w, r)
+	})
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
+func TestHandleFileProfileNotFound(t *testing.T) {
+	entry := &CoverageEntry{
+		Name:  "go",
+		Hits:  13,
+		Lines: 17,
+		Profiles: map[string]*profile.Profile{
+			"only_this_file.go": {
+				FileName: "only_this_file.go",
+				Hits:     13,
+				Lines:    17,
+				Blocks:   [][]int{{1, 5, 1}},
+			},
+		},
+	}
+
+	cov := &Coverage{
+		RepoID:    1215,
+		Revision:  "abcdef",
+		Timestamp: time.Now().Round(0),
+		Entries:   []*CoverageEntry{entry},
+	}
+
+	store := setupCoverageStore(t, cov)
+	s := newCoverageHandler(store)
+
+	r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d/go/files/missing_file.go", cov.ID), nil)
+	r = r.WithContext(core.WithRepo(r.Context(), core.Repository{Url: "link"}))
+	w := httptest.NewRecorder()
+
+	s.Handler().ServeHTTP(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
 func TestCoverageHandler_HandleUpload_ValidationErrors(t *testing.T) {
 	repo := core.Repository{Id: 1215}
 	store := setupCoverageStore(t)
