@@ -341,15 +341,6 @@ describe('TrackerDetailView', () => {
     expect(datepickers.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('renders series table with name and data type', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: '', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 'series-a', data_type: 'float' }],
-    })
-    render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
-    expect(screen.getByText('series-a')).toBeInTheDocument()
-    expect(screen.getByText('float')).toBeInTheDocument()
-  })
 })
 
 describe('TrackerDetailEdit', () => {

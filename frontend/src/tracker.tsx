@@ -465,9 +465,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
         </>
       ) : (
         <>
-          {/* Chart */}
-          <h2 className="text-xl my-2">Chart</h2>
-
           <div className="pt-2 flex items-center mb-2">
             <span className="mr-1">From</span>
             <div className="w-1/4">
@@ -496,34 +493,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
           ) : (
             <p className="text-muted-foreground">No data to display</p>
           )}
-
-          {/* Series list (read-only) */}
-          <h2 className="text-xl my-2">Series</h2>
-
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Data Type</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {seriesList.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={2} className="text-center text-muted-foreground">
-                    No series yet
-                  </TableCell>
-                </TableRow>
-              ) : (
-                seriesList.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell>{s.name}</TableCell>
-                    <TableCell>{s.data_type}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
         </>
       )}
     </div>
