@@ -143,12 +143,6 @@ describe('TrackerView', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders Trackers heading', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
-    render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('Trackers')).toBeInTheDocument()
-  })
-
   it('shows Create Tracker link', () => {
     vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
     render(<MemoryRouter><TrackerView /></MemoryRouter>)

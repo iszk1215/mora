@@ -307,8 +307,6 @@ export const TrackerView = (): React.JSX.Element => {
 
   return (
     <div>
-      <h1 className="text-3xl my-4">Trackers</h1>
-
       <div className="mb-4">
         <Button asChild><Link to="/tracker/new">Create Tracker</Link></Button>
       </div>

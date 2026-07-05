@@ -434,9 +434,6 @@ const router = createBrowserRouter([
       },
       {
         path: '/tracker',
-        handle: {
-          crumb: (_params: Params, _data: any) => ({ label: "Tracker", link: "/tracker" }),
-        },
         children: trackerRoute,
       },
       {
