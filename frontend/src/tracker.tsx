@@ -7,7 +7,6 @@ import ReactECharts from 'echarts-for-react'
 import {
   Link,
   LoaderFunctionArgs,
-  Params,
   useLoaderData,
   useNavigate,
 } from 'react-router'
@@ -421,12 +420,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <Link to="/tracker" className="text-blue-600 dark:text-blue-500 hover:underline">
-          &larr; Back to Trackers
-        </Link>
-      </div>
-
       <div className="flex items-center gap-3 my-4">
         <h1 className="text-3xl">{tracker.name}</h1>
         {tracker.type === 'coverage' && (
@@ -904,17 +897,11 @@ export const trackerRoute = [
   },
   {
     path: ':trackerId',
-    handle: {
-      crumb: (params: Params, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }),
-    },
     loader: loadTrackerDetail,
     element: <TrackerDetailView />,
   },
   {
     path: ':trackerId/edit',
-    handle: {
-      crumb: (params: Params, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }),
-    },
     loader: loadTrackerDetail,
     element: <TrackerDetailEdit />,
   },
