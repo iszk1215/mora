@@ -37,12 +37,18 @@ export interface UserData {
   avatar_url: string
 }
 
+export interface ChartConfig {
+  x_axis_label?: string
+  y_axis_label?: string
+}
+
 export interface TrackerResponse {
   id: number
   name: string
   visibility: string
   type: string
   repo_id?: number
+  chart_config: string
   role: string
   liked: boolean
 }

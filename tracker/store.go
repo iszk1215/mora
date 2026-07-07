@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     visibility TEXT NOT NULL DEFAULT 'private',
-    type TEXT NOT NULL DEFAULT 'tracker'
+    type TEXT NOT NULL DEFAULT 'tracker',
+    chart_config TEXT NOT NULL DEFAULT '{}'
 )`
 
 var schemaSeries = `
@@ -70,13 +71,14 @@ type (
 
 // TrackerResponse is returned in tracker lists and includes user-specific flags.
 type TrackerResponse struct {
-	Id         int64  `json:"id"    db:"id"`
-	Name       string `json:"name"  db:"name"`
-	Visibility string `json:"visibility"` // "public" | "unlisted" | "private"
-	Type       string `json:"type"`
-	RepoID     *int64 `json:"repo_id,omitempty" db:"repo_id"`
-	Role       string `json:"role"`       // "" | "owner" | "editor"
-	Liked      bool   `json:"liked"`
+	Id          int64  `json:"id"    db:"id"`
+	Name        string `json:"name"  db:"name"`
+	Visibility  string `json:"visibility"` // "public" | "unlisted" | "private"
+	Type        string `json:"type"`
+	RepoID      *int64 `json:"repo_id,omitempty" db:"repo_id"`
+	ChartConfig string `json:"chart_config" db:"chart_config"`
+	Role        string `json:"role"`       // "" | "owner" | "editor"
+	Liked       bool   `json:"liked"`
 }
 
 func newTrackerStore(db *sqlx.DB) *trackerStore {
@@ -90,9 +92,12 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64, repoID *i
 	if tracker.Visibility == "" {
 		tracker.Visibility = "private"
 	}
-	query := "INSERT INTO tracker (name, visibility, type) VALUES (?, ?, ?)"
+	if tracker.ChartConfig == "" {
+		tracker.ChartConfig = "{}"
+	}
+	query := "INSERT INTO tracker (name, visibility, type, chart_config) VALUES (?, ?, ?, ?)"
 
-	res, err := s.db.Exec(query, tracker.Name, tracker.Visibility, tracker.Type)
+	res, err := s.db.Exec(query, tracker.Name, tracker.Visibility, tracker.Type, tracker.ChartConfig)
 	if err != nil {
 		return fmt.Errorf("addTracker insert: %w", err)
 	}
@@ -136,7 +141,7 @@ func (s *trackerStore) listTrackers(userID int64, page, perPage int) ([]TrackerR
 	}
 
 	query := `
-		SELECT t.id, t.name, t.visibility, t.type,
+		SELECT t.id, t.name, t.visibility, t.type, t.chart_config,
 		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked
@@ -163,7 +168,7 @@ func (s *trackerStore) listTrackers(userID int64, page, perPage int) ([]TrackerR
 }
 
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
-	query := `SELECT t.id, t.name, t.visibility, t.type, tc.repo_id
+	query := `SELECT t.id, t.name, t.visibility, t.type, t.chart_config, tc.repo_id
 		FROM tracker t
 		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		WHERE t.id = ?`
@@ -203,15 +208,37 @@ func (s *trackerStore) deleteTracker(id int64) error {
 	return nil
 }
 
-func (s *trackerStore) updateVisibility(id int64, visibility string) error {
-	query := "UPDATE tracker SET visibility = ? WHERE id = ?"
-	res, err := s.db.Exec(query, visibility, id)
+func (s *trackerStore) updateTracker(id int64, visibility *string, chartConfig *string) error {
+	if visibility == nil && chartConfig == nil {
+		return nil
+	}
+	query := "UPDATE tracker SET "
+	args := []any{}
+	parts := []string{}
+	if visibility != nil {
+		parts = append(parts, "visibility = ?")
+		args = append(args, *visibility)
+	}
+	if chartConfig != nil {
+		parts = append(parts, "chart_config = ?")
+		args = append(args, *chartConfig)
+	}
+	for i, p := range parts {
+		if i > 0 {
+			query += ", "
+		}
+		query += p
+	}
+	query += " WHERE id = ?"
+	args = append(args, id)
+
+	res, err := s.db.Exec(query, args...)
 	if err != nil {
-		return fmt.Errorf("updateVisibility exec: %w", err)
+		return fmt.Errorf("updateTracker exec: %w", err)
 	}
 	n, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("updateVisibility RowsAffected: %w", err)
+		return fmt.Errorf("updateTracker RowsAffected: %w", err)
 	}
 	if n == 0 {
 		return errorTrackerNotFound
@@ -437,6 +464,9 @@ func (s *trackerStore) initialize() error {
 	if err != nil {
 		return fmt.Errorf("initialize schemaTracker: %w", err)
 	}
+
+	// migration: add chart_config column for existing databases
+	_, _ = s.db.Exec("ALTER TABLE tracker ADD COLUMN chart_config TEXT NOT NULL DEFAULT '{}'")
 
 	_, err = s.db.Exec(schemaSeries)
 	if err != nil {

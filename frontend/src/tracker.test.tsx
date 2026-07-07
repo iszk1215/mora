@@ -38,8 +38,8 @@ describe('loadTrackerList', () => {
   it('returns paginated trackers from successful API response', async () => {
     const mockResponse = {
       trackers: [
-        { id: 1, name: 'tracker-a', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
-        { id: 2, name: 'tracker-b', visibility: 'public', type: 'tracker', role: '', liked: true },
+        { id: 1, name: 'tracker-a', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+        { id: 2, name: 'tracker-b', visibility: 'public', type: 'tracker', chart_config: '{}', role: '', liked: true },
       ],
       total: 2,
       page: 1,
@@ -76,7 +76,7 @@ describe('loadTrackerDetail', () => {
 
   it('returns tracker detail from API response', async () => {
     const mockResponse = {
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
     }
     vi.mocked(globalThis.fetch).mockResolvedValue({
@@ -108,18 +108,34 @@ describe('patchTracker', () => {
   })
 
   it('sends PATCH request with visibility and returns updated tracker', async () => {
-    const updated = { id: 1, name: 'test', visibility: 'public', type: 'tracker', role: 'owner', liked: false }
+    const updated = { id: 1, name: 'test', visibility: 'public', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(updated),
     } as Response)
 
-    const result = await patchTracker(1, 'public')
+    const result = await patchTracker(1, { visibility: 'public' })
     expect(result).toEqual(updated)
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ visibility: 'public' }),
+    })
+  })
+
+  it('sends PATCH request with chart_config', async () => {
+    const updated = { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}', role: 'owner', liked: false }
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(updated),
+    } as Response)
+
+    const result = await patchTracker(1, { chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}' })
+    expect(result).toEqual(updated)
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}' }),
     })
   })
 
@@ -129,7 +145,7 @@ describe('patchTracker', () => {
       status: 403,
     } as Response)
 
-    await expect(patchTracker(1, 'public')).rejects.toBeDefined()
+    await expect(patchTracker(1, { visibility: 'public' })).rejects.toBeDefined()
   })
 })
 
@@ -153,8 +169,8 @@ describe('TrackerView', () => {
   it('renders tracker cards', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       trackers: [
-        { id: 1, name: 'tracker-a', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
-        { id: 2, name: 'tracker-b', visibility: 'public', type: 'tracker', role: '', liked: true },
+        { id: 1, name: 'tracker-a', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+        { id: 2, name: 'tracker-b', visibility: 'public', type: 'tracker', chart_config: '{}', role: '', liked: true },
       ],
       total: 2,
       page: 1,
@@ -168,7 +184,7 @@ describe('TrackerView', () => {
   it('shows role badge for owned trackers', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       trackers: [
-        { id: 1, name: 'my-tracker', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
+        { id: 1, name: 'my-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       ],
       total: 1,
       page: 1,
@@ -191,6 +207,7 @@ describe('TrackerView', () => {
       visibility: 'private' as const,
       type: 'tracker' as const,
       role: 'owner' as const,
+      chart_config: '{}' as const,
       liked: false,
     }))
     vi.mocked(useLoaderData).mockReturnValue({
@@ -226,7 +243,7 @@ describe('TrackerCreate', () => {
   })
 
   it('creates tracker and navigates on submit', async () => {
-    const created = { id: 42, name: 'new-tracker', visibility: 'private', type: 'tracker', role: 'owner', liked: false }
+    const created = { id: 42, name: 'new-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(created),
@@ -288,7 +305,7 @@ describe('TrackerDetailView', () => {
 
   it('renders tracker name', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test-tracker', visibility: 'private', type: 'tracker', role: '', liked: false },
+      tracker: { id: 1, name: 'test-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
@@ -297,7 +314,7 @@ describe('TrackerDetailView', () => {
 
   it('renders Like button', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: '', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
@@ -306,7 +323,7 @@ describe('TrackerDetailView', () => {
 
   it('renders Unlike button when liked', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: '', liked: true },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: true },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
@@ -315,7 +332,7 @@ describe('TrackerDetailView', () => {
 
   it('shows Edit button when user has role', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
@@ -324,7 +341,7 @@ describe('TrackerDetailView', () => {
 
   it('hides Edit button when user has no role', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: '', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
@@ -333,7 +350,7 @@ describe('TrackerDetailView', () => {
 
   it('renders datepickers', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: '', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
@@ -358,7 +375,7 @@ describe('TrackerDetailEdit', () => {
 
   it('renders edit heading with tracker name', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'edit-tracker', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'edit-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
@@ -367,7 +384,7 @@ describe('TrackerDetailEdit', () => {
 
   it('renders Add Series form', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
@@ -377,7 +394,7 @@ describe('TrackerDetailEdit', () => {
 
   it('renders Add Value form', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
@@ -386,7 +403,7 @@ describe('TrackerDetailEdit', () => {
 
   it('back link goes to tracker detail', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
@@ -396,12 +413,36 @@ describe('TrackerDetailEdit', () => {
 
   it('renders visibility selector', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'unlisted', type: 'tracker', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'unlisted', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
     expect(screen.getByText('Visibility')).toBeInTheDocument()
     const select = screen.getByDisplayValue('Unlisted')
     expect(select).toBeInTheDocument()
+  })
+
+  it('renders Chart Options section with label inputs', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    expect(screen.getByText('Chart Options')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('X-axis label')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Y-axis label')).toBeInTheDocument()
+    expect(screen.getByText('Save Chart Options')).toBeInTheDocument()
+  })
+
+  it('pre-fills chart option labels from tracker.chart_config', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const inputs = screen.getAllByDisplayValue(/Time|Value/)
+    expect(inputs.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByDisplayValue('Time')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Value')).toBeInTheDocument()
   })
 })

@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { TrackerResponse } from './core'
+import { ChartConfig, TrackerResponse } from './core'
 
 interface SeriesModel {
   id: number
@@ -48,6 +48,7 @@ interface TrackerChartProps {
   data?: { datasets: Dataset[] }
   min?: Date | null
   max?: Date | null
+  chartConfig?: ChartConfig | null
 }
 
 interface TrackerDetailData {
@@ -144,11 +145,11 @@ async function unlikeTracker(trackerId: number): Promise<void> {
   if (!resp.ok) throw resp
 }
 
-export async function patchTracker(trackerId: number, visibility: string): Promise<TrackerResponse> {
+export async function patchTracker(trackerId: number, opts: { visibility?: string; chart_config?: string }): Promise<TrackerResponse> {
   const resp = await fetch(`/api/tracker/${trackerId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ visibility }),
+    body: JSON.stringify(opts),
   })
   if (!resp.ok) throw resp
   return resp.json()
@@ -184,6 +185,15 @@ const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       valueFormatter: (value: number) =>
         Number.isInteger(value) ? String(value) : value.toFixed(1),
     },
+  }
+
+  if (params.chartConfig) {
+    if (params.chartConfig.x_axis_label) {
+      option.xAxis.name = params.chartConfig.x_axis_label
+    }
+    if (params.chartConfig.y_axis_label) {
+      option.yAxis.name = params.chartConfig.y_axis_label
+    }
   }
 
   if (params.min) {
@@ -397,6 +407,14 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
   const datasets: Dataset[] = seriesValues.map(valuesToDataset)
 
+  const viewChartConfig = useMemo<ChartConfig | null>(() => {
+    try {
+      return JSON.parse(tracker.chart_config) as ChartConfig
+    } catch {
+      return null
+    }
+  }, [tracker.chart_config])
+
   const coverageOption = useMemo(() => {
     if (!isCoverage) return null
     const entryNames = [...new Set(coverageTimeline.map((p) => p.entry_name))]
@@ -482,7 +500,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
           </div>
 
           {datasets.length > 0 ? (
-            <TrackerChart data={{ datasets }} min={startDate} max={endDate} />
+            <TrackerChart data={{ datasets }} min={startDate} max={endDate} chartConfig={viewChartConfig} />
           ) : (
             <p className="text-muted-foreground">No data to display</p>
           )}
@@ -507,14 +525,36 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [startDate, setStartDate] = useState<Date | null>(null)
   const [endDate, setEndDate] = useState<Date | null>(null)
 
+  const [savedChartConfig, setSavedChartConfig] = useState(tracker.chart_config)
+  const parsedChartConfig = useMemo<ChartConfig>(() => {
+    try {
+      return JSON.parse(savedChartConfig) as ChartConfig
+    } catch {
+      return {}
+    }
+  }, [savedChartConfig])
   const [visibility, setVisibility] = useState(tracker.visibility)
+  const [xLabel, setXLabel] = useState(parsedChartConfig.x_axis_label ?? '')
+  const [yLabel, setYLabel] = useState(parsedChartConfig.y_axis_label ?? '')
 
   const isCoverage = tracker.type === 'coverage'
 
   const handleVisibilityChange = async (newVisibility: string) => {
     try {
-      await patchTracker(tracker.id, newVisibility)
+      await patchTracker(tracker.id, { visibility: newVisibility })
       setVisibility(newVisibility)
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleChartConfigSave = async () => {
+    const cc: ChartConfig = {}
+    if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
+    if (yLabel.trim()) cc.y_axis_label = yLabel.trim()
+    try {
+      const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(cc) })
+      setSavedChartConfig(updated.chart_config)
     } catch {
       // ignore
     }
@@ -588,6 +628,14 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   })
 
   const datasets: Dataset[] = seriesValues.map(valuesToDataset)
+
+  const chartConfigForChart = useMemo<ChartConfig | null>(() => {
+    try {
+      return JSON.parse(savedChartConfig) as ChartConfig
+    } catch {
+      return null
+    }
+  }, [savedChartConfig])
 
   if (isCoverage) {
     return (
@@ -722,10 +770,30 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       </div>
 
       {datasets.length > 0 ? (
-        <TrackerChart data={{ datasets }} min={startDate} max={endDate} />
+        <TrackerChart data={{ datasets }} min={startDate} max={endDate} chartConfig={chartConfigForChart} />
       ) : (
         <p className="text-muted-foreground">No data to display</p>
       )}
+
+      {/* Chart Options */}
+      <h2 className="text-xl my-2">Chart Options</h2>
+      <div className="flex items-center gap-2 mb-4">
+        <input
+          type="text"
+          value={xLabel}
+          onChange={(e) => setXLabel(e.target.value)}
+          placeholder="X-axis label"
+          className="border rounded px-2 py-1 w-48"
+        />
+        <input
+          type="text"
+          value={yLabel}
+          onChange={(e) => setYLabel(e.target.value)}
+          placeholder="Y-axis label"
+          className="border rounded px-2 py-1 w-48"
+        />
+        <Button onClick={handleChartConfigSave}>Save Chart Options</Button>
+      </div>
 
       {/* Add value form */}
       <h2 className="text-xl my-2">Add Value</h2>

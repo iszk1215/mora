@@ -160,14 +160,15 @@ func TestStoreDeleteTracker(t *testing.T) {
 	})
 }
 
-func TestStoreUpdateVisibility(t *testing.T) {
+func TestStoreUpdateTracker(t *testing.T) {
 	s := initTestStore(t)
 
 	tracker := &TrackerModel{Name: "vis_test"}
 	require.NoError(t, s.addTracker(tracker, 1, nil))
 
 	t.Run("update to public", func(t *testing.T) {
-		err := s.updateVisibility(tracker.Id, "public")
+		v := "public"
+		err := s.updateTracker(tracker.Id, &v, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -176,7 +177,8 @@ func TestStoreUpdateVisibility(t *testing.T) {
 	})
 
 	t.Run("update to unlisted", func(t *testing.T) {
-		err := s.updateVisibility(tracker.Id, "unlisted")
+		v := "unlisted"
+		err := s.updateTracker(tracker.Id, &v, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -185,7 +187,8 @@ func TestStoreUpdateVisibility(t *testing.T) {
 	})
 
 	t.Run("update to private", func(t *testing.T) {
-		err := s.updateVisibility(tracker.Id, "private")
+		v := "private"
+		err := s.updateTracker(tracker.Id, &v, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -194,8 +197,24 @@ func TestStoreUpdateVisibility(t *testing.T) {
 	})
 
 	t.Run("non-existing tracker returns error", func(t *testing.T) {
-		err := s.updateVisibility(99999, "public")
+		v := "public"
+		err := s.updateTracker(99999, &v, nil)
 		require.ErrorIs(t, err, errorTrackerNotFound)
+	})
+
+	t.Run("update chart_config", func(t *testing.T) {
+		cc := `{"x_axis_label":"Time"}`
+		err := s.updateTracker(tracker.Id, nil, &cc)
+		require.NoError(t, err)
+
+		got, err := s.findTrackerById(tracker.Id)
+		require.NoError(t, err)
+		require.Equal(t, cc, got.ChartConfig)
+	})
+
+	t.Run("nil fields is no-op", func(t *testing.T) {
+		err := s.updateTracker(tracker.Id, nil, nil)
+		require.NoError(t, err)
 	})
 }
 

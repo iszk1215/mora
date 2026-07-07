@@ -71,6 +71,8 @@ func getResponse(t *testing.T, expectedStatus int, h http.Handler, r *http.Reque
 	return res
 }
 
+func strPtr(s string) *string { return &s }
+
 // ----------------------------------------------------------------------
 // Auth
 
@@ -133,6 +135,28 @@ func TestHandlerCreateTracker(t *testing.T) {
 	t.Run("invalid visibility", func(t *testing.T) {
 		h := newTestHandler(t)
 		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{Name: "test", Visibility: "invalid"})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("with chart_config", func(t *testing.T) {
+		h := newTestHandler(t)
+		cc := `{"x_axis_label":"Time"}`
+		req := CreateTrackerRequest{Name: "cfg_tracker", Visibility: "private", ChartConfig: &cc}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusCreated, h, r)
+
+		var got TrackerModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, cc, got.ChartConfig)
+	})
+
+	t.Run("invalid chart_config JSON", func(t *testing.T) {
+		h := newTestHandler(t)
+		bad := "not-json"
+		req := CreateTrackerRequest{Name: "bad_cfg", Visibility: "private", ChartConfig: &bad}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
@@ -254,7 +278,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 
 		h := newHandler(store, nil)
 		path := fmt.Sprintf("/%d", tr.Id)
-		body := PatchTrackerRequest{Visibility: "public"}
+		body := PatchTrackerRequest{Visibility: strPtr("public")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -272,7 +296,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 
 		h := newHandler(store, nil)
 		path := fmt.Sprintf("/%d", tr.Id)
-		body := PatchTrackerRequest{Visibility: "public"}
+		body := PatchTrackerRequest{Visibility: strPtr("public")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		var uid int64 = 2
 		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
@@ -286,10 +310,38 @@ func TestHandlerPatchTracker(t *testing.T) {
 
 		h := newHandler(store, nil)
 		path := fmt.Sprintf("/%d", tr.Id)
-		type badBody struct {
-			Visibility string `json:"visibility"`
-		}
-		r := newRequestWithJSON(t, http.MethodPatch, path, badBody{Visibility: "invalid"})
+		r := newRequestWithJSON(t, http.MethodPatch, path, PatchTrackerRequest{Visibility: strPtr("invalid")})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("patch chart_config", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d", tr.Id)
+		cc := `{"x_axis_label":"Time","y_axis_label":"Value"}`
+		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got TrackerResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, cc, got.ChartConfig)
+	})
+
+	t.Run("patch chart_config invalid JSON", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := PatchTrackerRequest{ChartConfig: strPtr("not-json")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})

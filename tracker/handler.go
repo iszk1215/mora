@@ -20,11 +20,12 @@ type (
 	}
 
 	TrackerModel struct {
-		Id         int64  `json:"id"         db:"id"`
-		Name       string `json:"name"       db:"name"`
-		Visibility string `json:"visibility" db:"visibility"`
-		Type       string `json:"type"       db:"type"`
-		RepoID     *int64 `json:"repo_id,omitempty" db:"repo_id"`
+		Id          int64  `json:"id"         db:"id"`
+		Name        string `json:"name"       db:"name"`
+		Visibility  string `json:"visibility" db:"visibility"`
+		Type        string `json:"type"       db:"type"`
+		RepoID      *int64 `json:"repo_id,omitempty" db:"repo_id"`
+		ChartConfig string `json:"chart_config" db:"chart_config"`
 	}
 
 	SeriesModel struct {
@@ -42,10 +43,11 @@ type (
 	}
 
 	CreateTrackerRequest struct {
-		Name       string `json:"name"`
-		Visibility string `json:"visibility"` // required: "public"|"unlisted"|"private"
-		Type       string `json:"type"`       // "tracker" or "coverage", defaults to "tracker"
-		RepoID     *int64 `json:"repo_id"`    // required if type="coverage"
+		Name        string  `json:"name"`
+		Visibility  string  `json:"visibility"` // required: "public"|"unlisted"|"private"
+		Type        string  `json:"type"`       // "tracker" or "coverage", defaults to "tracker"
+		RepoID      *int64  `json:"repo_id"`    // required if type="coverage"
+		ChartConfig *string `json:"chart_config"`
 	}
 
 	CreateSeriesRequest struct {
@@ -59,7 +61,8 @@ type (
 	}
 
 	PatchTrackerRequest struct {
-		Visibility string `json:"visibility"`
+		Visibility  *string `json:"visibility"`
+		ChartConfig *string `json:"chart_config"`
 	}
 
 	ListTrackersResponse struct {
@@ -320,7 +323,17 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tracker := TrackerModel{Name: req.Name, Visibility: req.Visibility, Type: req.Type}
+	tracker := TrackerModel{
+		Name: req.Name, Visibility: req.Visibility, Type: req.Type,
+		ChartConfig: "{}",
+	}
+	if req.ChartConfig != nil {
+		if !json.Valid([]byte(*req.ChartConfig)) {
+			render.BadRequest(w, errors.New("chart_config must be valid JSON"))
+			return
+		}
+		tracker.ChartConfig = *req.ChartConfig
+	}
 	err = h.store.addTracker(&tracker, uid, req.RepoID)
 	if err != nil {
 		log.Warn().Err(err).Msg("addTracker")
@@ -329,13 +342,14 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := TrackerResponse{
-		Id:         tracker.Id,
-		Name:       tracker.Name,
-		Visibility: tracker.Visibility,
-		Type:       tracker.Type,
-		RepoID:     req.RepoID,
-		Role:       "owner",
-		Liked:      false,
+		Id:          tracker.Id,
+		Name:        tracker.Name,
+		Visibility:  tracker.Visibility,
+		Type:        tracker.Type,
+		RepoID:      req.RepoID,
+		ChartConfig: tracker.ChartConfig,
+		Role:        "owner",
+		Liked:       false,
 	}
 	render.JSON(w, resp, http.StatusCreated)
 }
@@ -396,29 +410,44 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	valid := req.Visibility == "public" || req.Visibility == "unlisted" || req.Visibility == "private"
-	if !valid {
-		render.BadRequest(w, errors.New("visibility must be 'public', 'unlisted', or 'private'"))
-		return
+	if req.Visibility != nil {
+		v := *req.Visibility
+		if v != "public" && v != "unlisted" && v != "private" {
+			render.BadRequest(w, errors.New("visibility must be 'public', 'unlisted', or 'private'"))
+			return
+		}
+	}
+
+	if req.ChartConfig != nil {
+		if !json.Valid([]byte(*req.ChartConfig)) {
+			render.BadRequest(w, errors.New("chart_config must be valid JSON"))
+			return
+		}
 	}
 
 	tracker, _ := trackerFrom(r.Context())
-	err = h.store.updateVisibility(tracker.Id, req.Visibility)
+	err = h.store.updateTracker(tracker.Id, req.Visibility, req.ChartConfig)
 	if err != nil {
-		log.Error().Err(err).Msg("patchTracker updateVisibility")
+		log.Error().Err(err).Msg("patchTracker updateTracker")
 		render.InternalError(w, err)
 		return
 	}
 
 	uid, _ := UserIDFromContext(r.Context())
-	tracker.Visibility = req.Visibility
+	if req.Visibility != nil {
+		tracker.Visibility = *req.Visibility
+	}
+	if req.ChartConfig != nil {
+		tracker.ChartConfig = *req.ChartConfig
+	}
 
 	resp := TrackerResponse{
-		Id:         tracker.Id,
-		Name:       tracker.Name,
-		Visibility: tracker.Visibility,
-		Type:       tracker.Type,
-		RepoID:     tracker.RepoID,
+		Id:          tracker.Id,
+		Name:        tracker.Name,
+		Visibility:  tracker.Visibility,
+		Type:        tracker.Type,
+		RepoID:      tracker.RepoID,
+		ChartConfig: tracker.ChartConfig,
 	}
 	if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
 		resp.Role = role
@@ -501,6 +530,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 
 	trackerResp := TrackerResponse{
 		Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID,
+		ChartConfig: tracker.ChartConfig,
 	}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
@@ -541,7 +571,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID}
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID, ChartConfig: tracker.ChartConfig}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		_, role, err := h.store.isMember(uid, tracker.Id)
 		if err == nil {
