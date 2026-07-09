@@ -30,8 +30,8 @@ export const CoverageChart = (params: any): React.JSX.Element => {
     }
     if (!dataZoomAdded.current) {
       opt.dataZoom = [
-        { type: 'inside' as const, xAxisIndex: 0 },
-        { type: 'slider' as const, xAxisIndex: 0, bottom: 10 },
+        { type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const },
+        { type: 'slider' as const, xAxisIndex: 0, bottom: 10, filterMode: 'none' as const },
       ]
     }
     return opt
