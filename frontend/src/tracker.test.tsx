@@ -422,7 +422,7 @@ describe('TrackerDetailEdit', () => {
     expect(select).toBeInTheDocument()
   })
 
-  it('renders Chart Options section with label inputs', () => {
+  it('renders Chart Options section with all inputs', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
@@ -431,6 +431,9 @@ describe('TrackerDetailEdit', () => {
     expect(screen.getByText('Chart Options')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('X-axis label')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Y-axis label')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Y-axis max')).toBeInTheDocument()
+    expect(screen.getByText('Area')).toBeInTheDocument()
+    expect(screen.getByText('Legend')).toBeInTheDocument()
     expect(screen.getByText('Save Chart Options')).toBeInTheDocument()
   })
 

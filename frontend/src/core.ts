@@ -40,6 +40,9 @@ export interface UserData {
 export interface ChartConfig {
   x_axis_label?: string
   y_axis_label?: string
+  area?: boolean
+  show_legend?: boolean
+  y_max?: number
 }
 
 export interface TrackerResponse {

@@ -1,26 +1,41 @@
 import { DateTime } from 'luxon'
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { getCoverageOption, makeCoverageSeries } from './chart'
 import { Coverage } from './core'
 
 export const CoverageChart = (params: any): React.JSX.Element => {
   const coverages = params.coverages as Coverage[]
+  const dataZoomAdded = useRef(false)
 
-  const option: any = getCoverageOption()
+  useEffect(() => {
+    dataZoomAdded.current = true
+  }, [])
 
-  if (params.min) {
-    option.xAxis.min = DateTime.fromJSDate(params.min).toISO()
-  }
-  if (params.max) {
-    option.xAxis.max = DateTime.fromJSDate(params.max).toISO()
-  }
-
-  if (coverages.length > 0) {
-    option.series = makeCoverageSeries(coverages)
-  } else {
-    option.series = []
-  }
+  const option = useMemo(() => {
+    const opt: any = getCoverageOption()
+    if (params.min) {
+      opt.xAxis.min = DateTime.fromJSDate(params.min).toISO()
+    }
+    if (params.max) {
+      opt.xAxis.max = DateTime.fromJSDate(params.max).toISO()
+    }
+    if (coverages.length > 0) {
+      opt.series = makeCoverageSeries(coverages)
+      for (const s of opt.series) {
+        s.areaStyle = { opacity: 0.12 }
+      }
+    } else {
+      opt.series = []
+    }
+    if (!dataZoomAdded.current) {
+      opt.dataZoom = [
+        { type: 'inside' as const, xAxisIndex: 0 },
+        { type: 'slider' as const, xAxisIndex: 0, bottom: 10 },
+      ]
+    }
+    return opt
+  }, [coverages, params.min, params.max])
 
   const onChartClick = useCallback((rawParams: any) => {
     if (rawParams.seriesName !== 'total') {

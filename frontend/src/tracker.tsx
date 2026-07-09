@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import DatePicker from 'react-datepicker'
 
@@ -166,45 +166,61 @@ export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise
 
 const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   const datasets = params.data?.datasets ?? []
+  const cc = params.chartConfig
+  const dataZoomAdded = useRef(false)
 
-  const option: any = {
-    grid: { left: 60, right: 20, top: 20, bottom: 40 },
-    xAxis: {
-      type: 'time' as const,
-    },
-    yAxis: {
-      type: 'value' as const,
-    },
-    series: datasets.map((ds) => ({
-      name: ds.label,
-      type: 'line' as const,
-      data: ds.data.map((p) => [p.x, Number(p.y)]),
-    })),
-    tooltip: {
-      trigger: 'axis',
-      valueFormatter: (value: number) =>
-        Number.isInteger(value) ? String(value) : value.toFixed(1),
-    },
-  }
-
-  if (params.chartConfig) {
-    if (params.chartConfig.x_axis_label) {
-      option.xAxis.name = params.chartConfig.x_axis_label
+  const option = useMemo(() => {
+    const showLegend = cc?.show_legend !== false && datasets.length > 1
+    const opt: any = {
+      grid: { left: 60, right: 20, top: showLegend ? 40 : 20, bottom: 60 },
+      xAxis: {
+        type: 'time' as const,
+        splitLine: { show: false },
+      },
+      yAxis: {
+        type: 'value' as const,
+        splitLine: { lineStyle: { type: 'dashed' as const, opacity: 0.3 } },
+      },
+      series: datasets.map((ds) => ({
+        name: ds.label,
+        type: 'line' as const,
+        data: ds.data.map((p) => [p.x, Number(p.y)]),
+        areaStyle: cc?.area !== false ? { opacity: 0.12 } : undefined,
+      })),
+      tooltip: {
+        trigger: 'axis',
+        valueFormatter: (value: number) =>
+          Number.isInteger(value) ? String(value) : value.toFixed(1),
+      },
     }
-    if (params.chartConfig.y_axis_label) {
-      option.yAxis.name = params.chartConfig.y_axis_label
+    if (!dataZoomAdded.current) {
+      opt.dataZoom = [
+        { type: 'inside' as const, xAxisIndex: 0 },
+        { type: 'slider' as const, xAxisIndex: 0, bottom: 10 },
+      ]
     }
-  }
+    if (showLegend) {
+      opt.legend = { type: 'scroll' as const, top: 0 }
+    }
+    if (cc) {
+      if (cc.x_axis_label) opt.xAxis.name = cc.x_axis_label
+      if (cc.y_axis_label) opt.yAxis.name = cc.y_axis_label
+      if (cc.y_max !== undefined && cc.y_max > 0) opt.yAxis.max = cc.y_max
+    }
+    if (params.min) opt.xAxis.min = params.min
+    if (params.max) opt.xAxis.max = params.max
+    return opt
+  }, [datasets, cc, params.min, params.max])
 
-  if (params.min) {
-    option.xAxis.min = params.min
-  }
-  if (params.max) {
-    option.xAxis.max = params.max
-  }
+  useEffect(() => {
+    dataZoomAdded.current = true
+  }, [])
 
   return (
-    <ReactECharts option={option} style={{ width: '100%', height: 300 }} />
+    <ReactECharts
+      option={option}
+      style={{ width: '100%', height: 300 }}
+    />
   )
 }
 
@@ -229,6 +245,7 @@ const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; 
         data: ds.data.map((p) => [p.x, Number(p.y)]),
         lineStyle: { width: 1.5 },
         symbol: 'none',
+        areaStyle: { opacity: 0.1 },
       })),
       tooltip: { trigger: 'axis' as const },
     }
@@ -359,7 +376,13 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
   const [coverageTimeline, setCoverageTimeline] = useState<Array<{ time: string; value: number; entry_name: string }>>([])
 
+  const coverageZoomAdded = useRef(false)
+
   const isCoverage = tracker.type === 'coverage'
+
+  useEffect(() => {
+    coverageZoomAdded.current = true
+  }, [])
 
   useEffect(() => {
     if (isCoverage && tracker.repo_id != null) {
@@ -405,7 +428,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     label: sv.series.name,
   })
 
-  const datasets: Dataset[] = seriesValues.map(valuesToDataset)
+  const datasets: Dataset[] = useMemo(() => seriesValues.map(valuesToDataset), [seriesValues])
 
   const viewChartConfig = useMemo<ChartConfig | null>(() => {
     try {
@@ -418,22 +441,38 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const coverageOption = useMemo(() => {
     if (!isCoverage) return null
     const entryNames = [...new Set(coverageTimeline.map((p) => p.entry_name))]
-    return {
-      grid: { left: 60, right: 20, top: 30, bottom: 40 },
-      xAxis: { type: 'time' as const },
-      yAxis: { type: 'value' as const, min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
+    const opt: any = {
+      grid: { left: 60, right: 20, top: 30, bottom: 60 },
+      xAxis: {
+        type: 'time' as const,
+        splitLine: { show: false },
+      },
+      yAxis: {
+        type: 'value' as const,
+        min: 0, max: 100,
+        axisLabel: { formatter: '{value}%' },
+        splitLine: { lineStyle: { type: 'dashed' as const, opacity: 0.3 } },
+      },
       series: entryNames.map((name) => ({
         name,
         type: 'line' as const,
         data: coverageTimeline
           .filter((p) => p.entry_name === name)
           .map((p) => [p.time, p.value]),
+        areaStyle: { opacity: 0.12 },
       })),
       tooltip: {
         trigger: 'axis' as const,
         valueFormatter: (value: number) => value.toFixed(1) + '%',
       },
     }
+    if (!coverageZoomAdded.current) {
+      opt.dataZoom = [
+        { type: 'inside' as const, xAxisIndex: 0 },
+        { type: 'slider' as const, xAxisIndex: 0, bottom: 10 },
+      ]
+    }
+    return opt
   }, [isCoverage, coverageTimeline])
 
   return (
@@ -536,6 +575,9 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [visibility, setVisibility] = useState(tracker.visibility)
   const [xLabel, setXLabel] = useState(parsedChartConfig.x_axis_label ?? '')
   const [yLabel, setYLabel] = useState(parsedChartConfig.y_axis_label ?? '')
+  const [area, setArea] = useState(parsedChartConfig.area ?? true)
+  const [showLegend, setShowLegend] = useState(parsedChartConfig.show_legend ?? true)
+  const [yMax, setYMax] = useState(parsedChartConfig.y_max ? String(parsedChartConfig.y_max) : '')
 
   const isCoverage = tracker.type === 'coverage'
 
@@ -552,6 +594,12 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     const cc: ChartConfig = {}
     if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
     if (yLabel.trim()) cc.y_axis_label = yLabel.trim()
+    if (!area) cc.area = false
+    if (!showLegend) cc.show_legend = false
+    if (yMax.trim()) {
+      const parsed = parseFloat(yMax.trim())
+      if (parsed > 0) cc.y_max = parsed
+    }
     try {
       const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(cc) })
       setSavedChartConfig(updated.chart_config)
@@ -627,7 +675,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     label: sv.series.name,
   })
 
-  const datasets: Dataset[] = seriesValues.map(valuesToDataset)
+  const datasets: Dataset[] = useMemo(() => seriesValues.map(valuesToDataset), [seriesValues])
 
   const chartConfigForChart = useMemo<ChartConfig | null>(() => {
     try {
@@ -777,20 +825,36 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
 
       {/* Chart Options */}
       <h2 className="text-xl my-2">Chart Options</h2>
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <input
           type="text"
           value={xLabel}
           onChange={(e) => setXLabel(e.target.value)}
           placeholder="X-axis label"
-          className="border rounded px-2 py-1 w-48"
+          className="border rounded px-2 py-1 w-40"
         />
         <input
           type="text"
           value={yLabel}
           onChange={(e) => setYLabel(e.target.value)}
           placeholder="Y-axis label"
-          className="border rounded px-2 py-1 w-48"
+          className="border rounded px-2 py-1 w-40"
+        />
+        <label className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={area} onChange={(e) => setArea(e.target.checked)} />
+          Area
+        </label>
+        <label className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
+          Legend
+        </label>
+        <input
+          type="number"
+          value={yMax}
+          onChange={(e) => setYMax(e.target.value)}
+          placeholder="Y-axis max"
+          className="border rounded px-2 py-1 w-28"
+          min="0"
         />
         <Button onClick={handleChartConfigSave}>Save Chart Options</Button>
       </div>
