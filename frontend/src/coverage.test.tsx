@@ -1,26 +1,13 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter, useLoaderData, useParams } from 'react-router'
-import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList, filterCoveragesByDate } from './coverage'
+import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList } from './coverage'
 import { Coverage } from './core'
 
 vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
   return { ...actual, useLoaderData: vi.fn(), useParams: vi.fn() }
 })
-
-vi.mock('react-datepicker', () => ({
-  default: (props: any) => {
-    const { onChange, ...rest } = props
-    return (
-      <input
-        data-testid="datepicker"
-        onChange={(e) => onChange(new Date(e.target.value))}
-        {...rest}
-      />
-    )
-  },
-}))
 
 vi.mock('echarts-for-react', () => ({
   default: () => <div data-testid="echart" />,
@@ -132,54 +119,6 @@ const makeCoverages = (): Coverage[] => [
   },
 ]
 
-describe('filterCoveragesByDate', () => {
-  it('returns all coverages when no dates are set', () => {
-    const result = filterCoveragesByDate(makeCoverages(), null, null)
-    expect(result).toHaveLength(3)
-  })
-
-  it('filters out coverages before start date', () => {
-    const result = filterCoveragesByDate(makeCoverages(), new Date('2024-06-01'), null)
-    expect(result).toHaveLength(2)
-    expect(result[0].index).toBe(2)
-    expect(result[1].index).toBe(3)
-  })
-
-  it('filters out coverages after end date', () => {
-    const result = filterCoveragesByDate(makeCoverages(), null, new Date('2024-06-30'))
-    expect(result).toHaveLength(2)
-    expect(result[0].index).toBe(1)
-    expect(result[1].index).toBe(2)
-  })
-
-  it('returns only coverages within both dates', () => {
-    const result = filterCoveragesByDate(makeCoverages(), new Date('2024-06-01'), new Date('2024-12-31'))
-    expect(result).toHaveLength(2)
-    expect(result[0].index).toBe(2)
-    expect(result[1].index).toBe(3)
-  })
-
-  it('includes coverage on the boundary of start date', () => {
-    const result = filterCoveragesByDate(makeCoverages(), new Date('2024-01-15'), null)
-    expect(result).toHaveLength(3)
-  })
-
-  it('includes coverage on the boundary of end date', () => {
-    const result = filterCoveragesByDate(makeCoverages(), null, new Date('2024-12-25'))
-    expect(result).toHaveLength(3)
-  })
-
-  it('returns empty array when all coverages are before start date', () => {
-    const result = filterCoveragesByDate(makeCoverages(), new Date('2025-01-01'), null)
-    expect(result).toHaveLength(0)
-  })
-
-  it('returns empty array when all coverages are after end date', () => {
-    const result = filterCoveragesByDate(makeCoverages(), null, new Date('2024-01-01'))
-    expect(result).toHaveLength(0)
-  })
-})
-
 describe('CoverageList', () => {
   beforeEach(() => {
     vi.mocked(useLoaderData).mockReturnValue({
@@ -204,25 +143,5 @@ describe('CoverageList', () => {
     expect(entryLinks[0]).toHaveAttribute('href', '/repos/1/coverages/1/go')
     expect(entryLinks[1]).toHaveAttribute('href', '/repos/1/coverages/2/py')
     expect(entryLinks[2]).toHaveAttribute('href', '/repos/1/coverages/3/js')
-  })
-
-  it('renders date pickers for filtering', () => {
-    render(<MemoryRouter><CoverageList /></MemoryRouter>)
-    const pickers = screen.getAllByTestId('datepicker')
-    expect(pickers).toHaveLength(2)
-  })
-
-  it('filters coverage list items when start date is set', () => {
-    render(<MemoryRouter><CoverageList /></MemoryRouter>)
-    expect(screen.getByText(/#1/)).toBeInTheDocument()
-    expect(screen.getByText(/#2/)).toBeInTheDocument()
-    expect(screen.getByText(/#3/)).toBeInTheDocument()
-
-    const pickers = screen.getAllByTestId('datepicker')
-    fireEvent.change(pickers[0], { target: { value: '2024-06-01' } })
-
-    expect(screen.queryByText(/#1/)).not.toBeInTheDocument()
-    expect(screen.getByText(/#2/)).toBeInTheDocument()
-    expect(screen.getByText(/#3/)).toBeInTheDocument()
   })
 })

@@ -1,4 +1,3 @@
-import { DateTime } from 'luxon'
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { getCoverageOption, makeCoverageSeries } from './chart'
@@ -14,12 +13,6 @@ export const CoverageChart = (params: any): React.JSX.Element => {
 
   const option = useMemo(() => {
     const opt: any = getCoverageOption()
-    if (params.min) {
-      opt.xAxis.min = DateTime.fromJSDate(params.min).toISO()
-    }
-    if (params.max) {
-      opt.xAxis.max = DateTime.fromJSDate(params.max).toISO()
-    }
     if (coverages.length > 0) {
       opt.series = makeCoverageSeries(coverages)
       for (const s of opt.series) {
@@ -35,7 +28,7 @@ export const CoverageChart = (params: any): React.JSX.Element => {
       ]
     }
     return opt
-  }, [coverages, params.min, params.max])
+  }, [coverages])
 
   const onChartClick = useCallback((rawParams: any) => {
     if (rawParams.seriesName !== 'total') {

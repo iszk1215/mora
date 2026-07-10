@@ -1,6 +1,5 @@
 import { DateTime } from 'luxon'
-import React, { useState } from 'react'
-import DatePicker from "react-datepicker";
+import React from 'react'
 import {
   LoaderFunctionArgs,
   Params,
@@ -16,19 +15,6 @@ import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-
-export function filterCoveragesByDate(
-  coverages: Coverage[],
-  startDate: Date | null,
-  endDate: Date | null
-): Coverage[] {
-  return coverages.filter((cov) => {
-    const t = DateTime.fromISO(cov.time)
-    if (startDate && t < DateTime.fromJSDate(startDate).startOf('day')) return false
-    if (endDate && t > DateTime.fromJSDate(endDate).endOf('day')) return false
-    return true
-  })
-}
 
 interface CoverageEntryMetadata {
   hits: number
@@ -226,16 +212,8 @@ export const CoverageList = (): React.JSX.Element => {
   const params = useParams()
   const repo = data.repo
 
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null)
-
-  const onStartDateChange = (date: Date | null) => { setStartDate(date) }
-  const onEndDateChange = (date: Date | null) => { setEndDate(date) }
-
-  const filteredCoverages = filterCoveragesByDate(data.coverages, startDate, endDate)
-
   const items: React.JSX.Element[] = []
-  filteredCoverages.forEach((cov: Coverage, i: number) => {
+  data.coverages.forEach((cov: Coverage, i: number) => {
     items.push(<div key={i}>
       <CoverageSegment cov={cov} params={params} />
     </div>)
@@ -244,29 +222,7 @@ export const CoverageList = (): React.JSX.Element => {
   return (
     <div><h2 className="text-3xl my-4">Coverages</h2>
       Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
-      <div className="pt-2 flex items-center">
-        <span className="mr-1">From</span>
-        <div className="w-1/4">
-          <DatePicker
-            selected={startDate}
-            onChange={onStartDateChange}
-            className="border rounded px-2 py-1 w-full"
-            placeholderText="Select date"
-            dateFormat="yyyy-MM-dd"
-          />
-        </div>
-        <span className="px-2">To</span>
-        <div className="w-1/4">
-          <DatePicker
-            selected={endDate}
-            onChange={onEndDateChange}
-            className="border rounded px-2 py-1 w-full"
-            placeholderText="Select date"
-            dateFormat="yyyy-MM-dd"
-          />
-        </div>
-      </div>
-      <CoverageChart coverages={data.coverages} min={startDate} max={endDate} />
+      <CoverageChart coverages={data.coverages} />
       <div>{items}</div>
     </div>)
 }
