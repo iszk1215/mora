@@ -3,6 +3,8 @@ import { useLoaderData } from 'react-router'
 
 import { Coverage, CoverageEntry, Repo, TrackerResponse } from './core'
 import { CoverageListContent } from './coverage'
+import { TimeRangeSelector, computeDateRange } from './time_range'
+import type { TimeRangeKey } from './time_range'
 
 interface SeriesModel {
   id: number
@@ -47,8 +49,15 @@ export const CoverageTrackerDetail = (): React.JSX.Element => {
   }, [tracker.repo_id])
 
   const params = tracker.repo_id != null ? { repo_id: String(tracker.repo_id) } : { repo_id: '' }
+  const [range, setRange] = useState<TimeRangeKey>('all')
+  const { min, max } = computeDateRange(range)
 
   return repo && coverages.length > 0
-    ? <CoverageListContent repo={repo} coverages={coverages} params={params} />
+    ? (
+      <>
+        <TimeRangeSelector value={range} onChange={setRange} />
+        <CoverageListContent repo={repo} coverages={coverages} params={params} min={min} max={max} />
+      </>
+    )
     : <p className="text-muted-foreground">No coverage data</p>
 }

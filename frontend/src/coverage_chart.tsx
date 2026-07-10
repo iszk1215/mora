@@ -5,6 +5,8 @@ import { Coverage } from './core'
 
 export const CoverageChart = (params: any): React.JSX.Element => {
   const coverages = params.coverages as Coverage[]
+  const min = params.min as Date | undefined
+  const max = params.max as Date | undefined
   const dataZoomAdded = useRef(false)
 
   useEffect(() => {
@@ -21,6 +23,8 @@ export const CoverageChart = (params: any): React.JSX.Element => {
     } else {
       opt.series = []
     }
+    if (min) opt.xAxis.min = min
+    if (max) opt.xAxis.max = max
     if (!dataZoomAdded.current) {
       opt.dataZoom = [
         { type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const },
@@ -28,7 +32,7 @@ export const CoverageChart = (params: any): React.JSX.Element => {
       ]
     }
     return opt
-  }, [coverages])
+  }, [coverages, min, max])
 
   const onChartClick = useCallback((rawParams: any) => {
     if (rawParams.seriesName !== 'total') {

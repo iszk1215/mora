@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon'
-import React from 'react'
+import React, { useState } from 'react'
 import {
   LoaderFunctionArgs,
   Params,
@@ -15,6 +15,8 @@ import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { TimeRangeSelector, computeDateRange } from './time_range'
+import type { TimeRangeKey } from './time_range'
 
 interface CoverageEntryMetadata {
   hits: number
@@ -207,10 +209,12 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
     </Card>)
 }
 
-export const CoverageListContent = ({ repo, coverages, params }: {
+export const CoverageListContent = ({ repo, coverages, params, min, max }: {
   repo: Repo
   coverages: Coverage[]
   params: Params
+  min?: Date | null
+  max?: Date | null
 }): React.JSX.Element => {
   const items: React.JSX.Element[] = []
   coverages.forEach((cov: Coverage, i: number) => {
@@ -224,7 +228,7 @@ export const CoverageListContent = ({ repo, coverages, params }: {
       <div className="mb-4">
         Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
       </div>
-      <CoverageChart coverages={coverages} />
+      <CoverageChart coverages={coverages} min={min} max={max} />
       <div>{items}</div>
     </div>)
 }
@@ -232,7 +236,14 @@ export const CoverageListContent = ({ repo, coverages, params }: {
 export const CoverageList = (): React.JSX.Element => {
   const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
   const params = useParams()
-  return <CoverageListContent repo={data.repo} coverages={data.coverages} params={params} />
+  const [range, setRange] = useState<TimeRangeKey>('all')
+  const { min, max } = computeDateRange(range)
+  return (
+    <>
+      <TimeRangeSelector value={range} onChange={setRange} />
+      <CoverageListContent repo={data.repo} coverages={data.coverages} params={params} min={min} max={max} />
+    </>
+  )
 }
 
 export const coverageRoute = [

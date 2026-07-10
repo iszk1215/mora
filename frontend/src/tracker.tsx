@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/table'
 import { ChartConfig, TrackerResponse } from './core'
 import { CoverageTrackerDetail } from './tracker_coverage'
+import { TimeRangeSelector, computeDateRange } from './time_range'
+import type { TimeRangeKey } from './time_range'
 
 interface SeriesModel {
   id: number
@@ -411,6 +413,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }, [tracker.chart_config])
 
+  const [range, setRange] = useState<TimeRangeKey>('all')
+  const { min, max } = computeDateRange(range)
+
   return (
     <div>
       <div className="flex items-center gap-3 my-4">
@@ -431,7 +436,10 @@ export const TrackerDetailView = (): React.JSX.Element => {
       </div>
 
       {datasets.length > 0 ? (
-        <TrackerChart data={{ datasets }} chartConfig={viewChartConfig} />
+        <>
+          <TimeRangeSelector value={range} onChange={setRange} />
+          <TrackerChart data={{ datasets }} chartConfig={viewChartConfig} min={min} max={max} />
+        </>
       ) : (
         <p className="text-muted-foreground">No data to display</p>
       )}
