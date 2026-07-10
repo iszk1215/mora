@@ -146,6 +146,15 @@ describe('Header', () => {
   })
 })
 
+describe('Header z-index', () => {
+  it('has z-index class to stay above page content', () => {
+    const { container } = render(<MemoryRouter><Header /></MemoryRouter>)
+    const header = container.querySelector('header')
+    expect(header).not.toBeNull()
+    expect(header!.className).toMatch(/\bz-\d+\b/)
+  })
+})
+
 describe('ErrorPage', () => {
   beforeEach(() => {
     vi.mocked(useRouteError).mockReset()

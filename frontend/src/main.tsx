@@ -266,7 +266,7 @@ export const Header = (): React.JSX.Element => {
   }, [menuOpen, handleClickOutside])
 
   return (
-    <header className="sticky top-0 mb-2 bg-black text-white py-1">
+    <header className="sticky top-0 mb-2 bg-black text-white py-1 z-10">
       <div className="w-8/12 m-auto">
         <nav className="flex justify-between">
           <HeaderLink to={'/'}>{siteName}</HeaderLink>
