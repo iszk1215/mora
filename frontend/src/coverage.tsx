@@ -165,7 +165,7 @@ interface CoverageSegmentProperty {
 }
 
 
-const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
+export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
   const params = props.params
   const cov = props.cov
 
@@ -207,13 +207,13 @@ const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
     </Card>)
 }
 
-export const CoverageList = (): React.JSX.Element => {
-  const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
-  const params = useParams()
-  const repo = data.repo
-
+export const CoverageListContent = ({ repo, coverages, params }: {
+  repo: Repo
+  coverages: Coverage[]
+  params: Params
+}): React.JSX.Element => {
   const items: React.JSX.Element[] = []
-  data.coverages.forEach((cov: Coverage, i: number) => {
+  coverages.forEach((cov: Coverage, i: number) => {
     items.push(<div key={i}>
       <CoverageSegment cov={cov} params={params} />
     </div>)
@@ -221,10 +221,18 @@ export const CoverageList = (): React.JSX.Element => {
 
   return (
     <div><h2 className="text-3xl my-4">Coverages</h2>
-      Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
-      <CoverageChart coverages={data.coverages} />
+      <div className="mb-4">
+        Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
+      </div>
+      <CoverageChart coverages={coverages} />
       <div>{items}</div>
     </div>)
+}
+
+export const CoverageList = (): React.JSX.Element => {
+  const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
+  const params = useParams()
+  return <CoverageListContent repo={data.repo} coverages={data.coverages} params={params} />
 }
 
 export const coverageRoute = [

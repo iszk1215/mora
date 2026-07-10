@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChartConfig, TrackerResponse } from './core'
+import { CoverageTrackerDetail } from './tracker_coverage'
 
 interface SeriesModel {
   id: number
@@ -250,9 +251,7 @@ const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; 
     }
   }, [preview])
 
-  const linkTo = tracker.type === 'coverage' && tracker.repo_id != null
-    ? `/repos/${tracker.repo_id}/coverages`
-    : `/tracker/${tracker.id}`
+  const linkTo = `/tracker/${tracker.id}`
 
   return (
     <Link to={linkTo} className="block border rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -370,28 +369,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [liked, setLiked] = useState(tracker.liked)
   const [likeLoading, setLikeLoading] = useState(false)
 
-  const [coverageTimeline, setCoverageTimeline] = useState<Array<{ time: string; value: number; entry_name: string }>>([])
-
-  const coverageZoomAdded = useRef(false)
-
-  const isCoverage = tracker.type === 'coverage'
-
-  useEffect(() => {
-    coverageZoomAdded.current = true
-  }, [])
-
-  useEffect(() => {
-    if (isCoverage && tracker.repo_id != null) {
-      fetch(`/api/repos/${tracker.repo_id}/coverage/timeline?limit=30`)
-        .then((r) => r.json())
-        .then((d: { timeline: Array<{ time: string; value: number; entry_name: string }> }) => {
-          setCoverageTimeline(d.timeline ?? [])
-          return undefined
-        })
-        .catch(() => {})
-    }
-  }, [isCoverage, tracker.repo_id])
-
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
@@ -434,50 +411,10 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }, [tracker.chart_config])
 
-  const coverageOption = useMemo(() => {
-    if (!isCoverage) return null
-    const entryNames = [...new Set(coverageTimeline.map((p) => p.entry_name))]
-    const opt: any = {
-      grid: { left: 60, right: 20, top: 30, bottom: 60 },
-      xAxis: {
-        type: 'time' as const,
-        splitLine: { show: false },
-      },
-      yAxis: {
-        type: 'value' as const,
-        min: 0, max: 100,
-        axisLabel: { formatter: '{value}%' },
-        splitLine: { lineStyle: { type: 'dashed' as const, opacity: 0.3 } },
-      },
-      series: entryNames.map((name) => ({
-        name,
-        type: 'line' as const,
-        data: coverageTimeline
-          .filter((p) => p.entry_name === name)
-          .map((p) => [p.time, p.value]),
-        areaStyle: { opacity: 0.12 },
-      })),
-      tooltip: {
-        trigger: 'axis' as const,
-        valueFormatter: (value: number) => value.toFixed(1) + '%',
-      },
-    }
-    if (!coverageZoomAdded.current) {
-      opt.dataZoom = [
-        { type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const },
-        { type: 'slider' as const, xAxisIndex: 0, bottom: 10, filterMode: 'none' as const },
-      ]
-    }
-    return opt
-  }, [isCoverage, coverageTimeline])
-
   return (
     <div>
       <div className="flex items-center gap-3 my-4">
         <h1 className="text-3xl">{tracker.name}</h1>
-        {tracker.type === 'coverage' && (
-          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
-        )}
         <Button
           variant={liked ? 'default' : 'secondary'}
           size="sm"
@@ -486,37 +423,17 @@ export const TrackerDetailView = (): React.JSX.Element => {
         >
           {liked ? 'Unlike' : 'Like'}
         </Button>
-        {tracker.role !== '' && !isCoverage && (
+        {tracker.role !== '' && (
           <Button variant="outline" size="sm" asChild>
             <Link to={`/tracker/${tracker.id}/edit`}>Edit</Link>
           </Button>
         )}
       </div>
 
-      {isCoverage ? (
-        <>
-          <h2 className="text-xl my-2">Coverage Timeline</h2>
-          {coverageTimeline.length > 0 ? (
-            <ReactECharts option={coverageOption} style={{ width: '100%', height: 300 }} opts={{ renderer: 'svg' }} />
-          ) : (
-            <p className="text-muted-foreground">No coverage data</p>
-          )}
-          {tracker.repo_id != null && (
-            <div className="mt-4">
-              <Button asChild>
-                <Link to={`/repos/${tracker.repo_id}/coverages`}>View Coverage Details</Link>
-              </Button>
-            </div>
-          )}
-        </>
+      {datasets.length > 0 ? (
+        <TrackerChart data={{ datasets }} chartConfig={viewChartConfig} />
       ) : (
-        <>
-          {datasets.length > 0 ? (
-            <TrackerChart data={{ datasets }} chartConfig={viewChartConfig} />
-          ) : (
-            <p className="text-muted-foreground">No data to display</p>
-          )}
-        </>
+        <p className="text-muted-foreground">No data to display</p>
       )}
     </div>
   )
@@ -964,6 +881,13 @@ export const TrackerCreate = (): React.JSX.Element => {
   )
 }
 
+const TrackerDetailRouter = (): React.JSX.Element => {
+  const data = useLoaderData() as TrackerDetailData
+  return data.tracker.type === 'coverage'
+    ? <CoverageTrackerDetail />
+    : <TrackerDetailView />
+}
+
 export const trackerRoute = [
   {
     index: true,
@@ -977,7 +901,7 @@ export const trackerRoute = [
   {
     path: ':trackerId',
     loader: loadTrackerDetail,
-    element: <TrackerDetailView />,
+    element: <TrackerDetailRouter />,
   },
   {
     path: ':trackerId/edit',
