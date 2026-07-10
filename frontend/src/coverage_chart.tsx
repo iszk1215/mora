@@ -52,6 +52,7 @@ export const CoverageChart = (params: any): React.JSX.Element => {
       option={option}
       style={{ width: '100%', height: 300 }}
       onEvents={{ click: onChartClick }}
+      opts={{ renderer: 'svg' }}
     />
   )
 }

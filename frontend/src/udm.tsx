@@ -163,7 +163,7 @@ export const UdmChart = (params: UdmChartProps): React.JSX.Element => {
   }
 
   return (
-    <ReactECharts option={option} style={{ width: '100%', height: 300 }} id="udm-chart" />)
+    <ReactECharts option={option} style={{ width: '100%', height: 300 }} id="udm-chart" opts={{ renderer: 'svg' }} />)
 }
 
 export const UdmMetricRoot = (): React.JSX.Element => {

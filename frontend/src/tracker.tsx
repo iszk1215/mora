@@ -218,6 +218,7 @@ const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     <ReactECharts
       option={option}
       style={{ width: '100%', height: 300 }}
+      opts={{ renderer: 'svg' }}
     />
   )
 }
@@ -268,7 +269,7 @@ const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; 
         {loading ? (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
         ) : option.series.length > 0 ? (
-          <ReactECharts option={option} style={{ width: '100%', height: 120 }} />
+          <ReactECharts option={option} style={{ width: '100%', height: 120 }} opts={{ renderer: 'svg' }} />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
         )}
@@ -496,7 +497,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
         <>
           <h2 className="text-xl my-2">Coverage Timeline</h2>
           {coverageTimeline.length > 0 ? (
-            <ReactECharts option={coverageOption} style={{ width: '100%', height: 300 }} />
+            <ReactECharts option={coverageOption} style={{ width: '100%', height: 300 }} opts={{ renderer: 'svg' }} />
           ) : (
             <p className="text-muted-foreground">No coverage data</p>
           )}
