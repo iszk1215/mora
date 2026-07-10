@@ -209,12 +209,13 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
     </Card>)
 }
 
-export const CoverageListContent = ({ repo, coverages, params, min, max }: {
+export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSelector }: {
   repo: Repo
   coverages: Coverage[]
   params: Params
   min?: Date | null
   max?: Date | null
+  rangeSelector?: React.ReactNode
 }): React.JSX.Element => {
   const items: React.JSX.Element[] = []
   coverages.forEach((cov: Coverage, i: number) => {
@@ -228,6 +229,7 @@ export const CoverageListContent = ({ repo, coverages, params, min, max }: {
       <div className="mb-4">
         Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
       </div>
+      {rangeSelector}
       <CoverageChart coverages={coverages} min={min} max={max} />
       <div>{items}</div>
     </div>)
@@ -239,10 +241,10 @@ export const CoverageList = (): React.JSX.Element => {
   const [range, setRange] = useState<TimeRangeKey>('all')
   const { min, max } = computeDateRange(range)
   return (
-    <>
-      <TimeRangeSelector value={range} onChange={setRange} />
-      <CoverageListContent repo={data.repo} coverages={data.coverages} params={params} min={min} max={max} />
-    </>
+    <CoverageListContent
+      repo={data.repo} coverages={data.coverages} params={params} min={min} max={max}
+      rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}
+    />
   )
 }
 
