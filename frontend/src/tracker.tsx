@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import DatePicker from 'react-datepicker'
-
 import ReactECharts from 'echarts-for-react'
 
 import {
@@ -371,9 +369,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [liked, setLiked] = useState(tracker.liked)
   const [likeLoading, setLikeLoading] = useState(false)
 
-  const [startDate, setStartDate] = useState<Date | null>(null)
-  const [endDate, setEndDate] = useState<Date | null>(null)
-
   const [coverageTimeline, setCoverageTimeline] = useState<Array<{ time: string; value: number; entry_name: string }>>([])
 
   const coverageZoomAdded = useRef(false)
@@ -515,31 +510,8 @@ export const TrackerDetailView = (): React.JSX.Element => {
         </>
       ) : (
         <>
-          <div className="pt-2 flex items-center mb-2">
-            <span className="mr-1">From</span>
-            <div className="w-1/4">
-              <DatePicker
-                selected={startDate}
-                onChange={(d: Date | null) => setStartDate(d)}
-                className="border rounded px-2 py-1 w-full"
-                placeholderText="Select date"
-                dateFormat="yyyy-MM-dd"
-              />
-            </div>
-            <span className="px-2">To</span>
-            <div className="w-1/4">
-              <DatePicker
-                selected={endDate}
-                onChange={(d: Date | null) => setEndDate(d)}
-                className="border rounded px-2 py-1 w-full"
-                placeholderText="Select date"
-                dateFormat="yyyy-MM-dd"
-              />
-            </div>
-          </div>
-
           {datasets.length > 0 ? (
-            <TrackerChart data={{ datasets }} min={startDate} max={endDate} chartConfig={viewChartConfig} />
+            <TrackerChart data={{ datasets }} chartConfig={viewChartConfig} />
           ) : (
             <p className="text-muted-foreground">No data to display</p>
           )}
@@ -560,9 +532,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(null)
   const [newValueTime, setNewValueTime] = useState('')
   const [newValueNumber, setNewValueNumber] = useState('')
-
-  const [startDate, setStartDate] = useState<Date | null>(null)
-  const [endDate, setEndDate] = useState<Date | null>(null)
 
   const [savedChartConfig, setSavedChartConfig] = useState(tracker.chart_config)
   const parsedChartConfig = useMemo<ChartConfig>(() => {
@@ -794,31 +763,8 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       {/* Chart */}
       <h2 className="text-xl my-2">Chart</h2>
 
-      <div className="pt-2 flex items-center mb-2">
-        <span className="mr-1">From</span>
-        <div className="w-1/4">
-          <DatePicker
-            selected={startDate}
-            onChange={(d: Date | null) => setStartDate(d)}
-            className="border rounded px-2 py-1 w-full"
-            placeholderText="Select date"
-            dateFormat="yyyy-MM-dd"
-          />
-        </div>
-        <span className="px-2">To</span>
-        <div className="w-1/4">
-          <DatePicker
-            selected={endDate}
-            onChange={(d: Date | null) => setEndDate(d)}
-            className="border rounded px-2 py-1 w-full"
-            placeholderText="Select date"
-            dateFormat="yyyy-MM-dd"
-          />
-        </div>
-      </div>
-
       {datasets.length > 0 ? (
-        <TrackerChart data={{ datasets }} min={startDate} max={endDate} chartConfig={chartConfigForChart} />
+        <TrackerChart data={{ datasets }} chartConfig={chartConfigForChart} />
       ) : (
         <p className="text-muted-foreground">No data to display</p>
       )}

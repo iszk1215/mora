@@ -348,17 +348,8 @@ describe('TrackerDetailView', () => {
     expect(screen.queryByText('Edit')).not.toBeInTheDocument()
   })
 
-  it('renders datepickers', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
-    const datepickers = screen.getAllByTestId('datepicker')
-    expect(datepickers.length).toBeGreaterThanOrEqual(2)
-  })
-
 })
+
 
 describe('TrackerDetailEdit', () => {
   beforeEach(() => {
