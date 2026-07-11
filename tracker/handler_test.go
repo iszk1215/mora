@@ -1161,6 +1161,7 @@ func TestHandlerPreviewCoverageTracker(t *testing.T) {
 		require.Equal(t, tr.Id, got.Tracker.Id)
 		require.Len(t, got.Series, 1)
 		require.Equal(t, "overall", got.Series[0].Series.Name)
+		require.Equal(t, `{"value_format":"%.1f%%"}`, got.Series[0].Series.Config)
 	})
 
 	t.Run("coverage tracker without repoID", func(t *testing.T) {

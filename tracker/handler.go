@@ -510,6 +510,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 						TrackerId: tracker.Id,
 						Name:      name,
 						DataType:  "float",
+						Config:    `{"value_format":"%.1f%%"}`,
 					},
 					Values: values,
 				})
