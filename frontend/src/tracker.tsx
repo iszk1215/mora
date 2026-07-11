@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import ReactECharts from 'echarts-for-react'
 
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse } from './core'
 import { CoverageTrackerDetail } from './tracker_coverage'
-import { formatValue, Dataset } from './chart'
+import { formatValue, Dataset, TrackerChart } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 
@@ -32,15 +32,6 @@ interface ValueModel {
 interface SeriesValues {
   series: SeriesModel
   values: ValueModel[]
-}
-
-interface TrackerChartProps {
-  data?: { datasets: Dataset[] }
-  min?: Date | null
-  max?: Date | null
-  chartConfig?: ChartConfig | null
-  animation?: boolean
-  onChartClick?: (params: any) => void
 }
 
 interface TrackerDetailData {
@@ -166,76 +157,6 @@ export async function loadTrackerList(): Promise<PaginatedTrackers> {
 export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise<TrackerDetailData> {
   if (!params.trackerId) throw new Error('trackerId is required')
   return listSeries(parseInt(params.trackerId))
-}
-
-export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
-  const datasets = params.data?.datasets ?? []
-  const cc = params.chartConfig
-  const dataZoomAdded = useRef(false)
-
-  const option = useMemo(() => {
-    const showLegend = cc?.show_legend !== false && datasets.length > 1
-    const opt: any = {
-      grid: { left: 60, right: 20, top: showLegend ? 40 : 20, bottom: 60 },
-      xAxis: {
-        type: 'time' as const,
-        splitLine: { show: false },
-      },
-      yAxis: {
-        type: 'value' as const,
-        splitLine: { lineStyle: { type: 'dashed' as const, opacity: 0.3 } },
-      },
-      series: datasets.map((ds) => ({
-        name: ds.label,
-        type: 'line' as const,
-        data: ds.data.map((p) => ({ value: [p.x, Number(p.y)], ...p.extra })),
-        areaStyle: cc?.area !== false ? { opacity: 0.12 } : undefined,
-      })),
-      tooltip: {
-        trigger: 'axis',
-        formatter: (params: any) => {
-          const items = Array.isArray(params) ? params : [params]
-          return items.map((p: any) => {
-            const fmt = datasets[p.seriesIndex]?.seriesConfig?.value_format
-            return `${p.marker} ${p.seriesName}: ${formatValue(p.value[1], fmt)}`
-          }).join('<br/>')
-        },
-      },
-    }
-    if (params.animation === false) {
-      opt.animation = false
-    }
-    if (!dataZoomAdded.current) {
-      opt.dataZoom = [
-        { type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const },
-        { type: 'slider' as const, xAxisIndex: 0, bottom: 10, filterMode: 'none' as const },
-      ]
-    }
-    if (showLegend) {
-      opt.legend = { type: 'scroll' as const, top: 0 }
-    }
-    if (cc) {
-      if (cc.x_axis_label) opt.xAxis.name = cc.x_axis_label
-      if (cc.y_axis_label) opt.yAxis.name = cc.y_axis_label
-      if (cc.y_max !== undefined && cc.y_max > 0) opt.yAxis.max = cc.y_max
-    }
-    if (params.min) opt.xAxis.min = params.min
-    if (params.max) opt.xAxis.max = params.max
-    return opt
-  }, [datasets, cc, params.min, params.max, params.animation])
-
-  useEffect(() => {
-    dataZoomAdded.current = true
-  }, [])
-
-  return (
-    <ReactECharts
-      option={option}
-      style={{ width: '100%', height: 300 }}
-      onEvents={params.onChartClick ? { click: params.onChartClick } : undefined}
-      opts={{ renderer: 'svg' }}
-    />
-  )
 }
 
 const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean }): React.JSX.Element => {

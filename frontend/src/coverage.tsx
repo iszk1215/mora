@@ -9,7 +9,7 @@ import {
 } from 'react-router'
 
 import { Coverage, CoverageEntry, FileData, Repo } from './core'
-import { TrackerChart } from './tracker'
+import { TrackerChart } from './chart'
 import { Dataset } from './chart'
 import { Browser } from './browser'
 import { CodeView } from './codeview'
