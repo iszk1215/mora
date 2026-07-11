@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, useLoaderData, useParams } from 'react-router'
-import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList, makeCoverageSeries } from './coverage'
+import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList, makeCoverageSeries, coverageToDatasets, buildCoverageClickUrl } from './coverage'
 import { Coverage } from './core'
 
 vi.mock('react-router', async () => {
@@ -159,5 +159,54 @@ describe('makeCoverageSeries', () => {
     }]
     const series = makeCoverageSeries(coverages)
     expect(series[0].data[0].value[1]).toBe(0)
+  })
+})
+
+describe('coverageToDatasets', () => {
+  it('includes index in extra for each data point', () => {
+    const coverages: Coverage[] = [
+      {
+        index: 5, hits: 90, lines: 100, revision: 'abc', revision_url: '',
+        time: '2024-01-15T10:00:00Z',
+        entries: [{ name: 'go', hits: 90, lines: 100 }],
+      },
+      {
+        index: 8, hits: 80, lines: 100, revision: 'def', revision_url: '',
+        time: '2024-06-15T10:00:00Z',
+        entries: [{ name: 'go', hits: 80, lines: 100 }],
+      },
+    ]
+    const datasets = coverageToDatasets(coverages)
+    expect(datasets[0].data[0].extra).toEqual({ index: 5 })
+    expect(datasets[0].data[1].extra).toEqual({ index: 8 })
+  })
+
+  it('includes total series with extra.index when multiple entries exist', () => {
+    const coverages: Coverage[] = [
+      {
+        index: 1, hits: 150, lines: 200, revision: 'abc', revision_url: '',
+        time: '2024-01-15T10:00:00Z',
+        entries: [
+          { name: 'go', hits: 90, lines: 100 },
+          { name: 'py', hits: 60, lines: 100 },
+        ],
+      },
+    ]
+    const datasets = coverageToDatasets(coverages)
+    const totalDataset = datasets.find(d => d.label === 'total')
+    expect(totalDataset).toBeDefined()
+    expect(totalDataset!.data[0].extra).toEqual({ index: 1 })
+  })
+})
+
+describe('buildCoverageClickUrl', () => {
+  it('builds url from location, index, and series name', () => {
+    expect(buildCoverageClickUrl('http://localhost:4000/repos/1/coverages', 3, 'go'))
+      .toBe('http://localhost:4000/repos/1/coverages/3/go')
+  })
+
+  it('handles numeric index', () => {
+    expect(buildCoverageClickUrl('http://example.com/repo/coverages', 42, 'py'))
+      .toBe('http://example.com/repo/coverages/42/py')
   })
 })

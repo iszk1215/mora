@@ -70,6 +70,10 @@ export function formatRatio(hits: number, lines: number) {
   return (hits * 100.0 / lines).toFixed(1)
 }
 
+export function buildCoverageClickUrl(currentLocation: string, index: number, seriesName: string): string {
+  return `${currentLocation}/${index}/${seriesName}`
+}
+
 // returns CodeData
 async function loadFile({ params }: LoaderFunctionArgs): Promise<Response> {
   const url = `/api/${makeEntryPath(params)}/files/${params["*"]}`
@@ -236,8 +240,8 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
   const onChartClick = useCallback((rawParams: any) => {
     if (rawParams.seriesName !== 'total') {
       const d = rawParams.data
-      if (d?.extra?.index !== undefined) {
-        const url = `${window.location}/${d.extra.index}/${rawParams.seriesName}`
+      if (d?.index !== undefined) {
+        const url = buildCoverageClickUrl(window.location.href, d.index, rawParams.seriesName)
         window.location.assign(url)
       }
     }
@@ -376,7 +380,7 @@ export function coverageToDatasets(coverages: Coverage[]): Dataset[] {
     }
     if (hasMultiEntries) {
       const y = cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines
-      map.total.push({ x: cov.time, y: y.toFixed(1) })
+      map.total.push({ x: cov.time, y: y.toFixed(1), extra: { index: cov.index } })
     }
   }
 
