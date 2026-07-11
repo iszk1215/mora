@@ -1,5 +1,5 @@
 import { DateTime } from 'luxon'
-import React, { useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import {
   LoaderFunctionArgs,
   Params,
@@ -9,7 +9,8 @@ import {
 } from 'react-router'
 
 import { Coverage, CoverageEntry, FileData, Repo } from './core'
-import { CoverageChart } from './coverage_chart'
+import { TrackerChart } from './tracker'
+import { coverageToDatasets } from './chart'
 import { Browser } from './browser'
 import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
@@ -224,13 +225,31 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
     </div>)
   })
 
+  const datasets = useMemo(() => coverageToDatasets(coverages), [coverages])
+
+  const onChartClick = useCallback((rawParams: any) => {
+    if (rawParams.seriesName !== 'total') {
+      const d = rawParams.data
+      if (d?.index !== undefined) {
+        const url = `${window.location}/${d.index}/${rawParams.seriesName}`
+        window.location.assign(url)
+      }
+    }
+  }, [])
+
   return (
     <div><h2 className="text-3xl my-4">Coverages</h2>
       <div className="mb-4">
         Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
       </div>
       {rangeSelector}
-      <CoverageChart coverages={coverages} min={min} max={max} />
+      <TrackerChart
+        data={{ datasets }}
+        min={min}
+        max={max}
+        animation={false}
+        onChartClick={onChartClick}
+      />
       <div>{items}</div>
     </div>)
 }

@@ -45,6 +45,8 @@ interface TrackerChartProps {
   min?: Date | null
   max?: Date | null
   chartConfig?: ChartConfig | null
+  animation?: boolean
+  onChartClick?: (params: any) => void
 }
 
 interface TrackerDetailData {
@@ -172,7 +174,7 @@ export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise
   return listSeries(parseInt(params.trackerId))
 }
 
-const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
+export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   const datasets = params.data?.datasets ?? []
   const cc = params.chartConfig
   const dataZoomAdded = useRef(false)
@@ -206,6 +208,9 @@ const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
         },
       },
     }
+    if (params.animation === false) {
+      opt.animation = false
+    }
     if (!dataZoomAdded.current) {
       opt.dataZoom = [
         { type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const },
@@ -223,7 +228,7 @@ const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     if (params.min) opt.xAxis.min = params.min
     if (params.max) opt.xAxis.max = params.max
     return opt
-  }, [datasets, cc, params.min, params.max])
+  }, [datasets, cc, params.min, params.max, params.animation])
 
   useEffect(() => {
     dataZoomAdded.current = true
@@ -233,6 +238,7 @@ const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     <ReactECharts
       option={option}
       style={{ width: '100%', height: 300 }}
+      onEvents={params.onChartClick ? { click: params.onChartClick } : undefined}
       opts={{ renderer: 'svg' }}
     />
   )

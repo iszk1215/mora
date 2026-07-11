@@ -1,9 +1,15 @@
-import { Coverage } from './core'
+import { Coverage, SeriesConfig } from './core'
 
 interface Point {
   x: string
   y: number
   index: number
+}
+
+export interface Dataset {
+  data: Array<{ x: string; y: string }>
+  label: string
+  seriesConfig?: SeriesConfig
 }
 
 export function formatValue(value: number, fmt: string | undefined): string {
@@ -80,4 +86,42 @@ export function makeCoverageSeries(coverages: Coverage[]) {
   }
 
   return series
+}
+
+export function coverageToDatasets(coverages: Coverage[]): Dataset[] {
+  const map: { [name: string]: Array<{ x: string; y: string }> } = {}
+
+  const hasMultiEntries = coverages.reduce(
+    (flag: boolean, cov: Coverage) => flag || cov.entries.length > 1,
+    false
+  )
+  if (hasMultiEntries) {
+    map.total = []
+  }
+
+  for (const cov of coverages) {
+    for (const e of cov.entries) {
+      if (!(e.name in map)) {
+        map[e.name] = []
+      }
+      const y = e.lines === 0 ? 0 : e.hits * 100.0 / e.lines
+      map[e.name].push({ x: cov.time, y: y.toFixed(1) })
+    }
+    if (hasMultiEntries) {
+      const y = cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines
+      map.total.push({ x: cov.time, y: y.toFixed(1) })
+    }
+  }
+
+  const datasets: Dataset[] = []
+  for (const k in map) {
+    const label = k === '_default' ? 'coverage' : k
+    datasets.push({
+      label,
+      data: map[k],
+      seriesConfig: { value_format: '%.1f%%' },
+    })
+  }
+
+  return datasets
 }
