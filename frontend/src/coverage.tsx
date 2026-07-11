@@ -70,8 +70,8 @@ export function formatRatio(hits: number, lines: number) {
   return (hits * 100.0 / lines).toFixed(1)
 }
 
-export function buildCoverageClickUrl(currentLocation: string, index: number, seriesName: string): string {
-  return `${currentLocation}/${index}/${seriesName}`
+export function buildCoverageClickUrl(repoId: string, index: number, seriesName: string): string {
+  return `/repos/${repoId}/coverages/${index}/${seriesName}`
 }
 
 // returns CodeData
@@ -240,12 +240,12 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
   const onChartClick = useCallback((rawParams: any) => {
     if (rawParams.seriesName !== 'total') {
       const d = rawParams.data
-      if (d?.index !== undefined) {
-        const url = buildCoverageClickUrl(window.location.href, d.index, rawParams.seriesName)
+      if (d?.index !== undefined && params.repo_id) {
+        const url = buildCoverageClickUrl(params.repo_id, d.index, rawParams.seriesName)
         window.location.assign(url)
       }
     }
-  }, [])
+  }, [params.repo_id])
 
   return (
     <div><h2 className="text-3xl my-4">Coverages</h2>

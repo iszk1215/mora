@@ -200,13 +200,13 @@ describe('coverageToDatasets', () => {
 })
 
 describe('buildCoverageClickUrl', () => {
-  it('builds url from location, index, and series name', () => {
-    expect(buildCoverageClickUrl('http://localhost:4000/repos/1/coverages', 3, 'go'))
-      .toBe('http://localhost:4000/repos/1/coverages/3/go')
+  it('builds url from repoId, index, and series name', () => {
+    expect(buildCoverageClickUrl('2', 3, 'go'))
+      .toBe('/repos/2/coverages/3/go')
   })
 
   it('handles numeric index', () => {
-    expect(buildCoverageClickUrl('http://example.com/repo/coverages', 42, 'py'))
-      .toBe('http://example.com/repo/coverages/42/py')
+    expect(buildCoverageClickUrl('42', 10, 'py'))
+      .toBe('/repos/42/coverages/10/py')
   })
 })
