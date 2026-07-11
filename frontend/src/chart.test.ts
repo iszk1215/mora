@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatValue, makeCoverageSeries } from './chart'
-import { Coverage } from './core'
+import { formatValue } from './chart'
 
 describe('formatValue', () => {
   it('returns default format when fmt is undefined', () => {
@@ -34,21 +33,5 @@ describe('formatValue', () => {
   it('handles integer values', () => {
     expect(formatValue(0, '%.2f')).toBe('0.00')
     expect(formatValue(100, '%.1f')).toBe('100.0')
-  })
-})
-
-describe('makeCoverageSeries', () => {
-  it('returns 0 instead of Infinity when lines is 0', () => {
-    const coverages: Coverage[] = [{
-      index: 1,
-      time: '2024-01-01T00:00:00Z',
-      hits: 0,
-      lines: 0,
-      revision: '',
-      revision_url: '',
-      entries: [{ name: 'src/main.go', hits: 0, lines: 0 }],
-    }]
-    const series = makeCoverageSeries(coverages)
-    expect(series[0].data[0].value[1]).toBe(0)
   })
 })

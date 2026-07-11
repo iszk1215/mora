@@ -10,7 +10,7 @@ import {
 
 import { Coverage, CoverageEntry, FileData, Repo } from './core'
 import { TrackerChart } from './tracker'
-import { coverageToDatasets } from './chart'
+import { Dataset } from './chart'
 import { Browser } from './browser'
 import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
@@ -18,6 +18,12 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
+
+interface Point {
+  x: string
+  y: number
+  index: number
+}
 
 interface CoverageEntryMetadata {
   hits: number
@@ -308,5 +314,83 @@ export const coverageRoute = [
     ],
   },
 ]
+
+export function makeCoverageSeries(coverages: Coverage[]) {
+  const map: { [name: string]: Point[] } = {}
+
+  const hasMultiEntries = coverages.reduce(
+    (flag: boolean, cov: Coverage) => flag || cov.entries.length > 1,
+    false
+  )
+  if (hasMultiEntries) {
+    map.total = []
+  }
+
+  for (const cov of coverages) {
+    for (const e of cov.entries) {
+      if (!(e.name in map)) {
+        map[e.name] = []
+      }
+      map[e.name].push(
+        { x: cov.time, y: e.lines === 0 ? 0 : e.hits * 100.0 / e.lines, index: cov.index }
+      )
+    }
+    if (hasMultiEntries) {
+      map.total.push(
+        { x: cov.time, y: cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines, index: cov.index }
+      )
+    }
+  }
+
+  const series = []
+  for (const k in map) {
+    const name = k === '_default' ? 'coverage' : k
+    series.push({
+      name,
+      type: 'line' as const,
+      data: map[k].map(p => ({ value: [p.x, p.y], index: p.index })),
+    })
+  }
+
+  return series
+}
+
+export function coverageToDatasets(coverages: Coverage[]): Dataset[] {
+  const map: { [name: string]: Array<{ x: string; y: string }> } = {}
+
+  const hasMultiEntries = coverages.reduce(
+    (flag: boolean, cov: Coverage) => flag || cov.entries.length > 1,
+    false
+  )
+  if (hasMultiEntries) {
+    map.total = []
+  }
+
+  for (const cov of coverages) {
+    for (const e of cov.entries) {
+      if (!(e.name in map)) {
+        map[e.name] = []
+      }
+      const y = e.lines === 0 ? 0 : e.hits * 100.0 / e.lines
+      map[e.name].push({ x: cov.time, y: y.toFixed(1) })
+    }
+    if (hasMultiEntries) {
+      const y = cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines
+      map.total.push({ x: cov.time, y: y.toFixed(1) })
+    }
+  }
+
+  const datasets: Dataset[] = []
+  for (const k in map) {
+    const label = k === '_default' ? 'coverage' : k
+    datasets.push({
+      label,
+      data: map[k],
+      seriesConfig: { value_format: '%.1f%%' },
+    })
+  }
+
+  return datasets
+}
 
 

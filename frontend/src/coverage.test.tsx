@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, useLoaderData, useParams } from 'react-router'
-import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList } from './coverage'
+import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList, makeCoverageSeries } from './coverage'
 import { Coverage } from './core'
 
 vi.mock('react-router', async () => {
@@ -143,5 +143,21 @@ describe('CoverageList', () => {
     expect(entryLinks[0]).toHaveAttribute('href', '/repos/1/coverages/1/go')
     expect(entryLinks[1]).toHaveAttribute('href', '/repos/1/coverages/2/py')
     expect(entryLinks[2]).toHaveAttribute('href', '/repos/1/coverages/3/js')
+  })
+})
+
+describe('makeCoverageSeries', () => {
+  it('returns 0 instead of Infinity when lines is 0', () => {
+    const coverages: Coverage[] = [{
+      index: 1,
+      time: '2024-01-01T00:00:00Z',
+      hits: 0,
+      lines: 0,
+      revision: '',
+      revision_url: '',
+      entries: [{ name: 'src/main.go', hits: 0, lines: 0 }],
+    }]
+    const series = makeCoverageSeries(coverages)
+    expect(series[0].data[0].value[1]).toBe(0)
   })
 })
