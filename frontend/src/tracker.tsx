@@ -18,17 +18,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ChartConfig, TrackerResponse } from './core'
+import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse } from './core'
 import { CoverageTrackerDetail } from './tracker_coverage'
+import { formatValue } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
-
-interface SeriesModel {
-  id: number
-  tracker_id: number
-  name: string
-  data_type: string
-}
 
 interface ValueModel {
   time: string
@@ -43,6 +37,7 @@ interface SeriesValues {
 interface Dataset {
   data: Array<{ x: string; y: string }>
   label: string
+  seriesConfig?: SeriesConfig
 }
 
 interface TrackerChartProps {
@@ -107,11 +102,23 @@ async function listSeries(trackerId: number): Promise<TrackerDetailData> {
   return resp.json()
 }
 
-async function createSeries(trackerId: number, name: string, dataType: string): Promise<SeriesModel> {
+async function createSeries(trackerId: number, name: string, dataType: string, config?: string): Promise<SeriesModel> {
+  const body: Record<string, unknown> = { name, data_type: dataType }
+  if (config) body.config = config
   const resp = await fetch(`/api/tracker/${trackerId}/series`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, data_type: dataType }),
+    body: JSON.stringify(body),
+  })
+  if (!resp.ok) throw resp
+  return resp.json()
+}
+
+async function patchSeries(trackerId: number, seriesId: number, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
+  const resp = await fetch(`/api/tracker/${trackerId}/series/${seriesId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
   })
   if (!resp.ok) throw resp
   return resp.json()
@@ -190,8 +197,13 @@ const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       })),
       tooltip: {
         trigger: 'axis',
-        valueFormatter: (value: number) =>
-          Number.isInteger(value) ? String(value) : value.toFixed(1),
+        formatter: (params: any) => {
+          const items = Array.isArray(params) ? params : [params]
+          return items.map((p: any) => {
+            const fmt = datasets[p.seriesIndex]?.seriesConfig?.value_format
+            return `${p.marker} ${p.seriesName}: ${formatValue(p.value[1], fmt)}`
+          }).join('<br/>')
+        },
       },
     }
     if (!dataZoomAdded.current) {
@@ -228,10 +240,17 @@ const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
 
 const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean }): React.JSX.Element => {
   const option = useMemo(() => {
-    const datasets = preview?.series?.map((sv) => ({
-      label: sv.series.name,
-      data: sv.values.map((v) => ({ x: v.time, y: String(v.value) })),
-    })) ?? []
+    const datasets = preview?.series?.map((sv) => {
+      let seriesConfig: SeriesConfig | undefined
+      try {
+        seriesConfig = JSON.parse(sv.series.config) as SeriesConfig
+      } catch { /* ignore */ }
+      return {
+        label: sv.series.name,
+        data: sv.values.map((v) => ({ x: v.time, y: String(v.value) })),
+        seriesConfig,
+      }
+    }) ?? []
 
     return {
       animation: false,
@@ -249,7 +268,16 @@ const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; 
         symbol: 'none',
         areaStyle: { opacity: 0.1 },
       })),
-      tooltip: { trigger: 'axis' as const },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          const items = Array.isArray(params) ? params : [params]
+          return items.map((p: any) => {
+            const fmt = datasets[p.seriesIndex]?.seriesConfig?.value_format
+            return `${p.marker} ${p.seriesName}: ${formatValue(p.value[1], fmt)}`
+          }).join('<br/>')
+        },
+      },
     }
   }, [preview])
 
@@ -398,10 +426,17 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
-  const valuesToDataset = (sv: SeriesValues) => ({
-    data: sv.values.map((v: ValueModel) => ({ x: v.time, y: String(v.value) })),
-    label: sv.series.name,
-  })
+  const valuesToDataset = (sv: SeriesValues): Dataset => {
+    let seriesConfig: SeriesConfig | undefined
+    try {
+      seriesConfig = JSON.parse(sv.series.config) as SeriesConfig
+    } catch { /* ignore */ }
+    return {
+      data: sv.values.map((v: ValueModel) => ({ x: v.time, y: String(v.value) })),
+      label: sv.series.name,
+      seriesConfig,
+    }
+  }
 
   const datasets: Dataset[] = useMemo(() => seriesValues.map(valuesToDataset), [seriesValues])
 
@@ -458,6 +493,17 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(null)
   const [newValueTime, setNewValueTime] = useState('')
   const [newValueNumber, setNewValueNumber] = useState('')
+
+  const [seriesValueFormats, setSeriesValueFormats] = useState<Record<number, string>>(() => {
+    const map: Record<number, string> = {}
+    for (const s of data.series) {
+      try {
+        const cfg = JSON.parse(s.config) as SeriesConfig
+        if (cfg.value_format) map[s.id] = cfg.value_format
+      } catch { /* ignore */ }
+    }
+    return map
+  })
 
   const [savedChartConfig, setSavedChartConfig] = useState(tracker.chart_config)
   const parsedChartConfig = useMemo<ChartConfig>(() => {
@@ -552,6 +598,25 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     }
   }
 
+  const handleSaveValueFormat = async (seriesId: number, fmt: string) => {
+    const config: SeriesConfig = fmt ? { value_format: fmt } : {}
+    try {
+      const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
+      setSeriesList((prev) => prev.map((s) => s.id === seriesId ? updated : s))
+      if (fmt) {
+        setSeriesValueFormats((prev) => ({ ...prev, [seriesId]: fmt }))
+      } else {
+        setSeriesValueFormats((prev) => {
+          const next = { ...prev }
+          delete next[seriesId]
+          return next
+        })
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const handleDeleteValues = async (seriesId: number) => {
     try {
       await deleteValues(tracker.id, seriesId)
@@ -565,10 +630,17 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     }
   }
 
-  const valuesToDataset = (sv: SeriesValues) => ({
-    data: sv.values.map((v: ValueModel) => ({ x: v.time, y: String(v.value) })),
-    label: sv.series.name,
-  })
+  const valuesToDataset = (sv: SeriesValues): Dataset => {
+    let seriesConfig: SeriesConfig | undefined
+    try {
+      seriesConfig = JSON.parse(sv.series.config) as SeriesConfig
+    } catch { /* ignore */ }
+    return {
+      data: sv.values.map((v: ValueModel) => ({ x: v.time, y: String(v.value) })),
+      label: sv.series.name,
+      seriesConfig,
+    }
+  }
 
   const datasets: Dataset[] = useMemo(() => seriesValues.map(valuesToDataset), [seriesValues])
 
@@ -650,13 +722,14 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Data Type</TableHead>
+            <TableHead>Value Format</TableHead>
             <TableHead className="w-48">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {seriesList.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={3} className="text-center text-muted-foreground">
+              <TableCell colSpan={4} className="text-center text-muted-foreground">
                 No series yet
               </TableCell>
             </TableRow>
@@ -672,6 +745,13 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
                   </button>
                 </TableCell>
                 <TableCell>{s.data_type}</TableCell>
+                <TableCell>
+                  <ValueFormatCell
+                    seriesId={s.id}
+                    initialFormat={seriesValueFormats[s.id] ?? ''}
+                    onSave={handleSaveValueFormat}
+                  />
+                </TableCell>
                 <TableCell className="flex gap-2">
                   <Button variant="destructive" size="sm" onClick={() => handleDeleteSeries(s.id)}>
                     Delete
@@ -885,6 +965,38 @@ export const TrackerCreate = (): React.JSX.Element => {
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ValueFormatCell({ seriesId, initialFormat, onSave }: { seriesId: number; initialFormat: string; onSave: (seriesId: number, fmt: string) => void }): React.JSX.Element {
+  const [value, setValue] = useState(initialFormat)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => { setValue(initialFormat); setSaved(false) }, [initialFormat])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setSaved(false)
+    onSave(seriesId, value)
+    setSaving(false)
+    setSaved(true)
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => { setValue(e.target.value); setSaved(false) }}
+        placeholder="e.g. %.1f"
+        className="border rounded px-1 py-0.5 w-20 text-sm"
+        onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+      />
+      <Button size="sm" variant="outline" onClick={handleSave} disabled={saving}>
+        {saving ? '...' : saved ? 'Saved' : 'Save'}
+      </Button>
     </div>
   )
 }

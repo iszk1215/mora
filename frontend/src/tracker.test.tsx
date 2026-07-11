@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
 import {
@@ -438,5 +438,87 @@ describe('TrackerDetailEdit', () => {
     expect(inputs.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByDisplayValue('Time')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Value')).toBeInTheDocument()
+  })
+
+  it('renders Value Format column in series table', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    expect(screen.getByText('Value Format')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('e.g. %.1f')).toBeInTheDocument()
+  })
+
+  it('pre-fills value format input from series config', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"value_format":"%.2f"}' }],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const input = screen.getByPlaceholderText('e.g. %.1f') as HTMLInputElement
+    expect(input.value).toBe('%.2f')
+  })
+
+  it('sends PATCH request when saving value format', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }],
+    })
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        return {
+          ok: true,
+          json: () => Promise.resolve({ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"value_format":"%.1f"}' }),
+        } as Response
+      }
+      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
+    })
+
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const input = screen.getByPlaceholderText('e.g. %.1f') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '%.1f' } })
+
+    const saveBtn = screen.getByText('Save')
+    saveBtn.click()
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1/series/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: '{"value_format":"%.1f"}' }),
+      })
+    })
+  })
+
+  it('clears value format when input is empty and saved', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"value_format":"%.2f"}' }],
+    })
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        return {
+          ok: true,
+          json: () => Promise.resolve({ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }),
+        } as Response
+      }
+      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
+    })
+
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const input = screen.getByPlaceholderText('e.g. %.1f') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '' } })
+
+    const saveBtn = screen.getByText('Save')
+    saveBtn.click()
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1/series/10', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: '{}' }),
+      })
+    })
   })
 })

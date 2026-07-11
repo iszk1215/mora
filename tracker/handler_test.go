@@ -587,6 +587,97 @@ func TestHandlerDeleteSeries(t *testing.T) {
 	})
 }
 
+func TestHandlerPatchSeries(t *testing.T) {
+	t.Run("patch series config", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+		require.Equal(t, "{}", s.Config)
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
+		cfg := `{"value_format":"%.2f"}`
+		body := PatchSeriesRequest{Config: strPtr(cfg)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got SeriesModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, cfg, got.Config)
+	})
+
+	t.Run("patch series data_type", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
+		body := PatchSeriesRequest{DataType: strPtr("int")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got SeriesModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, "int", got.DataType)
+	})
+
+	t.Run("patch series name", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
+		body := PatchSeriesRequest{Name: strPtr("renamed")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got SeriesModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, "renamed", got.Name)
+	})
+
+	t.Run("invalid JSON config rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
+		body := PatchSeriesRequest{Config: strPtr("not-json")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("forbidden without edit permission", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
+		body := PatchSeriesRequest{Config: strPtr(`{"value_format":"%.1f"}`)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(ContextWithAuth(context.Background(), nil))
+		getResponse(t, http.StatusForbidden, h, r)
+	})
+}
+
 // ----------------------------------------------------------------------
 // Values
 

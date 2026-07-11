@@ -33,6 +33,7 @@ type (
 		TrackerId int64  `json:"tracker_id" db:"tracker_id"`
 		Name      string `json:"name"       db:"name"`
 		DataType  string `json:"data_type"  db:"data_type"`
+		Config    string `json:"config"     db:"config"`
 	}
 
 	ValueModel struct {
@@ -51,13 +52,20 @@ type (
 	}
 
 	CreateSeriesRequest struct {
-		Name     string `json:"name"`
-		DataType string `json:"data_type"`
+		Name     string  `json:"name"`
+		DataType string  `json:"data_type"`
+		Config   *string `json:"config"`
 	}
 
 	CreateValueRequest struct {
 		Timestamp time.Time `json:"time"`
 		Value     float64   `json:"value"`
+	}
+
+	PatchSeriesRequest struct {
+		Name     *string `json:"name"`
+		DataType *string `json:"data_type"`
+		Config   *string `json:"config"`
 	}
 
 	PatchTrackerRequest struct {
@@ -636,10 +644,20 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	config := "{}"
+	if req.Config != nil {
+		if !json.Valid([]byte(*req.Config)) {
+			render.BadRequest(w, errors.New("config must be valid JSON"))
+			return
+		}
+		config = *req.Config
+	}
+
 	series := SeriesModel{
 		TrackerId: tracker.Id,
 		Name:      req.Name,
 		DataType:  dataType,
+		Config:    config,
 	}
 
 	err = h.store.addSeries(&series)
@@ -681,6 +699,77 @@ func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderNoContent(w)
+}
+
+// PatchSeries godoc
+// @Summary      Update a series
+// @Description  Update fields of a series (e.g. data_type, config). Requires edit permission.
+// @Tags         tracker
+// @Accept       json
+// @Produce      json
+// @Param        trackerId  path  int                      true  "Tracker ID"
+// @Param        seriesId   path  int                      true  "Series ID"
+// @Param        body       body  tracker.PatchSeriesRequest  true  "Fields to update"
+// @Success      200  {object}  tracker.SeriesModel
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/tracker/{trackerId}/series/{seriesId} [patch]
+func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			log.Error().Err(err).Msg("Body.Close")
+		}
+	}()
+
+	tracker, _ := trackerFrom(r.Context())
+	if tracker.Type == "coverage" {
+		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
+		return
+	}
+
+	var req PatchSeriesRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		log.Warn().Err(err).Msg("tracker.handler.patchSeries")
+		render.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.DataType != nil {
+		dt := *req.DataType
+		if dt != "int" && dt != "float" {
+			render.BadRequest(w, errors.New("invalid data_type: must be 'int' or 'float'"))
+			return
+		}
+	}
+
+	if req.Config != nil {
+		if !json.Valid([]byte(*req.Config)) {
+			render.BadRequest(w, errors.New("config must be valid JSON"))
+			return
+		}
+	}
+
+	series, _ := seriesFrom(r.Context())
+	err = h.store.updateSeries(series.Id, req.Name, req.DataType, req.Config)
+	if err != nil {
+		log.Error().Err(err).Msg("patchSeries updateSeries")
+		render.InternalError(w, err)
+		return
+	}
+
+	// Reload the updated series
+	updated, err := h.store.findSeriesById(series.Id)
+	if err != nil {
+		log.Error().Err(err).Msg("patchSeries findSeriesById")
+		render.InternalError(w, err)
+		return
+	}
+
+	render.JSON(w, updated, http.StatusOK)
 }
 
 // ----------------------------------------------------------------------
@@ -949,6 +1038,7 @@ func newHandler(store *trackerStore, cp CoverageTimelineProvider) http.Handler {
 
 				r.Route("/{seriesId}", func(r chi.Router) {
 					r.Use(h.injectSeries)
+					r.With(h.requireEditPermission).Patch("/", h.patchSeries)
 					r.With(h.requireEditPermission).Delete("/", h.deleteSeries)
 
 					r.Route("/values", func(r chi.Router) {

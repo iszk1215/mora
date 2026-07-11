@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS tracker_series (
     tracker_id INTEGER NOT NULL REFERENCES tracker(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     data_type TEXT NOT NULL DEFAULT 'float',
+    config TEXT NOT NULL DEFAULT '{}',
     UNIQUE(tracker_id, name)
 )`
 
@@ -255,9 +256,13 @@ func (s *trackerStore) addSeries(series *SeriesModel) error {
 		return fmt.Errorf("addSeries findTrackerById: %w", err)
 	}
 
-	query := "INSERT INTO tracker_series (tracker_id, name, data_type) VALUES (?, ?, ?)"
+	if series.Config == "" {
+		series.Config = "{}"
+	}
 
-	res, err := s.db.Exec(query, series.TrackerId, series.Name, series.DataType)
+	query := "INSERT INTO tracker_series (tracker_id, name, data_type, config) VALUES (?, ?, ?, ?)"
+
+	res, err := s.db.Exec(query, series.TrackerId, series.Name, series.DataType, series.Config)
 	if err != nil {
 		return fmt.Errorf("addSeries insert: %w", err)
 	}
@@ -271,7 +276,7 @@ func (s *trackerStore) addSeries(series *SeriesModel) error {
 }
 
 func (s *trackerStore) findSeriesById(id int64) (*SeriesModel, error) {
-	query := "SELECT id, tracker_id, name, data_type FROM tracker_series WHERE id = ?"
+	query := "SELECT id, tracker_id, name, data_type, config FROM tracker_series WHERE id = ?"
 
 	rows := []SeriesModel{}
 	err := s.db.Select(&rows, query, id)
@@ -287,7 +292,7 @@ func (s *trackerStore) findSeriesById(id int64) (*SeriesModel, error) {
 }
 
 func (s *trackerStore) listSeries(trackerId int64) ([]SeriesModel, error) {
-	query := "SELECT id, tracker_id, name, data_type FROM tracker_series WHERE tracker_id = ?"
+	query := "SELECT id, tracker_id, name, data_type, config FROM tracker_series WHERE tracker_id = ?"
 
 	rows := []SeriesModel{}
 	err := s.db.Select(&rows, query, trackerId)
@@ -304,6 +309,48 @@ func (s *trackerStore) deleteSeries(id int64) error {
 	_, err := s.db.Exec(query, id)
 	if err != nil {
 		return fmt.Errorf("deleteSeries delete: %w", err)
+	}
+	return nil
+}
+
+func (s *trackerStore) updateSeries(id int64, name *string, dataType *string, config *string) error {
+	if name == nil && dataType == nil && config == nil {
+		return nil
+	}
+	query := "UPDATE tracker_series SET "
+	args := []any{}
+	parts := []string{}
+	if name != nil {
+		parts = append(parts, "name = ?")
+		args = append(args, *name)
+	}
+	if dataType != nil {
+		parts = append(parts, "data_type = ?")
+		args = append(args, *dataType)
+	}
+	if config != nil {
+		parts = append(parts, "config = ?")
+		args = append(args, *config)
+	}
+	for i, p := range parts {
+		if i > 0 {
+			query += ", "
+		}
+		query += p
+	}
+	query += " WHERE id = ?"
+	args = append(args, id)
+
+	res, err := s.db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("updateSeries exec: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("updateSeries RowsAffected: %w", err)
+	}
+	if n == 0 {
+		return errorSeriesNotFound
 	}
 	return nil
 }
@@ -472,6 +519,9 @@ func (s *trackerStore) initialize() error {
 	if err != nil {
 		return fmt.Errorf("initialize schemaSeries: %w", err)
 	}
+
+	// migration: add config column for existing databases
+	_, _ = s.db.Exec("ALTER TABLE tracker_series ADD COLUMN config TEXT NOT NULL DEFAULT '{}'")
 
 	_, err = s.db.Exec(schemaValue)
 	if err != nil {

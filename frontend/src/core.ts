@@ -45,6 +45,18 @@ export interface ChartConfig {
   y_max?: number
 }
 
+export interface SeriesConfig {
+  value_format?: string
+}
+
+export interface SeriesModel {
+  id: number
+  tracker_id: number
+  name: string
+  data_type: string
+  config: string
+}
+
 export interface TrackerResponse {
   id: number
   name: string
