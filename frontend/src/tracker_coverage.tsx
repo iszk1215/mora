@@ -54,10 +54,13 @@ export const CoverageTrackerDetail = (): React.JSX.Element => {
 
   return repo && coverages.length > 0
     ? (
-      <CoverageListContent
-        repo={repo} coverages={coverages} params={params} min={min} max={max}
-        rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}
-      />
+      <div>
+        <h2 className="text-3xl my-4">{tracker.name}</h2>
+        <CoverageListContent
+          repo={repo} coverages={coverages} params={params} min={min} max={max}
+          rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}
+        />
+      </div>
     )
     : <p className="text-muted-foreground">No coverage data</p>
 }
