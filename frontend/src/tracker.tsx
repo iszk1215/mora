@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse } from './core'
 import { CoverageTrackerDetail } from './tracker_coverage'
-import { formatValue } from './chart'
+import { formatValue, Dataset } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 
@@ -32,12 +32,6 @@ interface ValueModel {
 interface SeriesValues {
   series: SeriesModel
   values: ValueModel[]
-}
-
-interface Dataset {
-  data: Array<{ x: string; y: string }>
-  label: string
-  seriesConfig?: SeriesConfig
 }
 
 interface TrackerChartProps {
@@ -194,7 +188,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       series: datasets.map((ds) => ({
         name: ds.label,
         type: 'line' as const,
-        data: ds.data.map((p) => [p.x, Number(p.y)]),
+        data: ds.data.map((p) => ({ value: [p.x, Number(p.y)], ...p.extra })),
         areaStyle: cc?.area !== false ? { opacity: 0.12 } : undefined,
       })),
       tooltip: {

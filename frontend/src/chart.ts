@@ -1,7 +1,7 @@
 import { SeriesConfig } from './core'
 
 export interface Dataset {
-  data: Array<{ x: string; y: string }>
+  data: Array<{ x: string; y: string; extra?: Record<string, any> }>
   label: string
   seriesConfig?: SeriesConfig
 }

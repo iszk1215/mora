@@ -236,8 +236,8 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
   const onChartClick = useCallback((rawParams: any) => {
     if (rawParams.seriesName !== 'total') {
       const d = rawParams.data
-      if (d?.index !== undefined) {
-        const url = `${window.location}/${d.index}/${rawParams.seriesName}`
+      if (d?.extra?.index !== undefined) {
+        const url = `${window.location}/${d.extra.index}/${rawParams.seriesName}`
         window.location.assign(url)
       }
     }
@@ -356,7 +356,7 @@ export function makeCoverageSeries(coverages: Coverage[]) {
 }
 
 export function coverageToDatasets(coverages: Coverage[]): Dataset[] {
-  const map: { [name: string]: Array<{ x: string; y: string }> } = {}
+  const map: { [name: string]: Array<{ x: string; y: string; extra?: Record<string, any> }> } = {}
 
   const hasMultiEntries = coverages.reduce(
     (flag: boolean, cov: Coverage) => flag || cov.entries.length > 1,
@@ -372,7 +372,7 @@ export function coverageToDatasets(coverages: Coverage[]): Dataset[] {
         map[e.name] = []
       }
       const y = e.lines === 0 ? 0 : e.hits * 100.0 / e.lines
-      map[e.name].push({ x: cov.time, y: y.toFixed(1) })
+      map[e.name].push({ x: cov.time, y: y.toFixed(1), extra: { index: cov.index } })
     }
     if (hasMultiEntries) {
       const y = cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines
