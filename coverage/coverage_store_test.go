@@ -1,7 +1,6 @@
 package coverage
 
 import (
-	"encoding/json"
 	"runtime"
 	"sync"
 	"testing"
@@ -328,164 +327,6 @@ func TestCoverageStore_Timeline_DBError(t *testing.T) {
 	require.ErrorContains(t, err, "Timeline select")
 }
 
-// --- Migration tests ---
-
-func setupOldStyleCoverage(t *testing.T, db *sqlx.DB) {
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS coverage (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			repo_id INTEGER NOT NULL,
-			revision TEXT NOT NULL,
-			time DATETIME NOT NULL,
-			contents TEXT NOT NULL,
-			UNIQUE(repo_id, revision)
-		)`)
-	require.NoError(t, err)
-
-	_, err = db.Exec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_coverage_repo_revision ON coverage(repo_id, revision)`)
-	require.NoError(t, err)
-}
-
-func TestCoverageStore_MigrateFromContents(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
-	require.NoError(t, err)
-	db.SetMaxOpenConns(1)
-
-	setupOldStyleCoverage(t, db)
-
-	now := time.Now().Round(0)
-	contentsJSON, err := json.Marshal([]*CoverageEntry{
-		{
-			Name:  "go",
-			Hits:  13,
-			Lines: 17,
-			Profiles: map[string]*profile.Profile{
-				"test.go": {
-					FileName: "test.go",
-					Hits:     13,
-					Lines:    17,
-					Blocks:   [][]int{{1, 5, 1}, {10, 13, 0}},
-				},
-			},
-		},
-		{
-			Name:  "py",
-			Hits:  5,
-			Lines: 10,
-		},
-	})
-	require.NoError(t, err)
-
-	db.MustExec(
-		"INSERT INTO coverage (repo_id, revision, time, contents) VALUES (?, ?, ?, ?)",
-		1215, "abc123", now, string(contentsJSON))
-
-	// Init should create new tables and migrate
-	s := NewCoverageStore(db)
-	err = s.Init()
-	require.NoError(t, err)
-
-	covs, err := s.List(1215)
-	require.NoError(t, err)
-	require.Len(t, covs, 1)
-
-	cov := covs[0]
-	assert.Equal(t, int64(1215), cov.RepoID)
-	assert.Equal(t, "abc123", cov.Revision)
-	assert.Equal(t, now.Unix(), cov.Timestamp.Unix())
-	require.Len(t, cov.Entries, 2)
-
-	assert.Equal(t, "go", cov.Entries[0].Name)
-	assert.Equal(t, 13, cov.Entries[0].Hits)
-	assert.Equal(t, 17, cov.Entries[0].Lines)
-	assert.Nil(t, cov.Entries[0].Profiles)
-
-	assert.Equal(t, "py", cov.Entries[1].Name)
-	assert.Equal(t, 5, cov.Entries[1].Hits)
-	assert.Equal(t, 10, cov.Entries[1].Lines)
-	assert.Nil(t, cov.Entries[1].Profiles)
-
-	assert.Equal(t, cov, covs[0])
-
-	// Find returns full data with profiles
-	full, err := s.Find(1)
-	require.NoError(t, err)
-	require.NotNil(t, full.Entries[0].Profiles)
-	assert.Len(t, full.Entries[0].Profiles, 1)
-	assert.Equal(t, "test.go", full.Entries[0].Profiles["test.go"].FileName)
-	assert.Equal(t, [][]int{{1, 5, 1}, {10, 13, 0}}, full.Entries[0].Profiles["test.go"].Blocks)
-	assert.Nil(t, full.Entries[1].Profiles)
-}
-
-func TestCoverageStore_MigrateIdempotent(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
-	require.NoError(t, err)
-	db.SetMaxOpenConns(1)
-
-	setupOldStyleCoverage(t, db)
-
-	now := time.Now().Round(0)
-	contentsJSON, err := json.Marshal([]*CoverageEntry{
-		{Name: "go", Hits: 13, Lines: 17},
-	})
-	require.NoError(t, err)
-	db.MustExec(
-		"INSERT INTO coverage (repo_id, revision, time, contents) VALUES (?, ?, ?, ?)",
-		1215, "abc123", now, string(contentsJSON))
-
-	s := NewCoverageStore(db)
-	err = s.Init()
-	require.NoError(t, err)
-
-	// Second Init should not create duplicates
-	err = s.Init()
-	require.NoError(t, err)
-
-	var entryCount int
-	err = db.Get(&entryCount, "SELECT COUNT(*) FROM coverage_entry")
-	require.NoError(t, err)
-	assert.Equal(t, 1, entryCount)
-}
-
-func TestCoverageStore_MigrateNoOldData(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
-	require.NoError(t, err)
-	db.SetMaxOpenConns(1)
-
-	// No old data, Init just creates tables
-	s := NewCoverageStore(db)
-	err = s.Init()
-	require.NoError(t, err)
-
-	var entryCount int
-	err = db.Get(&entryCount, "SELECT COUNT(*) FROM coverage_entry")
-	require.NoError(t, err)
-	assert.Equal(t, 0, entryCount)
-}
-
-func TestCoverageStore_MigrateEmptyEntries(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
-	require.NoError(t, err)
-	db.SetMaxOpenConns(1)
-
-	setupOldStyleCoverage(t, db)
-
-	now := time.Now().Round(0)
-	db.MustExec(
-		"INSERT INTO coverage (repo_id, revision, time, contents) VALUES (?, ?, ?, ?)",
-		1215, "empty", now, "[]")
-
-	s := NewCoverageStore(db)
-	err = s.Init()
-	require.NoError(t, err)
-
-	var entryCount int
-	err = db.Get(&entryCount, "SELECT COUNT(*) FROM coverage_entry")
-	require.NoError(t, err)
-	assert.Equal(t, 0, entryCount, "empty entries array should migrate to zero rows")
-}
-
 func TestCoverageStore_ReplaceEntries_BeginTxError(t *testing.T) {
 	cov := &Coverage{
 		RepoID:    1215,
@@ -510,22 +351,6 @@ func TestCoverageStore_ReplaceEntries_BeginTxError(t *testing.T) {
 	err = impl.replaceEntries(id, cov.Entries)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "replaceEntries")
-}
-
-func TestCoverageStore_MigrateFromContents_BadJSON(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
-	require.NoError(t, err)
-	db.SetMaxOpenConns(1)
-
-	setupOldStyleCoverage(t, db)
-	db.MustExec(
-		"INSERT INTO coverage (repo_id, revision, time, contents) VALUES (?, ?, ?, ?)",
-		1215, "bad", time.Now().Round(0), "{invalid json}")
-
-	s := NewCoverageStore(db)
-	err = s.Init()
-	require.Error(t, err)
-	require.ErrorContains(t, err, "migrate: failed to parse contents")
 }
 
 func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
@@ -562,33 +387,4 @@ func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
 	_, err = s.Find(1)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "loadCoverage unmarshal blocks")
-}
-
-func TestCoverageStore_MigrateWithBackwardCompatContents(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
-	require.NoError(t, err)
-	db.SetMaxOpenConns(1)
-
-	setupOldStyleCoverage(t, db)
-
-	now := time.Now().Round(0)
-	contentsJSON, err := json.Marshal([]*CoverageEntry{
-		{Name: "go", Hits: 13, Lines: 17, Profiles: map[string]*profile.Profile{
-			"test.go": {FileName: "test.go", Hits: 13, Lines: 17, Blocks: [][]int{{1, 5, 1}}},
-		}},
-	})
-	require.NoError(t, err)
-	db.MustExec(
-		"INSERT INTO coverage (repo_id, revision, time, contents) VALUES (?, ?, ?, ?)",
-		1215, "abc123", now, string(contentsJSON))
-
-	s := NewCoverageStore(db)
-	err = s.Init()
-	require.NoError(t, err)
-
-	// coverage.contents should still be intact
-	var storedContents string
-	err = db.Get(&storedContents, "SELECT contents FROM coverage WHERE id = 1")
-	require.NoError(t, err)
-	assert.JSONEq(t, string(contentsJSON), storedContents)
 }

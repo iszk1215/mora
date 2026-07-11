@@ -485,43 +485,15 @@ func (s *trackerStore) isLiked(userID, trackerID int64) (bool, error) {
 // Init
 
 func (s *trackerStore) initialize() error {
-	// Drop old track tables if they exist
-	_, err := s.db.Exec("DROP TABLE IF EXISTS track_like")
-	if err != nil {
-		return fmt.Errorf("drop old track_like: %w", err)
-	}
-	_, err = s.db.Exec("DROP TABLE IF EXISTS track_value")
-	if err != nil {
-		return fmt.Errorf("drop old track_value: %w", err)
-	}
-	_, err = s.db.Exec("DROP TABLE IF EXISTS track_series")
-	if err != nil {
-		return fmt.Errorf("drop old track_series: %w", err)
-	}
-	_, err = s.db.Exec("DROP TABLE IF EXISTS track_member")
-	if err != nil {
-		return fmt.Errorf("drop old track_member: %w", err)
-	}
-	_, err = s.db.Exec("DROP TABLE IF EXISTS track")
-	if err != nil {
-		return fmt.Errorf("drop old track: %w", err)
-	}
-
-	_, err = s.db.Exec(schemaTracker)
+	_, err := s.db.Exec(schemaTracker)
 	if err != nil {
 		return fmt.Errorf("initialize schemaTracker: %w", err)
 	}
-
-	// migration: add chart_config column for existing databases
-	_, _ = s.db.Exec("ALTER TABLE tracker ADD COLUMN chart_config TEXT NOT NULL DEFAULT '{}'")
 
 	_, err = s.db.Exec(schemaSeries)
 	if err != nil {
 		return fmt.Errorf("initialize schemaSeries: %w", err)
 	}
-
-	// migration: add config column for existing databases
-	_, _ = s.db.Exec("ALTER TABLE tracker_series ADD COLUMN config TEXT NOT NULL DEFAULT '{}'")
 
 	_, err = s.db.Exec(schemaValue)
 	if err != nil {
