@@ -241,7 +241,7 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
     if (rawParams.seriesName !== 'total') {
       const d = rawParams.data
       if (d?.index !== undefined && params.repo_id) {
-        const url = buildCoverageClickUrl(params.repo_id, d.index, rawParams.seriesName)
+        const url = buildCoverageClickUrl(params.repo_id, d.index, d.entryName)
         window.location.assign(url)
       }
     }
@@ -376,11 +376,11 @@ export function coverageToDatasets(coverages: Coverage[]): Dataset[] {
         map[e.name] = []
       }
       const y = e.lines === 0 ? 0 : e.hits * 100.0 / e.lines
-      map[e.name].push({ x: cov.time, y: y.toFixed(1), extra: { index: cov.index } })
+      map[e.name].push({ x: cov.time, y: y.toFixed(1), extra: { index: cov.index, entryName: e.name } })
     }
     if (hasMultiEntries) {
       const y = cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines
-      map.total.push({ x: cov.time, y: y.toFixed(1), extra: { index: cov.index } })
+      map.total.push({ x: cov.time, y: y.toFixed(1), extra: { index: cov.index, entryName: 'total' } })
     }
   }
 

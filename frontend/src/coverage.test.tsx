@@ -177,8 +177,8 @@ describe('coverageToDatasets', () => {
       },
     ]
     const datasets = coverageToDatasets(coverages)
-    expect(datasets[0].data[0].extra).toEqual({ index: 5 })
-    expect(datasets[0].data[1].extra).toEqual({ index: 8 })
+    expect(datasets[0].data[0].extra).toEqual({ index: 5, entryName: 'go' })
+    expect(datasets[0].data[1].extra).toEqual({ index: 8, entryName: 'go' })
   })
 
   it('includes total series with extra.index when multiple entries exist', () => {
@@ -195,7 +195,7 @@ describe('coverageToDatasets', () => {
     const datasets = coverageToDatasets(coverages)
     const totalDataset = datasets.find(d => d.label === 'total')
     expect(totalDataset).toBeDefined()
-    expect(totalDataset!.data[0].extra).toEqual({ index: 1 })
+    expect(totalDataset!.data[0].extra).toEqual({ index: 1, entryName: 'total' })
   })
 })
 
