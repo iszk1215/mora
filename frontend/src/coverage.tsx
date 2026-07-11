@@ -248,7 +248,7 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
   }, [params.repo_id])
 
   return (
-    <div><h2 className="text-3xl my-4">Coverages</h2>
+    <div>
       <div className="mb-4">
         Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
       </div>
@@ -270,10 +270,13 @@ export const CoverageList = (): React.JSX.Element => {
   const [range, setRange] = useState<TimeRangeKey>('all')
   const { min, max } = computeDateRange(range)
   return (
-    <CoverageListContent
-      repo={data.repo} coverages={data.coverages} params={params} min={min} max={max}
-      rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}
-    />
+    <div>
+      <h2 className="text-3xl my-4">Coverages</h2>
+      <CoverageListContent
+        repo={data.repo} coverages={data.coverages} params={params} min={min} max={max}
+        rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}
+      />
+    </div>
   )
 }
 
