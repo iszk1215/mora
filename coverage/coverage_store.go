@@ -89,49 +89,6 @@ func (s *coverageStoreImpl) Init() error {
 		return fmt.Errorf("coverage Init index: %w", err)
 	}
 
-	return s.migrateIfNeeded()
-}
-
-func (s *coverageStoreImpl) migrateIfNeeded() error {
-	var entryCount int
-	if err := s.db.Get(&entryCount, "SELECT COUNT(*) FROM coverage_entry"); err != nil {
-		return fmt.Errorf("migrateIfNeeded count entries: %w", err)
-	}
-	if entryCount > 0 {
-		return nil
-	}
-
-	var coverageCount int
-	if err := s.db.Get(&coverageCount, "SELECT COUNT(*) FROM coverage"); err != nil {
-		return fmt.Errorf("migrateIfNeeded count coverages: %w", err)
-	}
-	if coverageCount == 0 {
-		return nil
-	}
-
-	return s.migrateFromContents()
-}
-
-func (s *coverageStoreImpl) migrateFromContents() error {
-	var rows []struct {
-		ID       int64     `db:"id"`
-		Contents string    `db:"contents"`
-	}
-	if err := s.db.Select(&rows, "SELECT id, contents FROM coverage"); err != nil {
-		return fmt.Errorf("migrateFromContents select: %w", err)
-	}
-
-	for _, row := range rows {
-		var entries []*CoverageEntry
-		if err := json.Unmarshal([]byte(row.Contents), &entries); err != nil {
-			return fmt.Errorf("migrate: failed to parse contents for coverage %d: %w", row.ID, err)
-		}
-
-		if err := s.replaceEntries(row.ID, entries); err != nil {
-			return fmt.Errorf("migrate: failed to insert entries for coverage %d: %w", row.ID, err)
-		}
-	}
-
 	return nil
 }
 

@@ -255,19 +255,5 @@ func (s *udmStore) initialize() error {
 		return fmt.Errorf("initialize schema_value: %w", err)
 	}
 
-	// migration: drop revision column from udm_value if present
-	var hasRevision bool
-	err = s.db.Get(&hasRevision,
-		`SELECT COUNT(*) > 0 FROM pragma_table_info('udm_value') WHERE name = 'revision'`)
-	if err != nil {
-		return fmt.Errorf("migration check revision column: %w", err)
-	}
-	if hasRevision {
-		_, err = s.db.Exec(`ALTER TABLE udm_value DROP COLUMN revision`)
-		if err != nil {
-			return fmt.Errorf("migration drop revision column: %w", err)
-		}
-	}
-
 	return nil
 }
