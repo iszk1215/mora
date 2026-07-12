@@ -127,21 +127,48 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64, repoID *i
 	return nil
 }
 
-func (s *trackerStore) listTrackers(userID int64, page, perPage int) ([]TrackerResponse, int, error) {
-	countQuery := `
+func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perPage int) ([]TrackerResponse, int, error) {
+	loggedIn := userID > 0
+	hasQuery := searchQuery != ""
+
+	var whereClause string
+	var args []interface{}
+
+	// JOIN args are always needed (userID for member/like joins)
+	joinArgs := []interface{}{userID, userID}
+
+	switch {
+	case !hasQuery && loggedIn:
+		// No query, logged in: user's trackers only (members + liked)
+		whereClause = "(m.user_id IS NOT NULL OR l.user_id IS NOT NULL)"
+		args = joinArgs
+	case hasQuery && loggedIn:
+		// Query provided, logged in: user's trackers + public, filtered by name
+		whereClause = "((m.user_id IS NOT NULL OR l.user_id IS NOT NULL) OR t.visibility = 'public') AND t.name LIKE ?"
+		args = append(joinArgs, "%"+searchQuery+"%")
+	case hasQuery && !loggedIn:
+		// Query provided, not logged in: public only, filtered by name
+		whereClause = "t.visibility = 'public' AND t.name LIKE ?"
+		args = append(joinArgs, "%"+searchQuery+"%")
+	default:
+		// No query, not logged in: empty result
+		return []TrackerResponse{}, 0, nil
+	}
+
+	countQuery := fmt.Sprintf(`
 		SELECT COUNT(*)
 		FROM tracker t
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
 		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
-		WHERE m.user_id IS NOT NULL OR l.user_id IS NOT NULL`
+		WHERE %s`, whereClause)
 
 	var total int
-	err := s.db.Get(&total, countQuery, userID, userID)
+	err := s.db.Get(&total, countQuery, args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("listTrackers count: %w", err)
 	}
 
-	query := `
+	selectQuery := fmt.Sprintf(`
 		SELECT t.id, t.name, t.visibility, t.type, t.chart_config,
 		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
@@ -150,17 +177,20 @@ func (s *trackerStore) listTrackers(userID int64, page, perPage int) ([]TrackerR
 		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
 		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
-		WHERE m.user_id IS NOT NULL OR l.user_id IS NOT NULL
-		ORDER BY t.name`
+		WHERE %s
+		ORDER BY t.name`, whereClause)
+
+	selectArgs := make([]interface{}, len(args))
+	copy(selectArgs, args)
+
+	if perPage > 0 {
+		selectQuery += " LIMIT ? OFFSET ?"
+		offset := (page - 1) * perPage
+		selectArgs = append(selectArgs, perPage, offset)
+	}
 
 	rows := []TrackerResponse{}
-	if perPage > 0 {
-		query += " LIMIT ? OFFSET ?"
-		offset := (page - 1) * perPage
-		err = s.db.Select(&rows, query, userID, userID, perPage, offset)
-	} else {
-		err = s.db.Select(&rows, query, userID, userID)
-	}
+	err = s.db.Select(&rows, selectQuery, selectArgs...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("listTrackers select: %w", err)
 	}

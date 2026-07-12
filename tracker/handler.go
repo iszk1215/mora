@@ -241,7 +241,15 @@ func (h *trackerHandler) requireReadPermission(next http.Handler) http.Handler {
 func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
-		render.JSON(w, ListTrackersResponse{Trackers: []TrackerResponse{}, Total: 0, Page: 1, PerPage: 0}, http.StatusOK)
+		uid = 0
+	}
+
+	q := r.URL.Query().Get("q")
+
+	if q == "" && !ok {
+		render.JSON(w, ListTrackersResponse{
+			Trackers: []TrackerResponse{}, Total: 0, Page: 1, PerPage: 0,
+		}, http.StatusOK)
 		return
 	}
 
@@ -259,7 +267,7 @@ func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	trackers, total, err := h.store.listTrackers(uid, page, perPage)
+	trackers, total, err := h.store.listTrackers(uid, q, page, perPage)
 	if err != nil {
 		log.Error().Err(err).Msg("tracker.handler.listTrackers")
 		render.InternalError(w, err)

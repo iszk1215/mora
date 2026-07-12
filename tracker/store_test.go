@@ -108,14 +108,14 @@ func TestStoreFindTracker(t *testing.T) {
 	})
 
 	t.Run("list for non-member user returns empty", func(t *testing.T) {
-		trackers, total, err := s.listTrackers(999, 0, 0)
+		trackers, total, err := s.listTrackers(999, "", 0, 0)
 		require.NoError(t, err)
 		require.Empty(t, trackers)
 		require.Equal(t, 0, total)
 	})
 
 	t.Run("list for owner user returns tracker", func(t *testing.T) {
-		trackers, total, err := s.listTrackers(1, 0, 0)
+		trackers, total, err := s.listTrackers(1, "", 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
 		require.Equal(t, 1, total)
@@ -129,7 +129,7 @@ func TestStoreFindTracker(t *testing.T) {
 			tr := &TrackerModel{Name: fmt.Sprintf("paginate_%d", i)}
 			require.NoError(t, s.addTracker(tr, 1, nil))
 		}
-		trackers, total, err := s.listTrackers(1, 1, 3)
+		trackers, total, err := s.listTrackers(1, "", 1, 3)
 		require.NoError(t, err)
 		require.Equal(t, 3, len(trackers))
 		require.Equal(t, 6, total)
@@ -504,7 +504,7 @@ func TestStoreLike(t *testing.T) {
 		err := s.addLike(999, tr.Id)
 		require.NoError(t, err)
 
-		trackers, _, err := s.listTrackers(999, 0, 0)
+		trackers, _, err := s.listTrackers(999, "", 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
 		require.True(t, trackers[0].Liked)
@@ -515,7 +515,7 @@ func TestStoreLike(t *testing.T) {
 		err := s.removeLike(999, tr.Id)
 		require.NoError(t, err)
 
-		trackers, _, err := s.listTrackers(999, 0, 0)
+		trackers, _, err := s.listTrackers(999, "", 0, 0)
 		require.NoError(t, err)
 		require.Empty(t, trackers)
 	})
@@ -531,7 +531,7 @@ func TestStoreLike(t *testing.T) {
 		err = s.addLike(888, tr.Id)
 		require.NoError(t, err)
 
-		trackers, _, err := s.listTrackers(888, 0, 0)
+		trackers, _, err := s.listTrackers(888, "", 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
 	})
@@ -551,7 +551,7 @@ func TestStoreTrackerListUserScoped(t *testing.T) {
 	require.NoError(t, s.addLike(2, tr1.Id))
 
 	t.Run("user 1 sees owned trackers with liked flag", func(t *testing.T) {
-		trackers, total, err := s.listTrackers(1, 0, 0)
+		trackers, total, err := s.listTrackers(1, "", 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 2, len(trackers))
 		require.Equal(t, 2, total)
@@ -561,7 +561,7 @@ func TestStoreTrackerListUserScoped(t *testing.T) {
 	})
 
 	t.Run("user 2 sees liked trackers only", func(t *testing.T) {
-		trackers, total, err := s.listTrackers(2, 0, 0)
+		trackers, total, err := s.listTrackers(2, "", 0, 0)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
 		require.Equal(t, 1, total)
@@ -571,7 +571,7 @@ func TestStoreTrackerListUserScoped(t *testing.T) {
 	})
 
 	t.Run("user 3 sees nothing", func(t *testing.T) {
-		trackers, total, err := s.listTrackers(3, 0, 0)
+		trackers, total, err := s.listTrackers(3, "", 0, 0)
 		require.NoError(t, err)
 		require.Empty(t, trackers)
 		require.Equal(t, 0, total)
@@ -579,7 +579,70 @@ func TestStoreTrackerListUserScoped(t *testing.T) {
 
 	t.Run("tracker delete cascades to member and like", func(t *testing.T) {
 		require.NoError(t, s.deleteTracker(tr1.Id))
-		trackers, total, err := s.listTrackers(2, 0, 0)
+		trackers, total, err := s.listTrackers(2, "", 0, 0)
+		require.NoError(t, err)
+		require.Empty(t, trackers)
+		require.Equal(t, 0, total)
+	})
+}
+
+func TestStoreTrackerSearch(t *testing.T) {
+	s := initTestStore(t)
+
+	// User 1 owns "tracker_alpha" (private) and "tracker_beta" (public)
+	tr1 := &TrackerModel{Name: "tracker_alpha", Visibility: "private"}
+	require.NoError(t, s.addTracker(tr1, 1, nil))
+
+	tr2 := &TrackerModel{Name: "tracker_beta", Visibility: "public"}
+	require.NoError(t, s.addTracker(tr2, 1, nil))
+
+	// User 2 owns "public_gamma"
+	tr3 := &TrackerModel{Name: "public_gamma", Visibility: "public"}
+	require.NoError(t, s.addTracker(tr3, 2, nil))
+
+	t.Run("logged in, no query returns user's trackers", func(t *testing.T) {
+		trackers, total, err := s.listTrackers(1, "", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 2, total)
+		require.Equal(t, 2, len(trackers))
+	})
+
+	t.Run("logged in, query matches user's trackers and public", func(t *testing.T) {
+		trackers, total, err := s.listTrackers(1, "tracker", 0, 0)
+		require.NoError(t, err)
+		// user 1's trackers matching "tracker": tracker_alpha, tracker_beta
+		// public trackers matching "tracker": tracker_beta (already counted)
+		require.Equal(t, 2, total)
+		require.Equal(t, 2, len(trackers))
+	})
+
+	t.Run("logged in, query matches only public from other user", func(t *testing.T) {
+		trackers, total, err := s.listTrackers(1, "gamma", 0, 0)
+		require.NoError(t, err)
+		// user 1's trackers: none match "gamma"
+		// public trackers: "public_gamma" matches "gamma"
+		require.Equal(t, 1, total)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, tr3.Id, trackers[0].Id)
+	})
+
+	t.Run("not logged in, no query returns empty", func(t *testing.T) {
+		trackers, total, err := s.listTrackers(0, "", 0, 0)
+		require.NoError(t, err)
+		require.Empty(t, trackers)
+		require.Equal(t, 0, total)
+	})
+
+	t.Run("not logged in, query matches public only", func(t *testing.T) {
+		trackers, total, err := s.listTrackers(0, "gamma", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 1, total)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, tr3.Id, trackers[0].Id)
+	})
+
+	t.Run("not logged in, query does not match private", func(t *testing.T) {
+		trackers, total, err := s.listTrackers(0, "alpha", 0, 0)
 		require.NoError(t, err)
 		require.Empty(t, trackers)
 		require.Equal(t, 0, total)

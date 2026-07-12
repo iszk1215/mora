@@ -227,6 +227,80 @@ func TestHandlerListTrackers(t *testing.T) {
 	})
 }
 
+func TestHandlerListTrackersSearch(t *testing.T) {
+	t.Run("anonymous with query searches public only", func(t *testing.T) {
+		store := initTestStore(t)
+		tr1 := &TrackerModel{Name: "alpha", Visibility: "private"}
+		tr2 := &TrackerModel{Name: "alpha_public", Visibility: "public"}
+		tr3 := &TrackerModel{Name: "beta_public", Visibility: "public"}
+		require.NoError(t, store.addTracker(tr1, 1, nil))
+		require.NoError(t, store.addTracker(tr2, 2, nil))
+		require.NoError(t, store.addTracker(tr3, 2, nil))
+
+		h := newHandler(store, nil)
+		r := httptest.NewRequest(http.MethodGet, "/?q=alpha", nil)
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListTrackersResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, 1, len(got.Trackers))
+		require.Equal(t, tr2.Id, got.Trackers[0].Id)
+	})
+
+	t.Run("anonymous without query returns empty", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test", Visibility: "public"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListTrackersResponse
+		unmarshalResponse(t, res, &got)
+		require.Empty(t, got.Trackers)
+	})
+
+	t.Run("logged in with query searches user and public", func(t *testing.T) {
+		store := initTestStore(t)
+		tr1 := &TrackerModel{Name: "my_tracker", Visibility: "private"}
+		tr2 := &TrackerModel{Name: "public_tracker", Visibility: "public"}
+		tr3 := &TrackerModel{Name: "other_public", Visibility: "public"}
+		require.NoError(t, store.addTracker(tr1, 1, nil))
+		require.NoError(t, store.addTracker(tr2, 2, nil))
+		require.NoError(t, store.addTracker(tr3, 2, nil))
+
+		h := newHandler(store, nil)
+		r := httptest.NewRequest(http.MethodGet, "/?q=tracker", nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListTrackersResponse
+		unmarshalResponse(t, res, &got)
+		// "my_tracker" matches (user 1's), "public_tracker" matches (public)
+		// "other_public" does not match "tracker"
+		require.Equal(t, 2, len(got.Trackers))
+	})
+
+	t.Run("logged in without query returns user's trackers", func(t *testing.T) {
+		store := initTestStore(t)
+		tr1 := &TrackerModel{Name: "my_tracker"}
+		tr2 := &TrackerModel{Name: "other_tracker"}
+		require.NoError(t, store.addTracker(tr1, 1, nil))
+		require.NoError(t, store.addTracker(tr2, 2, nil))
+
+		h := newHandler(store, nil)
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListTrackersResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, 1, len(got.Trackers))
+		require.Equal(t, tr1.Id, got.Trackers[0].Id)
+	})
+}
+
 func TestHandlerDeleteTracker(t *testing.T) {
 	t.Run("delete existing tracker as member", func(t *testing.T) {
 		store := initTestStore(t)
