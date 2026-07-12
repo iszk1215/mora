@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData, useRouteError, useMatches, isRouteErrorResponse } from 'react-router'
-import { RepoList, SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache } from './main'
-import { loadUdmMetrics } from './udm'
+import { SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache } from './main'
 
 vi.mock('react-dom/client', () => ({
   default: { createRoot: () => ({ render: vi.fn() }) },
@@ -19,11 +18,6 @@ vi.mock('react-router', async () => {
     isRouteErrorResponse: vi.fn(),
     ScrollRestoration: () => null,
   }
-})
-
-vi.mock('./udm', async () => {
-  const actual = await vi.importActual('./udm')
-  return { ...actual, loadUdmMetrics: vi.fn() }
 })
 
 describe('makeBredcrumbs', () => {
@@ -174,57 +168,6 @@ describe('ErrorPage', () => {
     vi.mocked(isRouteErrorResponse).mockReturnValue(true)
     render(<MemoryRouter><ErrorPage /></MemoryRouter>)
     expect(screen.getByText('Not Found')).toBeInTheDocument()
-  })
-})
-
-describe('RepoList', () => {
-  beforeEach(() => {
-    vi.mocked(useLoaderData).mockReset()
-    vi.mocked(loadUdmMetrics).mockReset()
-  })
-
-  it('renders repo URLs', () => {
-    vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://example.com/repo', namespace: 'ns', name: 'repo' },
-    ])
-    vi.mocked(loadUdmMetrics).mockResolvedValue([])
-    render(<MemoryRouter><RepoList /></MemoryRouter>)
-    expect(screen.getByText('https://example.com/repo')).toBeInTheDocument()
-  })
-
-  it('renders coverage link for each repo', async () => {
-    vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://example.com/repo', namespace: 'ns', name: 'repo' },
-    ])
-    vi.mocked(loadUdmMetrics).mockResolvedValue([])
-    render(<MemoryRouter><RepoList /></MemoryRouter>)
-    const coverageLink = await screen.findByText('coverage')
-    expect(coverageLink).toBeInTheDocument()
-    expect(coverageLink.closest('a')).toHaveAttribute('href', '/repos/1/coverages')
-  })
-
-  it('renders UDM metric links', async () => {
-    vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://example.com/repo', namespace: 'ns', name: 'repo' },
-    ])
-    vi.mocked(loadUdmMetrics).mockResolvedValue([
-      { id: 10, repod_id: 1, name: 'custom-metric' },
-    ])
-    render(<MemoryRouter><RepoList /></MemoryRouter>)
-    const udmLink = await screen.findByText('custom-metric')
-    expect(udmLink).toBeInTheDocument()
-    expect(udmLink.closest('a')).toHaveAttribute('href', '/repos/1/udm/metrics/10')
-  })
-
-  it('renders multiple repos', () => {
-    vi.mocked(useLoaderData).mockReturnValue([
-      { id: 1, url: 'https://example.com/repo1', namespace: 'ns1', name: 'repo1' },
-      { id: 2, url: 'https://example.com/repo2', namespace: 'ns2', name: 'repo2' },
-    ])
-    vi.mocked(loadUdmMetrics).mockResolvedValue([])
-    render(<MemoryRouter><RepoList /></MemoryRouter>)
-    expect(screen.getByText('https://example.com/repo1')).toBeInTheDocument()
-    expect(screen.getByText('https://example.com/repo2')).toBeInTheDocument()
   })
 })
 

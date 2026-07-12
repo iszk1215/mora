@@ -16,10 +16,10 @@ import { RouterProvider } from 'react-router/dom'
 import 'react-datepicker/dist/react-datepicker.css'
 import './index.css'
 
-import { Repo, UserData } from './core'
+import { UserData, TrackerResponse } from './core'
 import { coverageRoute } from './coverage'
-import { udmRoute, loadUdmMetrics } from './udm'
-import { trackerRoute } from './tracker'
+import { udmRoute } from './udm'
+import { trackerRoute, listTrackers, TrackerCard, fetchPreview, PreviewData } from './tracker'
 import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
 import { PasswordLoginForm } from './auth'
@@ -34,61 +34,89 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 
-// RepoList
+// Tracker Search Page (top page)
 
-interface Metric {
-  name: string,
-  link: string,
-}
+const TrackerSearchPage = (): React.JSX.Element => {
+  const [query, setQuery] = useState('')
+  const [trackers, setTrackers] = useState<TrackerResponse[]>([])
+  const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
+  const [searching, setSearching] = useState(false)
+  const [initial, setInitial] = useState(true)
 
-async function loadMetrics(repo_id: number): Promise<Metric[]> {
-  const metrics: Metric[] = [{ name: "coverage", link: "coverages" }]
-
-  const udmMetrics = await loadUdmMetrics(repo_id)
-  const tmp: Metric[] = udmMetrics.map(
-    (m): Metric => ({ name: m.name, link: `udm/metrics/${m.id}` }))
-
-  return metrics.concat(tmp)
-}
-
-export async function loadRepoList(): Promise<Repo[]> {
-  const data = await fetch('/api/repos')
-  const json = await data.json()
-  return json
-}
-
-export const RepoList = (): React.JSX.Element => {
-  const repos: Repo[] = useLoaderData() as Repo[]
-
-  const [metrics, setMetrics] = useState<Metric[][]>([])
-
+  // Initial load: fetch user's trackers if logged in
   useEffect(() => {
-    Promise.all(
-      repos.map((r: Repo) => loadMetrics(r.id))).then(setMetrics).catch(() => {})
+    listTrackers(1, 100)
+      .then((data) => {
+        setTrackers(data.trackers)
+        setInitial(false)
+        return undefined
+      })
+      .catch(() => setInitial(false))
   }, [])
 
-
-  const elems: React.JSX.Element[] = []
-
-  repos.forEach((repo: Repo, i: number) => {
-    let metricElems: React.JSX.Element[] = []
-    if (metrics.length > 0) {
-      metricElems = metrics[i].map((m, j) =>
-        <li key={j}>
-          <DefaultLink to={`/repos/${repo.id}/${m.link}`}>{m.name}</DefaultLink>
-        </li>
+  // Fetch previews when trackers change
+  useEffect(() => {
+    if (trackers.length === 0) return
+    const loadAll = async () => {
+      const entries = await Promise.all(
+        trackers.map(async (t) => {
+          try {
+            const data = await fetchPreview(t.id)
+            return [t.id, data] as const
+          } catch {
+            return null
+          }
+        })
       )
+      const map = new Map<number, PreviewData>()
+      for (const entry of entries) {
+        if (entry) map.set(entry[0], entry[1])
+      }
+      setPreviews(map)
     }
-    elems.push(
-      <li className="mb-4" key={i}>
-        <h2 className="text-lg">{repo.url}</h2>
-        <ul className="list-inside list-disc pl-8">{metricElems}</ul>
-      </li>)
-  })
+    void loadAll()
+  }, [trackers])
+
+  const handleSearch = async () => {
+    const q = query.trim()
+    setSearching(true)
+    try {
+      const data = await listTrackers(1, 12, q || undefined)
+      setTrackers(data.trackers)
+    } catch {
+      setTrackers([])
+    } finally {
+      setSearching(false)
+    }
+  }
 
   return (
     <div>
-      <ul className="list-inside">{elems}</ul>
+      <div className="flex gap-2 mb-6">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          placeholder="Search trackers..."
+          className="flex-1 border rounded px-3 py-2"
+        />
+        <Button onClick={handleSearch} disabled={searching}>
+          Search
+        </Button>
+      </div>
+      {initial && <p className="text-muted-foreground">Loading...</p>}
+      {!initial && !searching && trackers.length === 0 && !query && (
+        <p className="text-muted-foreground">No trackers. Create one from the menu.</p>
+      )}
+      {!searching && trackers.length === 0 && query && (
+        <p className="text-muted-foreground">No trackers found.</p>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {trackers.map((t) => (
+          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -410,8 +438,7 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <RepoList />,
-        loader: loadRepoList,
+        element: <TrackerSearchPage />,
       },
       {
         path: '/auth',

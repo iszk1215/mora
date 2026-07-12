@@ -46,7 +46,7 @@ interface PaginatedTrackers {
   per_page: number
 }
 
-interface PreviewData {
+export interface PreviewData {
   tracker: TrackerResponse
   series: Array<{
     series: SeriesModel
@@ -54,10 +54,11 @@ interface PreviewData {
   }>
 }
 
-async function listTrackers(page?: number, perPage?: number): Promise<PaginatedTrackers> {
+export async function listTrackers(page?: number, perPage?: number, query?: string): Promise<PaginatedTrackers> {
   const params = new URLSearchParams()
   if (page) params.set('page', String(page))
   if (perPage) params.set('per_page', String(perPage))
+  if (query) params.set('q', query)
   const qs = params.toString()
   const url = qs ? `/api/tracker?${qs}` : '/api/tracker'
   const resp = await fetch(url)
@@ -65,7 +66,7 @@ async function listTrackers(page?: number, perPage?: number): Promise<PaginatedT
   return resp.json()
 }
 
-async function fetchPreview(trackerId: number): Promise<PreviewData> {
+export async function fetchPreview(trackerId: number): Promise<PreviewData> {
   const resp = await fetch(`/api/tracker/${trackerId}/preview`)
   if (!resp.ok) throw resp
   return resp.json()
@@ -159,7 +160,7 @@ export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise
   return listSeries(parseInt(params.trackerId))
 }
 
-const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean }): React.JSX.Element => {
+export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean }): React.JSX.Element => {
   const option = useMemo(() => {
     const datasets = preview?.series?.map((sv) => {
       let seriesConfig: SeriesConfig | undefined
