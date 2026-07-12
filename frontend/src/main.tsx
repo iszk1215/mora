@@ -92,23 +92,20 @@ const TrackerSearchPage = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="flex gap-2 mb-6">
+      <div className="flex justify-center items-center gap-2 mb-6">
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Search trackers..."
-          className="flex-1 border rounded px-3 py-2"
+          className="w-96 border rounded px-3 py-2"
         />
         <Button onClick={handleSearch} disabled={searching}>
           Search
         </Button>
       </div>
       {initial && <p className="text-muted-foreground">Loading...</p>}
-      {!initial && !searching && trackers.length === 0 && !query && (
-        <p className="text-muted-foreground">No trackers. Create one from the menu.</p>
-      )}
       {!searching && trackers.length === 0 && query && (
         <p className="text-muted-foreground">No trackers found.</p>
       )}
