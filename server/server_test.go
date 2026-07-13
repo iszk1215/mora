@@ -846,9 +846,9 @@ func TestTrackerEndpointIsMounted(t *testing.T) {
 
 	handler := server.Handler()
 
-	t.Run("GET /api/tracker returns 200", func(t *testing.T) {
+	t.Run("GET /api/trackers returns 200", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, "/api/tracker", nil)
+		r := httptest.NewRequest(http.MethodGet, "/api/trackers", nil)
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()
@@ -864,10 +864,10 @@ func TestTrackerEndpointIsMounted(t *testing.T) {
 		require.Empty(t, resp.Trackers)
 	})
 
-	t.Run("POST /api/tracker requires auth", func(t *testing.T) {
+	t.Run("POST /api/trackers requires auth", func(t *testing.T) {
 		body := `{"name":"integration_test","visibility":"private"}`
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/api/tracker", strings.NewReader(body))
+		r := httptest.NewRequest(http.MethodPost, "/api/trackers", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
 		handler.ServeHTTP(w, r)
 
@@ -903,7 +903,7 @@ func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
 
 	body := `{"name":"test","visibility":"private"}`
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/tracker", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/api/trackers", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
 	handler.ServeHTTP(w, r)
@@ -937,7 +937,7 @@ func TestRequireTrackerAuth_APIKey(t *testing.T) {
 
 	body := `{"name":"api_test","visibility":"private"}`
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/tracker", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/api/trackers", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Authorization", "Bearer "+key)
 	handler.ServeHTTP(w, r)
@@ -963,7 +963,7 @@ func TestRequireTrackerAuth_AnonymousFallback(t *testing.T) {
 
 	body := `{"name":"anon_test","visibility":"private"}`
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/tracker", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/api/trackers", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	handler.ServeHTTP(w, r)
 

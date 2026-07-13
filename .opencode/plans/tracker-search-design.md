@@ -22,10 +22,10 @@ Add a tracker search feature to the top page (`/`). Users can search trackers by
 
 ## API Change
 
-`GET /api/tracker` — add `q` query parameter:
+`GET /api/trackers` — add `q` query parameter:
 
 ```
-GET /api/tracker?q=mora&page=1&per_page=12
+GET /api/trackers?q=mora&page=1&per_page=12
 ```
 
 - `q`: Text search (partial match on tracker name, `LIKE '%query%'`)
@@ -88,7 +88,7 @@ Key change: Previously, anonymous users always got an empty list. Now they can s
 
 ## Frontend Changes
 
-### `frontend/src/tracker.tsx`
+### `frontend/src/trackers.tsx`
 
 **Export TrackerCard** (currently module-private):
 
@@ -106,7 +106,7 @@ async function listTrackers(page?: number, perPage?: number, query?: string): Pr
   if (perPage) params.set('per_page', String(perPage))
   if (query) params.set('q', query)
   const qs = params.toString()
-  const url = qs ? `/api/tracker?${qs}` : '/api/tracker'
+  const url = qs ? `/api/trackers?${qs}` : '/api/trackers'
   const resp = await fetch(url)
   if (!resp.ok) throw resp
   return resp.json()
@@ -199,7 +199,7 @@ Top Page (/)
 
 - Logged in, no query: Shows user's trackers (members + liked) in card grid
 - After searching: Shows filtered results (user's matching + public matching)
-- TrackerCard component is shared with the `/tracker` (My Trackers) page
+- TrackerCard component is shared with the `/trackers` (My Trackers) page
 
 ## Files Changed
 
@@ -207,7 +207,7 @@ Top Page (/)
 |------|--------|
 | `tracker/store.go` | Add `query string` param to `listTrackers`, SQL branching |
 | `tracker/handler.go` | Parse `?q=` param, handle anonymous + no query |
-| `frontend/src/tracker.tsx` | Export `TrackerCard`, add `query` param to `listTrackers` API function |
+| `frontend/src/trackers.tsx` | Export `TrackerCard`, add `query` param to `listTrackers` API function |
 | `frontend/src/main.tsx` | Replace `RepoList` with `TrackerSearchPage`, remove `loadRepoList` |
 | `tracker/store_test.go` | Add tests for search query |
 | `tracker/handler_test.go` | Add tests for `?q=` param and anonymous behavior |

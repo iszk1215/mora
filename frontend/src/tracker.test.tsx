@@ -52,7 +52,7 @@ describe('loadTrackerList', () => {
 
     const result = await loadTrackerList()
     expect(result).toEqual(mockResponse)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker?page=1&per_page=12')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers?page=1&per_page=12')
   })
 
   it('throws on non-ok response', async () => {
@@ -88,7 +88,7 @@ describe('loadTrackerDetail', () => {
     const args = { params, request: {} as Request, url: new URL('http://localhost'), pattern: '/', context: {} }
     const result = await loadTrackerDetail(args)
     expect(result).toEqual(mockResponse)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1/series')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series')
   })
 
   it('throws on missing trackerId', async () => {
@@ -116,7 +116,7 @@ describe('patchTracker', () => {
 
     const result = await patchTracker(1, { visibility: 'public' })
     expect(result).toEqual(updated)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1', {
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ visibility: 'public' }),
@@ -132,7 +132,7 @@ describe('patchTracker', () => {
 
     const result = await patchTracker(1, { chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}' })
     expect(result).toEqual(updated)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1', {
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}' }),
@@ -163,7 +163,7 @@ describe('TrackerView', () => {
     vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
     render(<MemoryRouter><TrackerView /></MemoryRouter>)
     const link = screen.getByText('Create Tracker').closest('a')
-    expect(link).toHaveAttribute('href', '/tracker/new')
+    expect(link).toHaveAttribute('href', '/trackers/new')
   })
 
   it('renders tracker cards', () => {
@@ -239,7 +239,7 @@ describe('TrackerCreate', () => {
     expect(screen.getByText('Cancel')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Private')).toBeInTheDocument()
     const cancelLink = screen.getByText('Cancel').closest('a')
-    expect(cancelLink).toHaveAttribute('href', '/tracker')
+    expect(cancelLink).toHaveAttribute('href', '/trackers')
   })
 
   it('creates tracker and navigates on submit', async () => {
@@ -260,12 +260,12 @@ describe('TrackerCreate', () => {
     createBtn.click()
 
     await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker', {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'new-tracker', visibility: 'private', type: 'tracker' }),
       })
-      expect(mockNavigate).toHaveBeenCalledWith('/tracker/42')
+      expect(mockNavigate).toHaveBeenCalledWith('/trackers/42')
     })
   })
 
@@ -399,7 +399,7 @@ describe('TrackerDetailEdit', () => {
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
     const backLink = screen.getByText(/Back to Tracker/).closest('a')
-    expect(backLink).toHaveAttribute('href', '/tracker/1')
+    expect(backLink).toHaveAttribute('href', '/trackers/1')
   })
 
   it('renders visibility selector', () => {
@@ -483,7 +483,7 @@ describe('TrackerDetailEdit', () => {
     saveBtn.click()
 
     await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1/series/10', {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/10', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config: '{"value_format":"%.1f"}' }),
@@ -514,7 +514,7 @@ describe('TrackerDetailEdit', () => {
     saveBtn.click()
 
     await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/tracker/1/series/10', {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/10', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config: '{}' }),
