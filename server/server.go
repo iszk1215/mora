@@ -333,7 +333,7 @@ func (s *MoraServer) Handler() http.Handler {
 	})
 
 	if s.tracker != nil {
-		r.With(s.requireTrackerAuth).Mount("/api/tracker", s.tracker.Handler())
+		r.With(s.requireTrackerAuth).Mount("/api/trackers", s.tracker.Handler())
 	}
 
 	// login/logout

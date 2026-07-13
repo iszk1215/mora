@@ -1,4 +1,4 @@
-# `/api/tracker` 設計書 (v13)
+# `/api/trackers` 設計書 (v13)
 
 - **v7**: 二重認証（Session + API Key）設計 + フロントエンド設計を追加
 - **v8**: ユーザー権限管理（track_member/track_like）、スーパーユーザー、フロントエンド閲覧/編集分離
@@ -16,7 +16,7 @@
 - **パッケージ**: `tracker`
 - **テーブル**: `tracker`, `tracker_series`, `tracker_value`, `tracker_member`, `tracker_like`, `tracker_coverage`
 - **Go ファイル**: `tracker/store.go`, `tracker/handler.go`, `tracker/service.go`, `tracker/provider.go`
-- **フロントエンド**: `frontend/src/tracker.tsx`, `frontend/src/tracker_coverage.tsx`, `frontend/src/chart.tsx`
+- **フロントエンド**: `frontend/src/trackers.tsx`, `frontend/src/trackers_coverage.tsx`, `frontend/src/chart.tsx`
 - **既存ファイルの変更**: `server/server.go`（マウント + middleware）, `server/session.go`, `coverage/coverage_store.go`（`Timeline()` 追加）
 - **CLIは実装しない**
 - **OpenAPI**: swaggo コメント付き
@@ -262,20 +262,20 @@ func isAuthenticated(ctx context.Context) bool {
 
 | Method | Path | Success | Error |
 |--------|------|---------|-------|
-| GET | `/api/tracker` | 200 | - |
-| POST | `/api/tracker` | 201 | 400 |
-| DELETE | `/api/tracker/{trackerId}` | 204 | 400, 403, 404 |
-| PATCH | `/api/tracker/{trackerId}` | 200 | 400, 403, 404 |
-| GET | `/api/tracker/{trackerId}/preview` | 200 | 400, 404 |
-| GET | `/api/tracker/{trackerId}/series` | 200 | 400, 404 |
-| POST | `/api/tracker/{trackerId}/series` | 201 | 400, 403, 404 |
-| PATCH | `/api/tracker/{trackerId}/series/{seriesId}` | 200 | 400, 403, 404 |
-| DELETE | `/api/tracker/{trackerId}/series/{seriesId}` | 204 | 400, 403, 404 |
-| GET | `/api/tracker/{trackerId}/series/{seriesId}/values` | 200 | 400, 404 |
-| POST | `/api/tracker/{trackerId}/series/{seriesId}/values` | 201 | 400, 403, 404 |
-| DELETE | `/api/tracker/{trackerId}/series/{seriesId}/values` | 204 | 400, 403, 404 |
-| POST | `/api/tracker/{trackerId}/like` | 201 | 400, 404 |
-| DELETE | `/api/tracker/{trackerId}/like` | 204 | 400, 404 |
+| GET | `/api/trackers` | 200 | - |
+| POST | `/api/trackers` | 201 | 400 |
+| DELETE | `/api/trackers/{trackerId}` | 204 | 400, 403, 404 |
+| PATCH | `/api/trackers/{trackerId}` | 200 | 400, 403, 404 |
+| GET | `/api/trackers/{trackerId}/preview` | 200 | 400, 404 |
+| GET | `/api/trackers/{trackerId}/series` | 200 | 400, 404 |
+| POST | `/api/trackers/{trackerId}/series` | 201 | 400, 403, 404 |
+| PATCH | `/api/trackers/{trackerId}/series/{seriesId}` | 200 | 400, 403, 404 |
+| DELETE | `/api/trackers/{trackerId}/series/{seriesId}` | 204 | 400, 403, 404 |
+| GET | `/api/trackers/{trackerId}/series/{seriesId}/values` | 200 | 400, 404 |
+| POST | `/api/trackers/{trackerId}/series/{seriesId}/values` | 201 | 400, 403, 404 |
+| DELETE | `/api/trackers/{trackerId}/series/{seriesId}/values` | 204 | 400, 403, 404 |
+| POST | `/api/trackers/{trackerId}/like` | 201 | 400, 404 |
+| DELETE | `/api/trackers/{trackerId}/like` | 204 | 400, 404 |
 
 - POST は全エンドポイント **201 Created**
 - DELETE は **204 No Content**
@@ -300,7 +300,7 @@ func isAuthenticated(ctx context.Context) bool {
 
 ### Track
 
-#### GET /api/tracker — トラッカー一覧 (ページネーション対応)
+#### GET /api/trackers — トラッカー一覧 (ページネーション対応)
 
 ```go
 // ListTrackers godoc
@@ -309,7 +309,7 @@ func isAuthenticated(ctx context.Context) bool {
 // @Tags         tracker
 // @Success      200  {object}  tracker.ListTrackersResponse
 // @Failure      401  {object}  core.ErrorResponse
-// @Router       /api/tracker [get]
+// @Router       /api/trackers [get]
 func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -333,7 +333,7 @@ Response 200:
 }
 ```
 
-#### POST /api/tracker — トラッカー作成
+#### POST /api/trackers — トラッカー作成
 
 ```go
 // CreateTracker godoc
@@ -347,7 +347,7 @@ Response 200:
 // @Success      201   {object}  tracker.TrackerModel
 // @Failure      400   {object}  core.ErrorResponse
 // @Failure      401   {object}  core.ErrorResponse
-// @Router       /api/tracker [post]
+// @Router       /api/trackers [post]
 func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -373,7 +373,7 @@ Response 201:
 - type=`"coverage"` で常に series/values は空
 - リクエストボディ 1MB 制限（`MaxBytesReader`）
 
-#### DELETE /api/tracker/{trackerId} — トラッカー削除
+#### DELETE /api/trackers/{trackerId} — トラッカー削除
 
 ```go
 // DeleteTracker godoc
@@ -386,14 +386,14 @@ Response 201:
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId} [delete]
+// @Router       /api/trackers/{trackerId} [delete]
 func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 ```
 
 - `requireEditPermission` ミドルウェアにより権限チェック
 - 存在しない → 404
 
-#### PATCH /api/tracker/{trackerId} — トラッカー更新
+#### PATCH /api/trackers/{trackerId} — トラッカー更新
 
 ```go
 // PatchTracker godoc
@@ -409,7 +409,7 @@ func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId} [patch]
+// @Router       /api/trackers/{trackerId} [patch]
 func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -433,7 +433,7 @@ Response 200:
 - `visibility` は `"public"` / `"unlisted"` / `"private"` のみ許可
 - `requireEditPermission` ミドルウェアにより権限チェック
 
-#### GET /api/tracker/{trackerId}/preview — トラッカープレビュー
+#### GET /api/trackers/{trackerId}/preview — トラッカープレビュー
 
 ```go
 // PreviewTracker godoc
@@ -446,7 +446,7 @@ Response 200:
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/preview [get]
+// @Router       /api/trackers/{trackerId}/preview [get]
 func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -481,7 +481,7 @@ Response 200 (coverage例):
 
 ### Like
 
-#### POST /api/tracker/{trackerId}/like — いいね
+#### POST /api/trackers/{trackerId}/like — いいね
 
 ```go
 // LikeTracker godoc
@@ -493,14 +493,14 @@ Response 200 (coverage例):
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/like [post]
+// @Router       /api/trackers/{trackerId}/like [post]
 func (h *trackerHandler) likeTracker(w http.ResponseWriter, r *http.Request) {
 ```
 
 - userID が nil → 403 Forbidden
 - 重複いいねは 201 で正常終了（INSERT OR IGNORE）
 
-#### DELETE /api/tracker/{trackerId}/like — いいね解除
+#### DELETE /api/trackers/{trackerId}/like — いいね解除
 
 ```go
 // UnlikeTracker godoc
@@ -512,7 +512,7 @@ func (h *trackerHandler) likeTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/like [delete]
+// @Router       /api/trackers/{trackerId}/like [delete]
 func (h *trackerHandler) unlikeTracker(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -523,7 +523,7 @@ func (h *trackerHandler) unlikeTracker(w http.ResponseWriter, r *http.Request) {
 
 ### Series
 
-#### GET /api/tracker/{trackerId}/series — シリーズ一覧
+#### GET /api/trackers/{trackerId}/series — シリーズ一覧
 
 type=`tracker`: 指定されたトラッカーに属する全シリーズを返す（従来通り）。
 type=`coverage`: 空配列 `[]` を返す。
@@ -538,7 +538,7 @@ type=`coverage`: 空配列 `[]` を返す。
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series [get]
+// @Router       /api/trackers/{trackerId}/series [get]
 func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -553,7 +553,7 @@ Response 200 (tracker):
 }
 ```
 
-#### POST /api/tracker/{trackerId}/series — シリーズ作成
+#### POST /api/trackers/{trackerId}/series — シリーズ作成
 
 ```go
 // CreateSeries godoc
@@ -569,7 +569,7 @@ Response 200 (tracker):
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series [post]
+// @Router       /api/trackers/{trackerId}/series [post]
 func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -588,7 +588,7 @@ Response 201:
 - `requireEditPermission` ミドルウェアにより権限チェック
 - type=`coverage` のトラッカーに対しては 400 Bad Request（`"cannot modify series for coverage tracker"`）
 
-#### PATCH /api/tracker/{trackerId}/series/{seriesId} — シリーズ更新
+#### PATCH /api/trackers/{trackerId}/series/{seriesId} — シリーズ更新
 
 ```go
 // PatchSeries godoc
@@ -605,7 +605,7 @@ Response 201:
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId} [patch]
+// @Router       /api/trackers/{trackerId}/series/{seriesId} [patch]
 func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -623,7 +623,7 @@ Response 200:
 - `data_type` は `"int"` / `"float"` のみ許可
 - type=`coverage` のトラッカーに対しては 400 Bad Request
 
-#### DELETE /api/tracker/{trackerId}/series/{seriesId} — シリーズ削除
+#### DELETE /api/trackers/{trackerId}/series/{seriesId} — シリーズ削除
 
 ```go
 // DeleteSeries godoc
@@ -637,7 +637,7 @@ Response 200:
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId} [delete]
+// @Router       /api/trackers/{trackerId}/series/{seriesId} [delete]
 func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -645,7 +645,7 @@ func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 
 ### Values
 
-#### GET /api/tracker/{trackerId}/series/{seriesId}/values — 値一覧
+#### GET /api/trackers/{trackerId}/series/{seriesId}/values — 値一覧
 
 ```go
 // ListValues godoc
@@ -659,7 +659,7 @@ func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [get]
+// @Router       /api/trackers/{trackerId}/series/{seriesId}/values [get]
 func (h *trackerHandler) listValues(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -676,7 +676,7 @@ Response 200:
 
 将来拡張案: `?after=<time>&limit=100`、`?from=...&to=...`
 
-#### POST /api/tracker/{trackerId}/series/{seriesId}/values — 値追加
+#### POST /api/trackers/{trackerId}/series/{seriesId}/values — 値追加
 
 ```go
 // CreateValue godoc
@@ -693,7 +693,7 @@ Response 200:
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [post]
+// @Router       /api/trackers/{trackerId}/series/{seriesId}/values [post]
 func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -711,7 +711,7 @@ Response 201:
 - 同一 series_id + time 重複 → 400
 - `requireEditPermission` ミドルウェアにより権限チェック
 
-#### DELETE /api/tracker/{trackerId}/series/{seriesId}/values — 値の全削除
+#### DELETE /api/trackers/{trackerId}/series/{seriesId}/values — 値の全削除
 
 ```go
 // DeleteValues godoc
@@ -725,7 +725,7 @@ Response 201:
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [delete]
+// @Router       /api/trackers/{trackerId}/series/{seriesId}/values [delete]
 func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 ```
 
@@ -763,7 +763,7 @@ preview ハンドラは `tracker_coverage.repo_id` を取得し、`CoverageTimel
 
 | 要素 | type=`tracker` | type=`coverage` |
 |------|---------------|-----------------|
-| カードクリック | `/tracker/{id}` | `/repos/{repo_id}/coverages` |
+| カードクリック | `/trackers/{id}` | `/repos/{repo_id}/coverages` |
 | detail view | 通常の series/values 管理 | チャート + リンクのみ |
 
 detail view では、coverage tracker の詳細ページに「カバレッジ詳細を見る」リンクを表示し、クリックで coverage ページに遷移する。URL 直接アクセス時もエラーにはせず、情報ページとして ECharts チャートを表示する。
@@ -989,7 +989,7 @@ s := &MoraServer{
 
 // マウント（SessionMiddleware より後、requireTrackerAuth でラップ）
 if s.tracker != nil {
-    r.With(s.requireTrackerAuth).Mount("/api/tracker", s.tracker.Handler())
+    r.With(s.requireTrackerAuth).Mount("/api/trackers", s.tracker.Handler())
 }
 ```
 
@@ -1150,7 +1150,7 @@ func (s *Service) CreateValue(seriesID int64, timestamp time.Time, value float64
 coverage store が `tracker.CoverageTimelineProvider` インターフェイスを実装する:
 
 ```go
-import "github.com/iszk1215/mora/tracker"
+import "github.com/iszk1215/mora/trackers"
 
 func (s *Store) Timeline(repoID int64, limit int) (map[string][]tracker.CoverageTimelinePoint, error)
 ```
@@ -1187,8 +1187,8 @@ trackerService, err := tracker.NewService(db, s.coverageStore)
 - `tracker/store_test.go` — Store 単体テスト（587行）
 - `tracker/handler_test.go` — Handler 単体テスト（1203行）
 - `tracker/service_test.go` — Service 単体テスト（109行）
-- `frontend/src/tracker.test.tsx` — フロントエンドコンポーネントテスト（524行）
-- `frontend/src/tracker_coverage.test.tsx` — Coverage tracker フロントエンドテスト（69行）
+- `frontend/src/trackers.test.tsx` — フロントエンドコンポーネントテスト（524行）
+- `frontend/src/trackers_coverage.test.tsx` — Coverage tracker フロントエンドテスト（69行）
 
 方法論:
 - in-memory sqlite3 (`:memory:?_loc=auto`)
@@ -1216,7 +1216,7 @@ trackerService, err := tracker.NewService(db, s.coverageStore)
 | ページネーション | なし | listTrackers page/per_page |
 | OpenAPI | なし | swaggo コメント + exported types |
 | CLI | あり | なし |
-| Preview エンドポイント | なし | `GET /tracker/{id}/preview` |
+| Preview エンドポイント | なし | `GET /trackers/{id}/preview` |
 | chart_config | なし | JSON（x/yラベル、area、legend、y_max） |
 | series config | なし | JSON（value_format） |
 | PATCH /series | なし | name/data_type/config 更新 |
@@ -1227,14 +1227,14 @@ trackerService, err := tracker.NewService(db, s.coverageStore)
 
 ### ルート構成
 
-top-level (`/tracker`、repo 非依存、`/scms` と同列):
+top-level (`/trackers`、repo 非依存、`/scms` と同列):
 
 | Path | Page | 説明 | 編集権限 |
 |------|------|------|---------|
-| `/tracker` | TrackerView | カードグリッド一覧（ページネーション + プレビューチャート） | なし |
-| `/tracker/new` | TrackerCreate | トラッカー作成フォーム（name + visibility + type/repoID） | 認証必須 |
-| `/tracker/:trackerId` | TrackerDetailView | トラッカー詳細（type=tracker: 閲覧+Like+ECharts / type=coverage: 情報表示+coverage link） | なし |
-| `/tracker/:trackerId/edit` | TrackerDetailEdit | トラッカー詳細編集（type=trackerのみ、type=coverageは非対応） | role 必須 |
+| `/trackers` | TrackerView | カードグリッド一覧（ページネーション + プレビューチャート） | なし |
+| `/trackers/new` | TrackerCreate | トラッカー作成フォーム（name + visibility + type/repoID） | 認証必須 |
+| `/trackers/:trackerId` | TrackerDetailView | トラッカー詳細（type=tracker: 閲覧+Like+ECharts / type=coverage: 情報表示+coverage link） | なし |
+| `/trackers/:trackerId/edit` | TrackerDetailEdit | トラッカー詳細編集（type=trackerのみ、type=coverageは非対応） | role 必須 |
 
 `main.tsx` に `trackerRoute` として登録:
 
@@ -1258,7 +1258,7 @@ export const trackerRoute = [
 ]
 ```
 
-### ファイル: `frontend/src/tracker.tsx`
+### ファイル: `frontend/src/trackers.tsx`
 
 #### 型定義（core.ts の TrackerResponse + tracker.tsx 内）
 
@@ -1288,21 +1288,21 @@ interface PreviewData {
 
 | 関数 | Method | Path | 説明 |
 |------|--------|------|------|
-| `listTrackers(page?, perPage?)` | GET | `/api/tracker` | ページネーション対応一覧 |
-| `fetchPreview(trackerId)` | GET | `/api/tracker/{id}/preview` | カードプレビュー（type=coverageも同一フォーマット） |
-| `createTracker(name, visibility, type?, repoId?, chartConfig?)` | POST | `/api/tracker` | トラッカー作成 |
-| `patchTracker(trackerId, visibility?, chartConfig?)` | PATCH | `/api/tracker/{id}` | visibility/chart_config 更新 |
+| `listTrackers(page?, perPage?)` | GET | `/api/trackers` | ページネーション対応一覧 |
+| `fetchPreview(trackerId)` | GET | `/api/trackers/{id}/preview` | カードプレビュー（type=coverageも同一フォーマット） |
+| `createTracker(name, visibility, type?, repoId?, chartConfig?)` | POST | `/api/trackers` | トラッカー作成 |
+| `patchTracker(trackerId, visibility?, chartConfig?)` | PATCH | `/api/trackers/{id}` | visibility/chart_config 更新 |
 | `deleteTracker` はフロントエンド未実装 | — | — | — |
-| `listSeries(trackerId)` | GET | `/api/tracker/{id}/series` | 系列一覧（coverageは空配列） |
-| `createSeries(trackerId, name, dataType)` | POST | `/api/tracker/{id}/series` | 系列作成（coverageは不可） |
-| `patchSeries(trackerId, seriesId, name?, dataType?, config?)` | PATCH | `/api/tracker/{id}/series/{sid}` | 系列更新（coverageは不可） |
-| `deleteSeries(trackerId, seriesId)` | DELETE | `/api/tracker/{id}/series/{sid}` | 系列削除（coverageは不可） |
-| `createValue(trackerId, seriesId, time, value)` | POST | `/api/tracker/{id}/series/{sid}/values` | 値追加（coverageは不可） |
-| `deleteValues(trackerId, seriesId)` | DELETE | `/api/tracker/{id}/series/{sid}/values` | 値全削除（coverageは不可） |
-| `likeTracker(trackerId)` | POST | `/api/tracker/{id}/like` | いいね |
-| `unlikeTracker(trackerId)` | DELETE | `/api/tracker/{id}/like` | いいね解除 |
+| `listSeries(trackerId)` | GET | `/api/trackers/{id}/series` | 系列一覧（coverageは空配列） |
+| `createSeries(trackerId, name, dataType)` | POST | `/api/trackers/{id}/series` | 系列作成（coverageは不可） |
+| `patchSeries(trackerId, seriesId, name?, dataType?, config?)` | PATCH | `/api/trackers/{id}/series/{sid}` | 系列更新（coverageは不可） |
+| `deleteSeries(trackerId, seriesId)` | DELETE | `/api/trackers/{id}/series/{sid}` | 系列削除（coverageは不可） |
+| `createValue(trackerId, seriesId, time, value)` | POST | `/api/trackers/{id}/series/{sid}/values` | 値追加（coverageは不可） |
+| `deleteValues(trackerId, seriesId)` | DELETE | `/api/trackers/{id}/series/{sid}/values` | 値全削除（coverageは不可） |
+| `likeTracker(trackerId)` | POST | `/api/trackers/{id}/like` | いいね |
+| `unlikeTracker(trackerId)` | DELETE | `/api/trackers/{id}/like` | いいね解除 |
 
-#### TrackerView (`/tracker`)
+#### TrackerView (`/trackers`)
 
 トラッカーカードのグリッド表示 + ページネーション:
 
@@ -1324,11 +1324,11 @@ interface PreviewData {
 ```
 
 - `role != ""` → "My Tracks"、`liked=true && role==""` → "Liked Tracks"
-- 各カードに mini ECharts プレビュー表示（`GET /api/tracker/{id}/preview` を並列 fetch）
-- カードクリック: type=`tracker` → `/tracker/{id}`、type=`coverage` → `/repos/{repo_id}/coverages`
+- 各カードに mini ECharts プレビュー表示（`GET /api/trackers/{id}/preview` を並列 fetch）
+- カードクリック: type=`tracker` → `/trackers/{id}`、type=`coverage` → `/repos/{repo_id}/coverages`
 - Loader: `loadTrackerList` = `listTrackers(1, 12)`
 
-#### TrackerDetailView (`/tracker/:trackerId`)
+#### TrackerDetailView (`/trackers/:trackerId`)
 
 - `TrackerDetailRouter` が `tracker.type` に応じてコンポーネントを分岐
   - type=`tracker` → `TrackerDetailView`
@@ -1341,7 +1341,7 @@ interface PreviewData {
 - **type=`tracker`**: `react-datepicker` による日付範囲フィルター + `TrackerChart`（ECharts）折れ線チャート。系列一覧テーブル（表示のみ）。
 - Loader: `loadTrackerDetail` = `listSeries(trackerId)`
 
-#### TrackerCreate (`/tracker/new`)
+#### TrackerCreate (`/trackers/new`)
 
 - トラッカー作成専用ページ
 - Form:
@@ -1350,12 +1350,12 @@ interface PreviewData {
   - type (select, options: tracker/coverage, default: tracker)
   - repo_id (number input, type=coverage 時のみ表示、必須)
 - type 切替時に repo_id 欄の表示/非表示をトグル
-- Create 成功 → `navigate(/tracker/:id)`（詳細画面へ）
+- Create 成功 → `navigate(/trackers/:id)`（詳細画面へ）
 - Create 失敗 → エラーメッセージ表示
-- Cancel → `<Link to="/tracker">`
+- Cancel → `<Link to="/trackers">`
 - アバタードロップダウンメニューにも「Create Tracker」リンク
 
-#### TrackerDetailEdit (`/tracker/:trackerId/edit`)
+#### TrackerDetailEdit (`/trackers/:trackerId/edit`)
 
 - パンくず: Top > Tracker > `tracker.name` > Edit
 - 系列作成・削除・更新、値追加・全削除（type=`coverage` の場合は非対応、アクセス時にメッセージ表示）
@@ -1365,7 +1365,7 @@ interface PreviewData {
 - series config 編集（`ValueFormatCell` で value_format をインライン編集）
 - `role == ""` でアクセス: Edit ボタンが表示されない（URL 直アクセス時はエラーにはならないが、coverage type の場合は Edit ボタンも表示しない）
 
-### ファイル: `frontend/src/tracker_coverage.tsx`
+### ファイル: `frontend/src/trackers_coverage.tsx`
 
 - `CoverageTrackerDetail` コンポーネント: type=`coverage` のトラッカー専用ビュー
 - `/api/repos/{repo_id}/coverages` からデータ取得し、既存の `CoverageListContent` で表示

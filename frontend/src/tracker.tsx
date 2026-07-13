@@ -60,14 +60,14 @@ export async function listTrackers(page?: number, perPage?: number, query?: stri
   if (perPage) params.set('per_page', String(perPage))
   if (query) params.set('q', query)
   const qs = params.toString()
-  const url = qs ? `/api/tracker?${qs}` : '/api/tracker'
+  const url = qs ? `/api/trackers?${qs}` : '/api/trackers'
   const resp = await fetch(url)
   if (!resp.ok) throw resp
   return resp.json()
 }
 
 export async function fetchPreview(trackerId: number): Promise<PreviewData> {
-  const resp = await fetch(`/api/tracker/${trackerId}/preview`)
+  const resp = await fetch(`/api/trackers/${trackerId}/preview`)
   if (!resp.ok) throw resp
   return resp.json()
 }
@@ -75,7 +75,7 @@ async function createTracker(name: string, visibility: string, type_?: string, r
   const body: Record<string, unknown> = { name, visibility }
   if (type_) body.type = type_
   if (repoId !== undefined) body.repo_id = repoId
-  const resp = await fetch('/api/tracker', {
+  const resp = await fetch('/api/trackers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -85,7 +85,7 @@ async function createTracker(name: string, visibility: string, type_?: string, r
 }
 
 async function listSeries(trackerId: number): Promise<TrackerDetailData> {
-  const resp = await fetch(`/api/tracker/${trackerId}/series`)
+  const resp = await fetch(`/api/trackers/${trackerId}/series`)
   if (!resp.ok) throw resp
   return resp.json()
 }
@@ -93,7 +93,7 @@ async function listSeries(trackerId: number): Promise<TrackerDetailData> {
 async function createSeries(trackerId: number, name: string, dataType: string, config?: string): Promise<SeriesModel> {
   const body: Record<string, unknown> = { name, data_type: dataType }
   if (config) body.config = config
-  const resp = await fetch(`/api/tracker/${trackerId}/series`, {
+  const resp = await fetch(`/api/trackers/${trackerId}/series`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -103,7 +103,7 @@ async function createSeries(trackerId: number, name: string, dataType: string, c
 }
 
 async function patchSeries(trackerId: number, seriesId: number, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
-  const resp = await fetch(`/api/tracker/${trackerId}/series/${seriesId}`, {
+  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(opts),
@@ -113,12 +113,12 @@ async function patchSeries(trackerId: number, seriesId: number, opts: { name?: s
 }
 
 async function deleteSeries(trackerId: number, seriesId: number): Promise<void> {
-  const resp = await fetch(`/api/tracker/${trackerId}/series/${seriesId}`, { method: 'DELETE' })
+  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
 async function createValue(trackerId: number, seriesId: number, time: string, value: number): Promise<void> {
-  const resp = await fetch(`/api/tracker/${trackerId}/series/${seriesId}/values`, {
+  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ time, value }),
@@ -127,22 +127,22 @@ async function createValue(trackerId: number, seriesId: number, time: string, va
 }
 
 async function deleteValues(trackerId: number, seriesId: number): Promise<void> {
-  const resp = await fetch(`/api/tracker/${trackerId}/series/${seriesId}/values`, { method: 'DELETE' })
+  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
 async function likeTracker(trackerId: number): Promise<void> {
-  const resp = await fetch(`/api/tracker/${trackerId}/like`, { method: 'POST' })
+  const resp = await fetch(`/api/trackers/${trackerId}/like`, { method: 'POST' })
   if (!resp.ok) throw resp
 }
 
 async function unlikeTracker(trackerId: number): Promise<void> {
-  const resp = await fetch(`/api/tracker/${trackerId}/like`, { method: 'DELETE' })
+  const resp = await fetch(`/api/trackers/${trackerId}/like`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
 export async function patchTracker(trackerId: number, opts: { visibility?: string; chart_config?: string }): Promise<TrackerResponse> {
-  const resp = await fetch(`/api/tracker/${trackerId}`, {
+  const resp = await fetch(`/api/trackers/${trackerId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(opts),
@@ -203,7 +203,7 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
     }
   }, [preview])
 
-  const linkTo = `/tracker/${tracker.id}`
+  const linkTo = `/trackers/${tracker.id}`
 
   return (
     <Link to={linkTo} className="block border rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -284,7 +284,7 @@ export const TrackerView = (): React.JSX.Element => {
   return (
     <div>
       <div className="mb-4">
-        <Button asChild><Link to="/tracker/new">Create Tracker</Link></Button>
+        <Button asChild><Link to="/trackers/new">Create Tracker</Link></Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -324,7 +324,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
-        fetch(`/api/tracker/${tracker.id}/series/${s.id}/values`)
+        fetch(`/api/trackers/${tracker.id}/series/${s.id}/values`)
           .then((r) => r.json() as Promise<{ values: ValueModel[] }>)
           .then((d) => ({ series: s, values: d.values ?? [] }))
       )
@@ -387,7 +387,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
         </Button>
         {tracker.role !== '' && (
           <Button variant="outline" size="sm" asChild>
-            <Link to={`/tracker/${tracker.id}/edit`}>Edit</Link>
+            <Link to={`/trackers/${tracker.id}/edit`}>Edit</Link>
           </Button>
         )}
       </div>
@@ -474,7 +474,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
-        fetch(`/api/tracker/${tracker.id}/series/${s.id}/values`)
+        fetch(`/api/trackers/${tracker.id}/series/${s.id}/values`)
           .then((r) => r.json() as Promise<{ values: ValueModel[] }>)
           .then((d) => ({ series: s, values: d.values ?? [] }))
       )
@@ -508,7 +508,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       await createValue(tracker.id, selectedSeriesId, new Date(newValueTime).toISOString(), parseFloat(newValueNumber))
       setNewValueTime('')
       setNewValueNumber('')
-      const resp = await fetch(`/api/tracker/${tracker.id}/series/${selectedSeriesId}/values`)
+      const resp = await fetch(`/api/trackers/${tracker.id}/series/${selectedSeriesId}/values`)
       const data = await resp.json()
       setSeriesValues((prev) =>
         prev.map((sv) =>
@@ -578,7 +578,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     return (
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <Link to={`/tracker/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
+          <Link to={`/trackers/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
             &larr; Back to Tracker
           </Link>
         </div>
@@ -609,7 +609,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <Link to={`/tracker/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
+        <Link to={`/trackers/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
           &larr; Back to Tracker
         </Link>
       </div>
@@ -803,7 +803,7 @@ export const TrackerCreate = (): React.JSX.Element => {
         type,
         type === 'coverage' ? (repoId ? parseInt(repoId) : undefined) : undefined,
       )
-      navigate(`/tracker/${created.id}`)
+      navigate(`/trackers/${created.id}`)
     } catch {
       setError('Failed to create tracker. Please try again.')
     } finally {
@@ -814,7 +814,7 @@ export const TrackerCreate = (): React.JSX.Element => {
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
-        <Link to="/tracker" className="text-blue-600 dark:text-blue-500 hover:underline">
+        <Link to="/trackers" className="text-blue-600 dark:text-blue-500 hover:underline">
           &larr; Back to Trackers
         </Link>
       </div>
@@ -880,7 +880,7 @@ export const TrackerCreate = (): React.JSX.Element => {
 
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link to="/tracker">Cancel</Link>
+            <Link to="/trackers">Cancel</Link>
           </Button>
           <Button onClick={handleCreate} disabled={!name.trim() || loading}>
             Create

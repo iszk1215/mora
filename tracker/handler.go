@@ -237,7 +237,7 @@ func (h *trackerHandler) requireReadPermission(next http.Handler) http.Handler {
 // @Tags         tracker
 // @Success      200  {object}  tracker.ListTrackersResponse
 // @Failure      401  {object}  core.ErrorResponse
-// @Router       /api/tracker [get]
+// @Router       /api/trackers [get]
 func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
@@ -292,7 +292,7 @@ func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
 // @Success      201   {object}  tracker.TrackerModel
 // @Failure      400   {object}  core.ErrorResponse
 // @Failure      401   {object}  core.ErrorResponse
-// @Router       /api/tracker [post]
+// @Router       /api/trackers [post]
 func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -380,7 +380,7 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId} [delete]
+// @Router       /api/trackers/{trackerId} [delete]
 func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 	err := h.store.deleteTracker(tracker.Id)
@@ -409,7 +409,7 @@ func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId} [patch]
+// @Router       /api/trackers/{trackerId} [patch]
 func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -487,7 +487,7 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/preview [get]
+// @Router       /api/trackers/{trackerId}/preview [get]
 func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 
@@ -573,7 +573,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series [get]
+// @Router       /api/trackers/{trackerId}/series [get]
 func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 
@@ -621,7 +621,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series [post]
+// @Router       /api/trackers/{trackerId}/series [post]
 func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -690,7 +690,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId} [delete]
+// @Router       /api/trackers/{trackerId}/series/{seriesId} [delete]
 func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 	if tracker.Type == "coverage" {
@@ -724,7 +724,7 @@ func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId} [patch]
+// @Router       /api/trackers/{trackerId}/series/{seriesId} [patch]
 func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -795,7 +795,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [get]
+// @Router       /api/trackers/{trackerId}/series/{seriesId}/values [get]
 func (h *trackerHandler) listValues(w http.ResponseWriter, r *http.Request) {
 	series, _ := seriesFrom(r.Context())
 
@@ -839,7 +839,7 @@ func (h *trackerHandler) listValues(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [post]
+// @Router       /api/trackers/{trackerId}/series/{seriesId}/values [post]
 func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -890,7 +890,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/series/{seriesId}/values [delete]
+// @Router       /api/trackers/{trackerId}/series/{seriesId}/values [delete]
 func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 	if tracker.Type == "coverage" {
@@ -921,7 +921,7 @@ func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/like [post]
+// @Router       /api/trackers/{trackerId}/like [post]
 func (h *trackerHandler) likeTracker(w http.ResponseWriter, r *http.Request) {
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
@@ -947,7 +947,7 @@ func (h *trackerHandler) likeTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/tracker/{trackerId}/like [delete]
+// @Router       /api/trackers/{trackerId}/like [delete]
 func (h *trackerHandler) unlikeTracker(w http.ResponseWriter, r *http.Request) {
 	uid, ok := UserIDFromContext(r.Context())
 	if !ok {
