@@ -210,6 +210,39 @@ func TestLogout_InvalidScmID(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, res.StatusCode)
 }
 
+func TestLogoutRedirectsToTopPage(t *testing.T) {
+	rm := NewMockRepositoryManager(0)
+	csrfToken := "test-csrf-token"
+	sess := NewMoraSession()
+	sess.setToken(rm.ID(), scm.Token{})
+
+	body := strings.NewReader("csrf_token=" + csrfToken)
+	req := httptest.NewRequest(http.MethodPost, "/", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{
+		Name:     csrfCookieName,
+		Value:    csrfToken,
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		HttpOnly: false,
+	})
+	req = req.WithContext(WithMoraSession(req.Context(), sess))
+
+	redirectHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	})
+	handler := LogoutHandler([]RepositoryManager{rm}, redirectHandler)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	res := w.Result()
+
+	require.Equal(t, http.StatusSeeOther, res.StatusCode)
+	loc, err := res.Location()
+	require.NoError(t, err)
+	assert.Equal(t, "/", loc.Path)
+}
+
 func TestLogout_NoSession(t *testing.T) {
 	rm := NewMockRepositoryManager(1)
 	next := func(w http.ResponseWriter, r *http.Request) {}

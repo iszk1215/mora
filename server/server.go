@@ -340,7 +340,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	redirectHandler := http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/auth", http.StatusSeeOther)
+			http.Redirect(w, r, "/", http.StatusSeeOther)
 		})
 
 	r.Mount("/login", LoginHandler(s.repositoryManagers, s.userStore, redirectHandler))
