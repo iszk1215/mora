@@ -11,6 +11,7 @@ import {
   loadTrackerDetail,
   patchTracker,
 } from './tracker'
+import { UserProvider } from './user-context'
 
 const mockNavigate = vi.fn()
 vi.mock('react-router', async () => {
@@ -303,12 +304,14 @@ describe('TrackerDetailView', () => {
     vi.restoreAllMocks()
   })
 
+  const mockUser = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
+
   it('renders tracker name', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
-    render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
     expect(screen.getByText('test-tracker')).toBeInTheDocument()
   })
 
@@ -317,7 +320,7 @@ describe('TrackerDetailView', () => {
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
-    render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
     expect(screen.getByText('Like')).toBeInTheDocument()
   })
 
@@ -326,8 +329,18 @@ describe('TrackerDetailView', () => {
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: true },
       series: [],
     })
-    render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
     expect(screen.getByText('Unlike')).toBeInTheDocument()
+  })
+
+  it('disables Like button when user is not logged in', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={null}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    const likeButton = screen.getByText('Like')
+    expect(likeButton).toBeDisabled()
   })
 
   it('shows Edit button when user has role', () => {
@@ -335,7 +348,7 @@ describe('TrackerDetailView', () => {
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
-    render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
     expect(screen.getByText('Edit')).toBeInTheDocument()
   })
 
@@ -344,7 +357,7 @@ describe('TrackerDetailView', () => {
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
-    render(<MemoryRouter><TrackerDetailView /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
     expect(screen.queryByText('Edit')).not.toBeInTheDocument()
   })
 

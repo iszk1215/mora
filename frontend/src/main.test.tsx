@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData, useRouteError, useMatches, isRouteErrorResponse } from 'react-router'
 import { SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache } from './main'
+import { UserProvider } from './user-context'
 
 vi.mock('react-dom/client', () => ({
   default: { createRoot: () => ({ render: vi.fn() }) },
@@ -69,12 +70,11 @@ describe('Header', () => {
     )
   }
 
+  const mockUser = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
+
   it('renders Login link for anonymous user', async () => {
     mockConfig()
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(null, { status: 204 })
-    )
-    render(<MemoryRouter><Header /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={null}><Header /></UserProvider></MemoryRouter>)
     expect(screen.getByText('Mora')).toBeInTheDocument()
     const login = await screen.findByText('Login')
     expect(login).toBeInTheDocument()
@@ -82,12 +82,8 @@ describe('Header', () => {
   })
 
   it('renders avatar with Open menu tooltip for logged-in user', async () => {
-    const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
     mockConfig()
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    )
-    render(<MemoryRouter><Header /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><Header /></UserProvider></MemoryRouter>)
     const img = await screen.findByRole('img')
     expect(img).toHaveAttribute('src', 'https://example.com/avatar.jpg')
     expect(img).toHaveAttribute('title', 'Open menu')
@@ -96,12 +92,8 @@ describe('Header', () => {
   })
 
   it('opens menu with My Trackers link on avatar click', async () => {
-    const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
     mockConfig()
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    )
-    render(<MemoryRouter><Header /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><Header /></UserProvider></MemoryRouter>)
     const img = await screen.findByRole('img')
     expect(screen.queryByText('My Trackers')).not.toBeInTheDocument()
     await img.click()
@@ -111,12 +103,8 @@ describe('Header', () => {
   })
 
   it('closes menu when clicking My Trackers', async () => {
-    const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
     mockConfig()
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    )
-    render(<MemoryRouter><Header /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><Header /></UserProvider></MemoryRouter>)
     const img = await screen.findByRole('img')
     await img.click()
     expect(screen.getByText('My Trackers')).toBeInTheDocument()
@@ -126,12 +114,9 @@ describe('Header', () => {
   })
 
   it('renders nothing when avatar_url is empty', async () => {
-    const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
+    const userNoAvatar = { ...mockUser, avatar_url: '' }
     mockConfig()
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify(user), { status: 200, headers: { 'Content-Type': 'application/json' } })
-    )
-    render(<MemoryRouter><Header /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={userNoAvatar}><Header /></UserProvider></MemoryRouter>)
     await waitFor(() => {
       expect(screen.queryByRole('img')).not.toBeInTheDocument()
     })

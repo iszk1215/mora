@@ -8,7 +8,6 @@ import {
   isRouteErrorResponse,
   ScrollRestoration,
   useLoaderData,
-  useLocation,
   useMatches,
   useRouteError,
 } from 'react-router'
@@ -17,6 +16,7 @@ import 'react-datepicker/dist/react-datepicker.css'
 import './index.css'
 
 import { UserData, TrackerResponse } from './core'
+import { UserProvider, useUser } from './user-context'
 import { coverageRoute } from './coverage'
 import { udmRoute } from './udm'
 import { trackerRoute, listTrackers, TrackerCard, fetchPreview, PreviewData } from './tracker'
@@ -250,11 +250,10 @@ export function resetConfigCache() {
 }
 
 export const Header = (): React.JSX.Element => {
-  const [user, setUser] = useState<UserData | null>(null)
+  const user = useUser()
   const [siteName, setSiteName] = useState('Mora')
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const location = useLocation()
 
   useEffect(() => {
     if (!configPromise) {
@@ -265,17 +264,6 @@ export const Header = (): React.JSX.Element => {
     }
     configPromise.then(cfg => setSiteName(cfg.site_name))
   }, [])
-
-  useEffect(() => {
-    fetch('/api/me')
-      .then(res => {
-        if (res.status === 204) return null
-        if (res.ok) return res.json()
-        return null
-      })
-      .then((data: UserData | null) => setUser(data))
-      .catch(() => setUser(null))
-  }, [location])
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
     if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -395,16 +383,31 @@ export const Breadcrumbs = (): React.JSX.Element => {
   return makeBredcrumbs(crumbs)
 }
 
+async function loadRootData(): Promise<{ user: UserData | null }> {
+  try {
+    const resp = await fetch('/api/me')
+    if (resp.status === 204) return { user: null }
+    if (resp.ok) return { user: await resp.json() as UserData }
+    return { user: null }
+  } catch {
+    return { user: null }
+  }
+}
+
 const Root = (): React.JSX.Element => {
+  const { user } = useLoaderData() as { user: UserData | null }
+
   return (
-    <div>
-      <ScrollRestoration />
-      <Header />
-      <div className="w-8/12 m-auto">
-        <Breadcrumbs />
-        <Outlet />
+    <UserProvider value={user}>
+      <div>
+        <ScrollRestoration />
+        <Header />
+        <div className="w-8/12 m-auto">
+          <Breadcrumbs />
+          <Outlet />
+        </div>
       </div>
-    </div>
+    </UserProvider>
   )
 }
 
@@ -431,6 +434,7 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <Root />,
+    loader: loadRootData,
     errorElement: <ErrorPage />,
     children: [
       {
