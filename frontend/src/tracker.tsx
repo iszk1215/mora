@@ -23,6 +23,7 @@ import { CoverageTrackerDetail } from './tracker_coverage'
 import { formatValue, Dataset, TrackerChart } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
+import { useUser } from './user-context'
 
 interface ValueModel {
   time: string
@@ -316,6 +317,7 @@ export const TrackerView = (): React.JSX.Element => {
 export const TrackerDetailView = (): React.JSX.Element => {
   const data = useLoaderData() as TrackerDetailData
   const { tracker } = data
+  const user = useUser()
   const [seriesList] = useState<SeriesModel[]>(data.series)
   const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
   const [liked, setLiked] = useState(tracker.liked)
@@ -381,7 +383,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
           variant={liked ? 'default' : 'secondary'}
           size="sm"
           onClick={handleLikeToggle}
-          disabled={likeLoading}
+          disabled={likeLoading || !user}
         >
           {liked ? 'Unlike' : 'Like'}
         </Button>
