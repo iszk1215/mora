@@ -79,8 +79,8 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       if (cc.y_axis_label) opt.yAxis.name = cc.y_axis_label
       if (cc.y_max !== undefined && cc.y_max > 0) opt.yAxis.max = cc.y_max
     }
-    if (params.min) opt.xAxis.min = params.min
-    if (params.max) opt.xAxis.max = params.max
+    opt.xAxis.min = params.min
+    opt.xAxis.max = params.max
     return opt
   }, [datasets, cc, params.min, params.max, params.animation])
 

@@ -155,12 +155,8 @@ export const UdmChart = (params: UdmChartProps): React.JSX.Element => {
     },
   }
 
-  if (params.min) {
-    option.xAxis.min = params.min
-  }
-  if (params.max) {
-    option.xAxis.max = params.max
-  }
+  option.xAxis.min = params.min
+  option.xAxis.max = params.max
 
   return (
     <ReactECharts option={option} style={{ width: '100%', height: 300 }} id="udm-chart" opts={{ renderer: 'svg' }} />)

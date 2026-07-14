@@ -148,4 +148,25 @@ describe('TrackerChart', () => {
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.legend).toBeUndefined()
   })
+
+  it('sets xAxis.min/max to null when min and max are null', () => {
+    render(<TrackerChart data={{ datasets }} min={null} max={null} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.xAxis.min).toBeNull()
+    expect(option.xAxis.max).toBeNull()
+  })
+
+  it('sets xAxis.min to null when switching from a date range to null', () => {
+    const { rerender } = render(
+      <TrackerChart data={{ datasets }} min={new Date('2024-01-01')} max={null} />
+    )
+    const el = screen.getByTestId('echart')
+    const option1 = JSON.parse(el.getAttribute('data-option')!)
+    expect(option1.xAxis.min).toBeTruthy()
+
+    rerender(<TrackerChart data={{ datasets }} min={null} max={null} />)
+    const option2 = JSON.parse(el.getAttribute('data-option')!)
+    expect(option2.xAxis.min).toBeNull()
+  })
 })
