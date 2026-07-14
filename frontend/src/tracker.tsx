@@ -19,7 +19,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse } from './core'
-import { CoverageTrackerDetail } from './tracker_coverage'
 import { formatValue, Dataset, TrackerChart } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
@@ -204,7 +203,9 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
     }
   }, [preview])
 
-  const linkTo = `/trackers/${tracker.id}`
+  const linkTo = tracker.type === 'coverage'
+    ? `/coverages/${tracker.id}`
+    : `/trackers/${tracker.id}`
 
   return (
     <Link to={linkTo} className="block border rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -580,7 +581,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     return (
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <Link to={`/trackers/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
+          <Link to={`/coverages/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
             &larr; Back to Tracker
           </Link>
         </div>
@@ -805,7 +806,10 @@ export const TrackerCreate = (): React.JSX.Element => {
         type,
         type === 'coverage' ? (repoId ? parseInt(repoId) : undefined) : undefined,
       )
-      navigate(`/trackers/${created.id}`)
+      const path = created.type === 'coverage'
+        ? `/coverages/${created.id}`
+        : `/trackers/${created.id}`
+      navigate(path)
     } catch {
       setError('Failed to create tracker. Please try again.')
     } finally {
@@ -927,9 +931,10 @@ function ValueFormatCell({ seriesId, initialFormat, onSave }: { seriesId: number
 
 const TrackerDetailRouter = (): React.JSX.Element => {
   const data = useLoaderData() as TrackerDetailData
-  return data.tracker.type === 'coverage'
-    ? <CoverageTrackerDetail />
-    : <TrackerDetailView />
+  if (data.tracker.type === 'coverage') {
+    throw new Response('Not Found', { status: 404 })
+  }
+  return <TrackerDetailView />
 }
 
 export const trackerRoute = [
