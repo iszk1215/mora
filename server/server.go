@@ -385,9 +385,6 @@ func (s *MoraServer) Handler() http.Handler {
 		r.Get("/", s.handleRepoList)
 		r.Route("/{repo_id}", func(r chi.Router) {
 			r.Use(s.injectRepo)
-			if s.coverage != nil {
-				r.Mount("/coverages", s.coverage.Handler())
-			}
 
 			if s.udm != nil {
 				r.Mount("/udm", s.udm.Handler())

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, useLoaderData, useParams } from 'react-router'
-import { formatRevision, formatRatio, formatTime, makeRepoCoverageListPath, makeEntryPath, CoverageEntryPage, CoverageList, makeCoverageSeries, coverageToDatasets, buildCoverageClickUrl } from './coverage'
+import { useLoaderData } from 'react-router'
+import { formatRevision, formatRatio, formatTime, CoverageEntryPage, makeCoverageSeries, coverageToDatasets, buildCoverageClickUrl } from './coverage'
 import { Coverage } from './core'
 
 vi.mock('react-router', async () => {
@@ -66,20 +66,6 @@ describe('formatTime', () => {
   })
 })
 
-describe('makeRepoCoverageListPath', () => {
-  it('builds path from repo_id', () => {
-    const params = { repo_id: '42' }
-    expect(makeRepoCoverageListPath(params)).toBe('repos/42/coverages')
-  })
-})
-
-describe('makeEntryPath', () => {
-  it('builds path from repo_id, index, and entry', () => {
-    const params = { repo_id: '42', index: '3', entry: 'src' }
-    expect(makeEntryPath(params)).toBe('repos/42/coverages/3/src')
-  })
-})
-
 describe('CoverageEntryPage', () => {
   beforeEach(() => {
     vi.mocked(useLoaderData).mockReturnValue({
@@ -98,51 +84,6 @@ describe('CoverageEntryPage', () => {
     render(<CoverageEntryPage />)
     const link = screen.getByText('abcdefghij').closest('a')
     expect(link).toHaveAttribute('href', 'https://example.com/commit/abc123')
-  })
-})
-
-const makeCoverages = (): Coverage[] => [
-  {
-    index: 1, hits: 90, lines: 100, revision: 'abc', revision_url: '',
-    time: '2024-01-15T10:00:00Z',
-    entries: [{ name: 'go', hits: 90, lines: 100 }],
-  },
-  {
-    index: 2, hits: 50, lines: 100, revision: 'def', revision_url: '',
-    time: '2024-06-15T10:00:00Z',
-    entries: [{ name: 'py', hits: 50, lines: 100 }],
-  },
-  {
-    index: 3, hits: 80, lines: 100, revision: 'ghi', revision_url: '',
-    time: '2024-12-25T10:00:00Z',
-    entries: [{ name: 'js', hits: 80, lines: 100 }],
-  },
-]
-
-describe('CoverageList', () => {
-  beforeEach(() => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      repo: { id: 1, url: 'https://example.com/repo', namespace: 'ns', name: 'repo' },
-      coverages: makeCoverages(),
-    })
-    vi.mocked(useParams).mockReturnValue({ repo_id: '1' })
-  })
-
-  it('renders all coverage segments', () => {
-    render(<MemoryRouter><CoverageList /></MemoryRouter>)
-    expect(screen.getByText(/#1/)).toBeInTheDocument()
-    expect(screen.getByText(/#2/)).toBeInTheDocument()
-    expect(screen.getByText(/#3/)).toBeInTheDocument()
-  })
-
-  it('renders coverage entry links', () => {
-    render(<MemoryRouter><CoverageList /></MemoryRouter>)
-    const links = screen.getAllByRole('link')
-    const entryLinks = links.filter(l => l.getAttribute('href')?.startsWith('/repos/1/coverages/'))
-    expect(entryLinks).toHaveLength(3)
-    expect(entryLinks[0]).toHaveAttribute('href', '/repos/1/coverages/1/go')
-    expect(entryLinks[1]).toHaveAttribute('href', '/repos/1/coverages/2/py')
-    expect(entryLinks[2]).toHaveAttribute('href', '/repos/1/coverages/3/js')
   })
 })
 
@@ -200,18 +141,13 @@ describe('coverageToDatasets', () => {
 })
 
 describe('buildCoverageClickUrl', () => {
-  it('builds url from repoId, index, and series name', () => {
-    expect(buildCoverageClickUrl('2', undefined, 3, 'go'))
-      .toBe('/repos/2/coverages/3/go')
+  it('builds url from trackerId', () => {
+    expect(buildCoverageClickUrl('2', '5', 3, 'go'))
+      .toBe('/coverages/5/3/go')
   })
 
   it('handles numeric index', () => {
-    expect(buildCoverageClickUrl('42', undefined, 10, 'py'))
-      .toBe('/repos/42/coverages/10/py')
-  })
-
-  it('builds url from trackerId when provided', () => {
-    expect(buildCoverageClickUrl('2', '5', 3, 'go'))
-      .toBe('/coverages/5/3/go')
+    expect(buildCoverageClickUrl('42', '10', 10, 'py'))
+      .toBe('/coverages/10/10/py')
   })
 })

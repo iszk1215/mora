@@ -47,14 +47,6 @@ interface CodeData {
   blocks: CoverageBlock[]
 }
 
-export function makeRepoCoverageListPath(params: Params) {
-  return `repos/${params.repo_id}/coverages`
-}
-
-export function makeEntryPath(params: Params) {
-  return `${makeRepoCoverageListPath(params)}/${params.index}/${params.entry}`
-}
-
 export function makeCoverageTrackerPath(params: Params) {
   return `coverages/${params.trackerId}`
 }
@@ -64,10 +56,7 @@ export function makeCoverageTrackerEntryPath(params: Params) {
 }
 
 export function buildEntryUrl(params: Params, cov: Coverage, entryName: string): string {
-  if (params.trackerId) {
-    return `/coverages/${params.trackerId}/${cov.index}/${entryName}`
-  }
-  return `/repos/${params.repo_id}/coverages/${cov.index}/${entryName}`
+  return `/coverages/${params.trackerId}/${cov.index}/${entryName}`
 }
 
 // formatters
@@ -86,19 +75,7 @@ export function formatRatio(hits: number, lines: number) {
 }
 
 export function buildCoverageClickUrl(repoId: string | undefined, trackerId: string | undefined, index: number, seriesName: string): string {
-  if (trackerId) {
-    return `/coverages/${trackerId}/${index}/${seriesName}`
-  }
-  return `/repos/${repoId}/coverages/${index}/${seriesName}`
-}
-
-// returns CodeData
-async function loadFile({ params }: LoaderFunctionArgs): Promise<Response> {
-  const url = `/api/${makeEntryPath(params)}/files/${params["*"]}`
-  const resp = await fetch(url)
-  if (!resp.ok)
-    throw resp
-  return resp
+  return `/coverages/${trackerId}/${index}/${seriesName}`
 }
 
 const FilePage = (): React.JSX.Element => {
@@ -110,17 +87,6 @@ const FilePage = (): React.JSX.Element => {
 }
 
 // CoverageEntryPage
-
-async function loadCoverageEntry({ params }: LoaderFunctionArgs): Promise<Response> {
-  const url = `/api/${makeEntryPath(params)}/files`
-  const resp = await fetch(url)
-  if (resp.status == 403) {
-    return redirect("/auth")
-  }
-  if (!resp.ok)
-    throw resp
-  return resp
-}
 
 async function loadCoverageEntryByTracker({ params }: LoaderFunctionArgs): Promise<Response> {
   const url = `/api/coverages/${params.trackerId}/${params.index}/${params.entry}/files`
@@ -167,47 +133,6 @@ export const CoverageEntryPage = (): React.JSX.Element => {
     </div>)
 }
 
-
-// CoverageListPage
-
-async function loadCoverageList({ params }: { params: Params }): Promise<Response | {
-  repo: Repo,
-  coverages: Coverage[]
-}> {
-  const url = `/api/repos/${params.repo_id}/coverages`
-  const resp = await fetch(url)
-  if (resp.status == 403) {
-    return redirect("/auth")
-  }
-  if (!resp.ok)
-    throw resp
-
-  const data = await resp.json()
-
-  const coverages = data.coverages
-
-  // preprocess
-  coverages.sort((a: Coverage, b: Coverage) => {
-    return b.index - a.index
-  })
-
-  for (const cov of coverages) {
-    let hits = 0; let lines = 0
-
-    cov.entries.sort((a: CoverageEntry, b: CoverageEntry) => {
-      return a.name.localeCompare(b.name)
-    })
-
-    for (const e of cov.entries) {
-      hits += e.hits
-      lines += e.lines
-    }
-    cov.hits = hits
-    cov.lines = lines
-  }
-
-  return { repo: data.repo, coverages: coverages }
-}
 
 async function loadCoverageListByTracker({ params }: { params: Params }): Promise<Response | {
   repo: Repo,
@@ -339,64 +264,6 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
       <div>{items}</div>
     </div>)
 }
-
-export const CoverageList = (): React.JSX.Element => {
-  const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
-  const params = useParams()
-  const [range, setRange] = useState<TimeRangeKey>('all')
-  const { min, max } = computeDateRange(range)
-  return (
-    <div>
-      <h2 className="text-3xl my-4">Coverages</h2>
-      <CoverageListContent
-        repo={data.repo} coverages={data.coverages} params={params} min={min} max={max}
-        rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}
-      />
-    </div>
-  )
-}
-
-export const coverageRoute = [
-  {
-    index: true,
-    element: <CoverageList />,
-    loader: loadCoverageList,
-  },
-  {
-    path: ':index',
-    handle: {
-      crumb: (params: Params) => {
-        return { label: `#${params.index}` }
-      }
-    },
-    children: [
-      {
-        path: ':entry',
-        handle: {
-          crumb: (params: Params) => ({
-            label: params.entry,
-            link: `/${makeEntryPath(params)}`
-          }),
-        },
-        children: [
-          {
-            index: true,
-            element: <CoverageEntryPage />,
-            loader: loadCoverageEntry,
-          },
-          {
-            path: '*',
-            element: <FilePage />,
-            loader: loadFile,
-            handle: {
-              crumb: (params: Params) => ({ label: params["*"] })
-            },
-          },
-        ],
-      },
-    ],
-  },
-]
 
 export const CoverageTrackerList = (): React.JSX.Element => {
   const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
