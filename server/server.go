@@ -302,6 +302,69 @@ func (s *MoraServer) requireTrackerAuth(next http.Handler) http.Handler {
 	})
 }
 
+func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		trackerID, err := strconv.ParseInt(chi.URLParam(r, "trackerId"), 10, 64)
+		if err != nil {
+			log.Err(err).Msg("invalid trackerId in URL")
+			render.BadRequest(w, errors.New("invalid tracker id"))
+			return
+		}
+
+		repoID, err := s.tracker.FindRepoIDByTrackerID(trackerID)
+		if err != nil {
+			log.Err(err).Msg("failed to find repo_id by tracker_id")
+			render.InternalError(w, errors.New("internal error"))
+			return
+		}
+		if repoID == nil {
+			render.NotFound(w, errors.New("tracker has no associated repository"))
+			return
+		}
+
+		repo, err := s.repos.Find(*repoID)
+		if err != nil {
+			log.Err(err).Msg("failed to find repository")
+			render.NotFound(w, errors.New("repository not found"))
+			return
+		}
+
+		rm := s.findRepositoryManager(repo.RepositoryManager)
+		if rm == nil {
+			log.Error().Msgf("rm not found: id=%d", repo.RepositoryManager)
+			render.InternalError(w, errors.New("internal error"))
+			return
+		}
+
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+
+		ctx := r.Context()
+
+		if s.apiKey == "" || s.apiKey != token {
+			sess, ok := MoraSessionFrom(r.Context())
+			if !ok {
+				render.Forbidden(w, render.ErrForbidden)
+				return
+			}
+			err = checkRepoAccess(sess, rm, repo)
+			if errors.Is(err, errorTokenNotFound) {
+				render.Forbidden(w, render.ErrForbidden)
+				return
+			} else if err != nil {
+				log.Err(err).Msg("injectTrackerCoverage")
+				render.InternalError(w, errors.New("internal error"))
+				return
+			} else {
+				ctx, _ = sess.WithToken(ctx, rm.ID())
+			}
+		}
+
+		ctx = core.WithRepositoryClient(ctx, rm)
+		ctx = core.WithRepo(ctx, repo)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func (s *MoraServer) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -334,6 +397,15 @@ func (s *MoraServer) Handler() http.Handler {
 
 	if s.tracker != nil {
 		r.With(s.requireTrackerAuth).Mount("/api/trackers", s.tracker.Handler())
+	}
+
+	if s.coverage != nil {
+		r.Route("/api/coverages", func(r chi.Router) {
+			r.Route("/{trackerId}", func(r chi.Router) {
+				r.Use(s.injectTrackerCoverage)
+				r.Mount("/", s.coverage.Handler())
+			})
+		})
 	}
 
 	// login/logout

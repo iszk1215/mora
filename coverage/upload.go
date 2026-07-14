@@ -127,12 +127,7 @@ func parseFile(filename, entryName string, root fs.FS) (*CoverageEntryUploadRequ
 	return e, nil
 }
 
-func upload(serverURL, repoURL string, req *CoverageUploadRequest, httpClient *http.Client) error {
-	repo, err := findRepositoryByURL(serverURL, repoURL, httpClient)
-	if err != nil {
-		return fmt.Errorf("upload findRepositoryByURL: %w", err)
-	}
-
+func upload(serverURL, repoURL string, req *CoverageUploadRequest, trackerID int64, httpClient *http.Client) error {
 	client := coverageClient{
 		client: &core.APIClientImpl{
 			BaseURL: serverURL,
@@ -141,8 +136,8 @@ func upload(serverURL, repoURL string, req *CoverageUploadRequest, httpClient *h
 		},
 	}
 
-	url := fmt.Sprintf("/api/repos/%d/coverages", repo.Id)
-	err = client.client.Do(http.MethodPost, url, &req, nil)
+	url := fmt.Sprintf("/api/coverages/%d", trackerID)
+	err := client.client.Do(http.MethodPost, url, &req, nil)
 	if err != nil {
 		return fmt.Errorf("upload client.Do: %w", err)
 	}
@@ -257,7 +252,7 @@ func ask() (bool, error) {
 	return true, nil
 }
 
-func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes bool, args []string) error {
+func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes bool, trackerID int64, args []string) error {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return errors.New("can not open repository. Use -repo-path=<repository>")
@@ -294,9 +289,12 @@ func Upload(server, repoURL, repoPath, entryName string, dryRun, force bool, yes
 		if server == "" {
 			return fmt.Errorf("use -server=<server url>")
 		}
+		if trackerID == 0 {
+			return fmt.Errorf("use -tracker=<tracker id>")
+		}
 
 		httpClient := &http.Client{Timeout: 30 * time.Second}
-		err = upload(server, repoURL, req, httpClient)
+		err = upload(server, repoURL, req, trackerID, httpClient)
 		if err != nil {
 			return fmt.Errorf("Upload upload: %w", err)
 		}

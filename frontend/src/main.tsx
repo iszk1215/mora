@@ -17,7 +17,7 @@ import './index.css'
 
 import { UserData, TrackerResponse } from './core'
 import { UserProvider, useUser } from './user-context'
-import { coverageRoute } from './coverage'
+import { coverageRoute, coverageTrackerRoute } from './coverage'
 import { udmRoute } from './udm'
 import { trackerRoute, listTrackers, TrackerCard, fetchPreview, PreviewData } from './tracker'
 import { signupRoute } from './signup'
@@ -463,6 +463,16 @@ const router = createBrowserRouter([
       {
         path: '/trackers',
         children: trackerRoute,
+      },
+      {
+        path: '/coverages/:trackerId',
+        handle: {
+          crumb: (params: Params) => ({
+            label: `Coverage #${params.trackerId}`,
+            link: `/coverages/${params.trackerId}`,
+          })
+        },
+        children: coverageTrackerRoute,
       },
       {
         path: '/repos/:repo_id',

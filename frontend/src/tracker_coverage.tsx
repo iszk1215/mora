@@ -27,7 +27,7 @@ export const CoverageTrackerDetail = (): React.JSX.Element => {
 
   useEffect(() => {
     if (tracker.repo_id == null) return
-    fetch(`/api/repos/${tracker.repo_id}/coverages`)
+    fetch(`/api/coverages/${tracker.id}`)
       .then((r) => r.json())
       .then((d: { repo: Repo; coverages: Coverage[] }) => {
         d.coverages.sort((a: Coverage, b: Coverage) => b.index - a.index)
@@ -48,7 +48,7 @@ export const CoverageTrackerDetail = (): React.JSX.Element => {
       .catch(() => {})
   }, [tracker.repo_id])
 
-  const params = tracker.repo_id != null ? { repo_id: String(tracker.repo_id) } : { repo_id: '' }
+  const params = { trackerId: String(tracker.id) }
   const [range, setRange] = useState<TimeRangeKey>('all')
   const { min, max } = computeDateRange(range)
 

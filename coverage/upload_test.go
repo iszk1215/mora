@@ -79,7 +79,7 @@ func TestUpload_ReturnsErrorWhenDirty(t *testing.T) {
 	err = os.WriteFile(srcFile, []byte("package main\n\nfunc main() {}\n"), 0644)
 	require.NoError(t, err)
 
-	err = Upload("", "http://example.com/repo", gitDir, "go", true, false, true, []string{lcovFile})
+	err = Upload("", "http://example.com/repo", gitDir, "go", true, false, true, 0, []string{lcovFile})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "dirty")
 }
@@ -117,7 +117,7 @@ func TestUpload_ReturnsErrorWhenServerEmpty(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = Upload("", "http://example.com/repo", gitDir, "go", false, false, true, []string{lcovFile})
+	err = Upload("", "http://example.com/repo", gitDir, "go", false, false, true, 0, []string{lcovFile})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "server")
 }
@@ -186,13 +186,7 @@ func TestUpload(t *testing.T) {
 		requestCount++
 		switch requestCount {
 		case 1:
-			assert.Equal(t, "/api/repos", r.URL.Path)
-			repos := []core.Repository{
-				{Id: 1, Url: "http://example.com/repo", Namespace: "owner", Name: "repo"},
-			}
-			require.NoError(t, json.NewEncoder(w).Encode(repos))
-		case 2:
-			assert.Equal(t, "/api/repos/1/coverages", r.URL.Path)
+			assert.Equal(t, "/api/coverages/1", r.URL.Path)
 			w.WriteHeader(http.StatusCreated)
 		default:
 			t.Fatal("unexpected request")
@@ -209,9 +203,9 @@ func TestUpload(t *testing.T) {
 		Entries:   []*CoverageEntryUploadRequest{},
 	}
 
-	err := upload(srv.URL, "http://example.com/repo", req, httpClient)
+	err := upload(srv.URL, "http://example.com/repo", req, 1, httpClient)
 	require.NoError(t, err)
-	assert.Equal(t, 2, requestCount)
+	assert.Equal(t, 1, requestCount)
 }
 
 func TestIsDirty_Clean(t *testing.T) {

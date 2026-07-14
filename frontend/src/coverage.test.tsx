@@ -201,12 +201,17 @@ describe('coverageToDatasets', () => {
 
 describe('buildCoverageClickUrl', () => {
   it('builds url from repoId, index, and series name', () => {
-    expect(buildCoverageClickUrl('2', 3, 'go'))
+    expect(buildCoverageClickUrl('2', undefined, 3, 'go'))
       .toBe('/repos/2/coverages/3/go')
   })
 
   it('handles numeric index', () => {
-    expect(buildCoverageClickUrl('42', 10, 'py'))
+    expect(buildCoverageClickUrl('42', undefined, 10, 'py'))
       .toBe('/repos/42/coverages/10/py')
+  })
+
+  it('builds url from trackerId when provided', () => {
+    expect(buildCoverageClickUrl('2', '5', 3, 'go'))
+      .toBe('/coverages/5/3/go')
   })
 })

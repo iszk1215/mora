@@ -28,6 +28,10 @@ func (s *Service) Handler() http.Handler {
 	return newHandler(s.store, s.coverageProvider)
 }
 
+func (s *Service) FindRepoIDByTrackerID(trackerID int64) (*int64, error) {
+	return s.store.findRepoIDByTrackerID(trackerID)
+}
+
 func (s *Service) CreateTracker(name, visibility string, userID int64, trackerType string, repoID *int64) (*TrackerModel, error) {
 	t := &TrackerModel{Name: name, Visibility: visibility, Type: trackerType}
 	if err := s.store.addTracker(t, userID, repoID); err != nil {
