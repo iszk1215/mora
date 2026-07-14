@@ -85,7 +85,7 @@ export function formatRatio(hits: number, lines: number) {
   return (hits * 100.0 / lines).toFixed(1)
 }
 
-export function buildCoverageClickUrl(repoId: string, trackerId: string | undefined, index: number, seriesName: string): string {
+export function buildCoverageClickUrl(repoId: string | undefined, trackerId: string | undefined, index: number, seriesName: string): string {
   if (trackerId) {
     return `/coverages/${trackerId}/${index}/${seriesName}`
   }
