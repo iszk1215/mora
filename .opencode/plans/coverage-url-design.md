@@ -26,11 +26,12 @@ Change coverage URLs from repository-centric (`/repos/:repo_id/coverages`) to tr
 
 ## Design Decisions
 
-1. **Both URLs work**: `/trackers/:trackerId` and `/coverages/:trackerId` both show coverage detail (no redirect)
-2. **Shared features stay on `/trackers/:trackerId`**: Like, visibility, members remain on tracker URLs
+1. **Coverage type returns 404 on `/trackers/:trackerId`**: Only `/coverages/:trackerId` shows coverage detail
+2. **Shared features stay on `/trackers/:trackerId`**: Like, visibility, members remain on tracker URLs (coverage type accessible via API)
 3. **Upload uses `--tracker` flag**: Upload command specifies tracker ID, POSTs to `/api/coverages/:trackerId`
 4. **Middleware approach**: New `injectTrackerCoverage` middleware resolves `trackerId` -> `repo_id` -> repo
 5. **Backwards compatibility**: Old routes (`/repos/:repo_id/coverages`) kept during migration, can be removed later
+6. **API URL flexibility**: Both `/api/trackers/:trackerId` and `/api/coverages/:trackerId` work for coverage type
 
 ## Implementation Phases
 
@@ -40,6 +41,13 @@ Change coverage URLs from repository-centric (`/repos/:repo_id/coverages`) to tr
 2. Add `/coverages` route to `main.tsx`
 3. Update `tracker_coverage.tsx` to fetch from `/api/coverages/${tracker.id}`
 4. Update `CoverageSegment` and `CoverageListContent` to support both URL modes
+
+### Phase 4: 404 Behavior
+
+1. `TrackerDetailRouter` returns 404 for coverage type
+2. `TrackerCard` links to `/coverages/:trackerId` for coverage type
+3. `TrackerDetailEdit` back link points to `/coverages/:trackerId` for coverage type
+4. `TrackerCreate` redirects to `/coverages/:trackerId` after creating coverage tracker
 
 ### Phase 2: API Changes
 
