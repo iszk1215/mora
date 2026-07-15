@@ -135,6 +135,7 @@ export const CoverageEntryPage = (): React.JSX.Element => {
 
 
 async function loadCoverageListByTracker({ params }: { params: Params }): Promise<Response | {
+  trackerName: string,
   repo: Repo,
   coverages: Coverage[]
 }> {
@@ -170,7 +171,10 @@ async function loadCoverageListByTracker({ params }: { params: Params }): Promis
     cov.lines = lines
   }
 
-  return { repo: data.repo, coverages: coverages }
+  const trackerResp = await fetch(`/api/trackers/${params.trackerId}`)
+  const trackerName = trackerResp.ok ? (await trackerResp.json()).name : ''
+
+  return { trackerName, repo: data.repo, coverages: coverages }
 }
 
 interface CoverageSegmentProperty {
@@ -266,13 +270,13 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
 }
 
 export const CoverageTrackerList = (): React.JSX.Element => {
-  const data = useLoaderData() as { repo: Repo, coverages: Coverage[] }
+  const data = useLoaderData() as { trackerName: string, repo: Repo, coverages: Coverage[] }
   const params = useParams()
   const [range, setRange] = useState<TimeRangeKey>('all')
   const { min, max } = computeDateRange(range)
   return (
     <div>
-      <h2 className="text-3xl my-4">Coverages</h2>
+      <h2 className="text-3xl my-4">{data.trackerName}</h2>
       <CoverageListContent
         repo={data.repo} coverages={data.coverages} params={params} min={min} max={max}
         rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}

@@ -410,6 +410,19 @@ func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/trackers/{trackerId} [patch]
+func (h *trackerHandler) getTracker(w http.ResponseWriter, r *http.Request) {
+	tracker, _ := trackerFrom(r.Context())
+	uid, _ := UserIDFromContext(r.Context())
+
+	resp, err := h.store.findTrackerResponseById(tracker.Id, uid)
+	if err != nil {
+		log.Error().Err(err).Msg("getTracker findTrackerResponseById")
+		render.InternalError(w, err)
+		return
+	}
+	render.JSON(w, resp, http.StatusOK)
+}
+
 func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -1035,6 +1048,7 @@ func newHandler(store *trackerStore, cp CoverageTimelineProvider) http.Handler {
 		r.Route("/{trackerId}", func(r chi.Router) {
 			r.Use(h.injectTracker)
 			r.Use(h.requireReadPermission)
+			r.Get("/", h.getTracker)
 			r.With(h.requireEditPermission).Delete("/", h.deleteTracker)
 			r.With(h.requireEditPermission).Patch("/", h.patchTracker)
 			r.Post("/like", h.likeTracker)

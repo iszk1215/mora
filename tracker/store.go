@@ -217,6 +217,29 @@ func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
 	return &rows[0], nil
 }
 
+func (s *trackerStore) findTrackerResponseById(id, userID int64) (*TrackerResponse, error) {
+	query := `
+		SELECT t.id, t.name, t.visibility, t.type, t.chart_config,
+		       tc.repo_id,
+		       COALESCE(m.role, '') AS role,
+		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked
+		FROM tracker t
+		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
+		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
+		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
+		WHERE t.id = ?`
+
+	rows := []TrackerResponse{}
+	err := s.db.Select(&rows, query, userID, userID, id)
+	if err != nil {
+		return nil, fmt.Errorf("findTrackerResponseById select: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, errorTrackerNotFound
+	}
+	return &rows[0], nil
+}
+
 func (s *trackerStore) findRepoIDByTrackerID(trackerID int64) (*int64, error) {
 	query := "SELECT repo_id FROM tracker_coverage WHERE tracker_id = ?"
 	var repoID int64
