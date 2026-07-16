@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -32,6 +33,10 @@ var trackerNames = []string{
 	"Battery Usage", "Crash Rate", "ANR Rate", "App Start Time", "Screen FPS",
 }
 
+var paletteNames = []string{
+	"default", "vintage", "dark", "infographic", "macarons", "essos", "halloween", "purple",
+}
+
 func trackerNamesForUser(idx, count int) []string {
 	start := (idx * 10) % len(trackerNames)
 	end := start + count
@@ -61,7 +66,10 @@ func (s *MoraServer) seedDemoData() error {
 			visibilities := []string{"public", "unlisted", "private"}
 			visibility := visibilities[rng.Intn(len(visibilities))]
 
-			tracker, err := s.tracker.CreateTracker(tname, visibility, user.ID, "tracker", nil)
+			palette := paletteNames[rng.Intn(len(paletteNames))]
+			cc, _ := json.Marshal(map[string]string{"palette": palette})
+
+			tracker, err := s.tracker.CreateTracker(tname, visibility, user.ID, "tracker", nil, string(cc))
 			if err != nil {
 				return fmt.Errorf("create demo tracker %s: %w", tname, err)
 			}
@@ -120,7 +128,7 @@ func (s *MoraServer) seedDemoData() error {
 		adminID := int64(1)
 		for _, repo := range repos {
 			repoID := repo.Id
-			_, err := s.tracker.CreateTracker(repo.Name+" coverage", "public", adminID, "coverage", &repoID)
+			_, err := s.tracker.CreateTracker(repo.Name+" coverage", "public", adminID, "coverage", &repoID, "")
 			if err != nil {
 				log.Warn().Err(err).Str("repo", repo.Name).Msg("Failed to create coverage tracker")
 			}

@@ -42,7 +42,7 @@ func TestServiceCreateTracker(t *testing.T) {
 	svc := initTestService(t)
 
 	t.Run("valid tracker", func(t *testing.T) {
-		tr, err := svc.CreateTracker("test_tracker", "private", 1, "tracker", nil)
+		tr, err := svc.CreateTracker("test_tracker", "private", 1, "tracker", nil, "")
 		require.NoError(t, err)
 		require.Equal(t, int64(1), tr.Id)
 		require.Equal(t, "test_tracker", tr.Name)
@@ -51,9 +51,9 @@ func TestServiceCreateTracker(t *testing.T) {
 	})
 
 	t.Run("duplicate name", func(t *testing.T) {
-		_, err := svc.CreateTracker("dup", "private", 1, "tracker", nil)
+		_, err := svc.CreateTracker("dup", "private", 1, "tracker", nil, "")
 		require.NoError(t, err)
-		_, err = svc.CreateTracker("dup", "private", 1, "tracker", nil)
+		_, err = svc.CreateTracker("dup", "private", 1, "tracker", nil, "")
 		require.Error(t, err)
 	})
 }
@@ -61,7 +61,7 @@ func TestServiceCreateTracker(t *testing.T) {
 func TestServiceCreateSeries(t *testing.T) {
 	svc := initTestService(t)
 
-	tr, err := svc.CreateTracker("test_tracker", "private", 1, "tracker", nil)
+	tr, err := svc.CreateTracker("test_tracker", "private", 1, "tracker", nil, "")
 	require.NoError(t, err)
 
 	t.Run("valid series", func(t *testing.T) {
@@ -81,7 +81,7 @@ func TestServiceCreateSeries(t *testing.T) {
 func TestServiceCreateValue(t *testing.T) {
 	svc := initTestService(t)
 
-	tr, err := svc.CreateTracker("test_tracker", "private", 1, "tracker", nil)
+	tr, err := svc.CreateTracker("test_tracker", "private", 1, "tracker", nil, "")
 	require.NoError(t, err)
 
 	s, err := svc.CreateSeries(tr.Id, "test_series", "float")
