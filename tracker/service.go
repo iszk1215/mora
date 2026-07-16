@@ -55,3 +55,7 @@ func (s *Service) CreateValue(seriesID int64, timestamp time.Time, value float64
 	}
 	return v, nil
 }
+
+func (s *Service) Like(userID, trackerID int64) error {
+	return s.store.addLike(userID, trackerID)
+}

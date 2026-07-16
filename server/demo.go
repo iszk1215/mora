@@ -52,6 +52,12 @@ func (s *MoraServer) seedDemoData() error {
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	now := time.Now()
 
+	type trackerEntry struct {
+		id      int64
+		ownerID int64
+	}
+	var allTrackers []trackerEntry
+
 	for i, du := range demoUsers {
 		user, err := s.userStore.CreateUserWithPassword(du.Username, du.Password)
 		if err != nil {
@@ -74,6 +80,8 @@ func (s *MoraServer) seedDemoData() error {
 				return fmt.Errorf("create demo tracker %s: %w", tname, err)
 			}
 			log.Debug().Int64("tracker_id", tracker.Id).Str("name", tname).Msg("Created demo tracker")
+
+			allTrackers = append(allTrackers, trackerEntry{id: tracker.Id, ownerID: user.ID})
 
 			seriesCount := 1 + rng.Intn(3) // 1-3 series per tracker
 			seriesNames := []string{"count", "duration_ms", "score", "rate", "value"}
@@ -118,6 +126,24 @@ func (s *MoraServer) seedDemoData() error {
 					if _, err := s.tracker.CreateValue(series.Id, ts, val); err != nil {
 						return fmt.Errorf("create demo value: %w", err)
 					}
+				}
+			}
+		}
+	}
+
+	// Seed likes: each user randomly likes ~30% of other users' trackers
+	for _, du := range demoUsers {
+		user, err := s.userStore.FindByUsername(du.Username)
+		if err != nil {
+			continue
+		}
+		for _, t := range allTrackers {
+			if t.ownerID == user.ID {
+				continue // skip own trackers
+			}
+			if rng.Intn(3) == 0 { // ~33%
+				if err := s.tracker.Like(user.ID, t.id); err != nil {
+					log.Warn().Err(err).Msg("Failed to seed like")
 				}
 			}
 		}
