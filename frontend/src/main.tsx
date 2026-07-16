@@ -298,7 +298,7 @@ export const Header = (): React.JSX.Element => {
                   </div>
                 )}
                 {menuOpen && (
-                  <div className="absolute right-0 mt-2 w-40 bg-white text-black rounded shadow-lg z-50">
+                  <div className="absolute right-0 mt-2 w-40 bg-card text-black rounded shadow-lg z-50">
                     <a href="/trackers"
                        className="block px-4 py-2 hover:bg-gray-100 text-sm"
                        onClick={() => setMenuOpen(false)}>My Trackers</a>

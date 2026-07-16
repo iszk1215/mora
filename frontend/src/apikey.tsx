@@ -138,7 +138,7 @@ export const APIKeyPage = (): React.JSX.Element => {
           <p className="text-sm mb-2">
             Copy this key now. You will not be able to see it again.
           </p>
-          <div className="bg-white border rounded px-3 py-2 font-mono text-sm break-all select-all">
+          <div className="bg-card border rounded px-3 py-2 font-mono text-sm break-all select-all">
             {createdKey}
           </div>
           <Button

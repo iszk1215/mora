@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse } from './core'
-import { formatValue, Dataset, TrackerChart } from './chart'
+import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, PALETTE_NAMES } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
@@ -161,6 +161,11 @@ export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise
 }
 
 export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean }): React.JSX.Element => {
+  const chartConfig = useMemo(() => {
+    try { return JSON.parse(preview?.tracker?.chart_config ?? '{}') as ChartConfig }
+    catch { return {} as ChartConfig }
+  }, [preview])
+  const colors = useMemo(() => resolvePalette(chartConfig.palette), [chartConfig.palette])
   const option = useMemo(() => {
     const datasets = preview?.series?.map((sv) => {
       let seriesConfig: SeriesConfig | undefined
@@ -176,19 +181,20 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
 
     return {
       animation: false,
+      color: colors,
       grid: { left: 50, right: 10, top: 10, bottom: 25 },
       xAxis: {
         type: 'time' as const,
         axisLabel: { hideOverlap: true },
       },
       yAxis: { type: 'value' as const },
-      series: datasets.map((ds) => ({
+      series: datasets.map((ds, i) => ({
         name: ds.label,
         type: 'line' as const,
         data: ds.data.map((p) => [p.x, Number(p.y)]),
         lineStyle: { width: 1.5 },
         symbol: 'none',
-        areaStyle: { opacity: 0.1 },
+        areaStyle: areaGradient(colors[i % colors.length], 0.3),
       })),
       tooltip: {
         trigger: 'axis',
@@ -201,14 +207,14 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
         },
       },
     }
-  }, [preview])
+  }, [preview, colors])
 
   const linkTo = tracker.type === 'coverage'
     ? `/coverages/${tracker.id}`
     : `/trackers/${tracker.id}`
 
   return (
-    <Link to={linkTo} className="block border rounded-lg p-4 hover:shadow-md transition-shadow">
+    <Link to={linkTo} className="block bg-card border rounded-lg p-4 hover:shadow-md transition-shadow">
       <div className="flex items-center gap-2 mb-2">
         <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
         {tracker.role && (
@@ -444,6 +450,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [area, setArea] = useState(parsedChartConfig.area ?? true)
   const [showLegend, setShowLegend] = useState(parsedChartConfig.show_legend ?? true)
   const [yMax, setYMax] = useState(parsedChartConfig.y_max ? String(parsedChartConfig.y_max) : '')
+  const [palette, setPalette] = useState(parsedChartConfig.palette ?? 'random')
 
   const isCoverage = tracker.type === 'coverage'
 
@@ -466,6 +473,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       const parsed = parseFloat(yMax.trim())
       if (parsed > 0) cc.y_max = parsed
     }
+    if (palette && palette !== 'random') cc.palette = palette
     try {
       const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(cc) })
       setSavedChartConfig(updated.chart_config)
@@ -733,6 +741,16 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
           className="border rounded px-2 py-1 w-28"
           min="0"
         />
+        <select
+          value={palette}
+          onChange={(e) => setPalette(e.target.value)}
+          className="border rounded px-2 py-1"
+        >
+          <option value="random">Random palette</option>
+          {PALETTE_NAMES.map((name) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
         <Button onClick={handleChartConfigSave}>Save Chart Options</Button>
       </div>
 

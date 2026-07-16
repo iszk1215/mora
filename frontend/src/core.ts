@@ -43,6 +43,7 @@ export interface ChartConfig {
   area?: boolean
   show_legend?: boolean
   y_max?: number
+  palette?: string
 }
 
 export interface SeriesConfig {
