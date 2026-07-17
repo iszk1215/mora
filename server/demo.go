@@ -53,8 +53,9 @@ func (s *MoraServer) seedDemoData() error {
 	now := time.Now()
 
 	type trackerEntry struct {
-		id      int64
-		ownerID int64
+		id         int64
+		ownerID    int64
+		visibility string
 	}
 	var allTrackers []trackerEntry
 
@@ -81,7 +82,7 @@ func (s *MoraServer) seedDemoData() error {
 			}
 			log.Debug().Int64("tracker_id", tracker.Id).Str("name", tname).Msg("Created demo tracker")
 
-			allTrackers = append(allTrackers, trackerEntry{id: tracker.Id, ownerID: user.ID})
+			allTrackers = append(allTrackers, trackerEntry{id: tracker.Id, ownerID: user.ID, visibility: visibility})
 
 			seriesCount := 1 + rng.Intn(3) // 1-3 series per tracker
 			seriesNames := []string{"count", "duration_ms", "score", "rate", "value"}
@@ -141,22 +142,13 @@ func (s *MoraServer) seedDemoData() error {
 			if t.ownerID == user.ID {
 				continue // skip own trackers
 			}
+			if t.visibility == "private" {
+				continue // skip private trackers
+			}
 			if rng.Intn(3) == 0 { // ~33%
 				if err := s.tracker.Like(user.ID, t.id); err != nil {
 					log.Warn().Err(err).Msg("Failed to seed like")
 				}
-			}
-		}
-	}
-
-	repos, err := s.repos.ListAll()
-	if err == nil && len(repos) > 0 {
-		adminID := int64(1)
-		for _, repo := range repos {
-			repoID := repo.Id
-			_, err := s.tracker.CreateTracker(repo.Name+" coverage", "public", adminID, "coverage", &repoID, "")
-			if err != nil {
-				log.Warn().Err(err).Str("repo", repo.Name).Msg("Failed to create coverage tracker")
 			}
 		}
 	}
