@@ -162,6 +162,7 @@ export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise
 }
 
 export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean }): React.JSX.Element => {
+  const user = useUser()
   const chartConfig = useMemo(() => {
     try { return JSON.parse(preview?.tracker?.chart_config ?? '{}') as ChartConfig }
     catch { return {} as ChartConfig }
@@ -218,7 +219,10 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
     <Link to={linkTo} className="block bg-card border rounded-lg p-4 hover:shadow-md transition-shadow">
       <div className="flex items-center gap-2 mb-2">
         <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
-        {tracker.role && (
+        {tracker.role === 'owner' && user?.avatar_url && (
+          <img src={user.avatar_url} alt="owner" className="w-5 h-5 rounded-full ml-auto flex-shrink-0" />
+        )}
+        {tracker.role && tracker.role !== 'owner' && (
           <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tracker.role}</span>
         )}
         {tracker.type === 'coverage' && (
