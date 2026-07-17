@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import ReactECharts from 'echarts-for-react'
+import { Star } from 'lucide-react'
 
 import {
   Link,
@@ -222,6 +223,12 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
         )}
         {tracker.type === 'coverage' && (
           <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
+        )}
+        {(tracker.like_count ?? 0) > 0 && (
+          <span className="relative ml-auto flex-shrink-0">
+            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+            <span className="absolute -bottom-1 -right-1.5 text-[10px] leading-none font-medium text-yellow-700 bg-yellow-50 rounded px-0.5">{tracker.like_count}</span>
+          </span>
         )}
       </div>
       <div className="h-[120px]">

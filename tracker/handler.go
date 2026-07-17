@@ -612,6 +612,9 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 			trackerResp.Liked = liked
 		}
 	}
+	if likeCount, err := h.store.countLikes(tracker.Id); err == nil {
+		trackerResp.LikeCount = likeCount
+	}
 
 	resp := ListSeriesResponse{
 		Tracker: trackerResp,

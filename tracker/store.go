@@ -72,14 +72,15 @@ type (
 
 // TrackerResponse is returned in tracker lists and includes user-specific flags.
 type TrackerResponse struct {
-	Id          int64  `json:"id"    db:"id"`
-	Name        string `json:"name"  db:"name"`
-	Visibility  string `json:"visibility"` // "public" | "unlisted" | "private"
-	Type        string `json:"type"`
-	RepoID      *int64 `json:"repo_id,omitempty" db:"repo_id"`
+	Id         int64  `json:"id"    db:"id"`
+	Name       string `json:"name"  db:"name"`
+	Visibility string `json:"visibility"` // "public" | "unlisted" | "private"
+	Type       string `json:"type"`
+	RepoID     *int64 `json:"repo_id,omitempty" db:"repo_id"`
 	ChartConfig string `json:"chart_config" db:"chart_config"`
-	Role        string `json:"role"`       // "" | "owner" | "editor"
-	Liked       bool   `json:"liked"`
+	Role       string `json:"role"`       // "" | "owner" | "editor"
+	Liked      bool   `json:"liked"`
+	LikeCount  int    `json:"like_count" db:"like_count"`
 }
 
 func newTrackerStore(db *sqlx.DB) *trackerStore {
@@ -172,7 +173,8 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 		SELECT t.id, t.name, t.visibility, t.type, t.chart_config,
 		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
-		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked
+		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
+		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
 		FROM tracker t
 		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
@@ -222,7 +224,8 @@ func (s *trackerStore) findTrackerResponseById(id, userID int64) (*TrackerRespon
 		SELECT t.id, t.name, t.visibility, t.type, t.chart_config,
 		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
-		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked
+		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
+		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
 		FROM tracker t
 		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
@@ -532,6 +535,16 @@ func (s *trackerStore) isLiked(userID, trackerID int64) (bool, error) {
 		return false, fmt.Errorf("isLiked select: %w", err)
 	}
 	return count > 0, nil
+}
+
+func (s *trackerStore) countLikes(trackerID int64) (int, error) {
+	query := "SELECT COUNT(*) FROM tracker_like WHERE tracker_id = ?"
+	var count int
+	err := s.db.Get(&count, query, trackerID)
+	if err != nil {
+		return 0, fmt.Errorf("countLikes select: %w", err)
+	}
+	return count, nil
 }
 
 // ----------------------------------------------------------------------
