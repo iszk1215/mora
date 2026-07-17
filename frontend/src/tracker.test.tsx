@@ -182,19 +182,17 @@ describe('TrackerView', () => {
     expect(screen.getByText('tracker-b')).toBeInTheDocument()
   })
 
-  it('shows owner avatar for owned trackers', () => {
+  it('shows role badge for owned trackers', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       trackers: [
-        { id: 1, name: 'my-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, like_count: 0 },
+        { id: 1, name: 'my-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       ],
       total: 1,
       page: 1,
       per_page: 12,
     })
-    const user = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
-    render(<MemoryRouter><UserProvider value={user}><TrackerView /></UserProvider></MemoryRouter>)
-    const img = screen.getByAltText('owner')
-    expect(img).toHaveAttribute('src', 'https://example.com/avatar.jpg')
+    render(<MemoryRouter><TrackerView /></MemoryRouter>)
+    expect(screen.getByText('owner')).toBeInTheDocument()
   })
 
   it('shows empty state when no trackers', () => {
