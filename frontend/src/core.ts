@@ -67,4 +67,5 @@ export interface TrackerResponse {
   chart_config: string
   role: string
   liked: boolean
+  like_count: number
 }
