@@ -430,11 +430,21 @@ export const ErrorPage = (): React.JSX.Element => {
   )
 }
 
+export function rootShouldRevalidate({ currentUrl, nextUrl, defaultShouldRevalidate }: {
+  currentUrl: URL
+  nextUrl: URL
+  defaultShouldRevalidate: boolean
+}) {
+  if (currentUrl.pathname !== nextUrl.pathname) return true
+  return defaultShouldRevalidate
+}
+
 const router = createBrowserRouter([
   {
     path: '/',
     element: <Root />,
     loader: loadRootData,
+    shouldRevalidate: rootShouldRevalidate,
     errorElement: <ErrorPage />,
     children: [
       {

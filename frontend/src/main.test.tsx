@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData, useRouteError, useMatches, isRouteErrorResponse } from 'react-router'
-import { SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache } from './main'
+import { SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache, rootShouldRevalidate } from './main'
 import { UserProvider } from './user-context'
 
 vi.mock('react-dom/client', () => ({
@@ -279,5 +279,39 @@ describe('Breadcrumbs', () => {
     render(<MemoryRouter><Breadcrumbs /></MemoryRouter>)
     expect(screen.getByText('Sign Up')).toBeInTheDocument()
     expect(screen.queryByText('hidden')).toBeNull()
+  })
+})
+
+describe('rootShouldRevalidate', () => {
+  it('returns true when pathname changes', () => {
+    expect(rootShouldRevalidate({
+      currentUrl: new URL('http://localhost/auth'),
+      nextUrl: new URL('http://localhost/'),
+      defaultShouldRevalidate: false,
+    })).toBe(true)
+  })
+
+  it('returns true when pathname changes reverse', () => {
+    expect(rootShouldRevalidate({
+      currentUrl: new URL('http://localhost/'),
+      nextUrl: new URL('http://localhost/auth'),
+      defaultShouldRevalidate: false,
+    })).toBe(true)
+  })
+
+  it('returns defaultShouldRevalidate when pathname is same', () => {
+    expect(rootShouldRevalidate({
+      currentUrl: new URL('http://localhost/'),
+      nextUrl: new URL('http://localhost/'),
+      defaultShouldRevalidate: false,
+    })).toBe(false)
+  })
+
+  it('returns true when defaultShouldRevalidate is true and pathname is same', () => {
+    expect(rootShouldRevalidate({
+      currentUrl: new URL('http://localhost/'),
+      nextUrl: new URL('http://localhost/'),
+      defaultShouldRevalidate: true,
+    })).toBe(true)
   })
 })
