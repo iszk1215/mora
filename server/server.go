@@ -373,7 +373,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	// api
 
-	r.Get("/api/scms", s.handleRepositoryManagerList)
+	r.Get("/api/providers", s.handleRepositoryManagerList)
 	r.Get("/api/me", s.handleMe)
 	r.Get("/api/config", s.handleConfig)
 
