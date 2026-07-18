@@ -361,7 +361,7 @@ func TestServerRepositoryManagerList(t *testing.T) {
 
 	cookie := requireLogin(t, handler, rm.ID())
 
-	req := httptest.NewRequest(http.MethodGet, "/api/scms", strings.NewReader(""))
+	req := httptest.NewRequest(http.MethodGet, "/api/providers", strings.NewReader(""))
 	req.AddCookie(cookie)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)

@@ -129,7 +129,7 @@ interface SCMData {
 
 // returns SCMData[]
 async function loadSCMList(): Promise<Response> {
-  const resp = await fetch('/api/scms')
+  const resp = await fetch('/api/providers')
   if (!resp.ok)
     throw resp
   return resp
