@@ -72,6 +72,9 @@ frontend-lint:
 frontend-coverage:
 	$(MAKE) -C frontend coverage-report
 
+frontend-e2e: $(EXE) frontend-build
+	$(MAKE) -C frontend test-e2e
+
 # others
 
 run: bin/mora
