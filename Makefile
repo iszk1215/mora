@@ -19,7 +19,7 @@ all: build-all test-all lint-all
 
 build-all: frontend-build build
 
-test-all: frontend-test test
+test-all: frontend-test test frontend-e2e
 
 lint-all: frontend-lint lint
 

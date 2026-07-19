@@ -94,7 +94,7 @@ func handleAvatar(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	port := flag.Int("port", 4001, "Mock OAuth provider port")
+	port := flag.Int("port", 4101, "Mock OAuth provider port")
 	flag.Parse()
 
 	http.HandleFunc("/login/oauth/authorize", handleAuthorize)

@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 30_000,
   retries: 0,
   use: {
-    baseURL: 'http://localhost:4000',
+    baseURL: 'http://localhost:4100',
     headless: true,
   },
   projects: [
@@ -13,14 +13,14 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'cd .. && bin/mock-provider -port 4001',
-      port: 4001,
+      command: 'cd .. && bin/mock-provider -port 4101',
+      port: 4101,
       reuseExistingServer: true,
       timeout: 10_000,
     },
     {
-      command: 'cd .. && bin/mora web --debug --demo -c e2e/mora-test.conf',
-      port: 4000,
+      command: 'cd .. && bin/mora web --debug --demo -p 4100 -c e2e/mora-test.conf',
+      port: 4100,
       reuseExistingServer: true,
       timeout: 30_000,
     },
