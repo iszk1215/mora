@@ -34,6 +34,9 @@ bin/mora: $(SOURCES) $(FRONTEND_OUT)
 	go build $(GO_PKGS)
 	go build $(LDFLAGS) -o $@ main.go
 
+bin/mock-provider: e2e/mock-provider/main.go
+	go build -o $@ $<
+
 lint: $(SOURCES)
 	golangci-lint run $(GO_PKGS)
 
@@ -72,7 +75,7 @@ frontend-lint:
 frontend-coverage:
 	$(MAKE) -C frontend coverage-report
 
-frontend-e2e: $(EXE) frontend-build
+frontend-e2e: $(EXE) bin/mock-provider frontend-build
 	$(MAKE) -C frontend test-e2e
 
 # others

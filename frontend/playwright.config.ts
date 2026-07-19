@@ -11,10 +11,18 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },
   ],
-  webServer: {
-    command: 'cd .. && bin/mora web --debug --demo -c e2e/mora-test.conf',
-    port: 4000,
-    reuseExistingServer: true,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: 'cd .. && bin/mock-provider -port 4001',
+      port: 4001,
+      reuseExistingServer: true,
+      timeout: 10_000,
+    },
+    {
+      command: 'cd .. && bin/mora web --debug --demo -c e2e/mora-test.conf',
+      port: 4000,
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+  ],
 })
