@@ -54,6 +54,15 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - `upload.sh` post-processes lcov.info paths: `sed -i 's|^SF:src/|SF:frontend/src/|g'` (changes frontend-relative to repo-root-relative for mora upload)
 - Two remotes: `origin` (GitHub, https://github.com/iszk1215/mora) and `gitea` (http://localhost:3001/kazuhisa/mora)
 
+## Documentation
+
+- [docs/system-overview.md](docs/system-overview.md) - Architecture, packages, routes, middleware, auth
+- [docs/specs/tracker.md](docs/specs/tracker.md) - Tracker API spec (endpoints, auth, data model)
+- [docs/specs/tracker-search.md](docs/specs/tracker-search.md) - Tracker search spec (top page search feature)
+- [docs/specs/coverage.md](docs/specs/coverage.md) - Coverage URL spec (URLs, middleware, upload)
+- [docs/decisions/0001-use-sqlite3.md](docs/decisions/0001-use-sqlite3.md) - ADR: SQLite3
+- [docs/decisions/0002-use-go-chi.md](docs/decisions/0002-use-go-chi.md) - ADR: chi router
+
 ## UDM (User Defined Metrics)
 
 Tracks custom metrics beyond code coverage. Data model: Metric → Item → Value (stored in `udm_metric`, `udm_item`, `udm_value` tables).
