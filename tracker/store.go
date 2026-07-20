@@ -74,7 +74,7 @@ type (
 type TrackerResponse struct {
 	Id         int64  `json:"id"    db:"id"`
 	Name       string `json:"name"  db:"name"`
-	Visibility string `json:"visibility"` // "public" | "unlisted" | "private"
+	Visibility string `json:"visibility"` // "public" | "private"
 	Type       string `json:"type"`
 	RepoID     *int64 `json:"repo_id,omitempty" db:"repo_id"`
 	ChartConfig string `json:"chart_config" db:"chart_config"`

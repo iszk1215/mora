@@ -45,7 +45,7 @@ type (
 
 	CreateTrackerRequest struct {
 		Name        string  `json:"name"`
-		Visibility  string  `json:"visibility"` // required: "public"|"unlisted"|"private"
+		Visibility  string  `json:"visibility"` // required: "public"|"private"
 		Type        string  `json:"type"`       // "tracker" or "coverage", defaults to "tracker"
 		RepoID      *int64  `json:"repo_id"`    // required if type="coverage"
 		ChartConfig *string `json:"chart_config"`
@@ -201,7 +201,7 @@ func (h *trackerHandler) requireReadPermission(next http.Handler) http.Handler {
 			render.BadRequest(w, errors.New("no tracker in context"))
 			return
 		}
-		if tracker.Visibility == "public" || tracker.Visibility == "unlisted" {
+		if tracker.Visibility == "public" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -313,8 +313,8 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		render.BadRequest(w, errors.New("name is required"))
 		return
 	}
-	if req.Visibility != "public" && req.Visibility != "unlisted" && req.Visibility != "private" {
-		render.BadRequest(w, errors.New("visibility must be one of: public, unlisted, private"))
+	if req.Visibility != "public" && req.Visibility != "private" {
+		render.BadRequest(w, errors.New("visibility must be one of: public, private"))
 		return
 	}
 	if req.Type == "" {
@@ -441,8 +441,8 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 
 	if req.Visibility != nil {
 		v := *req.Visibility
-		if v != "public" && v != "unlisted" && v != "private" {
-			render.BadRequest(w, errors.New("visibility must be 'public', 'unlisted', or 'private'"))
+		if v != "public" && v != "private" {
+			render.BadRequest(w, errors.New("visibility must be 'public' or 'private'"))
 			return
 		}
 	}

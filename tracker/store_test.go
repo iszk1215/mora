@@ -176,15 +176,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 		require.Equal(t, "public", got.Visibility)
 	})
 
-	t.Run("update to unlisted", func(t *testing.T) {
-		v := "unlisted"
-		err := s.updateTracker(tracker.Id, &v, nil)
-		require.NoError(t, err)
 
-		got, err := s.findTrackerById(tracker.Id)
-		require.NoError(t, err)
-		require.Equal(t, "unlisted", got.Visibility)
-	})
 
 	t.Run("update to private", func(t *testing.T) {
 		v := "private"
