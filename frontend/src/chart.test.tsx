@@ -101,7 +101,7 @@ describe('TrackerChart', () => {
   it('applies chartConfig axis labels', () => {
     const chartConfig = {
       x_axis_label: 'Date',
-      y_axes: [{ id: 0, label: 'Coverage %', max: 100, position: 'left' }],
+      y_axes: [{ id: 0, label: 'Coverage %', max: 100, position: 'left' as const }],
     }
     render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
     const el = screen.getByTestId('echart')
@@ -198,8 +198,8 @@ describe('TrackerChart', () => {
   it('renders multiple Y-axes from chartConfig', () => {
     const chartConfig = {
       y_axes: [
-        { id: 0, label: 'Count', position: 'left' },
-        { id: 1, label: 'Rate (%)', position: 'right', min: 0, max: 100 },
+        { id: 0, label: 'Count', position: 'left' as const },
+        { id: 1, label: 'Rate (%)', position: 'right' as const, min: 0, max: 100 },
       ],
     }
     render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
@@ -216,8 +216,8 @@ describe('TrackerChart', () => {
   it('assigns series to correct Y-axis via y_axis_index', () => {
     const chartConfig = {
       y_axes: [
-        { id: 0, label: 'Count', position: 'left' },
-        { id: 1, label: 'Rate', position: 'right' },
+        { id: 0, label: 'Count', position: 'left' as const },
+        { id: 1, label: 'Rate', position: 'right' as const },
       ],
     }
     const multiDatasets = [
