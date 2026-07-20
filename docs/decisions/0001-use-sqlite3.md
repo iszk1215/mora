@@ -27,6 +27,14 @@ Use SQLite3 via `github.com/mattn/go-sqlite3` (CGo driver) with `github.com/jmoi
 - Concurrent write throughput is limited by SQLite's file-level locking
 - Not suitable for multi-server deployments (single-writer constraint)
 
+### Future: PostgreSQL Support
+
+SQLite3 is sufficient for single-server deployments, but PostgreSQL support is planned for production environments requiring concurrent access and better write throughput. The `sqlx` abstraction makes this feasible — most queries use standard SQL, and the `database/sql` interface supports multiple drivers. A migration path would involve:
+
+- Introducing a `driver` config field (`"sqlite3"` or `"postgres"`)
+- Handling SQL dialect differences (e.g., `AUTOINCREMENT` vs `SERIAL`, `DATETIME` vs `TIMESTAMP`)
+- Keeping SQLite3 as the default for development and demo mode
+
 ### Mitigations
 
 - Tests use in-memory SQLite (`:memory:?_loc=auto`) for speed

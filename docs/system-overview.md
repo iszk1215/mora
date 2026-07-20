@@ -145,7 +145,7 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 ## Demo Mode
 
 `mora web --demo` starts with in-memory SQLite and seeded test data:
-- 3 users (admin + 2 regular)
-- 5 repositories
-- Coverage data for each repository
-- Tracker metrics with sample series/values
+- 5 users (demo, alice, bob, charlie, dave)
+- ~40-50 trackers across all users with random visibility (public/private)
+- 1-3 series per tracker, 10-20 values per series
+- Random likes between users on public trackers
