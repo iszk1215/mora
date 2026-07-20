@@ -417,12 +417,12 @@ describe('TrackerDetailEdit', () => {
 
   it('renders visibility selector', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'unlisted', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
     expect(screen.getByText('Visibility')).toBeInTheDocument()
-    const select = screen.getByDisplayValue('Unlisted')
+    const select = screen.getByDisplayValue('Private')
     expect(select).toBeInTheDocument()
   })
 

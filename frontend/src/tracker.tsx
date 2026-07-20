@@ -617,7 +617,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
           className="border rounded px-2 py-1 mb-4"
         >
           <option value="private">Private</option>
-          <option value="unlisted">Unlisted</option>
           <option value="public">Public</option>
         </select>
       </div>
@@ -804,7 +803,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
         className="border rounded px-2 py-1 mb-4"
       >
         <option value="private">Private</option>
-        <option value="unlisted">Unlisted</option>
         <option value="public">Public</option>
       </select>
     </div>
@@ -877,7 +875,6 @@ export const TrackerCreate = (): React.JSX.Element => {
             disabled={loading}
           >
             <option value="private">Private</option>
-            <option value="unlisted">Unlisted</option>
             <option value="public">Public</option>
           </select>
         </div>

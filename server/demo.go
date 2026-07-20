@@ -70,7 +70,7 @@ func (s *MoraServer) seedDemoData() error {
 		names := trackerNamesForUser(i, trackerCount)
 
 		for _, tname := range names {
-			visibilities := []string{"public", "unlisted", "private"}
+			visibilities := []string{"public", "private"}
 			visibility := visibilities[rng.Intn(len(visibilities))]
 
 			palette := paletteNames[rng.Intn(len(paletteNames))]

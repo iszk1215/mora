@@ -433,16 +433,7 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 		getResponse(t, http.StatusOK, h, r)
 	})
 
-	t.Run("unlisted tracker accessible by anonymous", func(t *testing.T) {
-		store := initTestStore(t)
-		tr := &TrackerModel{Name: "test", Visibility: "unlisted"}
-		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
-		path := fmt.Sprintf("/%d/series", tr.Id)
-		r := httptest.NewRequest(http.MethodGet, path, nil)
-		getResponse(t, http.StatusOK, h, r)
-	})
 
 	t.Run("private tracker blocked for anonymous", func(t *testing.T) {
 		store := initTestStore(t)
