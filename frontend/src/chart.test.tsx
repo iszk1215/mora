@@ -101,15 +101,15 @@ describe('TrackerChart', () => {
   it('applies chartConfig axis labels', () => {
     const chartConfig = {
       x_axis_label: 'Date',
-      y_axis_label: 'Coverage %',
-      y_max: 100,
+      y_axes: [{ id: 0, label: 'Coverage %', max: 100, position: 'left' }],
     }
     render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.xAxis.name).toBe('Date')
-    expect(option.yAxis.name).toBe('Coverage %')
-    expect(option.yAxis.max).toBe(100)
+    expect(option.yAxis).toHaveLength(1)
+    expect(option.yAxis[0].name).toBe('Coverage %')
+    expect(option.yAxis[0].max).toBe(100)
   })
 
   it('applies min and max to xAxis', () => {
@@ -168,5 +168,74 @@ describe('TrackerChart', () => {
     rerender(<TrackerChart data={{ datasets }} min={null} max={null} />)
     const option2 = JSON.parse(el.getAttribute('data-option')!)
     expect(option2.xAxis.min).toBeNull()
+  })
+
+  it('renders bar series when seriesConfig.type is bar', () => {
+    const barDatasets = [
+      { label: 'count', data: [{ x: '2024-01-15', y: '10' }], seriesConfig: { type: 'bar' as const } },
+    ]
+    render(<TrackerChart data={{ datasets: barDatasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].type).toBe('bar')
+    expect(option.series[0].barMaxWidth).toBe('60%')
+    expect(option.series[0].areaStyle).toBeUndefined()
+  })
+
+  it('renders mixed line and bar series', () => {
+    const mixedDatasets = [
+      { label: 'count', data: [{ x: '2024-01-15', y: '10' }], seriesConfig: { type: 'bar' as const } },
+      { label: 'rate', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: { type: 'line' as const } },
+    ]
+    render(<TrackerChart data={{ datasets: mixedDatasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].type).toBe('bar')
+    expect(option.series[1].type).toBe('line')
+    expect(option.series[1].areaStyle).toBeDefined()
+  })
+
+  it('renders multiple Y-axes from chartConfig', () => {
+    const chartConfig = {
+      y_axes: [
+        { id: 0, label: 'Count', position: 'left' },
+        { id: 1, label: 'Rate (%)', position: 'right', min: 0, max: 100 },
+      ],
+    }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis).toHaveLength(2)
+    expect(option.yAxis[0].name).toBe('Count')
+    expect(option.yAxis[0].position).toBeUndefined()
+    expect(option.yAxis[1].name).toBe('Rate (%)')
+    expect(option.yAxis[1].position).toBe('right')
+    expect(option.yAxis[1].max).toBe(100)
+  })
+
+  it('assigns series to correct Y-axis via y_axis_index', () => {
+    const chartConfig = {
+      y_axes: [
+        { id: 0, label: 'Count', position: 'left' },
+        { id: 1, label: 'Rate', position: 'right' },
+      ],
+    }
+    const multiDatasets = [
+      { label: 'count', data: [{ x: '2024-01-15', y: '10' }], seriesConfig: { type: 'bar' as const, y_axis_index: 0 } },
+      { label: 'rate', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: { type: 'line' as const, y_axis_index: 1 } },
+    ]
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].yAxisIndex).toBe(0)
+    expect(option.series[1].yAxisIndex).toBe(1)
+  })
+
+  it('defaults to single Y-axis when y_axes is not set', () => {
+    render(<TrackerChart data={{ datasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis).toHaveLength(1)
+    expect(option.yAxis[0].type).toBe('value')
   })
 })
