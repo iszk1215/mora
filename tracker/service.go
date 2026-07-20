@@ -40,8 +40,8 @@ func (s *Service) CreateTracker(name, visibility string, userID int64, trackerTy
 	return t, nil
 }
 
-func (s *Service) CreateSeries(trackerID int64, name, dataType string) (*SeriesModel, error) {
-	se := &SeriesModel{TrackerId: trackerID, Name: name, DataType: dataType}
+func (s *Service) CreateSeries(trackerID int64, name, dataType, config string) (*SeriesModel, error) {
+	se := &SeriesModel{TrackerId: trackerID, Name: name, DataType: dataType, Config: config}
 	if err := s.store.addSeries(se); err != nil {
 		return nil, fmt.Errorf("CreateSeries: %w", err)
 	}

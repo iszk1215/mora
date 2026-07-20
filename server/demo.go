@@ -69,14 +69,24 @@ func (s *MoraServer) seedDemoData() error {
 		trackerCount := 8 + rng.Intn(3) // 8-10 per user
 		names := trackerNamesForUser(i, trackerCount)
 
-		for _, tname := range names {
+		for ti, tname := range names {
 			visibilities := []string{"public", "private"}
 			visibility := visibilities[rng.Intn(len(visibilities))]
 
 			palette := paletteNames[rng.Intn(len(paletteNames))]
-			cc, _ := json.Marshal(map[string]string{"palette": palette})
+			cc := map[string]any{"palette": palette}
 
-			tracker, err := s.tracker.CreateTracker(tname, visibility, user.ID, "tracker", nil, string(cc))
+			// Every 3rd tracker gets a bar or mixed chart with multi-Y-axis
+			if ti%3 == 0 {
+				cc["y_axes"] = []map[string]any{
+					{"id": 0, "label": "Count", "position": "left"},
+					{"id": 1, "label": "Rate (%)", "position": "right", "min": 0, "max": 100},
+				}
+			}
+
+			ccJSON, _ := json.Marshal(cc)
+
+			tracker, err := s.tracker.CreateTracker(tname, visibility, user.ID, "tracker", nil, string(ccJSON))
 			if err != nil {
 				return fmt.Errorf("create demo tracker %s: %w", tname, err)
 			}
@@ -85,23 +95,46 @@ func (s *MoraServer) seedDemoData() error {
 			allTrackers = append(allTrackers, trackerEntry{id: tracker.Id, ownerID: user.ID, visibility: visibility})
 
 			seriesCount := 1 + rng.Intn(3) // 1-3 series per tracker
-			seriesNames := []string{"count", "duration_ms", "score", "rate", "value"}
-			rng.Shuffle(len(seriesNames), func(i, j int) {
-				seriesNames[i], seriesNames[j] = seriesNames[j], seriesNames[i]
+			seriesDefs := []struct {
+				name     string
+				dataType string
+				barProb  int // probability (0-100) of being a bar chart
+			}{
+				{"count", "float", 40},
+				{"duration_ms", "float", 10},
+				{"score", "float", 30},
+				{"rate", "float", 20},
+				{"value", "float", 15},
+			}
+			rng.Shuffle(len(seriesDefs), func(i, j int) {
+				seriesDefs[i], seriesDefs[j] = seriesDefs[j], seriesDefs[i]
 			})
 
+			hasYAxes := ti%3 == 0
+
 			for si := 0; si < seriesCount; si++ {
-				sname := seriesNames[si]
-				dataType := "float"
-				if sname == "count" {
-					dataType = "integer"
+				sd := seriesDefs[si]
+
+				seriesConfig := map[string]any{}
+				isBar := rng.Intn(100) < sd.barProb
+				if isBar {
+					seriesConfig["type"] = "bar"
+				}
+				if hasYAxes {
+					// Assign "rate" series to right axis (id=1), others to left (id=0)
+					if sd.name == "rate" || sd.name == "score" {
+						seriesConfig["y_axis_index"] = 1
+						seriesConfig["value_format"] = "%.1f%%"
+					}
 				}
 
-				series, err := s.tracker.CreateSeries(tracker.Id, sname, dataType)
+				configJSON, _ := json.Marshal(seriesConfig)
+
+				series, err := s.tracker.CreateSeries(tracker.Id, sd.name, sd.dataType, string(configJSON))
 				if err != nil {
-					return fmt.Errorf("create demo series %s: %w", sname, err)
+					return fmt.Errorf("create demo series %s: %w", sd.name, err)
 				}
-				log.Debug().Int64("series_id", series.Id).Str("name", sname).Msg("Created demo series")
+				log.Debug().Int64("series_id", series.Id).Str("name", sd.name).Msg("Created demo series")
 
 				valueCount := 10 + rng.Intn(11) // 10-20 values per series
 				for vi := 0; vi < valueCount; vi++ {
@@ -111,7 +144,7 @@ func (s *MoraServer) seedDemoData() error {
 					ts := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()).AddDate(0, 0, -daysAgo)
 
 					var val float64
-					switch sname {
+					switch sd.name {
 					case "count":
 						val = float64(rng.Intn(1000))
 					case "duration_ms":

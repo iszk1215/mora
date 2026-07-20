@@ -65,7 +65,7 @@ func TestServiceCreateSeries(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("valid series", func(t *testing.T) {
-		s, err := svc.CreateSeries(tr.Id, "test_series", "float")
+		s, err := svc.CreateSeries(tr.Id, "test_series", "float", "")
 		require.NoError(t, err)
 		require.Equal(t, tr.Id, s.TrackerId)
 		require.Equal(t, "test_series", s.Name)
@@ -73,7 +73,7 @@ func TestServiceCreateSeries(t *testing.T) {
 	})
 
 	t.Run("series for non-existent tracker", func(t *testing.T) {
-		_, err := svc.CreateSeries(999, "orphan", "float")
+		_, err := svc.CreateSeries(999, "orphan", "float", "")
 		require.Error(t, err)
 	})
 }
@@ -84,7 +84,7 @@ func TestServiceCreateValue(t *testing.T) {
 	tr, err := svc.CreateTracker("test_tracker", "private", 1, "tracker", nil, "")
 	require.NoError(t, err)
 
-	s, err := svc.CreateSeries(tr.Id, "test_series", "float")
+	s, err := svc.CreateSeries(tr.Id, "test_series", "float", "")
 	require.NoError(t, err)
 
 	t.Run("valid value", func(t *testing.T) {
