@@ -7,6 +7,7 @@ import {
   TrackerView,
   TrackerDetailView,
   TrackerDetailEdit,
+  TrackerCard,
   loadTrackerList,
   loadTrackerDetail,
   patchTracker,
@@ -20,7 +21,7 @@ vi.mock('react-router', async () => {
 })
 
 vi.mock('echarts-for-react', () => ({
-  default: () => <div data-testid="echart" />,
+  default: ({ option }: any) => <div data-testid="echart" data-option={JSON.stringify(option)} />,
 }))
 
 vi.mock('react-datepicker', () => ({
@@ -659,5 +660,51 @@ describe('TrackerDetailEdit', () => {
     await vi.waitFor(() => {
       expect(screen.getAllByText('Remove')).toHaveLength(2)
     })
+  })
+})
+
+describe('TrackerCard', () => {
+  it('renders multi-axis yAxis and yAxisIndex from chartConfig', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"}]}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"y_axis_index":0}' }, values: [{ time: '2024-01-01', value: 10 }] },
+        { series: { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '{"y_axis_index":1}' }, values: [{ time: '2024-01-01', value: 80 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis).toHaveLength(2)
+    expect(option.yAxis[0].position).toBe('left')
+    expect(option.yAxis[1].position).toBe('right')
+    expect(option.series[0].yAxisIndex).toBe(0)
+    expect(option.series[1].yAxisIndex).toBe(1)
+    expect(option.grid.right).toBe(50)
+  })
+
+  it('defaults to single left axis when chartConfig has no y_axes', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-01', value: 10 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis).toHaveLength(1)
+    expect(option.yAxis[0].position).toBe('left')
+    expect(option.grid.right).toBe(10)
   })
 })

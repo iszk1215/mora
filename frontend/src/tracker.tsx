@@ -180,20 +180,33 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
       }
     }) ?? []
 
+    const yAxes = chartConfig.y_axes?.length
+      ? chartConfig.y_axes
+      : [{ id: 0, position: 'left' as const }]
+    const hasRightAxis = yAxes.some((a) => a.position === 'right')
+
     return {
       animation: false,
       color: colors,
-      grid: { left: 50, right: 10, top: 10, bottom: 25 },
+      grid: { left: 50, right: hasRightAxis ? 50 : 10, top: 10, bottom: 25 },
       xAxis: {
         type: 'time' as const,
         axisLabel: { hideOverlap: true },
       },
-      yAxis: { type: 'value' as const },
+      yAxis: yAxes.map((a) => ({
+        type: 'value' as const,
+        position: a.position,
+        splitLine: {
+          lineStyle: { type: 'dashed' as const, opacity: 0.3 },
+          show: a.position === 'left' && !hasRightAxis,
+        },
+      })),
       series: datasets.map((ds, i) => {
         const seriesType = ds.seriesConfig?.type ?? 'line'
         const entry: any = {
           name: ds.label,
           type: seriesType,
+          yAxisIndex: ds.seriesConfig?.y_axis_index ?? 0,
           data: ds.data.map((p) => [p.x, Number(p.y)]),
         }
         if (seriesType === 'bar') {
