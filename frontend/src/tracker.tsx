@@ -504,13 +504,13 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     }
   }
 
-  const handleChartConfigSave = async () => {
+  const saveChartConfig = async (newYAxes: YAxisConfig[]) => {
     const cc: ChartConfig = {}
     if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
     if (!area) cc.area = false
     if (!showLegend) cc.show_legend = false
     if (palette && palette !== 'random') cc.palette = palette
-    cc.y_axes = yAxes.map((a) => {
+    cc.y_axes = newYAxes.map((a) => {
       const axis: YAxisConfig = { id: a.id, position: a.position }
       if (a.label?.trim()) axis.label = a.label.trim()
       if (a.min !== undefined) axis.min = a.min
@@ -524,6 +524,8 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       // ignore
     }
   }
+
+  const handleChartConfigSave = () => saveChartConfig(yAxes)
 
   useEffect(() => {
     Promise.all(
@@ -920,7 +922,9 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
                       await handleSeriesYAxisChange(sid, yi - 1)
                     }
                   }
-                  setYAxes(yAxes.filter((_, i) => i !== idx))
+                  const newYAxes = yAxes.filter((_, i) => i !== idx)
+                  setYAxes(newYAxes)
+                  await saveChartConfig(newYAxes)
                 }}
               >
                 Remove

@@ -547,10 +547,11 @@ describe('TrackerDetailEdit', () => {
   })
 
   it('reassigns series to Y0 when removed axis was used', async () => {
+    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"},{"id":1,"position":"right","label":"Rate"}]}'
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: {
         id: 1, name: 'test', visibility: 'private', type: 'tracker',
-        chart_config: '{"y_axes":[{"id":0,"position":"left","label":"Count"},{"id":1,"position":"right","label":"Rate"}]}',
+        chart_config: chartConfig,
         role: 'owner', liked: false,
       },
       series: [
@@ -561,6 +562,13 @@ describe('TrackerDetailEdit', () => {
 
     globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
       if (opts?.method === 'PATCH') {
+        if (url === '/api/trackers/1') {
+          const body = JSON.parse(opts.body as string)
+          return {
+            ok: true,
+            json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: body.chart_config, role: 'owner', liked: false }),
+          } as Response
+        }
         return {
           ok: true,
           json: () => Promise.resolve({ id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: opts.body }),
@@ -578,6 +586,13 @@ describe('TrackerDetailEdit', () => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/2', expect.objectContaining({
         method: 'PATCH',
         body: JSON.stringify({ config: '{"y_axis_index":0}' }),
+      }))
+    })
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ chart_config: '{"y_axes":[{"id":0,"position":"left","label":"Count"}]}' }),
       }))
     })
   })
