@@ -402,7 +402,7 @@ describe('TrackerDetailEdit', () => {
       series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText('Add')).toBeInTheDocument()
+    expect(screen.getByText('Add Value')).toBeInTheDocument()
   })
 
   it('back link goes to tracker detail', () => {
@@ -594,6 +594,70 @@ describe('TrackerDetailEdit', () => {
         method: 'PATCH',
         body: JSON.stringify({ chart_config: '{"y_axes":[{"id":0,"position":"left","label":"Count"}]}' }),
       }))
+    })
+  })
+
+  it('disables Remove button when only one axis is active', () => {
+    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"}]}'
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: {
+        id: 1, name: 'test', visibility: 'private', type: 'tracker',
+        chart_config: chartConfig,
+        role: 'owner', liked: false,
+      },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const removeButtons = screen.getAllByText('Remove')
+    expect(removeButtons).toHaveLength(1)
+    expect(removeButtons[0]).toBeDisabled()
+  })
+
+  it('shows Add button for removed axis and clicking it adds axis back', async () => {
+    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"},{"id":1,"position":"right","label":"Rate"}]}'
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: {
+        id: 1, name: 'test', visibility: 'private', type: 'tracker',
+        chart_config: chartConfig,
+        role: 'owner', liked: false,
+      },
+      series: [],
+    })
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH' && url === '/api/trackers/1') {
+        const body = JSON.parse(opts.body as string)
+        return {
+          ok: true,
+          json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: body.chart_config, role: 'owner', liked: false }),
+        } as Response
+      }
+      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
+    })
+
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+
+    // Both axes active: two Remove buttons, one Add button (in Add Value form)
+    expect(screen.getAllByText('Remove')).toHaveLength(2)
+    const addButtonsBefore = screen.getAllByText('Add')
+    expect(addButtonsBefore).toHaveLength(1) // Only the "Add Value" button
+
+    // Click Remove on Right axis (second Remove button)
+    const removeButtons = screen.getAllByText('Remove')
+    fireEvent.click(removeButtons[1])
+
+    // Now: Left active (Remove), Right inactive (Add for axis + Add Value)
+    await vi.waitFor(() => {
+      expect(screen.getAllByText('Remove')).toHaveLength(1)
+      expect(screen.getAllByText('Add')).toHaveLength(2) // Y-axis Add + Add Value
+    })
+
+    // Click the first Add button (Y-axis Add)
+    const addButtonsAfter = screen.getAllByText('Add')
+    fireEvent.click(addButtonsAfter[0])
+
+    await vi.waitFor(() => {
+      expect(screen.getAllByText('Remove')).toHaveLength(2)
     })
   })
 })

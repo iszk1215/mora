@@ -858,90 +858,93 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       {/* Y-Axes */}
       <h3 className="text-lg my-2">Y-Axes</h3>
       <div className="flex flex-col gap-2 mb-4">
-        {yAxes.map((axis, idx) => (
-          <div key={axis.id} className="flex items-center gap-2">
-            <span className="text-sm font-medium w-8">Y{axis.id}</span>
-            <input
-              type="text"
-              value={axis.label ?? ''}
-              onChange={(e) => {
-                const next = [...yAxes]
-                next[idx] = { ...next[idx], label: e.target.value || undefined }
-                setYAxes(next)
-              }}
-              placeholder="Label"
-              className="border rounded px-2 py-1 w-32 text-sm"
-            />
-            <input
-              type="number"
-              value={axis.min ?? ''}
-              onChange={(e) => {
-                const next = [...yAxes]
-                const v = e.target.value ? parseFloat(e.target.value) : undefined
-                next[idx] = { ...next[idx], min: v }
-                setYAxes(next)
-              }}
-              placeholder="Min"
-              className="border rounded px-2 py-1 w-20 text-sm"
-            />
-            <input
-              type="number"
-              value={axis.max ?? ''}
-              onChange={(e) => {
-                const next = [...yAxes]
-                const v = e.target.value ? parseFloat(e.target.value) : undefined
-                next[idx] = { ...next[idx], max: v }
-                setYAxes(next)
-              }}
-              placeholder="Max"
-              className="border rounded px-2 py-1 w-20 text-sm"
-            />
-            <select
-              value={axis.position}
-              onChange={(e) => {
-                const next = [...yAxes]
-                next[idx] = { ...next[idx], position: e.target.value as 'left' | 'right' }
-                setYAxes(next)
-              }}
-              className="border rounded px-2 py-1 text-sm"
-            >
-              <option value="left">Left</option>
-              <option value="right">Right</option>
-            </select>
-            {yAxes.length > 1 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={async () => {
-                  const removedIndex = idx
-                  for (const [sidStr, yi] of Object.entries(seriesYAxisIndices)) {
-                    const sid = Number(sidStr)
-                    if (yi === removedIndex) {
-                      await handleSeriesYAxisChange(sid, 0)
-                    } else if (yi > removedIndex) {
-                      await handleSeriesYAxisChange(sid, yi - 1)
-                    }
-                  }
-                  const newYAxes = yAxes.filter((_, i) => i !== idx)
-                  setYAxes(newYAxes)
-                  await saveChartConfig(newYAxes)
-                }}
-              >
-                Remove
-              </Button>
-            )}
-          </div>
-        ))}
-        <div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setYAxes([...yAxes, { id: yAxes.length, position: 'left' }])}
-            disabled={yAxes.length >= 2}
-          >
-            Add Y-Axis
-          </Button>
-        </div>
+        {(['left', 'right'] as const).map((pos) => {
+          const axis = yAxes.find((a) => a.position === pos)
+          const active = !!axis
+          const canRemove = yAxes.length > 1
+
+          return (
+            <div key={pos} className="flex items-center gap-2">
+              <span className="text-sm font-medium w-12">{pos === 'left' ? 'Left' : 'Right'}</span>
+              {active ? (
+                <>
+                  <input
+                    type="text"
+                    value={axis.label ?? ''}
+                    onChange={(e) => {
+                      const next = yAxes.map((a) =>
+                        a.position === pos ? { ...a, label: e.target.value || undefined } : a
+                      )
+                      setYAxes(next)
+                    }}
+                    placeholder="Label"
+                    className="border rounded px-2 py-1 w-32 text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={axis.min ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value ? parseFloat(e.target.value) : undefined
+                      const next = yAxes.map((a) =>
+                        a.position === pos ? { ...a, min: v } : a
+                      )
+                      setYAxes(next)
+                    }}
+                    placeholder="Min"
+                    className="border rounded px-2 py-1 w-20 text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={axis.max ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value ? parseFloat(e.target.value) : undefined
+                      const next = yAxes.map((a) =>
+                        a.position === pos ? { ...a, max: v } : a
+                      )
+                      setYAxes(next)
+                    }}
+                    placeholder="Max"
+                    className="border rounded px-2 py-1 w-20 text-sm"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={!canRemove}
+                    onClick={async () => {
+                      const removedIndex = yAxes.findIndex((a) => a.position === pos)
+                      for (const [sidStr, yi] of Object.entries(seriesYAxisIndices)) {
+                        const sid = Number(sidStr)
+                        if (yi === removedIndex) {
+                          await handleSeriesYAxisChange(sid, 0)
+                        } else if (yi > removedIndex) {
+                          await handleSeriesYAxisChange(sid, yi - 1)
+                        }
+                      }
+                      const newYAxes = yAxes.filter((a) => a.position !== pos)
+                      setYAxes(newYAxes)
+                      await saveChartConfig(newYAxes)
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    const id = yAxes.length > 0 ? Math.max(...yAxes.map((a) => a.id)) + 1 : 0
+                    const newYAxes = [...yAxes, { id, position: pos }]
+                    setYAxes(newYAxes)
+                    await saveChartConfig(newYAxes)
+                  }}
+                >
+                  Add
+                </Button>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <Button onClick={handleChartConfigSave}>Save Chart Options</Button>
