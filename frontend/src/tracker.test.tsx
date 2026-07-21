@@ -545,4 +545,40 @@ describe('TrackerDetailEdit', () => {
       })
     })
   })
+
+  it('reassigns series to Y0 when removed axis was used', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: {
+        id: 1, name: 'test', visibility: 'private', type: 'tracker',
+        chart_config: '{"y_axes":[{"id":0,"position":"left","label":"Count"},{"id":1,"position":"right","label":"Rate"}]}',
+        role: 'owner', liked: false,
+      },
+      series: [
+        { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' },
+        { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '{"y_axis_index":1}' },
+      ],
+    })
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        return {
+          ok: true,
+          json: () => Promise.resolve({ id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: opts.body }),
+        } as Response
+      }
+      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
+    })
+
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+
+    const removeButtons = screen.getAllByText('Remove')
+    fireEvent.click(removeButtons[1])
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/2', expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ config: '{"y_axis_index":0}' }),
+      }))
+    })
+  })
 })
