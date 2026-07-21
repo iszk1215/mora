@@ -463,7 +463,7 @@ describe('TrackerDetailEdit', () => {
 
   it('renders Chart Type and Y-Axis columns in series table', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"}]}', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"y_axes":[{"id":1,"position":"right"},{"id":0,"position":"left"}]}', role: 'owner', liked: false },
       series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"type":"bar","y_axis_index":1}' }],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
@@ -471,8 +471,13 @@ describe('TrackerDetailEdit', () => {
     expect(screen.getByText('Y-Axis')).toBeInTheDocument()
     const typeSelect = screen.getByDisplayValue('Bar') as HTMLSelectElement
     expect(typeSelect).toBeInTheDocument()
-    const yAxisSelect = screen.getByDisplayValue(/Right/) as HTMLSelectElement
+    // y_axis_index:1 is the left axis (reversed order in config), dropdown should show Left
+    const yAxisSelect = screen.getByDisplayValue('Left') as HTMLSelectElement
     expect(yAxisSelect).toBeInTheDocument()
+    const options = Array.from(yAxisSelect.options)
+    expect(options).toHaveLength(2)
+    expect(options[0].text).toBe('Left')
+    expect(options[1].text).toBe('Right')
   })
 
   it('pre-fills value format input from series config', () => {

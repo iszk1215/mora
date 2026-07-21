@@ -796,17 +796,25 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
                   </select>
                 </TableCell>
                 <TableCell>
-                  <select
-                    value={yAxes.some((a) => a.id === (seriesYAxisIndices[s.id] ?? 0)) ? (seriesYAxisIndices[s.id] ?? 0) : (yAxes[0]?.id ?? 0)}
-                    onChange={(e) => handleSeriesYAxisChange(s.id, parseInt(e.target.value))}
-                    className="border rounded px-1 py-0.5 text-sm"
-                  >
-                    {yAxes.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.position === 'left' ? 'Left' : 'Right'}{a.label ? ` (${a.label})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  {(() => {
+                    const sorted = yAxes.map((a, i) => ({ ...a, origIdx: i }))
+                      .sort((a, b) => (a.position === 'left' ? -1 : 1))
+                    const currentIdx = seriesYAxisIndices[s.id] ?? 0
+                    const dispIdx = sorted.findIndex((a) => a.origIdx === currentIdx)
+                    return (
+                      <select
+                        value={dispIdx >= 0 ? dispIdx : 0}
+                        onChange={(e) => handleSeriesYAxisChange(s.id, sorted[parseInt(e.target.value)].origIdx)}
+                        className="border rounded px-1 py-0.5 text-sm"
+                      >
+                        {sorted.map((a, i) => (
+                          <option key={i} value={i}>
+                            {a.position === 'left' ? 'Left' : 'Right'}{a.label ? ` (${a.label})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )
+                  })()}
                 </TableCell>
                 <TableCell>
                   <ValueFormatCell
