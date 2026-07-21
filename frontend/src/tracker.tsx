@@ -910,7 +910,18 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => setYAxes(yAxes.filter((_, i) => i !== idx))}
+                onClick={async () => {
+                  const removedIndex = idx
+                  for (const [sidStr, yi] of Object.entries(seriesYAxisIndices)) {
+                    const sid = Number(sidStr)
+                    if (yi === removedIndex) {
+                      await handleSeriesYAxisChange(sid, 0)
+                    } else if (yi > removedIndex) {
+                      await handleSeriesYAxisChange(sid, yi - 1)
+                    }
+                  }
+                  setYAxes(yAxes.filter((_, i) => i !== idx))
+                }}
               >
                 Remove
               </Button>
