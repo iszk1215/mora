@@ -37,17 +37,26 @@ export interface UserData {
   avatar_url: string
 }
 
+export interface YAxisConfig {
+  id: number
+  label?: string
+  min?: number
+  max?: number
+  position: 'left' | 'right'
+}
+
 export interface ChartConfig {
   x_axis_label?: string
-  y_axis_label?: string
   area?: boolean
   show_legend?: boolean
-  y_max?: number
   palette?: string
+  y_axes?: YAxisConfig[]
 }
 
 export interface SeriesConfig {
   value_format?: string
+  type?: 'line' | 'bar'
+  y_axis_index?: number
 }
 
 export interface SeriesModel {

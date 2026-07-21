@@ -434,8 +434,7 @@ describe('TrackerDetailEdit', () => {
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
     expect(screen.getByText('Chart Options')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('X-axis label')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Y-axis label')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Y-axis max')).toBeInTheDocument()
+    expect(screen.getByText('Y-Axes')).toBeInTheDocument()
     expect(screen.getByText('Area')).toBeInTheDocument()
     expect(screen.getByText('Legend')).toBeInTheDocument()
     expect(screen.getByText('Save Chart Options')).toBeInTheDocument()
@@ -443,12 +442,10 @@ describe('TrackerDetailEdit', () => {
 
   it('pre-fills chart option labels from tracker.chart_config', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"x_axis_label":"Time","y_axes":[{"id":0,"label":"Value","position":"left"}]}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const inputs = screen.getAllByDisplayValue(/Time|Value/)
-    expect(inputs.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByDisplayValue('Time')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Value')).toBeInTheDocument()
   })
@@ -461,6 +458,20 @@ describe('TrackerDetailEdit', () => {
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
     expect(screen.getByText('Value Format')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('e.g. %.1f')).toBeInTheDocument()
+  })
+
+  it('renders Chart Type and Y-Axis columns in series table', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"}]}', role: 'owner', liked: false },
+      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"type":"bar","y_axis_index":1}' }],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    expect(screen.getByText('Chart Type')).toBeInTheDocument()
+    expect(screen.getByText('Y-Axis')).toBeInTheDocument()
+    const typeSelect = screen.getByDisplayValue('Bar') as HTMLSelectElement
+    expect(typeSelect).toBeInTheDocument()
+    const yAxisSelect = screen.getByDisplayValue(/Y1.*right/) as HTMLSelectElement
+    expect(yAxisSelect).toBeInTheDocument()
   })
 
   it('pre-fills value format input from series config', () => {

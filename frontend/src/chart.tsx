@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react'
 import ReactECharts from 'echarts-for-react'
 import * as echarts from 'echarts'
-import { ChartConfig, SeriesConfig } from './core'
+import { ChartConfig, SeriesConfig, YAxisConfig } from './core'
 
 export const PALETTE_MAP: Record<string, string[]> = {
   default:  ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
@@ -44,6 +44,33 @@ export interface Dataset {
   seriesConfig?: SeriesConfig
 }
 
+const DEFAULT_Y_AXIS: YAxisConfig = { id: 0, position: 'left' }
+
+function buildYAxes(yAxes?: YAxisConfig[]): YAxisConfig[] {
+  if (yAxes && yAxes.length > 0) return yAxes
+  return [DEFAULT_Y_AXIS]
+}
+
+function echartYAxis(cfg: YAxisConfig, hasRightAxis: boolean): any {
+  const axis: any = {
+    type: 'value' as const,
+    splitLine: {
+      lineStyle: { type: 'dashed' as const, opacity: 0.3 },
+      show: cfg.position === 'left',
+    },
+  }
+  if (cfg.label) axis.name = cfg.label
+  if (cfg.position === 'right') {
+    axis.position = 'right' as const
+  }
+  if (cfg.min !== undefined) axis.min = cfg.min
+  if (cfg.max !== undefined) axis.max = cfg.max
+  if (hasRightAxis && cfg.position === 'left') {
+    axis.splitLine = { show: false }
+  }
+  return axis
+}
+
 export function formatValue(value: number, fmt: string | undefined): string {
   if (fmt === undefined || fmt === '') {
     return Number.isInteger(value) ? String(value) : value.toFixed(1)
@@ -73,23 +100,37 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
 
   const option = useMemo(() => {
     const showLegend = cc?.show_legend !== false && datasets.length > 1
+    const yAxes = buildYAxes(cc?.y_axes)
+    const hasRightAxis = yAxes.some((a) => a.position === 'right')
+
+    const grid: any = { left: 60, right: 20, top: showLegend ? 40 : 20, bottom: 60 }
+    if (hasRightAxis) grid.right = 60
+
     const opt: any = {
       color: colors,
-      grid: { left: 60, right: 20, top: showLegend ? 40 : 20, bottom: 60 },
+      grid,
       xAxis: {
         type: 'time' as const,
         splitLine: { show: false },
       },
-      yAxis: {
-        type: 'value' as const,
-        splitLine: { lineStyle: { type: 'dashed' as const, opacity: 0.3 } },
-      },
-      series: datasets.map((ds, i) => ({
-        name: ds.label,
-        type: 'line' as const,
-        data: ds.data.map((p) => ({ value: [p.x, Number(p.y)], ...p.extra })),
-        areaStyle: cc?.area !== false ? areaGradient(colors[i % colors.length]) : undefined,
-      })),
+      yAxis: yAxes.map((a) => echartYAxis(a, hasRightAxis)),
+      series: datasets.map((ds, i) => {
+        const seriesType = ds.seriesConfig?.type ?? 'line'
+        const yAxisIndex = ds.seriesConfig?.y_axis_index ?? 0
+        const entry: any = {
+          name: ds.label,
+          type: seriesType,
+          yAxisIndex,
+          data: ds.data.map((p) => ({ value: [p.x, Number(p.y)], ...p.extra })),
+        }
+        if (seriesType === 'line' && cc?.area !== false) {
+          entry.areaStyle = areaGradient(colors[i % colors.length])
+        }
+        if (seriesType === 'bar') {
+          entry.barMaxWidth = '60%'
+        }
+        return entry
+      }),
       tooltip: {
         trigger: 'axis',
         formatter: (params: any) => {
@@ -113,11 +154,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     if (showLegend) {
       opt.legend = { type: 'scroll' as const, top: 0 }
     }
-    if (cc) {
-      if (cc.x_axis_label) opt.xAxis.name = cc.x_axis_label
-      if (cc.y_axis_label) opt.yAxis.name = cc.y_axis_label
-      if (cc.y_max !== undefined && cc.y_max > 0) opt.yAxis.max = cc.y_max
-    }
+    if (cc?.x_axis_label) opt.xAxis.name = cc.x_axis_label
     opt.xAxis.min = params.min
     opt.xAxis.max = params.max
     return opt

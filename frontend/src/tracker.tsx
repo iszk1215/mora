@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse } from './core'
+import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig } from './core'
 import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, PALETTE_NAMES } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
@@ -189,14 +189,22 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
         axisLabel: { hideOverlap: true },
       },
       yAxis: { type: 'value' as const },
-      series: datasets.map((ds, i) => ({
-        name: ds.label,
-        type: 'line' as const,
-        data: ds.data.map((p) => [p.x, Number(p.y)]),
-        lineStyle: { width: 1.5 },
-        symbol: 'none',
-        areaStyle: areaGradient(colors[i % colors.length], 0.3),
-      })),
+      series: datasets.map((ds, i) => {
+        const seriesType = ds.seriesConfig?.type ?? 'line'
+        const entry: any = {
+          name: ds.label,
+          type: seriesType,
+          data: ds.data.map((p) => [p.x, Number(p.y)]),
+        }
+        if (seriesType === 'bar') {
+          entry.barMaxWidth = '80%'
+        } else {
+          entry.lineStyle = { width: 1.5 }
+          entry.symbol = 'none'
+          entry.areaStyle = areaGradient(colors[i % colors.length], 0.3)
+        }
+        return entry
+      }),
       tooltip: {
         trigger: 'axis',
         formatter: (params: any) => {
@@ -443,6 +451,28 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     return map
   })
 
+  const [seriesTypes, setSeriesTypes] = useState<Record<number, 'line' | 'bar'>>(() => {
+    const map: Record<number, 'line' | 'bar'> = {}
+    for (const s of data.series) {
+      try {
+        const cfg = JSON.parse(s.config) as SeriesConfig
+        if (cfg.type) map[s.id] = cfg.type
+      } catch { /* ignore */ }
+    }
+    return map
+  })
+
+  const [seriesYAxisIndices, setSeriesYAxisIndices] = useState<Record<number, number>>(() => {
+    const map: Record<number, number> = {}
+    for (const s of data.series) {
+      try {
+        const cfg = JSON.parse(s.config) as SeriesConfig
+        if (cfg.y_axis_index !== undefined) map[s.id] = cfg.y_axis_index
+      } catch { /* ignore */ }
+    }
+    return map
+  })
+
   const [savedChartConfig, setSavedChartConfig] = useState(tracker.chart_config)
   const parsedChartConfig = useMemo<ChartConfig>(() => {
     try {
@@ -453,11 +483,15 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   }, [savedChartConfig])
   const [visibility, setVisibility] = useState(tracker.visibility)
   const [xLabel, setXLabel] = useState(parsedChartConfig.x_axis_label ?? '')
-  const [yLabel, setYLabel] = useState(parsedChartConfig.y_axis_label ?? '')
   const [area, setArea] = useState(parsedChartConfig.area ?? true)
   const [showLegend, setShowLegend] = useState(parsedChartConfig.show_legend ?? true)
-  const [yMax, setYMax] = useState(parsedChartConfig.y_max ? String(parsedChartConfig.y_max) : '')
   const [palette, setPalette] = useState(parsedChartConfig.palette ?? 'random')
+  const [yAxes, setYAxes] = useState<YAxisConfig[]>(() => {
+    if (parsedChartConfig.y_axes && parsedChartConfig.y_axes.length > 0) {
+      return parsedChartConfig.y_axes
+    }
+    return [{ id: 0, position: 'left' }]
+  })
 
   const isCoverage = tracker.type === 'coverage'
 
@@ -473,14 +507,16 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const handleChartConfigSave = async () => {
     const cc: ChartConfig = {}
     if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
-    if (yLabel.trim()) cc.y_axis_label = yLabel.trim()
     if (!area) cc.area = false
     if (!showLegend) cc.show_legend = false
-    if (yMax.trim()) {
-      const parsed = parseFloat(yMax.trim())
-      if (parsed > 0) cc.y_max = parsed
-    }
     if (palette && palette !== 'random') cc.palette = palette
+    cc.y_axes = yAxes.map((a) => {
+      const axis: YAxisConfig = { id: a.id, position: a.position }
+      if (a.label?.trim()) axis.label = a.label.trim()
+      if (a.min !== undefined) axis.min = a.min
+      if (a.max !== undefined) axis.max = a.max
+      return axis
+    })
     try {
       const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(cc) })
       setSavedChartConfig(updated.chart_config)
@@ -538,20 +574,68 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     }
   }
 
-  const handleSaveValueFormat = async (seriesId: number, fmt: string) => {
-    const config: SeriesConfig = fmt ? { value_format: fmt } : {}
+  const buildSeriesConfig = (seriesId: number): SeriesConfig => {
+    const config: SeriesConfig = {}
+    const fmt = seriesValueFormats[seriesId]
+    if (fmt) config.value_format = fmt
+    const t = seriesTypes[seriesId]
+    if (t) config.type = t
+    const yi = seriesYAxisIndices[seriesId]
+    if (yi !== undefined) config.y_axis_index = yi
+    return config
+  }
+
+  const handleSaveSeriesConfig = async (seriesId: number) => {
+    const config = buildSeriesConfig(seriesId)
     try {
       const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
       setSeriesList((prev) => prev.map((s) => s.id === seriesId ? updated : s))
-      if (fmt) {
-        setSeriesValueFormats((prev) => ({ ...prev, [seriesId]: fmt }))
-      } else {
-        setSeriesValueFormats((prev) => {
-          const next = { ...prev }
-          delete next[seriesId]
-          return next
-        })
-      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleSaveValueFormat = async (seriesId: number, fmt: string) => {
+    if (fmt) {
+      setSeriesValueFormats((prev) => ({ ...prev, [seriesId]: fmt }))
+    } else {
+      setSeriesValueFormats((prev) => {
+        const next = { ...prev }
+        delete next[seriesId]
+        return next
+      })
+    }
+    const config: SeriesConfig = {}
+    if (fmt) config.value_format = fmt
+    const t = seriesTypes[seriesId]
+    if (t) config.type = t
+    const yi = seriesYAxisIndices[seriesId]
+    if (yi !== undefined) config.y_axis_index = yi
+    try {
+      const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
+      setSeriesList((s) => s.map((s) => s.id === seriesId ? updated : s))
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleSeriesTypeChange = async (seriesId: number, type: 'line' | 'bar') => {
+    setSeriesTypes((prev) => ({ ...prev, [seriesId]: type }))
+    const config: SeriesConfig = { ...buildSeriesConfig(seriesId), type }
+    try {
+      const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
+      setSeriesList((prev) => prev.map((s) => s.id === seriesId ? updated : s))
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleSeriesYAxisChange = async (seriesId: number, yAxisIndex: number) => {
+    setSeriesYAxisIndices((prev) => ({ ...prev, [seriesId]: yAxisIndex }))
+    const config: SeriesConfig = { ...buildSeriesConfig(seriesId), y_axis_index: yAxisIndex }
+    try {
+      const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
+      setSeriesList((prev) => prev.map((s) => s.id === seriesId ? updated : s))
     } catch {
       // ignore
     }
@@ -661,6 +745,8 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Data Type</TableHead>
+            <TableHead>Chart Type</TableHead>
+            <TableHead>Y-Axis</TableHead>
             <TableHead>Value Format</TableHead>
             <TableHead className="w-48">Actions</TableHead>
           </TableRow>
@@ -668,7 +754,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
         <TableBody>
           {seriesList.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 No series yet
               </TableCell>
             </TableRow>
@@ -684,6 +770,29 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
                   </button>
                 </TableCell>
                 <TableCell>{s.data_type}</TableCell>
+                <TableCell>
+                  <select
+                    value={seriesTypes[s.id] ?? 'line'}
+                    onChange={(e) => handleSeriesTypeChange(s.id, e.target.value as 'line' | 'bar')}
+                    className="border rounded px-1 py-0.5 text-sm"
+                  >
+                    <option value="line">Line</option>
+                    <option value="bar">Bar</option>
+                  </select>
+                </TableCell>
+                <TableCell>
+                  <select
+                    value={seriesYAxisIndices[s.id] ?? 0}
+                    onChange={(e) => handleSeriesYAxisChange(s.id, parseInt(e.target.value))}
+                    className="border rounded px-1 py-0.5 text-sm"
+                  >
+                    {yAxes.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.label ?? `Y${a.id}`} ({a.position})
+                      </option>
+                    ))}
+                  </select>
+                </TableCell>
                 <TableCell>
                   <ValueFormatCell
                     seriesId={s.id}
@@ -724,13 +833,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
           placeholder="X-axis label"
           className="border rounded px-2 py-1 w-40"
         />
-        <input
-          type="text"
-          value={yLabel}
-          onChange={(e) => setYLabel(e.target.value)}
-          placeholder="Y-axis label"
-          className="border rounded px-2 py-1 w-40"
-        />
         <label className="flex items-center gap-1 text-sm">
           <input type="checkbox" checked={area} onChange={(e) => setArea(e.target.checked)} />
           Area
@@ -739,14 +841,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
           <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
           Legend
         </label>
-        <input
-          type="number"
-          value={yMax}
-          onChange={(e) => setYMax(e.target.value)}
-          placeholder="Y-axis max"
-          className="border rounded px-2 py-1 w-28"
-          min="0"
-        />
         <select
           value={palette}
           onChange={(e) => setPalette(e.target.value)}
@@ -757,8 +851,84 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
             <option key={name} value={name}>{name}</option>
           ))}
         </select>
-        <Button onClick={handleChartConfigSave}>Save Chart Options</Button>
       </div>
+
+      {/* Y-Axes */}
+      <h3 className="text-lg my-2">Y-Axes</h3>
+      <div className="flex flex-col gap-2 mb-4">
+        {yAxes.map((axis, idx) => (
+          <div key={axis.id} className="flex items-center gap-2">
+            <span className="text-sm font-medium w-8">Y{axis.id}</span>
+            <input
+              type="text"
+              value={axis.label ?? ''}
+              onChange={(e) => {
+                const next = [...yAxes]
+                next[idx] = { ...next[idx], label: e.target.value || undefined }
+                setYAxes(next)
+              }}
+              placeholder="Label"
+              className="border rounded px-2 py-1 w-32 text-sm"
+            />
+            <input
+              type="number"
+              value={axis.min ?? ''}
+              onChange={(e) => {
+                const next = [...yAxes]
+                const v = e.target.value ? parseFloat(e.target.value) : undefined
+                next[idx] = { ...next[idx], min: v }
+                setYAxes(next)
+              }}
+              placeholder="Min"
+              className="border rounded px-2 py-1 w-20 text-sm"
+            />
+            <input
+              type="number"
+              value={axis.max ?? ''}
+              onChange={(e) => {
+                const next = [...yAxes]
+                const v = e.target.value ? parseFloat(e.target.value) : undefined
+                next[idx] = { ...next[idx], max: v }
+                setYAxes(next)
+              }}
+              placeholder="Max"
+              className="border rounded px-2 py-1 w-20 text-sm"
+            />
+            <select
+              value={axis.position}
+              onChange={(e) => {
+                const next = [...yAxes]
+                next[idx] = { ...next[idx], position: e.target.value as 'left' | 'right' }
+                setYAxes(next)
+              }}
+              className="border rounded px-2 py-1 text-sm"
+            >
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+            {yAxes.length > 1 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setYAxes(yAxes.filter((_, i) => i !== idx))}
+              >
+                Remove
+              </Button>
+            )}
+          </div>
+        ))}
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setYAxes([...yAxes, { id: yAxes.length, position: 'left' }])}
+          >
+            Add Y-Axis
+          </Button>
+        </div>
+      </div>
+
+      <Button onClick={handleChartConfigSave}>Save Chart Options</Button>
 
       {/* Add value form */}
       <h2 className="text-xl my-2">Add Value</h2>

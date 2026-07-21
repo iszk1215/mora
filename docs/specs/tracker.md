@@ -82,13 +82,13 @@ Only two values are allowed: `"public"` and `"private"`.
 ### CreateTrackerRequest
 
 ```json
-{ "name": "string", "visibility": "public|private", "type": "tracker|coverage", "repo_id": 1, "chart_config": "{}" }
+{ "name": "string", "visibility": "public|private", "type": "tracker|coverage", "repo_id": 1, "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
 ```
 
 ### PatchTrackerRequest
 
 ```json
-{ "visibility": "public|private", "chart_config": "{\"x_axis_label\":\"Date\"}" }
+{ "visibility": "public|private", "chart_config": "{\"x_axis_label\":\"Date\",\"y_axes\":[{\"id\":0,\"label\":\"Count\",\"position\":\"left\"}]}" }
 ```
 
 ### TrackerResponse
@@ -96,6 +96,55 @@ Only two values are allowed: `"public"` and `"private"`.
 ```json
 { "id": 1, "name": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "role": "owner", "liked": false }
 ```
+
+### ChartConfig (JSON stored in `chart_config`)
+
+```json
+{
+  "x_axis_label": "Date",
+  "area": true,
+  "show_legend": true,
+  "palette": "default",
+  "y_axes": [
+    { "id": 0, "label": "Count", "position": "left", "min": 0 },
+    { "id": 1, "label": "Rate (%)", "position": "right", "min": 0, "max": 100 }
+  ]
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `x_axis_label` | string | — | X-axis label |
+| `area` | boolean | true | Show area fill under line series |
+| `show_legend` | boolean | true | Show legend (when >1 series) |
+| `palette` | string | "random" | Named color palette |
+| `y_axes` | YAxisConfig[] | `[{id:0,position:"left"}]` | Y-axis definitions |
+
+### YAxisConfig
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | number | yes | 0-based axis index |
+| `label` | string | no | Axis label |
+| `position` | "left" \| "right" | yes | Axis side |
+| `min` | number | no | Minimum value |
+| `max` | number | no | Maximum value |
+
+### SeriesConfig (JSON stored in `series.config`)
+
+```json
+{
+  "value_format": "%.1f%%",
+  "type": "line",
+  "y_axis_index": 0
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `value_format` | string | — | Printf-style format for tooltip (e.g. `%.1f%%`) |
+| `type` | "line" \| "bar" | "line" | Chart series type |
+| `y_axis_index` | number | 0 | Which Y-axis this series maps to |
 
 ### PreviewResponse
 
@@ -137,4 +186,6 @@ When `type="coverage"`, the tracker links to a repository via `tracker_coverage`
 | `tracker/handler_test.go` | Handler unit tests |
 | `tracker/service_test.go` | Service unit tests |
 | `frontend/src/tracker.tsx` | Frontend components |
+| `frontend/src/chart.tsx` | Chart rendering (TrackerChart, ECharts) |
 | `frontend/src/tracker.test.tsx` | Frontend tests |
+| `frontend/src/chart.test.tsx` | Chart tests |
