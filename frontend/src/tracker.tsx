@@ -922,6 +922,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
             variant="outline"
             size="sm"
             onClick={() => setYAxes([...yAxes, { id: yAxes.length, position: 'left' }])}
+            disabled={yAxes.length >= 2}
           >
             Add Y-Axis
           </Button>

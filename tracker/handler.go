@@ -348,6 +348,10 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 			render.BadRequest(w, errors.New("chart_config must be valid JSON"))
 			return
 		}
+		if err := validateChartConfigYAxes(*req.ChartConfig); err != nil {
+			render.BadRequest(w, err)
+			return
+		}
 		tracker.ChartConfig = *req.ChartConfig
 	}
 	err = h.store.addTracker(&tracker, uid, req.RepoID)
@@ -450,6 +454,10 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	if req.ChartConfig != nil {
 		if !json.Valid([]byte(*req.ChartConfig)) {
 			render.BadRequest(w, errors.New("chart_config must be valid JSON"))
+			return
+		}
+		if err := validateChartConfigYAxes(*req.ChartConfig); err != nil {
+			render.BadRequest(w, err)
 			return
 		}
 	}
@@ -1078,4 +1086,17 @@ func newHandler(store *trackerStore, cp CoverageTimelineProvider) http.Handler {
 	})
 
 	return r
+}
+
+func validateChartConfigYAxes(raw string) error {
+	var cc struct {
+		YAxes []json.RawMessage `json:"y_axes"`
+	}
+	if err := json.Unmarshal([]byte(raw), &cc); err != nil {
+		return errors.New("chart_config must be valid JSON")
+	}
+	if len(cc.YAxes) > 2 {
+		return errors.New("chart_config: y_axes must have at most 2 axes")
+	}
+	return nil
 }

@@ -160,6 +160,15 @@ func TestHandlerCreateTracker(t *testing.T) {
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
+
+	t.Run("chart_config with 3+ y_axes rejected", func(t *testing.T) {
+		h := newTestHandler(t)
+		cc := `{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"},{"id":2,"position":"left"}]}`
+		req := CreateTrackerRequest{Name: "too_many_axes", Visibility: "private", ChartConfig: &cc}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
 }
 
 func TestHandlerListTrackers(t *testing.T) {
@@ -415,6 +424,20 @@ func TestHandlerPatchTracker(t *testing.T) {
 		h := newHandler(store, nil)
 		path := fmt.Sprintf("/%d", tr.Id)
 		body := PatchTrackerRequest{ChartConfig: strPtr("not-json")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("patch chart_config with 3+ y_axes rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d", tr.Id)
+		cc := `{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"},{"id":2,"position":"left"}]}`
+		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
