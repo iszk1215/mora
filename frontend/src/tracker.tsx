@@ -784,13 +784,13 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
                 </TableCell>
                 <TableCell>
                   <select
-                    value={seriesYAxisIndices[s.id] ?? 0}
+                    value={yAxes.some((a) => a.id === (seriesYAxisIndices[s.id] ?? 0)) ? (seriesYAxisIndices[s.id] ?? 0) : (yAxes[0]?.id ?? 0)}
                     onChange={(e) => handleSeriesYAxisChange(s.id, parseInt(e.target.value))}
                     className="border rounded px-1 py-0.5 text-sm"
                   >
                     {yAxes.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.label ?? `Y${a.id}`} ({a.position})
+                        {a.position === 'left' ? 'Left' : 'Right'}{a.label ? ` (${a.label})` : ''}
                       </option>
                     ))}
                   </select>

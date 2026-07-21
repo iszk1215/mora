@@ -470,7 +470,7 @@ describe('TrackerDetailEdit', () => {
     expect(screen.getByText('Y-Axis')).toBeInTheDocument()
     const typeSelect = screen.getByDisplayValue('Bar') as HTMLSelectElement
     expect(typeSelect).toBeInTheDocument()
-    const yAxisSelect = screen.getByDisplayValue(/Y1.*right/) as HTMLSelectElement
+    const yAxisSelect = screen.getByDisplayValue(/Right/) as HTMLSelectElement
     expect(yAxisSelect).toBeInTheDocument()
   })
 
