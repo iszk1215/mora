@@ -181,7 +181,10 @@ func makeCoverageListResponse(
 
 	covs := []CoverageResponse{}
 	for _, cov := range coverages {
-		revURL := rm.RevisionURL(repo.Url, cov.Revision)
+		var revURL string
+		if rm != nil {
+			revURL = rm.RevisionURL(repo.Url, cov.Revision)
+		}
 		covs = append(covs, makeCoverageResponse(revURL, cov))
 	}
 
@@ -208,6 +211,29 @@ func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Requ
 		return coverages[i].Timestamp.Before(coverages[j].Timestamp)
 	})
 
+	resp := makeCoverageListResponse(rm, repo, coverages)
+	render.JSON(w, resp, http.StatusOK)
+}
+
+func (s *CoverageHandler) HandleCoverageListPublic(w http.ResponseWriter, r *http.Request) {
+	repo, ok := core.RepoFrom(r.Context())
+	if !ok {
+		render.NotFound(w, errors.New("repository not found"))
+		return
+	}
+
+	coverages, err := s.coverages.List(repo.Id)
+	if err != nil {
+		log.Warn().Err(err).Msg("failed to list coverages")
+		render.NotFound(w, render.ErrNotFound)
+		return
+	}
+
+	sort.Slice(coverages, func(i, j int) bool {
+		return coverages[i].Timestamp.Before(coverages[j].Timestamp)
+	})
+
+	rm, _ := core.RepositoryClientFrom(r.Context())
 	resp := makeCoverageListResponse(rm, repo, coverages)
 	render.JSON(w, resp, http.StatusOK)
 }

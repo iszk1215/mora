@@ -115,7 +115,7 @@ func TestHandlerCreateTracker(t *testing.T) {
 
 		r2 := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{Name: "dup", Visibility: "private"})
 		r2 = r2.WithContext(superuserCtx())
-		getResponse(t, http.StatusBadRequest, h, r2)
+		getResponse(t, http.StatusCreated, h, r2)
 	})
 
 	t.Run("forbidden without auth", func(t *testing.T) {

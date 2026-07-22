@@ -365,6 +365,48 @@ func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 	})
 }
 
+func (s *MoraServer) handleCoverageListPublic(w http.ResponseWriter, r *http.Request) {
+	trackerID, err := strconv.ParseInt(chi.URLParam(r, "trackerId"), 10, 64)
+	if err != nil {
+		log.Err(err).Msg("invalid trackerId in URL")
+		render.BadRequest(w, errors.New("invalid tracker id"))
+		return
+	}
+
+	repoID, err := s.tracker.FindRepoIDByTrackerID(trackerID)
+	if err != nil {
+		log.Err(err).Msg("failed to find repo_id by tracker_id")
+		render.InternalError(w, errors.New("internal error"))
+		return
+	}
+	if repoID == nil {
+		render.NotFound(w, errors.New("tracker has no associated repository"))
+		return
+	}
+
+	repo, err := s.repos.Find(*repoID)
+	if err != nil {
+		log.Err(err).Msg("failed to find repository")
+		render.NotFound(w, errors.New("repository not found"))
+		return
+	}
+
+	ctx := core.WithRepo(r.Context(), repo)
+
+	rm := s.findRepositoryManager(repo.RepositoryManager)
+	if rm != nil {
+		sess, ok := MoraSessionFrom(r.Context())
+		if ok {
+			if err := checkRepoAccess(sess, rm, repo); err == nil {
+				ctx, _ = sess.WithToken(ctx, rm.ID())
+				ctx = core.WithRepositoryClient(ctx, rm)
+			}
+		}
+	}
+
+	s.coverage.HandleCoverageListPublic(w, r.WithContext(ctx))
+}
+
 func (s *MoraServer) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -399,8 +441,10 @@ func (s *MoraServer) Handler() http.Handler {
 	if s.coverage != nil {
 		r.Route("/api/coverages", func(r chi.Router) {
 			r.Route("/{trackerId}", func(r chi.Router) {
-				r.Use(s.injectTrackerCoverage)
-				r.Mount("/", s.coverage.Handler())
+				// List endpoint - no SCM auth required
+				r.Get("/", s.handleCoverageListPublic)
+				// Other endpoints - SCM auth required
+				r.With(s.injectTrackerCoverage).Mount("/", s.coverage.Handler())
 			})
 		})
 	}

@@ -28,6 +28,10 @@ func (s *CoverageService) Handler() http.Handler {
 	return s.handler.Handler()
 }
 
+func (s *CoverageService) HandleCoverageListPublic(w http.ResponseWriter, r *http.Request) {
+	s.handler.HandleCoverageListPublic(w, r)
+}
+
 func (s *CoverageService) Store() CoverageStore {
 	return s.store
 }

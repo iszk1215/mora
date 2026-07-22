@@ -10,12 +10,14 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/drone/go-scm/scm"
 	"github.com/drone/go-scm/scm/transport/oauth2"
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/core"
+	"github.com/iszk1215/mora/coverage"
 	"github.com/iszk1215/mora/mockscm"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
@@ -147,6 +149,11 @@ func (b *MoraServerBuilder) WithSessionManager() *MoraServerBuilder {
 
 func (b *MoraServerBuilder) WithTracker(trackerService *tracker.Service) *MoraServerBuilder {
 	b.Server.tracker = trackerService
+	return b
+}
+
+func (b *MoraServerBuilder) WithCoverage(coverageService *coverage.CoverageService) *MoraServerBuilder {
+	b.Server.coverage = coverageService
 	return b
 }
 
@@ -992,4 +999,99 @@ func TestHandleMe_UserNotFound(t *testing.T) {
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
 	require.Equal(t, http.StatusNoContent, res.StatusCode)
+}
+
+// ----------------------------------------------------------------------
+// handleCoverageListPublic
+
+func TestHandleCoverageListPublic(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	repo := Repository{
+		Id:                1,
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "repo",
+		Url:               "http://mock.scm/owner/repo",
+	}
+
+	rm := NewMockRepositoryManager(1)
+	rm.client.Repositories = createMockRepoService(controller, repo)
+
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	coverageService, err := coverage.NewCoverageService(db)
+	require.NoError(t, err)
+
+	cov := &coverage.Coverage{
+		RepoID:    repo.Id,
+		Revision:  "abc123",
+		Timestamp: time.Now().Round(0),
+	}
+	_, err = coverageService.Store().Put(cov)
+	require.NoError(t, err)
+
+	trackerService, err := tracker.NewService(db, coverageService.Store())
+	require.NoError(t, err)
+
+	// Create a tracker linked to the repo
+	repoID := repo.Id
+	trk, err := trackerService.CreateTracker("test coverage", "public", 1, "coverage", &repoID, "{}")
+	require.NoError(t, err)
+
+	server := NewMoraServerBuilder(t).
+		WithRepositoryManager(rm).
+		WithRepo(&repo).
+		WithSessionManager().
+		WithTracker(trackerService).
+		WithCoverage(coverageService).
+		Finish()
+
+	handler := server.Handler()
+
+	t.Run("logged in with valid token", func(t *testing.T) {
+		sess := NewMoraSessionWithTokenFor(rm)
+		sess.SetUserID(1)
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", trk.Id), nil)
+		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-logged-in"})
+		server.sessionManager.store["test-sess-logged-in"] = sess
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var data coverage.CoverageListResponse
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		require.Len(t, data.Coverages, 1)
+		assert.NotEmpty(t, data.Coverages[0].RevisionURL)
+	})
+
+	t.Run("not logged in", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", trk.Id), nil)
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var data coverage.CoverageListResponse
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		require.Len(t, data.Coverages, 1)
+		assert.Empty(t, data.Coverages[0].RevisionURL)
+	})
 }

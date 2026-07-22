@@ -186,6 +186,7 @@ interface CoverageSegmentProperty {
 export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
   const params = props.params
   const cov = props.cov
+  const hasScmAccess = !!cov.revision_url
 
   const elems: React.JSX.Element[] = []
 
@@ -197,11 +198,18 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
   }
 
   cov.entries.forEach((e: CoverageEntry) => {
-    const href = buildEntryUrl(params, cov, e.name)
-    elems.push(
-      <DefaultLink to={href}>
-        {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
-      </DefaultLink>)
+    if (hasScmAccess) {
+      const href = buildEntryUrl(params, cov, e.name)
+      elems.push(
+        <DefaultLink to={href}>
+          {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
+        </DefaultLink>)
+    } else {
+      elems.push(
+        <span>
+          {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
+        </span>)
+    }
   })
 
   const elemsWithMargin = elems.map((e: React.JSX.Element, i: number) => {
@@ -217,9 +225,13 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
         </div>
         <div>
           <span className="mr-2">{formatTime(cov.time)}</span>
-          <ExternalLink href={cov.revision_url}>
-            {formatRevision(cov.revision)}
-          </ExternalLink>
+          {hasScmAccess ? (
+            <ExternalLink href={cov.revision_url}>
+              {formatRevision(cov.revision)}
+            </ExternalLink>
+          ) : (
+            <span>{formatRevision(cov.revision)}</span>
+          )}
         </div>
       </CardContent>
     </Card>)

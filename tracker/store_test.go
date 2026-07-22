@@ -82,7 +82,7 @@ func TestStoreTracker(t *testing.T) {
 		}
 
 		err := s.addTracker(tracker, 1, nil)
-		require.Error(t, err)
+		require.NoError(t, err)
 	})
 }
 

@@ -232,6 +232,68 @@ func Test_CoverageHandler_CoverageList_Empty(t *testing.T) {
 	require.Empty(t, data.Coverages)
 }
 
+func Test_CoverageHandler_HandleCoverageListPublic(t *testing.T) {
+	rm := NewMockRepositoryClient()
+	repo := core.Repository{Id: 1215, Namespace: "owner", Name: "repo", Url: "url"}
+
+	time0 := time.Now().Round(0)
+	time1 := time0.Add(-10 * time.Hour * 24)
+	cov0 := &Coverage{ID: 0, RepoID: repo.Id, Timestamp: time0, Revision: "abc123"}
+	cov1 := &Coverage{ID: 1, RepoID: repo.Id, Timestamp: time1, Revision: "abc124"}
+
+	store := setupCoverageStore(t, cov0, cov1)
+	s := newCoverageHandler(store)
+
+	t.Run("with RepositoryClient", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		ctx := core.WithRepo(r.Context(), repo)
+		ctx = core.WithRepositoryClient(ctx, rm)
+		r = r.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		s.HandleCoverageListPublic(w, r)
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var data CoverageListResponse
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		require.Len(t, data.Coverages, 2)
+		assert.NotEmpty(t, data.Coverages[0].RevisionURL)
+		assert.NotEmpty(t, data.Coverages[1].RevisionURL)
+	})
+
+	t.Run("without RepositoryClient", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		ctx := core.WithRepo(r.Context(), repo)
+		r = r.WithContext(ctx)
+		w := httptest.NewRecorder()
+
+		s.HandleCoverageListPublic(w, r)
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var data CoverageListResponse
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		require.Len(t, data.Coverages, 2)
+		assert.Empty(t, data.Coverages[0].RevisionURL)
+		assert.Empty(t, data.Coverages[1].RevisionURL)
+	})
+}
+
 func Test_CoverageHandler_FileList(t *testing.T) {
 	rm := NewMockRepositoryClient()
 

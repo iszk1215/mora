@@ -16,7 +16,7 @@ var (
 var schemaTracker = `
 CREATE TABLE IF NOT EXISTS tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
     visibility TEXT NOT NULL DEFAULT 'private',
     type TEXT NOT NULL DEFAULT 'tracker',
     chart_config TEXT NOT NULL DEFAULT '{}'
@@ -579,6 +579,78 @@ func (s *trackerStore) initialize() error {
 	_, err = s.db.Exec(schemaTrackerCoverage)
 	if err != nil {
 		return fmt.Errorf("initialize schemaTrackerCoverage: %w", err)
+	}
+
+	if err := s.migrateCoverageTrackers(1); err != nil {
+		return fmt.Errorf("initialize migrateCoverageTrackers: %w", err)
+	}
+
+	return nil
+}
+
+func (s *trackerStore) migrateCoverageTrackers(adminUserID int64) error {
+	// Check if repository table exists; skip if not (e.g., in tests)
+	var count int
+	err := s.db.Get(&count, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='repository'")
+	if err != nil || count == 0 {
+		return nil
+	}
+
+	// Clean up orphaned tracker_coverage entries
+	_, err = s.db.Exec(`
+		DELETE FROM tracker_coverage
+		WHERE tracker_id NOT IN (SELECT id FROM tracker)
+	`)
+	if err != nil {
+		return fmt.Errorf("migrateCoverageTrackers cleanup orphaned: %w", err)
+	}
+
+	type repoRow struct {
+		ID        int64  `db:"id"`
+		Namespace string `db:"namespace"`
+		Name      string `db:"name"`
+	}
+
+	var repos []repoRow
+	err = s.db.Select(&repos, `
+		SELECT r.id, r.namespace, r.name
+		FROM repository r
+		WHERE NOT EXISTS (
+			SELECT 1 FROM tracker_coverage tc WHERE tc.repo_id = r.id
+		)
+	`)
+	if err != nil {
+		return nil
+	}
+
+	for _, r := range repos {
+		trackerName := r.Namespace + "/" + r.Name + " coverage"
+
+		res, err := s.db.Exec(
+			"INSERT INTO tracker (name, visibility, type, chart_config) VALUES (?, 'public', 'coverage', '{}')",
+			trackerName)
+		if err != nil {
+			return fmt.Errorf("migrateCoverageTrackers insert tracker for repo %d: %w", r.ID, err)
+		}
+
+		trackerID, err := res.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("migrateCoverageTrackers LastInsertId for repo %d: %w", r.ID, err)
+		}
+
+		_, err = s.db.Exec(
+			"INSERT INTO tracker_member (user_id, tracker_id, role) VALUES (?, ?, 'owner')",
+			adminUserID, trackerID)
+		if err != nil {
+			return fmt.Errorf("migrateCoverageTrackers insert member for repo %d: %w", r.ID, err)
+		}
+
+		_, err = s.db.Exec(
+			"INSERT INTO tracker_coverage (tracker_id, repo_id) VALUES (?, ?)",
+			trackerID, r.ID)
+		if err != nil {
+			return fmt.Errorf("migrateCoverageTrackers insert coverage for repo %d: %w", r.ID, err)
+		}
 	}
 
 	return nil
