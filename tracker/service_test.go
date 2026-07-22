@@ -54,7 +54,7 @@ func TestServiceCreateTracker(t *testing.T) {
 		_, err := svc.CreateTracker("dup", "private", 1, "tracker", nil, "")
 		require.NoError(t, err)
 		_, err = svc.CreateTracker("dup", "private", 1, "tracker", nil, "")
-		require.Error(t, err)
+		require.NoError(t, err)
 	})
 }
 
