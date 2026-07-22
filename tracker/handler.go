@@ -348,6 +348,10 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 			render.BadRequest(w, errors.New("chart_config must be valid JSON"))
 			return
 		}
+		if err := validateChartConfigYAxes(*req.ChartConfig); err != nil {
+			render.BadRequest(w, err)
+			return
+		}
 		tracker.ChartConfig = *req.ChartConfig
 	}
 	err = h.store.addTracker(&tracker, uid, req.RepoID)
@@ -450,6 +454,10 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	if req.ChartConfig != nil {
 		if !json.Valid([]byte(*req.ChartConfig)) {
 			render.BadRequest(w, errors.New("chart_config must be valid JSON"))
+			return
+		}
+		if err := validateChartConfigYAxes(*req.ChartConfig); err != nil {
+			render.BadRequest(w, err)
 			return
 		}
 	}
@@ -675,6 +683,10 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 			render.BadRequest(w, errors.New("config must be valid JSON"))
 			return
 		}
+		if err := validateSeriesConfigYAxisIndex(tracker.ChartConfig, *req.Config); err != nil {
+			render.BadRequest(w, err)
+			return
+		}
 		config = *req.Config
 	}
 
@@ -774,6 +786,10 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 	if req.Config != nil {
 		if !json.Valid([]byte(*req.Config)) {
 			render.BadRequest(w, errors.New("config must be valid JSON"))
+			return
+		}
+		if err := validateSeriesConfigYAxisIndex(tracker.ChartConfig, *req.Config); err != nil {
+			render.BadRequest(w, err)
 			return
 		}
 	}
@@ -1078,4 +1094,51 @@ func newHandler(store *trackerStore, cp CoverageTimelineProvider) http.Handler {
 	})
 
 	return r
+}
+
+func validateChartConfigYAxes(raw string) error {
+	var rawMap map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &rawMap); err != nil {
+		return errors.New("chart_config must be valid JSON")
+	}
+	_, hasYAxes := rawMap["y_axes"]
+	if !hasYAxes {
+		return nil
+	}
+	var yAxes []json.RawMessage
+	if err := json.Unmarshal(rawMap["y_axes"], &yAxes); err != nil {
+		return errors.New("chart_config: y_axes must be an array")
+	}
+	if len(yAxes) == 0 {
+		return errors.New("chart_config: y_axes must not be empty")
+	}
+	if len(yAxes) > 2 {
+		return errors.New("chart_config: y_axes must have at most 2 axes")
+	}
+	return nil
+}
+
+func validateSeriesConfigYAxisIndex(chartConfig string, seriesConfig string) error {
+	var sc struct {
+		YAxisIndex *int `json:"y_axis_index"`
+	}
+	if err := json.Unmarshal([]byte(seriesConfig), &sc); err != nil {
+		return errors.New("series config must be valid JSON")
+	}
+	if sc.YAxisIndex == nil {
+		return nil
+	}
+	var cc struct {
+		YAxes []json.RawMessage `json:"y_axes"`
+	}
+	if err := json.Unmarshal([]byte(chartConfig), &cc); err != nil || len(cc.YAxes) == 0 {
+		if *sc.YAxisIndex != 0 {
+			return errors.New("y_axis_index out of range")
+		}
+		return nil
+	}
+	if *sc.YAxisIndex < 0 || *sc.YAxisIndex >= len(cc.YAxes) {
+		return errors.New("y_axis_index out of range")
+	}
+	return nil
 }

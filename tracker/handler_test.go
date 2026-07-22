@@ -160,6 +160,24 @@ func TestHandlerCreateTracker(t *testing.T) {
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
+
+	t.Run("chart_config with 3+ y_axes rejected", func(t *testing.T) {
+		h := newTestHandler(t)
+		cc := `{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"},{"id":2,"position":"left"}]}`
+		req := CreateTrackerRequest{Name: "too_many_axes", Visibility: "private", ChartConfig: &cc}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("chart_config with empty y_axes rejected", func(t *testing.T) {
+		h := newTestHandler(t)
+		cc := `{"y_axes":[]}`
+		req := CreateTrackerRequest{Name: "empty_axes", Visibility: "private", ChartConfig: &cc}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
 }
 
 func TestHandlerListTrackers(t *testing.T) {
@@ -419,6 +437,34 @@ func TestHandlerPatchTracker(t *testing.T) {
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
+
+	t.Run("patch chart_config with 3+ y_axes rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d", tr.Id)
+		cc := `{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"},{"id":2,"position":"left"}]}`
+		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("patch chart_config with empty y_axes rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d", tr.Id)
+		cc := `{"y_axes":[]}`
+		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
 }
 
 func TestHandlerRequireReadPermission(t *testing.T) {
@@ -564,6 +610,20 @@ func TestHandlerCreateSeries(t *testing.T) {
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "float"})
 		// anonymous
 		getResponse(t, http.StatusForbidden, h, r)
+	})
+
+	t.Run("y_axis_index out of range rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		cc := `{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"}]}`
+		tr := &TrackerModel{Name: "test", ChartConfig: cc}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d/series", tr.Id)
+		cfg := `{"y_axis_index":2}`
+		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", Config: &cfg})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
 	})
 }
 
@@ -740,6 +800,23 @@ func TestHandlerPatchSeries(t *testing.T) {
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(ContextWithAuth(context.Background(), nil))
 		getResponse(t, http.StatusForbidden, h, r)
+	})
+
+	t.Run("patch series y_axis_index out of range rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		cc := `{"y_axes":[{"id":0,"position":"left"}]}`
+		tr := &TrackerModel{Name: "test", ChartConfig: cc}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
+		cfg := `{"y_axis_index":1}`
+		body := PatchSeriesRequest{Config: strPtr(cfg)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
 	})
 }
 

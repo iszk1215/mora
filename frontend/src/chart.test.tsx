@@ -207,7 +207,7 @@ describe('TrackerChart', () => {
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.yAxis).toHaveLength(2)
     expect(option.yAxis[0].name).toBe('Count')
-    expect(option.yAxis[0].position).toBeUndefined()
+    expect(option.yAxis[0].position).toBe('left')
     expect(option.yAxis[1].name).toBe('Rate (%)')
     expect(option.yAxis[1].position).toBe('right')
     expect(option.yAxis[1].max).toBe(100)
@@ -229,6 +229,20 @@ describe('TrackerChart', () => {
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.series[0].yAxisIndex).toBe(0)
     expect(option.series[1].yAxisIndex).toBe(1)
+  })
+
+  it('sets explicit position on both Y-axes', () => {
+    const chartConfig = {
+      y_axes: [
+        { id: 0, label: 'Left Axis', position: 'left' as const },
+        { id: 1, label: 'Right Axis', position: 'right' as const },
+      ],
+    }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis[0].position).toBe('left')
+    expect(option.yAxis[1].position).toBe('right')
   })
 
   it('defaults to single Y-axis when y_axes is not set', () => {

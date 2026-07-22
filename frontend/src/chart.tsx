@@ -60,9 +60,7 @@ function echartYAxis(cfg: YAxisConfig, hasRightAxis: boolean): any {
     },
   }
   if (cfg.label) axis.name = cfg.label
-  if (cfg.position === 'right') {
-    axis.position = 'right' as const
-  }
+  axis.position = cfg.position
   if (cfg.min !== undefined) axis.min = cfg.min
   if (cfg.max !== undefined) axis.max = cfg.max
   if (hasRightAxis && cfg.position === 'left') {

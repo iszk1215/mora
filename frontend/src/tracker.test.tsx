@@ -7,6 +7,7 @@ import {
   TrackerView,
   TrackerDetailView,
   TrackerDetailEdit,
+  TrackerCard,
   loadTrackerList,
   loadTrackerDetail,
   patchTracker,
@@ -20,7 +21,7 @@ vi.mock('react-router', async () => {
 })
 
 vi.mock('echarts-for-react', () => ({
-  default: () => <div data-testid="echart" />,
+  default: ({ option }: any) => <div data-testid="echart" data-option={JSON.stringify(option)} />,
 }))
 
 vi.mock('react-datepicker', () => ({
@@ -402,7 +403,7 @@ describe('TrackerDetailEdit', () => {
       series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText('Add')).toBeInTheDocument()
+    expect(screen.getByText('Add Value')).toBeInTheDocument()
   })
 
   it('back link goes to tracker detail', () => {
@@ -462,7 +463,7 @@ describe('TrackerDetailEdit', () => {
 
   it('renders Chart Type and Y-Axis columns in series table', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"}]}', role: 'owner', liked: false },
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"y_axes":[{"id":1,"position":"right"},{"id":0,"position":"left"}]}', role: 'owner', liked: false },
       series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"type":"bar","y_axis_index":1}' }],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
@@ -470,8 +471,13 @@ describe('TrackerDetailEdit', () => {
     expect(screen.getByText('Y-Axis')).toBeInTheDocument()
     const typeSelect = screen.getByDisplayValue('Bar') as HTMLSelectElement
     expect(typeSelect).toBeInTheDocument()
-    const yAxisSelect = screen.getByDisplayValue(/Y1.*right/) as HTMLSelectElement
+    // y_axis_index:1 is the left axis (reversed order in config), dropdown should show Left
+    const yAxisSelect = screen.getByDisplayValue('Left') as HTMLSelectElement
     expect(yAxisSelect).toBeInTheDocument()
+    const options = Array.from(yAxisSelect.options)
+    expect(options).toHaveLength(2)
+    expect(options[0].text).toBe('Left')
+    expect(options[1].text).toBe('Right')
   })
 
   it('pre-fills value format input from series config', () => {
@@ -544,5 +550,166 @@ describe('TrackerDetailEdit', () => {
         body: JSON.stringify({ config: '{}' }),
       })
     })
+  })
+
+  it('reassigns series to Y0 when removed axis was used', async () => {
+    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"},{"id":1,"position":"right","label":"Rate"}]}'
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: {
+        id: 1, name: 'test', visibility: 'private', type: 'tracker',
+        chart_config: chartConfig,
+        role: 'owner', liked: false,
+      },
+      series: [
+        { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' },
+        { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '{"y_axis_index":1}' },
+      ],
+    })
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        if (url === '/api/trackers/1') {
+          const body = JSON.parse(opts.body as string)
+          return {
+            ok: true,
+            json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: body.chart_config, role: 'owner', liked: false }),
+          } as Response
+        }
+        return {
+          ok: true,
+          json: () => Promise.resolve({ id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: opts.body }),
+        } as Response
+      }
+      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
+    })
+
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+
+    const removeButtons = screen.getAllByText('Remove')
+    fireEvent.click(removeButtons[1])
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/2', expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ config: '{"y_axis_index":0}' }),
+      }))
+    })
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ chart_config: '{"y_axes":[{"id":0,"position":"left","label":"Count"}]}' }),
+      }))
+    })
+  })
+
+  it('disables Remove button when only one axis is active', () => {
+    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"}]}'
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: {
+        id: 1, name: 'test', visibility: 'private', type: 'tracker',
+        chart_config: chartConfig,
+        role: 'owner', liked: false,
+      },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const removeButtons = screen.getAllByText('Remove')
+    expect(removeButtons).toHaveLength(1)
+    expect(removeButtons[0]).toBeDisabled()
+  })
+
+  it('shows Add button for removed axis and clicking it adds axis back', async () => {
+    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"},{"id":1,"position":"right","label":"Rate"}]}'
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: {
+        id: 1, name: 'test', visibility: 'private', type: 'tracker',
+        chart_config: chartConfig,
+        role: 'owner', liked: false,
+      },
+      series: [],
+    })
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH' && url === '/api/trackers/1') {
+        const body = JSON.parse(opts.body as string)
+        return {
+          ok: true,
+          json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: body.chart_config, role: 'owner', liked: false }),
+        } as Response
+      }
+      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
+    })
+
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+
+    // Both axes active: two Remove buttons, one Add button (in Add Value form)
+    expect(screen.getAllByText('Remove')).toHaveLength(2)
+    const addButtonsBefore = screen.getAllByText('Add')
+    expect(addButtonsBefore).toHaveLength(1) // Only the "Add Value" button
+
+    // Click Remove on Right axis (second Remove button)
+    const removeButtons = screen.getAllByText('Remove')
+    fireEvent.click(removeButtons[1])
+
+    // Now: Left active (Remove), Right inactive (Add for axis + Add Value)
+    await vi.waitFor(() => {
+      expect(screen.getAllByText('Remove')).toHaveLength(1)
+      expect(screen.getAllByText('Add')).toHaveLength(2) // Y-axis Add + Add Value
+    })
+
+    // Click the first Add button (Y-axis Add)
+    const addButtonsAfter = screen.getAllByText('Add')
+    fireEvent.click(addButtonsAfter[0])
+
+    await vi.waitFor(() => {
+      expect(screen.getAllByText('Remove')).toHaveLength(2)
+    })
+  })
+})
+
+describe('TrackerCard', () => {
+  it('renders multi-axis yAxis and yAxisIndex from chartConfig', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"}]}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"y_axis_index":0}' }, values: [{ time: '2024-01-01', value: 10 }] },
+        { series: { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '{"y_axis_index":1}' }, values: [{ time: '2024-01-01', value: 80 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis).toHaveLength(2)
+    expect(option.yAxis[0].position).toBe('left')
+    expect(option.yAxis[1].position).toBe('right')
+    expect(option.series[0].yAxisIndex).toBe(0)
+    expect(option.series[1].yAxisIndex).toBe(1)
+    expect(option.grid.right).toBe(50)
+  })
+
+  it('defaults to single left axis when chartConfig has no y_axes', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-01', value: 10 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis).toHaveLength(1)
+    expect(option.yAxis[0].position).toBe('left')
+    expect(option.grid.right).toBe(10)
   })
 })
