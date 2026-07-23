@@ -342,7 +342,7 @@ func TestHandlerDeleteTracker(t *testing.T) {
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		// anonymous user, no context set -> requireAuth sets ContextWithAuth(ctx, nil)
 		r = r.WithContext(ContextWithAuth(context.Background(), nil))
-		getResponse(t, http.StatusForbidden, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 
 	t.Run("delete with invalid URL", func(t *testing.T) {
@@ -392,7 +392,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		var uid int64 = 2
 		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
-		getResponse(t, http.StatusForbidden, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 
 	t.Run("invalid visibility value", func(t *testing.T) {
@@ -489,7 +489,7 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 		h := newHandler(store, nil)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
-		getResponse(t, http.StatusForbidden, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 
 	t.Run("private tracker accessible by member", func(t *testing.T) {
@@ -609,7 +609,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "float"})
 		// anonymous
-		getResponse(t, http.StatusForbidden, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 
 	t.Run("y_axis_index out of range rejected", func(t *testing.T) {
@@ -799,7 +799,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		body := PatchSeriesRequest{Config: strPtr(`{"value_format":"%.1f"}`)}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(ContextWithAuth(context.Background(), nil))
-		getResponse(t, http.StatusForbidden, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 
 	t.Run("patch series y_axis_index out of range rejected", func(t *testing.T) {
@@ -889,7 +889,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
 		// anonymous
-		getResponse(t, http.StatusForbidden, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 }
 
@@ -1044,7 +1044,7 @@ func TestHandlerLike(t *testing.T) {
 		h := newHandler(store, nil)
 		path := fmt.Sprintf("/%d/like", tr.Id)
 		r := httptest.NewRequest(http.MethodPost, path, nil)
-		getResponse(t, http.StatusForbidden, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 
 	t.Run("unlike requires auth", func(t *testing.T) {
@@ -1055,7 +1055,7 @@ func TestHandlerLike(t *testing.T) {
 		h := newHandler(store, nil)
 		path := fmt.Sprintf("/%d/like", tr.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
-		getResponse(t, http.StatusForbidden, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 
 	t.Run("like non-existing tracker", func(t *testing.T) {

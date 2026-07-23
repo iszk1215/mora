@@ -168,7 +168,7 @@ func (h *trackerHandler) requireEditPermission(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		uid, ok := UserIDFromContext(r.Context())
 		if !ok || uid == 0 {
-			render.Forbidden(w, errors.New("anonymous users cannot edit"))
+			render.NotFound(w, errors.New("tracker not found"))
 			return
 		}
 		if uid == 1 {
@@ -187,7 +187,7 @@ func (h *trackerHandler) requireEditPermission(next http.Handler) http.Handler {
 			return
 		}
 		if !member {
-			render.Forbidden(w, errors.New("not a tracker member"))
+			render.NotFound(w, errors.New("tracker not found"))
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -207,7 +207,7 @@ func (h *trackerHandler) requireReadPermission(next http.Handler) http.Handler {
 		}
 		uid, ok := UserIDFromContext(r.Context())
 		if !ok {
-			render.Forbidden(w, errors.New("this tracker is private"))
+			render.NotFound(w, errors.New("tracker not found"))
 			return
 		}
 		if uid == 1 {
@@ -221,7 +221,7 @@ func (h *trackerHandler) requireReadPermission(next http.Handler) http.Handler {
 			return
 		}
 		if !member {
-			render.Forbidden(w, errors.New("this tracker is private"))
+			render.NotFound(w, errors.New("tracker not found"))
 			return
 		}
 		next.ServeHTTP(w, r)
