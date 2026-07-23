@@ -1094,4 +1094,52 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		require.Len(t, data.Coverages, 1)
 		assert.Empty(t, data.Coverages[0].RevisionURL)
 	})
+
+	// Create a private tracker for access control tests
+	privateTrk, err := trackerService.CreateTracker("private coverage", "private", 1, "coverage", &repoID, "{}")
+	require.NoError(t, err)
+
+	t.Run("private tracker - anonymous returns 404", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", privateTrk.Id), nil)
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
+
+	t.Run("private tracker - superuser returns 200", func(t *testing.T) {
+		sess := NewMoraSessionWithTokenFor(rm)
+		sess.SetUserID(1)
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", privateTrk.Id), nil)
+		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-superuser"})
+		server.sessionManager.store["test-sess-superuser"] = sess
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusOK, res.StatusCode)
+	})
+
+	t.Run("private tracker - non-member returns 404", func(t *testing.T) {
+		// Create a second user who is not a member of the private tracker
+		userStore := NewUserStore(db)
+		require.NoError(t, userStore.Init())
+		user2, err := userStore.CreateUser("nonmember", "")
+		require.NoError(t, err)
+
+		sess := NewMoraSessionWithTokenFor(rm)
+		sess.SetUserID(user2.ID)
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", privateTrk.Id), nil)
+		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-nonmember"})
+		server.sessionManager.store["test-sess-nonmember"] = sess
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
 }
