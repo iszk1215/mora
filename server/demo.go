@@ -55,6 +55,7 @@ func (s *MoraServer) seedDemoData() error {
 	type trackerEntry struct {
 		id         int64
 		ownerID    int64
+		ownerName  string
 		visibility string
 	}
 	var allTrackers []trackerEntry
@@ -90,9 +91,11 @@ func (s *MoraServer) seedDemoData() error {
 			if err != nil {
 				return fmt.Errorf("create demo tracker %s: %w", tname, err)
 			}
-			log.Debug().Int64("tracker_id", tracker.Id).Str("name", tname).Msg("Created demo tracker")
+			log.Info().Int64("tracker_id", tracker.Id).Str("name", tname).
+				Str("visibility", visibility).Str("owner", du.Username).
+				Msg("Demo tracker created")
 
-			allTrackers = append(allTrackers, trackerEntry{id: tracker.Id, ownerID: user.ID, visibility: visibility})
+			allTrackers = append(allTrackers, trackerEntry{id: tracker.Id, ownerID: user.ID, ownerName: du.Username, visibility: visibility})
 
 			seriesCount := 1 + rng.Intn(3) // 1-3 series per tracker
 			seriesDefs := []struct {
@@ -187,5 +190,11 @@ func (s *MoraServer) seedDemoData() error {
 	}
 
 	log.Info().Msg("Demo data seeded")
+	log.Info().Msg("=== Tracker Summary ===")
+	for _, t := range allTrackers {
+		log.Info().Int64("id", t.id).Str("visibility", t.visibility).
+			Str("owner", t.ownerName).Msg("tracker")
+	}
+	log.Info().Int("total", len(allTrackers)).Msg("=== End Summary ===")
 	return nil
 }

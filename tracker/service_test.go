@@ -1,11 +1,17 @@
 package tracker
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -106,4 +112,231 @@ func TestServiceHandler(t *testing.T) {
 	svc := initTestService(t)
 	h := svc.Handler()
 	require.NotNil(t, h)
+}
+
+func TestServiceFindTrackerById(t *testing.T) {
+	svc := initTestService(t)
+
+	tr, err := svc.CreateTracker("findme", "public", 1, "tracker", nil, "{}")
+	require.NoError(t, err)
+
+	t.Run("found", func(t *testing.T) {
+		got, err := svc.FindTrackerById(tr.Id)
+		require.NoError(t, err)
+		assert.Equal(t, "findme", got.Name)
+		assert.Equal(t, "public", got.Visibility)
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		_, err := svc.FindTrackerById(999)
+		require.Error(t, err)
+	})
+}
+
+func TestServiceIsMember(t *testing.T) {
+	svc := initTestService(t)
+
+	tr, err := svc.CreateTracker("member_test", "private", 1, "tracker", nil, "{}")
+	require.NoError(t, err)
+
+	// user 1 is owner (added automatically by CreateTracker)
+	member, role, err := svc.IsMember(1, tr.Id)
+	require.NoError(t, err)
+	assert.True(t, member)
+	assert.Equal(t, "owner", role)
+
+	// user 999 is not a member
+	member, _, err = svc.IsMember(999, tr.Id)
+	require.NoError(t, err)
+	assert.False(t, member)
+}
+
+func TestServiceRequireReadPermission(t *testing.T) {
+	svc := initTestService(t)
+
+	publicTr, err := svc.CreateTracker("public_tracker", "public", 1, "tracker", nil, "{}")
+	require.NoError(t, err)
+
+	privateTr, err := svc.CreateTracker("private_tracker", "private", 1, "tracker", nil, "{}")
+	require.NoError(t, err)
+
+	// Create a second user (non-member, non-superuser)
+	db := svc.store.db
+	_, err = db.Exec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url)
+		VALUES (2, 'test', 'user2', 'user2', '')`)
+	require.NoError(t, err)
+
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+	// Chain: InjectTracker -> RequireReadPermission -> next
+	handler := InjectTracker(svc.store, RequireReadPermission(svc.store, next))
+
+	makeRequest := func(trackerID int64, ctx context.Context) *httptest.ResponseRecorder {
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("trackerId", fmt.Sprintf("%d", trackerID))
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+		nextCalled = false
+		handler.ServeHTTP(w, req)
+		return w
+	}
+
+	t.Run("public tracker - anonymous allowed", func(t *testing.T) {
+		w := makeRequest(publicTr.Id, context.Background())
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, nextCalled)
+	})
+
+	t.Run("public tracker - any user allowed", func(t *testing.T) {
+		ctx := ContextWithAuth(context.Background(), &[]int64{2}[0])
+		w := makeRequest(publicTr.Id, ctx)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, nextCalled)
+	})
+
+	t.Run("private tracker - anonymous returns 404", func(t *testing.T) {
+		w := makeRequest(privateTr.Id, context.Background())
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.False(t, nextCalled)
+	})
+
+	t.Run("private tracker - superuser allowed", func(t *testing.T) {
+		uid := int64(1)
+		ctx := ContextWithAuth(context.Background(), &uid)
+		w := makeRequest(privateTr.Id, ctx)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, nextCalled)
+	})
+
+	t.Run("private tracker - member allowed", func(t *testing.T) {
+		uid := int64(1) // user 1 is owner
+		ctx := ContextWithAuth(context.Background(), &uid)
+		w := makeRequest(privateTr.Id, ctx)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, nextCalled)
+	})
+
+	t.Run("private tracker - non-member returns 404", func(t *testing.T) {
+		uid := int64(2) // user 2 is not a member
+		ctx := ContextWithAuth(context.Background(), &uid)
+		w := makeRequest(privateTr.Id, ctx)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.False(t, nextCalled)
+	})
+
+	t.Run("invalid tracker id returns 400", func(t *testing.T) {
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("trackerId", "abc")
+		ctx := context.WithValue(context.Background(), chi.RouteCtxKey, rctx)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+		nextCalled = false
+		handler.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.False(t, nextCalled)
+	})
+
+	t.Run("non-existent tracker returns 404", func(t *testing.T) {
+		w := makeRequest(999, context.Background())
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.False(t, nextCalled)
+	})
+}
+
+func TestServiceRequireEditPermission(t *testing.T) {
+	svc := initTestService(t)
+
+	publicTr, err := svc.CreateTracker("public_edit", "public", 1, "tracker", nil, "{}")
+	require.NoError(t, err)
+
+	privateTr, err := svc.CreateTracker("private_edit", "private", 1, "tracker", nil, "{}")
+	require.NoError(t, err)
+
+	db := svc.store.db
+	_, err = db.Exec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url)
+		VALUES (2, 'test', 'user2', 'user2', '')`)
+	require.NoError(t, err)
+
+	nextCalled := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nextCalled = true
+		w.WriteHeader(http.StatusOK)
+	})
+	// Chain: InjectTracker -> RequireEditPermission -> next
+	handler := InjectTracker(svc.store, RequireEditPermission(svc.store, next))
+
+	makeRequest := func(trackerID int64, ctx context.Context) *httptest.ResponseRecorder {
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("trackerId", fmt.Sprintf("%d", trackerID))
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+		nextCalled = false
+		handler.ServeHTTP(w, req)
+		return w
+	}
+
+	t.Run("public tracker - owner allowed", func(t *testing.T) {
+		uid := int64(1)
+		ctx := ContextWithAuth(context.Background(), &uid)
+		w := makeRequest(publicTr.Id, ctx)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, nextCalled)
+	})
+
+	t.Run("public tracker - non-member returns 404", func(t *testing.T) {
+		uid := int64(2)
+		ctx := ContextWithAuth(context.Background(), &uid)
+		w := makeRequest(publicTr.Id, ctx)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.False(t, nextCalled)
+	})
+
+	t.Run("private tracker - anonymous returns 404", func(t *testing.T) {
+		w := makeRequest(privateTr.Id, context.Background())
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.False(t, nextCalled)
+	})
+
+	t.Run("private tracker - superuser allowed", func(t *testing.T) {
+		uid := int64(1)
+		ctx := ContextWithAuth(context.Background(), &uid)
+		w := makeRequest(privateTr.Id, ctx)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, nextCalled)
+	})
+
+	t.Run("private tracker - non-member returns 404", func(t *testing.T) {
+		uid := int64(2)
+		ctx := ContextWithAuth(context.Background(), &uid)
+		w := makeRequest(privateTr.Id, ctx)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.False(t, nextCalled)
+	})
+
+	t.Run("invalid tracker id returns 400", func(t *testing.T) {
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("trackerId", "abc")
+		ctx := context.WithValue(context.Background(), chi.RouteCtxKey, rctx)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+		nextCalled = false
+		handler.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.False(t, nextCalled)
+	})
+
+	t.Run("non-existent tracker returns 404", func(t *testing.T) {
+		w := makeRequest(999, context.Background())
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.False(t, nextCalled)
+	})
 }

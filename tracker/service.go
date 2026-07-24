@@ -59,3 +59,28 @@ func (s *Service) CreateValue(seriesID int64, timestamp time.Time, value float64
 func (s *Service) Like(userID, trackerID int64) error {
 	return s.store.addLike(userID, trackerID)
 }
+
+func (s *Service) FindTrackerById(id int64) (*TrackerModel, error) {
+	return s.store.findTrackerById(id)
+}
+
+func (s *Service) IsMember(userID, trackerID int64) (bool, string, error) {
+	return s.store.isMember(userID, trackerID)
+}
+
+// InjectTracker loads the tracker from the URL into context.
+func (s *Service) InjectTracker(next http.Handler) http.Handler {
+	return InjectTracker(s.store, next)
+}
+
+// RequireReadPermission checks tracker visibility and membership.
+// Returns 404 for unauthorized access to avoid leaking tracker existence.
+func (s *Service) RequireReadPermission(next http.Handler) http.Handler {
+	return RequireReadPermission(s.store, next)
+}
+
+// RequireEditPermission checks tracker edit access (membership).
+// Returns 404 for unauthorized access to avoid leaking tracker existence.
+func (s *Service) RequireEditPermission(next http.Handler) http.Handler {
+	return RequireEditPermission(s.store, next)
+}

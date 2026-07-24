@@ -164,69 +164,7 @@ func (h *trackerHandler) requireAuth(next http.Handler) http.Handler {
 	})
 }
 
-func (h *trackerHandler) requireEditPermission(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		uid, ok := UserIDFromContext(r.Context())
-		if !ok || uid == 0 {
-			render.Forbidden(w, errors.New("anonymous users cannot edit"))
-			return
-		}
-		if uid == 1 {
-			next.ServeHTTP(w, r)
-			return
-		}
-		tracker, ok := trackerFrom(r.Context())
-		if !ok {
-			render.BadRequest(w, errors.New("no tracker in context"))
-			return
-		}
-		member, _, err := h.store.isMember(uid, tracker.Id)
-		if err != nil {
-			log.Error().Err(err).Msg("requireEditPermission isMember")
-			render.InternalError(w, err)
-			return
-		}
-		if !member {
-			render.Forbidden(w, errors.New("not a tracker member"))
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
 
-func (h *trackerHandler) requireReadPermission(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tracker, ok := trackerFrom(r.Context())
-		if !ok {
-			render.BadRequest(w, errors.New("no tracker in context"))
-			return
-		}
-		if tracker.Visibility == "public" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		uid, ok := UserIDFromContext(r.Context())
-		if !ok {
-			render.Forbidden(w, errors.New("this tracker is private"))
-			return
-		}
-		if uid == 1 {
-			next.ServeHTTP(w, r)
-			return
-		}
-		member, _, err := h.store.isMember(uid, tracker.Id)
-		if err != nil {
-			log.Error().Err(err).Msg("requireReadPermission isMember")
-			render.InternalError(w, err)
-			return
-		}
-		if !member {
-			render.Forbidden(w, errors.New("this tracker is private"))
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
 
 // ----------------------------------------------------------------------
 // Tracker
@@ -996,64 +934,6 @@ func (h *trackerHandler) unlikeTracker(w http.ResponseWriter, r *http.Request) {
 	renderNoContent(w)
 }
 
-// ----------------------------------------------------------------------
-// Middleware
-
-func (h *trackerHandler) injectTracker(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(chi.URLParam(r, "trackerId"), 10, 64)
-		if err != nil {
-			log.Warn().Err(err).Msg("tracker.handler.injectTracker")
-			render.BadRequest(w, errors.New("invalid tracker id"))
-			return
-		}
-
-		tracker, err := h.store.findTrackerById(id)
-		if err == errorTrackerNotFound {
-			render.NotFound(w, errors.New("tracker not found"))
-			return
-		} else if err != nil {
-			log.Warn().Err(err).Msg("tracker.handler.injectTracker")
-			render.InternalError(w, err)
-			return
-		}
-
-		r = r.WithContext(withTracker(r.Context(), *tracker))
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (h *trackerHandler) injectSeries(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seriesId, err := strconv.ParseInt(chi.URLParam(r, "seriesId"), 10, 64)
-		if err != nil {
-			log.Warn().Err(err).Msg("invalid seriesId in URL")
-			render.BadRequest(w, errors.New("invalid series id"))
-			return
-		}
-
-		series, err := h.store.findSeriesById(seriesId)
-		if err == errorSeriesNotFound {
-			render.NotFound(w, errors.New("series not found"))
-			return
-		} else if err != nil {
-			log.Warn().Err(err).Msg("tracker.handler.injectSeries")
-			render.InternalError(w, err)
-			return
-		}
-
-		// Verify series belongs to the tracker in URL
-		tracker, _ := trackerFrom(r.Context())
-		if series.TrackerId != tracker.Id {
-			render.NotFound(w, errors.New("series not found"))
-			return
-		}
-
-		r = r.WithContext(withSeries(r.Context(), *series))
-		next.ServeHTTP(w, r)
-	})
-}
-
 func newHandler(store *trackerStore, cp CoverageTimelineProvider) http.Handler {
 	h := &trackerHandler{store: store, coverageProvider: cp}
 	r := chi.NewRouter()
@@ -1065,28 +945,28 @@ func newHandler(store *trackerStore, cp CoverageTimelineProvider) http.Handler {
 		r.Post("/", h.createTracker)
 
 		r.Route("/{trackerId}", func(r chi.Router) {
-			r.Use(h.injectTracker)
-			r.Use(h.requireReadPermission)
+			r.Use(func(next http.Handler) http.Handler { return InjectTracker(h.store, next) })
+			r.Use(func(next http.Handler) http.Handler { return RequireReadPermission(h.store, next) })
 			r.Get("/", h.getTracker)
-			r.With(h.requireEditPermission).Delete("/", h.deleteTracker)
-			r.With(h.requireEditPermission).Patch("/", h.patchTracker)
+			r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Delete("/", h.deleteTracker)
+			r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Patch("/", h.patchTracker)
 			r.Post("/like", h.likeTracker)
 			r.Delete("/like", h.unlikeTracker)
 			r.Get("/preview", h.previewTracker)
 
 			r.Route("/series", func(r chi.Router) {
 				r.Get("/", h.listSeries)
-				r.With(h.requireEditPermission).Post("/", h.createSeries)
+				r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Post("/", h.createSeries)
 
 				r.Route("/{seriesId}", func(r chi.Router) {
-					r.Use(h.injectSeries)
-					r.With(h.requireEditPermission).Patch("/", h.patchSeries)
-					r.With(h.requireEditPermission).Delete("/", h.deleteSeries)
+					r.Use(func(next http.Handler) http.Handler { return InjectSeries(h.store, next) })
+					r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Patch("/", h.patchSeries)
+					r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Delete("/", h.deleteSeries)
 
 					r.Route("/values", func(r chi.Router) {
 						r.Get("/", h.listValues)
-						r.With(h.requireEditPermission).Post("/", h.createValue)
-						r.With(h.requireEditPermission).Delete("/", h.deleteValues)
+						r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Post("/", h.createValue)
+						r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Delete("/", h.deleteValues)
 					})
 				})
 			})
