@@ -6,6 +6,7 @@ import { Star } from 'lucide-react'
 import {
   Link,
   LoaderFunctionArgs,
+  Params,
   useLoaderData,
   useNavigate,
 } from 'react-router'
@@ -694,12 +695,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   if (isCoverage) {
     return (
       <div>
-        <div className="flex items-center gap-2 mb-4">
-          <Link to={`/coverages/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
-            &larr; Back to Tracker
-          </Link>
-        </div>
-
         <h1 className="text-3xl my-4">{tracker.name} (Edit)</h1>
 
         <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6">
@@ -724,12 +719,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <Link to={`/trackers/${tracker.id}`} className="text-blue-600 dark:text-blue-500 hover:underline">
-          &larr; Back to Tracker
-        </Link>
-      </div>
-
       <h1 className="text-3xl my-4">{tracker.name} (Edit)</h1>
 
       {/* Series list */}
@@ -1183,10 +1172,18 @@ export const trackerRoute = [
     path: ':trackerId',
     loader: loadTrackerDetail,
     element: <TrackerDetailRouter />,
+    handle: {
+      crumb: (params: Params, data: any) => ({
+        label: data?.tracker?.name ?? `Tracker #${params.trackerId}`,
+      }),
+    },
   },
   {
     path: ':trackerId/edit',
     loader: loadTrackerDetail,
     element: <TrackerDetailEdit />,
+    handle: {
+      crumb: () => ({ label: 'Edit' }),
+    },
   },
 ]

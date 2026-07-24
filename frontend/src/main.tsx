@@ -10,6 +10,7 @@ import {
   useLoaderData,
   useMatches,
   useRouteError,
+  useSearchParams,
 } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import 'react-datepicker/dist/react-datepicker.css'
@@ -17,6 +18,7 @@ import './index.css'
 
 import { UserData, TrackerResponse } from './core'
 import { UserProvider, useUser } from './user-context'
+import { SearchProvider, useSearch } from './search-context'
 import { coverageTrackerRoute } from './coverage'
 import { udmRoute } from './udm'
 import { trackerRoute, listTrackers, TrackerCard, fetchPreview, PreviewData } from './tracker'
@@ -37,22 +39,39 @@ import {
 // Tracker Search Page (top page)
 
 const TrackerSearchPage = (): React.JSX.Element => {
-  const [query, setQuery] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlQuery = searchParams.get('q') ?? ''
+  const [query, setQuery] = useState(urlQuery)
   const [trackers, setTrackers] = useState<TrackerResponse[]>([])
   const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
   const [searching, setSearching] = useState(false)
   const [initial, setInitial] = useState(true)
+  const search = useSearch()
 
-  // Initial load: fetch user's trackers if logged in
+  // Initial load: check context cache first, then fetch
   useEffect(() => {
-    listTrackers(1, 100)
+    // If URL has query and context has cached results for this query, use cache
+    if (urlQuery && search?.query === urlQuery && search.results.length > 0) {
+      setTrackers(search.results)
+      setPreviews(search.previews)
+      setInitial(false)
+      return
+    }
+
+    // Otherwise fetch from API
+    const q = urlQuery || undefined
+    listTrackers(1, urlQuery ? 12 : 100, q)
       .then((data) => {
         setTrackers(data.trackers)
         setInitial(false)
+        // If URL has query, save to context
+        if (urlQuery) {
+          search?.setSearch({ query: urlQuery, results: data.trackers, previews: new Map() })
+        }
         return undefined
       })
       .catch(() => setInitial(false))
-  }, [])
+  }, [urlQuery])
 
   // Fetch previews when trackers change
   useEffect(() => {
@@ -73,6 +92,10 @@ const TrackerSearchPage = (): React.JSX.Element => {
         if (entry) map.set(entry[0], entry[1])
       }
       setPreviews(map)
+      // Update context with previews
+      if (urlQuery && search) {
+        search.setSearch({ query: urlQuery, results: trackers, previews: map })
+      }
     }
     void loadAll()
   }, [trackers])
@@ -83,6 +106,14 @@ const TrackerSearchPage = (): React.JSX.Element => {
     try {
       const data = await listTrackers(1, 12, q || undefined)
       setTrackers(data.trackers)
+      // Update URL params
+      if (q) {
+        setSearchParams({ q }, { replace: true })
+      } else {
+        setSearchParams({}, { replace: true })
+      }
+      // Save to context (previews will be updated by the useEffect above)
+      search?.setSearch({ query: q, results: data.trackers, previews: new Map() })
     } catch {
       setTrackers([])
     } finally {
@@ -372,15 +403,59 @@ export const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
 
 export const Breadcrumbs = (): React.JSX.Element => {
   const matches = useMatches()
+  const search = useSearch()
 
   const last = matches[matches.length - 1]
+  const routeIds = matches.map((m: any) => m.id ?? '')
 
-  const crumbs: Crumb[] = matches
+  const crumbs: Crumb[] = []
+
+  // Detect if we are on a tracker detail or edit page
+  const isTrackerDetail = routeIds.some(id => id.includes('trackerId')) &&
+    !routeIds.some(id => id.includes('edit'))
+  const isTrackerEdit = routeIds.some(id => id.includes('edit'))
+
+  // For tracker detail page: add "Search Results" parent if search context exists
+  if (isTrackerDetail && search?.query) {
+    crumbs.push({
+      label: 'Search Results',
+      link: `/?q=${encodeURIComponent(search.query)}`,
+    })
+  }
+
+  // For tracker edit page: always add tracker name, and optionally "Search Results"
+  if (isTrackerEdit) {
+    if (search?.query) {
+      crumbs.push({
+        label: 'Search Results',
+        link: `/?q=${encodeURIComponent(search.query)}`,
+      })
+    }
+    // Find the tracker detail match to get tracker name
+    const trackerMatch = matches.find((m: any) => {
+      const id = m.id ?? ''
+      return id.includes('trackerId') && !id.includes('edit')
+    })
+    if (trackerMatch) {
+      const trackerData = trackerMatch.data as any
+      crumbs.push({
+        label: trackerData?.tracker?.name ?? 'Tracker',
+        link: `/trackers/${trackerMatch.params?.trackerId}`,
+      })
+    }
+  }
+
+  // Add route-defined crumbs
+  matches
     .filter((match: any) => Boolean(match.handle?.crumb))
-    .map((match: any) => match.handle.crumb(match.params, last.data))
-    .filter((crumb: Crumb) => Boolean(crumb.label))
+    .forEach((match: any) => {
+      crumbs.push(match.handle.crumb(match.params, last.data))
+    })
 
-  return makeBredcrumbs(crumbs)
+  const filtered = crumbs.filter((crumb: Crumb) => Boolean(crumb.label))
+  if (filtered.length === 0) return <></>
+
+  return makeBredcrumbs(filtered)
 }
 
 async function loadRootData(): Promise<{ user: UserData | null }> {
@@ -399,14 +474,16 @@ const Root = (): React.JSX.Element => {
 
   return (
     <UserProvider value={user}>
-      <div>
-        <ScrollRestoration />
-        <Header />
-        <div className="w-8/12 m-auto">
-          <Breadcrumbs />
-          <Outlet />
+      <SearchProvider>
+        <div>
+          <ScrollRestoration />
+          <Header />
+          <div className="w-8/12 m-auto">
+            <Breadcrumbs />
+            <Outlet />
+          </div>
         </div>
-      </div>
+      </SearchProvider>
     </UserProvider>
   )
 }
