@@ -442,9 +442,9 @@ func (s *MoraServer) Handler() http.Handler {
 		r.Route("/api/coverages", func(r chi.Router) {
 			r.Route("/{trackerId}", func(r chi.Router) {
 				// List endpoint - no SCM auth required, but tracker visibility is checked
-				r.With(s.requireTrackerAuth, s.tracker.RequireReadPermission).Get("/", s.handleCoverageListPublic)
+				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission).Get("/", s.handleCoverageListPublic)
 				// Other endpoints - tracker visibility + SCM auth required
-				r.With(s.requireTrackerAuth, s.tracker.RequireReadPermission, s.injectTrackerCoverage).Mount("/", s.coverage.Handler())
+				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission, s.injectTrackerCoverage).Mount("/", s.coverage.Handler())
 			})
 		})
 	}

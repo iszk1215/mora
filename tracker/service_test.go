@@ -171,7 +171,8 @@ func TestServiceRequireReadPermission(t *testing.T) {
 		nextCalled = true
 		w.WriteHeader(http.StatusOK)
 	})
-	handler := svc.RequireReadPermission(next)
+	// Chain: InjectTracker -> RequireReadPermission -> next
+	handler := InjectTracker(svc.store, RequireReadPermission(svc.store, next))
 
 	makeRequest := func(trackerID int64, ctx context.Context) *httptest.ResponseRecorder {
 		rctx := chi.NewRouteContext()
@@ -267,7 +268,8 @@ func TestServiceRequireEditPermission(t *testing.T) {
 		nextCalled = true
 		w.WriteHeader(http.StatusOK)
 	})
-	handler := svc.RequireEditPermission(next)
+	// Chain: InjectTracker -> RequireEditPermission -> next
+	handler := InjectTracker(svc.store, RequireEditPermission(svc.store, next))
 
 	makeRequest := func(trackerID int64, ctx context.Context) *httptest.ResponseRecorder {
 		rctx := chi.NewRouteContext()
