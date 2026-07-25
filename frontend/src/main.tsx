@@ -18,7 +18,8 @@ import './index.css'
 
 import { UserData, TrackerResponse } from './core'
 import { UserProvider, useUser } from './user-context'
-import { SearchProvider, useSearch } from './search-context'
+import { SearchContext, useSearch } from './search-context'
+import type { SearchState } from './search-context'
 import { coverageTrackerRoute } from './coverage'
 import { udmRoute } from './udm'
 import { trackerRoute, listTrackers, TrackerCard, fetchPreview, PreviewData } from './tracker'
@@ -471,10 +472,15 @@ async function loadRootData(): Promise<{ user: UserData | null }> {
 
 const Root = (): React.JSX.Element => {
   const { user } = useLoaderData() as { user: UserData | null }
+  const [searchState, setSearchState] = useState<SearchState>({
+    query: '',
+    results: [],
+    previews: new Map(),
+  })
 
   return (
     <UserProvider value={user}>
-      <SearchProvider>
+      <SearchContext.Provider value={{ ...searchState, setSearch: setSearchState }}>
         <div>
           <ScrollRestoration />
           <Header />
@@ -483,7 +489,7 @@ const Root = (): React.JSX.Element => {
             <Outlet />
           </div>
         </div>
-      </SearchProvider>
+      </SearchContext.Provider>
     </UserProvider>
   )
 }

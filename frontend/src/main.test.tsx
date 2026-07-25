@@ -4,7 +4,8 @@ import { MemoryRouter } from 'react-router'
 import { useLoaderData, useRouteError, useMatches, isRouteErrorResponse } from 'react-router'
 import { SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache, rootShouldRevalidate } from './main'
 import { UserProvider } from './user-context'
-import { SearchProvider } from './search-context'
+import { SearchContext } from './search-context'
+import type { SearchState } from './search-context'
 
 vi.mock('react-dom/client', () => ({
   default: { createRoot: () => ({ render: vi.fn() }) },
@@ -282,7 +283,7 @@ describe('Breadcrumbs', () => {
     expect(screen.queryByText('hidden')).toBeNull()
   })
 
-  it('shows Search Results crumb for tracker detail page when search context has query', () => {
+  it('shows only Tracker Name when search context has no query', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -294,14 +295,14 @@ describe('Breadcrumbs', () => {
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
+    const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
     render(
       <MemoryRouter>
-        <SearchProvider>
+        <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
           <Breadcrumbs />
-        </SearchProvider>
+        </SearchContext.Provider>
       </MemoryRouter>
     )
-    // SearchProvider has empty query by default, so no "Search Results" crumb
     expect(screen.getByText('My Tracker')).toBeInTheDocument()
     expect(screen.queryByText('Search Results')).toBeNull()
   })
@@ -318,24 +319,108 @@ describe('Breadcrumbs', () => {
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
-    // Create a wrapper that sets search context with a query
-    const SearchWrapper = ({ children }: { children: React.ReactNode }) => (
-      <SearchProvider>
-        {children}
-      </SearchProvider>
-    )
-    // We need to manually set the search context value
-    // Since we can't directly set context in tests, we'll test the component behavior
-    // by verifying the SearchProvider is imported and used
+    const searchWithQuery: SearchState = { query: 'foo', results: [], previews: new Map() }
     render(
       <MemoryRouter>
-        <SearchWrapper>
+        <SearchContext.Provider value={{ ...searchWithQuery, setSearch: vi.fn() }}>
           <Breadcrumbs />
-        </SearchWrapper>
+        </SearchContext.Provider>
       </MemoryRouter>
     )
-    // With empty search context, only tracker name should show
+    expect(screen.getByText('Search Results')).toBeInTheDocument()
     expect(screen.getByText('My Tracker')).toBeInTheDocument()
+    const link = screen.getByText('Search Results').closest('a')
+    expect(link).toHaveAttribute('href', '/?q=foo')
+  })
+
+  it('shows Search Results > Tracker Name > Edit for edit page with query', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
+        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId/edit', pathname: '/trackers/1/edit', params: { trackerId: '1' }, 
+        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'Edit' }) },
+      },
+    ])
+    const searchWithQuery: SearchState = { query: 'foo', results: [], previews: new Map() }
+    render(
+      <MemoryRouter>
+        <SearchContext.Provider value={{ ...searchWithQuery, setSearch: vi.fn() }}>
+          <Breadcrumbs />
+        </SearchContext.Provider>
+      </MemoryRouter>
+    )
+    expect(screen.getByText('Search Results')).toBeInTheDocument()
+    expect(screen.getByText('My Tracker')).toBeInTheDocument()
+    expect(screen.getByText('Edit')).toBeInTheDocument()
+    const searchLink = screen.getByText('Search Results').closest('a')
+    expect(searchLink).toHaveAttribute('href', '/?q=foo')
+    const trackerLink = screen.getByText('My Tracker').closest('a')
+    expect(trackerLink).toHaveAttribute('href', '/trackers/1')
+  })
+
+  it('shows Tracker Name > Edit for edit page without query', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
+        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId/edit', pathname: '/trackers/1/edit', params: { trackerId: '1' }, 
+        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'Edit' }) },
+      },
+    ])
+    const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
+    render(
+      <MemoryRouter>
+        <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
+          <Breadcrumbs />
+        </SearchContext.Provider>
+      </MemoryRouter>
+    )
+    expect(screen.queryByText('Search Results')).toBeNull()
+    expect(screen.getByText('My Tracker')).toBeInTheDocument()
+    expect(screen.getByText('Edit')).toBeInTheDocument()
+    const trackerLink = screen.getByText('My Tracker').closest('a')
+    expect(trackerLink).toHaveAttribute('href', '/trackers/1')
+  })
+
+  it('Search Results link includes encoded query', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
+        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
+      },
+    ])
+    const searchWithSpaces: SearchState = { query: 'foo bar', results: [], previews: new Map() }
+    render(
+      <MemoryRouter>
+        <SearchContext.Provider value={{ ...searchWithSpaces, setSearch: vi.fn() }}>
+          <Breadcrumbs />
+        </SearchContext.Provider>
+      </MemoryRouter>
+    )
+    const link = screen.getByText('Search Results').closest('a')
+    expect(link).toHaveAttribute('href', '/?q=foo%20bar')
   })
 })
 
