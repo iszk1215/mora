@@ -407,14 +407,14 @@ export const Breadcrumbs = (): React.JSX.Element => {
   const search = useSearch()
 
   const last = matches[matches.length - 1]
-  const routeIds = matches.map((m: any) => m.id ?? '')
 
   const crumbs: Crumb[] = []
 
-  // Detect if we are on a tracker detail or edit page
-  const isTrackerDetail = routeIds.some(id => id.includes('trackerId')) &&
-    !routeIds.some(id => id.includes('edit'))
-  const isTrackerEdit = routeIds.some(id => id.includes('edit'))
+  // Detect if we are on a tracker detail or edit page using params (not route IDs)
+  const hasTrackerId = matches.some(m => Boolean((m.params as any)?.trackerId))
+  const isOnEditPage = last.pathname.endsWith('/edit')
+  const isTrackerDetail = hasTrackerId && !isOnEditPage
+  const isTrackerEdit = hasTrackerId && isOnEditPage
 
   // For tracker detail page: add "Search Results" parent if search context exists
   if (isTrackerDetail && search?.query) {
@@ -433,10 +433,7 @@ export const Breadcrumbs = (): React.JSX.Element => {
       })
     }
     // Find the tracker detail match to get tracker name
-    const trackerMatch = matches.find((m: any) => {
-      const id = m.id ?? ''
-      return id.includes('trackerId') && !id.includes('edit')
-    })
+    const trackerMatch = matches.find((m: any) => Boolean(m.params?.trackerId))
     if (trackerMatch) {
       const trackerData = trackerMatch.data as any
       crumbs.push({
