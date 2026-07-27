@@ -215,7 +215,9 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
         } else {
           entry.lineStyle = { width: 1.5 }
           entry.symbol = 'none'
-          entry.areaStyle = areaGradient(colors[i % colors.length], 0.3)
+          if (chartConfig.area !== false) {
+            entry.areaStyle = areaGradient(colors[i % colors.length], 0.3)
+          }
         }
         return entry
       }),

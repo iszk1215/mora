@@ -711,4 +711,58 @@ describe('TrackerCard', () => {
     expect(option.yAxis[0].position).toBe('left')
     expect(option.grid.right).toBe(10)
   })
+
+  it('applies areaStyle for line series when area is not false', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-01', value: 10 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].areaStyle).toBeDefined()
+  })
+
+  it('omits areaStyle for line series when area is false', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{"area":false}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-01', value: 10 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].areaStyle).toBeUndefined()
+  })
+
+  it('omits areaStyle for bar series regardless of area config', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"type":"bar"}' }, values: [{ time: '2024-01-01', value: 10 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].areaStyle).toBeUndefined()
+  })
 })
