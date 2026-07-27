@@ -359,6 +359,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [seriesList] = useState<SeriesModel[]>(data.series)
   const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
   const [liked, setLiked] = useState(tracker.liked)
+  const [likeCount, setLikeCount] = useState(tracker.like_count ?? 0)
   const [likeLoading, setLikeLoading] = useState(false)
 
   useEffect(() => {
@@ -377,9 +378,11 @@ export const TrackerDetailView = (): React.JSX.Element => {
       if (liked) {
         await unlikeTracker(tracker.id)
         setLiked(false)
+        setLikeCount((c) => Math.max(0, c - 1))
       } else {
         await likeTracker(tracker.id)
         setLiked(true)
+        setLikeCount((c) => c + 1)
       }
     } catch {
       // ignore
@@ -417,14 +420,22 @@ export const TrackerDetailView = (): React.JSX.Element => {
     <div>
       <div className="flex items-center gap-3 my-4">
         <h1 className="text-3xl">{tracker.name}</h1>
-        <Button
-          variant={liked ? 'default' : 'secondary'}
-          size="sm"
+        <button
+          type="button"
+          aria-label={liked ? 'Unlike' : 'Like'}
           onClick={handleLikeToggle}
           disabled={likeLoading || !user}
+          className="flex items-center gap-1 p-1.5 rounded hover:bg-accent hover:-translate-y-0.5 hover:shadow-sm transition-all disabled:opacity-50"
         >
-          {liked ? 'Unlike' : 'Like'}
-        </Button>
+          <Star
+            className={`w-5 h-5 transition-colors ${liked ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400 fill-gray-200'}`}
+          />
+          {likeCount > 0 && (
+            <span className={`text-sm font-medium ${liked ? 'text-yellow-700' : 'text-gray-500'}`}>
+              {likeCount}
+            </span>
+          )}
+        </button>
         {tracker.role !== '' && (
           <Button variant="outline" size="sm" asChild>
             <Link to={`/trackers/${tracker.id}/edit`}>Edit</Link>
