@@ -557,8 +557,8 @@ const router = createBrowserRouter([
       {
         path: '/coverages/:trackerId',
         handle: {
-          crumb: (params: Params) => ({
-            label: `Coverage #${params.trackerId}`,
+          crumb: (params: Params, data: any) => ({
+            label: data?.trackerName ?? `Coverage #${params.trackerId}`,
             link: `/coverages/${params.trackerId}`,
           })
         },
