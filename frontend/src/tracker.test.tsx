@@ -406,14 +406,13 @@ describe('TrackerDetailEdit', () => {
     expect(screen.getByText('Add Value')).toBeInTheDocument()
   })
 
-  it('back link goes to tracker detail', () => {
+  it('renders tracker name in title', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const backLink = screen.getByText(/Back to Tracker/).closest('a')
-    expect(backLink).toHaveAttribute('href', '/trackers/1')
+    expect(screen.getByText('test (Edit)')).toBeInTheDocument()
   })
 
   it('renders visibility selector', () => {
