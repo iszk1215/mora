@@ -16,14 +16,9 @@ export const PALETTE_MAP: Record<string, string[]> = {
 
 export const PALETTE_NAMES = Object.keys(PALETTE_MAP)
 
-export function randomPalette(): string[] {
-  const keys = Object.values(PALETTE_MAP)
-  return keys[Math.floor(Math.random() * keys.length)]
-}
-
 export function resolvePalette(name?: string): string[] {
-  if (!name || name === 'random') return randomPalette()
-  return PALETTE_MAP[name] ?? randomPalette()
+  if (!name) return PALETTE_MAP.default
+  return PALETTE_MAP[name] ?? PALETTE_MAP.default
 }
 
 export function areaGradient(hex: string, topAlpha = 0.35): object {

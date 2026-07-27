@@ -501,7 +501,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [xLabel, setXLabel] = useState(parsedChartConfig.x_axis_label ?? '')
   const [area, setArea] = useState(parsedChartConfig.area ?? true)
   const [showLegend, setShowLegend] = useState(parsedChartConfig.show_legend ?? true)
-  const [palette, setPalette] = useState(parsedChartConfig.palette ?? 'random')
+  const [palette, setPalette] = useState(parsedChartConfig.palette ?? 'default')
   const [yAxes, setYAxes] = useState<YAxisConfig[]>(() => {
     if (parsedChartConfig.y_axes && parsedChartConfig.y_axes.length > 0) {
       return parsedChartConfig.y_axes
@@ -525,7 +525,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
     if (!area) cc.area = false
     if (!showLegend) cc.show_legend = false
-    if (palette && palette !== 'random') cc.palette = palette
+    cc.palette = palette
     cc.y_axes = newYAxes.map((a) => {
       const axis: YAxisConfig = { id: a.id, position: a.position }
       if (a.label?.trim()) axis.label = a.label.trim()
@@ -860,7 +860,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
           onChange={(e) => setPalette(e.target.value)}
           className="border rounded px-2 py-1"
         >
-          <option value="random">Random palette</option>
           {PALETTE_NAMES.map((name) => (
             <option key={name} value={name}>{name}</option>
           ))}
