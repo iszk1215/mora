@@ -225,10 +225,13 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
         trigger: 'axis',
         formatter: (params: any) => {
           const items = Array.isArray(params) ? params : [params]
-          return items.map((p: any) => {
+          const axisValue = items[0]?.axisValue ?? ''
+          const header = axisValue ? `<b>${new Date(axisValue).toLocaleString()}</b><br/>` : ''
+          const body = items.map((p: any) => {
             const fmt = datasets[p.seriesIndex]?.seriesConfig?.value_format
             return `${p.marker} ${p.seriesName}: ${formatValue(p.value[1], fmt)}`
           }).join('<br/>')
+          return header + body
         },
       },
     }
