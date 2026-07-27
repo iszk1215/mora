@@ -322,7 +322,7 @@ describe('TrackerDetailView', () => {
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
-    expect(screen.getByText('Like')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /like/i })).toBeInTheDocument()
   })
 
   it('renders Unlike button when liked', () => {
@@ -331,7 +331,7 @@ describe('TrackerDetailView', () => {
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
-    expect(screen.getByText('Unlike')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /unlike/i })).toBeInTheDocument()
   })
 
   it('disables Like button when user is not logged in', () => {
@@ -340,7 +340,7 @@ describe('TrackerDetailView', () => {
       series: [],
     })
     render(<MemoryRouter><UserProvider value={null}><TrackerDetailView /></UserProvider></MemoryRouter>)
-    const likeButton = screen.getByText('Like')
+    const likeButton = screen.getByRole('button', { name: /like/i })
     expect(likeButton).toBeDisabled()
   })
 
