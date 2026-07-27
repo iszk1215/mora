@@ -211,7 +211,7 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
           data: ds.data.map((p) => [p.x, Number(p.y)]),
         }
         if (seriesType === 'bar') {
-          entry.barMaxWidth = '80%'
+          entry.barMaxWidth = '90%'
         } else {
           entry.lineStyle = { width: 1.5 }
           entry.symbol = 'none'

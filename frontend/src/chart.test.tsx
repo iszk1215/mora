@@ -178,7 +178,7 @@ describe('TrackerChart', () => {
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.series[0].type).toBe('bar')
-    expect(option.series[0].barMaxWidth).toBe('60%')
+    expect(option.series[0].barMaxWidth).toBe('80%')
     expect(option.series[0].areaStyle).toBeUndefined()
   })
 

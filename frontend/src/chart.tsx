@@ -120,7 +120,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
           entry.areaStyle = areaGradient(colors[i % colors.length])
         }
         if (seriesType === 'bar') {
-          entry.barMaxWidth = '60%'
+          entry.barMaxWidth = '80%'
         }
         return entry
       }),
