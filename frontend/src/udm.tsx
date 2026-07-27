@@ -150,8 +150,17 @@ export const UdmChart = (params: UdmChartProps): React.JSX.Element => {
     })),
     tooltip: {
       trigger: 'axis',
-      valueFormatter: (value: number) =>
-        Number.isInteger(value) ? String(value) : value.toFixed(1),
+      formatter: (params: any) => {
+        const items = Array.isArray(params) ? params : [params]
+        const axisValue = items[0]?.axisValue ?? ''
+        const header = axisValue ? `<b>${new Date(axisValue).toLocaleString()}</b><br/>` : ''
+        const body = items.map((p: any) => {
+          const v = p.value[1]
+          const formatted = Number.isInteger(v) ? String(v) : v.toFixed(1)
+          return `${p.marker} ${p.seriesName}: ${formatted}`
+        }).join('<br/>')
+        return header + body
+      },
     },
   }
 
