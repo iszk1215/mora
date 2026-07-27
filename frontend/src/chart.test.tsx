@@ -195,6 +195,14 @@ describe('TrackerChart', () => {
     expect(option.series[1].areaStyle).toBeDefined()
   })
 
+  it('omits areaStyle for line series when chartConfig.area is false', () => {
+    const chartConfig = { area: false }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].areaStyle).toBeUndefined()
+  })
+
   it('renders multiple Y-axes from chartConfig', () => {
     const chartConfig = {
       y_axes: [

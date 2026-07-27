@@ -75,9 +75,14 @@ func (s *MoraServer) seedDemoData() error {
 			visibility := visibilities[rng.Intn(len(visibilities))]
 
 			palette := paletteNames[rng.Intn(len(paletteNames))]
-			cc := map[string]any{"palette": palette}
+		cc := map[string]any{"palette": palette}
 
-			// Every 3rd tracker gets a bar or mixed chart with multi-Y-axis
+		// ~25% of trackers get area fill disabled
+		if rng.Intn(4) == 0 {
+			cc["area"] = false
+		}
+
+		// Every 3rd tracker gets a bar or mixed chart with multi-Y-axis
 			if ti%3 == 0 {
 				cc["y_axes"] = []map[string]any{
 					{"id": 0, "label": "Count", "position": "left"},
