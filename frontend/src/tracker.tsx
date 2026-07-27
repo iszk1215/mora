@@ -425,7 +425,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
           aria-label={liked ? 'Unlike' : 'Like'}
           onClick={handleLikeToggle}
           disabled={likeLoading || !user}
-          className="flex items-center gap-1 p-1.5 rounded hover:bg-accent transition-colors disabled:opacity-50"
+          className="flex items-center gap-1 p-1.5 rounded hover:bg-accent hover:-translate-y-0.5 hover:shadow-sm transition-all disabled:opacity-50"
         >
           <Star
             className={`w-5 h-5 transition-colors ${liked ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400 fill-gray-200'}`}
