@@ -399,6 +399,53 @@ describe('Breadcrumbs', () => {
     expect(trackerLink).toHaveAttribute('href', '/trackers/1')
   })
 
+  it('shows tracker name in coverage breadcrumb from data', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/coverages/:trackerId', pathname: '/coverages/3', params: { trackerId: '3' },
+        data: { trackerName: 'My Coverage Tracker' }, loaderData: undefined,
+        handle: { crumb: (params: any, data: any) => ({ label: data?.trackerName ?? `Coverage #${params.trackerId}`, link: `/coverages/${params.trackerId}` }) },
+      },
+    ])
+    const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
+    render(
+      <MemoryRouter>
+        <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
+          <Breadcrumbs />
+        </SearchContext.Provider>
+      </MemoryRouter>
+    )
+    expect(screen.getByText('My Coverage Tracker')).toBeInTheDocument()
+    expect(screen.queryByText('Coverage #3')).toBeNull()
+  })
+
+  it('falls back to Coverage #id when data is missing', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/coverages/:trackerId', pathname: '/coverages/5', params: { trackerId: '5' },
+        data: undefined, loaderData: undefined,
+        handle: { crumb: (params: any, data: any) => ({ label: data?.trackerName ?? `Coverage #${params.trackerId}`, link: `/coverages/${params.trackerId}` }) },
+      },
+    ])
+    const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
+    render(
+      <MemoryRouter>
+        <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
+          <Breadcrumbs />
+        </SearchContext.Provider>
+      </MemoryRouter>
+    )
+    expect(screen.getByText('Coverage #5')).toBeInTheDocument()
+  })
+
   it('Search Results link includes encoded query', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
