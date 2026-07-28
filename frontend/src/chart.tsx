@@ -137,6 +137,9 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
         if (seriesType === 'line' && cc?.area !== false) {
           entry.areaStyle = areaGradient(colors[i % colors.length])
         }
+        if (seriesType === 'line' && cc?.show_symbols === false) {
+          entry.symbol = 'none'
+        }
         if (seriesType === 'bar') {
           entry.barMaxWidth = '80%'
         }
