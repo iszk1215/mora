@@ -4,8 +4,6 @@ import { MemoryRouter } from 'react-router'
 import { useLoaderData, useRouteError, useMatches, isRouteErrorResponse } from 'react-router'
 import { SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache, rootShouldRevalidate } from './main'
 import { UserProvider } from './user-context'
-import { SearchContext } from './search-context'
-import type { SearchState } from './search-context'
 
 vi.mock('react-dom/client', () => ({
   default: { createRoot: () => ({ render: vi.fn() }) },
@@ -283,7 +281,7 @@ describe('Breadcrumbs', () => {
     expect(screen.queryByText('hidden')).toBeNull()
   })
 
-  it('shows only Tracker Name when search context has no query', () => {
+  it('shows only Tracker Name when no search location state', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -295,19 +293,16 @@ describe('Breadcrumbs', () => {
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
-    const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
     render(
-      <MemoryRouter>
-        <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
-          <Breadcrumbs />
-        </SearchContext.Provider>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/1' }]}>
+        <Breadcrumbs />
       </MemoryRouter>
     )
     expect(screen.getByText('My Tracker')).toBeInTheDocument()
     expect(screen.queryByText('Search Results')).toBeNull()
   })
 
-  it('shows Search Results crumb when search context has query', () => {
+  it('shows Search Results crumb when location state has fromSearch', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -319,12 +314,9 @@ describe('Breadcrumbs', () => {
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
-    const searchWithQuery: SearchState = { query: 'foo', results: [], previews: new Map() }
     render(
-      <MemoryRouter>
-        <SearchContext.Provider value={{ ...searchWithQuery, setSearch: vi.fn() }}>
-          <Breadcrumbs />
-        </SearchContext.Provider>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/1', state: { fromSearch: 'foo' } }]}>
+        <Breadcrumbs />
       </MemoryRouter>
     )
     expect(screen.getByText('Search Results')).toBeInTheDocument()
@@ -333,7 +325,7 @@ describe('Breadcrumbs', () => {
     expect(link).toHaveAttribute('href', '/?q=foo')
   })
 
-  it('shows Search Results > Tracker Name > Edit for edit page with query', () => {
+  it('shows Search Results > Tracker Name > Edit for edit page with fromSearch', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -350,12 +342,9 @@ describe('Breadcrumbs', () => {
         handle: { crumb: () => ({ label: 'Edit' }) },
       },
     ])
-    const searchWithQuery: SearchState = { query: 'foo', results: [], previews: new Map() }
     render(
-      <MemoryRouter>
-        <SearchContext.Provider value={{ ...searchWithQuery, setSearch: vi.fn() }}>
-          <Breadcrumbs />
-        </SearchContext.Provider>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit', state: { fromSearch: 'foo' } }]}>
+        <Breadcrumbs />
       </MemoryRouter>
     )
     expect(screen.getByText('Search Results')).toBeInTheDocument()
@@ -367,7 +356,7 @@ describe('Breadcrumbs', () => {
     expect(trackerLink).toHaveAttribute('href', '/trackers/1')
   })
 
-  it('shows Tracker Name > Edit for edit page without query', () => {
+  it('shows Tracker Name > Edit for edit page without fromSearch', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -384,12 +373,9 @@ describe('Breadcrumbs', () => {
         handle: { crumb: () => ({ label: 'Edit' }) },
       },
     ])
-    const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
     render(
-      <MemoryRouter>
-        <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
-          <Breadcrumbs />
-        </SearchContext.Provider>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit' }]}>
+        <Breadcrumbs />
       </MemoryRouter>
     )
     expect(screen.queryByText('Search Results')).toBeNull()
@@ -411,12 +397,9 @@ describe('Breadcrumbs', () => {
         handle: { crumb: (params: any, data: any) => ({ label: data?.trackerName ?? `Coverage #${params.trackerId}`, link: `/coverages/${params.trackerId}` }) },
       },
     ])
-    const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
     render(
-      <MemoryRouter>
-        <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
-          <Breadcrumbs />
-        </SearchContext.Provider>
+      <MemoryRouter initialEntries={[{ pathname: '/coverages/3' }]}>
+        <Breadcrumbs />
       </MemoryRouter>
     )
     expect(screen.getByText('My Coverage Tracker')).toBeInTheDocument()
@@ -435,12 +418,9 @@ describe('Breadcrumbs', () => {
         handle: { crumb: (params: any, data: any) => ({ label: data?.trackerName ?? `Coverage #${params.trackerId}`, link: `/coverages/${params.trackerId}` }) },
       },
     ])
-    const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
     render(
-      <MemoryRouter>
-        <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
-          <Breadcrumbs />
-        </SearchContext.Provider>
+      <MemoryRouter initialEntries={[{ pathname: '/coverages/5' }]}>
+        <Breadcrumbs />
       </MemoryRouter>
     )
     expect(screen.getByText('Coverage #5')).toBeInTheDocument()
@@ -458,12 +438,9 @@ describe('Breadcrumbs', () => {
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
-    const searchWithSpaces: SearchState = { query: 'foo bar', results: [], previews: new Map() }
     render(
-      <MemoryRouter>
-        <SearchContext.Provider value={{ ...searchWithSpaces, setSearch: vi.fn() }}>
-          <Breadcrumbs />
-        </SearchContext.Provider>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/1', state: { fromSearch: 'foo bar' } }]}>
+        <Breadcrumbs />
       </MemoryRouter>
     )
     const link = screen.getByText('Search Results').closest('a')
@@ -488,12 +465,9 @@ describe('Breadcrumbs', () => {
           handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
         },
       ])
-      const searchWithQuery: SearchState = { query: 'foo', results: [], previews: new Map() }
       render(
-        <MemoryRouter>
-          <SearchContext.Provider value={{ ...searchWithQuery, setSearch: vi.fn() }}>
-            <Breadcrumbs />
-          </SearchContext.Provider>
+        <MemoryRouter initialEntries={[{ pathname: '/trackers/1', state: { fromSearch: 'foo' } }]}>
+          <Breadcrumbs />
         </MemoryRouter>
       )
       expect(screen.getByText('Search Results')).toBeInTheDocument()
@@ -502,7 +476,7 @@ describe('Breadcrumbs', () => {
       expect(link).toHaveAttribute('href', '/?q=foo')
     })
 
-    it('shows only Tracker Name on tracker detail page without query (real IDs)', () => {
+    it('shows only Tracker Name on tracker detail page without fromSearch (real IDs)', () => {
       vi.mocked(useMatches).mockReturnValue([
         {
           id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -518,19 +492,16 @@ describe('Breadcrumbs', () => {
           handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
         },
       ])
-      const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
       render(
-        <MemoryRouter>
-          <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
-            <Breadcrumbs />
-          </SearchContext.Provider>
+        <MemoryRouter initialEntries={[{ pathname: '/trackers/1' }]}>
+          <Breadcrumbs />
         </MemoryRouter>
       )
       expect(screen.queryByText('Search Results')).toBeNull()
       expect(screen.getByText('My Tracker')).toBeInTheDocument()
     })
 
-    it('shows Search Results > Tracker Name > Edit on edit page with query (real IDs)', () => {
+    it('shows Search Results > Tracker Name > Edit on edit page with fromSearch (real IDs)', () => {
       vi.mocked(useMatches).mockReturnValue([
         {
           id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -546,12 +517,9 @@ describe('Breadcrumbs', () => {
           handle: { crumb: () => ({ label: 'Edit' }) },
         },
       ])
-      const searchWithQuery: SearchState = { query: 'foo', results: [], previews: new Map() }
       render(
-        <MemoryRouter>
-          <SearchContext.Provider value={{ ...searchWithQuery, setSearch: vi.fn() }}>
-            <Breadcrumbs />
-          </SearchContext.Provider>
+        <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit', state: { fromSearch: 'foo' } }]}>
+          <Breadcrumbs />
         </MemoryRouter>
       )
       expect(screen.getByText('Search Results')).toBeInTheDocument()
@@ -563,7 +531,7 @@ describe('Breadcrumbs', () => {
       expect(trackerLink).toHaveAttribute('href', '/trackers/1')
     })
 
-    it('shows Tracker Name > Edit on edit page without query (real IDs)', () => {
+    it('shows Tracker Name > Edit on edit page without fromSearch (real IDs)', () => {
       vi.mocked(useMatches).mockReturnValue([
         {
           id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -579,12 +547,9 @@ describe('Breadcrumbs', () => {
           handle: { crumb: () => ({ label: 'Edit' }) },
         },
       ])
-      const emptySearch: SearchState = { query: '', results: [], previews: new Map() }
       render(
-        <MemoryRouter>
-          <SearchContext.Provider value={{ ...emptySearch, setSearch: vi.fn() }}>
-            <Breadcrumbs />
-          </SearchContext.Provider>
+        <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit' }]}>
+          <Breadcrumbs />
         </MemoryRouter>
       )
       expect(screen.queryByText('Search Results')).toBeNull()
