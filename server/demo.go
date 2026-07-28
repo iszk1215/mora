@@ -149,8 +149,17 @@ func (s *MoraServer) seedDemoData() error {
 				log.Debug().Int64("series_id", series.Id).Str("name", sd.name).Msg("Created demo series")
 
 			valueCount := 10 + rng.Intn(11) // 10-20 values per series
+			var daysList []int
+			if xAxisType == "date" {
+				daysList = rng.Perm(90)[:valueCount]
+			}
 			for vi := 0; vi < valueCount; vi++ {
-				daysAgo := rng.Intn(90)
+				var daysAgo int
+				if xAxisType == "date" {
+					daysAgo = daysList[vi]
+				} else {
+					daysAgo = rng.Intn(90)
+				}
 				hour := 0
 				min := 0
 				if xAxisType == "datetime" {
