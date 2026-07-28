@@ -88,9 +88,11 @@ func (s *MoraServer) seedDemoData() error {
 			cc["area"] = false
 		}
 
-		// ~50% of trackers get symbols hidden
+		// ~50% of trackers get symbols hidden, rest get symbols shown
 		if rng.Intn(2) == 0 {
 			cc["show_symbols"] = false
+		} else {
+			cc["show_symbols"] = true
 		}
 
 		// Every 3rd tracker gets a bar or mixed chart with multi-Y-axis
