@@ -185,15 +185,30 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
       ? chartConfig.y_axes
       : [{ id: 0, position: 'left' as const }]
     const hasRightAxis = yAxes.some((a) => a.position === 'right')
+    const isDateOnly = chartConfig.x_axis_type === 'date'
+
+    const xAxis: any = {
+      type: 'time' as const,
+      axisLabel: { hideOverlap: true },
+    }
+    if (isDateOnly) {
+      xAxis.axisLabel = {
+        hideOverlap: true,
+        formatter: (value: number) => {
+          const d = new Date(value)
+          const y = d.getFullYear()
+          const m = d.getMonth() + 1
+          const day = d.getDate()
+          return `${y}/${m}/${day}`
+        },
+      }
+    }
 
     return {
       animation: false,
       color: colors,
       grid: { left: 50, right: hasRightAxis ? 50 : 10, top: 10, bottom: 25 },
-      xAxis: {
-        type: 'time' as const,
-        axisLabel: { hideOverlap: true },
-      },
+      xAxis,
       yAxis: yAxes.map((a) => ({
         type: 'value' as const,
         position: a.position,
@@ -226,7 +241,11 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
         formatter: (params: any) => {
           const items = Array.isArray(params) ? params : [params]
           const axisValue = items[0]?.axisValue ?? ''
-          const header = axisValue ? `<b>${new Date(axisValue).toLocaleString()}</b><br/>` : ''
+          const header = axisValue
+            ? isDateOnly
+              ? `<b>${new Date(axisValue).toLocaleDateString()}</b><br/>`
+              : `<b>${new Date(axisValue).toLocaleString()}</b><br/>`
+            : ''
           const body = items.map((p: any) => {
             const fmt = datasets[p.seriesIndex]?.seriesConfig?.value_format
             return `${p.marker} ${p.seriesName}: ${formatValue(p.value[1], fmt)}`
@@ -513,6 +532,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   }, [savedChartConfig])
   const [visibility, setVisibility] = useState(tracker.visibility)
   const [xLabel, setXLabel] = useState(parsedChartConfig.x_axis_label ?? '')
+  const [xAxisType, setXAxisType] = useState<'date' | 'datetime'>(parsedChartConfig.x_axis_type ?? 'date')
   const [area, setArea] = useState(parsedChartConfig.area ?? true)
   const [showLegend, setShowLegend] = useState(parsedChartConfig.show_legend ?? true)
   const [palette, setPalette] = useState(parsedChartConfig.palette ?? 'default')
@@ -537,6 +557,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const saveChartConfig = async (newYAxes: YAxisConfig[]) => {
     const cc: ChartConfig = {}
     if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
+    if (xAxisType === 'date') cc.x_axis_type = 'date'
     if (!area) cc.area = false
     if (!showLegend) cc.show_legend = false
     cc.palette = palette
@@ -854,6 +875,14 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       {/* Chart Options */}
       <h2 className="text-xl my-2">Chart Options</h2>
       <div className="flex flex-wrap items-center gap-3 mb-4">
+        <select
+          value={xAxisType}
+          onChange={(e) => setXAxisType(e.target.value as 'date' | 'datetime')}
+          className="border rounded px-2 py-1"
+        >
+          <option value="date">Date</option>
+          <option value="datetime">Datetime</option>
+        </select>
         <input
           type="text"
           value={xLabel}
@@ -989,7 +1018,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
           ))}
         </select>
         <input
-          type="datetime-local"
+          type={xAxisType === 'date' ? 'date' : 'datetime-local'}
           value={newValueTime}
           onChange={(e) => setNewValueTime(e.target.value)}
           className="border rounded px-2 py-1"

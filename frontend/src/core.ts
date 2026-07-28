@@ -47,6 +47,7 @@ export interface YAxisConfig {
 
 export interface ChartConfig {
   x_axis_label?: string
+  x_axis_type?: 'date' | 'datetime'
   area?: boolean
   show_legend?: boolean
   palette?: string

@@ -981,6 +981,15 @@ func validateChartConfigYAxes(raw string) error {
 	if err := json.Unmarshal([]byte(raw), &rawMap); err != nil {
 		return errors.New("chart_config must be valid JSON")
 	}
+	if v, ok := rawMap["x_axis_type"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			return errors.New("chart_config: x_axis_type must be a string")
+		}
+		if s != "date" && s != "datetime" {
+			return errors.New("chart_config: x_axis_type must be \"date\" or \"datetime\"")
+		}
+	}
 	_, hasYAxes := rawMap["y_axes"]
 	if !hasYAxes {
 		return nil
