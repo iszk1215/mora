@@ -3,7 +3,9 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
+	"sort"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -148,11 +150,13 @@ func (s *MoraServer) seedDemoData() error {
 				}
 				log.Debug().Int64("series_id", series.Id).Str("name", sd.name).Msg("Created demo series")
 
+			seriesSeed := int(series.Id*7 + tracker.Id*13)
 			valueCount := 10 + rng.Intn(11) // 10-20 values per series
 			var daysList []int
-			if xAxisType == "date" {
-				daysList = rng.Perm(90)[:valueCount]
-			}
+		if xAxisType == "date" {
+			daysList = rng.Perm(90)[:valueCount]
+			sort.Ints(daysList)
+		}
 			for vi := 0; vi < valueCount; vi++ {
 				var daysAgo int
 				if xAxisType == "date" {
@@ -169,17 +173,29 @@ func (s *MoraServer) seedDemoData() error {
 				ts := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()).AddDate(0, 0, -daysAgo)
 
 					var val float64
+					vi64 := float64(vi)
+					seed64 := float64(seriesSeed)
 					switch sd.name {
 					case "count":
-						val = float64(rng.Intn(1000))
+						val = math.Sin(vi64*0.1+seed64)*300 +
+							math.Sin(vi64*0.03+seed64*2)*200 +
+							(rng.Float64()-0.5)*2 + 505
 					case "duration_ms":
-						val = float64(100+rng.Intn(9900)) / 10.0
+						val = math.Sin(vi64*0.1+seed64)*300 +
+							math.Sin(vi64*0.03+seed64*2)*200 +
+							(rng.Float64()-0.5)*2 + 505
 					case "score":
-						val = float64(rng.Intn(100))
+						val = math.Sin(vi64*0.1+seed64)*30 +
+							math.Sin(vi64*0.03+seed64*2)*20 +
+							(rng.Float64()-0.5)*2 + 51
 					case "rate":
-						val = float64(rng.Intn(10000)) / 100.0
+						val = math.Sin(vi64*0.1+seed64)*30 +
+							math.Sin(vi64*0.03+seed64*2)*20 +
+							(rng.Float64()-0.5)*2 + 51
 					default:
-						val = float64(rng.Intn(10000)) / 100.0
+						val = math.Sin(vi64*0.1+seed64)*30 +
+							math.Sin(vi64*0.03+seed64*2)*20 +
+							(rng.Float64()-0.5)*2 + 51
 					}
 
 					if _, err := s.tracker.CreateValue(series.Id, ts, val); err != nil {
