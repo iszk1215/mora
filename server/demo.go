@@ -75,7 +75,11 @@ func (s *MoraServer) seedDemoData() error {
 			visibility := visibilities[rng.Intn(len(visibilities))]
 
 			palette := paletteNames[rng.Intn(len(paletteNames))]
-		cc := map[string]any{"palette": palette}
+			xAxisType := "date"
+			if rng.Intn(2) == 0 {
+				xAxisType = "datetime"
+			}
+		cc := map[string]any{"palette": palette, "x_axis_type": xAxisType}
 
 		// ~25% of trackers get area fill disabled
 		if rng.Intn(4) == 0 {
@@ -144,12 +148,16 @@ func (s *MoraServer) seedDemoData() error {
 				}
 				log.Debug().Int64("series_id", series.Id).Str("name", sd.name).Msg("Created demo series")
 
-				valueCount := 10 + rng.Intn(11) // 10-20 values per series
-				for vi := 0; vi < valueCount; vi++ {
-					daysAgo := rng.Intn(90)
-					hour := rng.Intn(24)
-					min := rng.Intn(60)
-					ts := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()).AddDate(0, 0, -daysAgo)
+			valueCount := 10 + rng.Intn(11) // 10-20 values per series
+			for vi := 0; vi < valueCount; vi++ {
+				daysAgo := rng.Intn(90)
+				hour := 0
+				min := 0
+				if xAxisType == "datetime" {
+					hour = rng.Intn(24)
+					min = rng.Intn(60)
+				}
+				ts := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()).AddDate(0, 0, -daysAgo)
 
 					var val float64
 					switch sd.name {
