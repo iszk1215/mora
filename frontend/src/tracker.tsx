@@ -133,12 +133,12 @@ async function deleteValues(trackerId: number, seriesId: number): Promise<void> 
   if (!resp.ok) throw resp
 }
 
-async function likeTracker(trackerId: number): Promise<void> {
+export async function likeTracker(trackerId: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/like`, { method: 'POST' })
   if (!resp.ok) throw resp
 }
 
-async function unlikeTracker(trackerId: number): Promise<void> {
+export async function unlikeTracker(trackerId: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/like`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
