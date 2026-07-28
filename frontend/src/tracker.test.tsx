@@ -597,7 +597,7 @@ describe('TrackerDetailEdit', () => {
     await vi.waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ chart_config: '{"palette":"default","y_axes":[{"id":0,"position":"left","label":"Count"}]}' }),
+        body: JSON.stringify({ chart_config: '{"x_axis_type":"date","palette":"default","y_axes":[{"id":0,"position":"left","label":"Count"}]}' }),
       }))
     })
   })

@@ -95,17 +95,35 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     const showLegend = cc?.show_legend !== false && datasets.length > 1
     const yAxes = buildYAxes(cc?.y_axes)
     const hasRightAxis = yAxes.some((a) => a.position === 'right')
+    const isDateOnly = cc?.x_axis_type === 'date'
 
     const grid: any = { left: 60, right: 20, top: showLegend ? 40 : 20, bottom: 60 }
     if (hasRightAxis) grid.right = 60
 
+    const xAxis: any = {
+      type: 'time' as const,
+      splitLine: { show: false },
+    }
+    if (isDateOnly) {
+      const currentYear = new Date().getFullYear()
+      xAxis.axisLabel = {
+        hideOverlap: true,
+        formatter: (value: number) => {
+          const d = new Date(value)
+          const m = d.getMonth() + 1
+          const day = d.getDate()
+          if (d.getFullYear() === currentYear) {
+            return `${m}/${day}`
+          }
+          return `${d.getFullYear()}/${m}/${day}`
+        },
+      }
+    }
+
     const opt: any = {
       color: colors,
       grid,
-      xAxis: {
-        type: 'time' as const,
-        splitLine: { show: false },
-      },
+      xAxis,
       yAxis: yAxes.map((a) => echartYAxis(a, hasRightAxis)),
       series: datasets.map((ds, i) => {
         const seriesType = ds.seriesConfig?.type ?? 'line'
@@ -129,7 +147,11 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
         formatter: (params: any) => {
           const items = Array.isArray(params) ? params : [params]
           const axisValue = items[0]?.axisValue ?? ''
-          const header = axisValue ? `<b>${new Date(axisValue).toLocaleString()}</b><br/>` : ''
+          const header = axisValue
+            ? isDateOnly
+              ? `<b>${new Date(axisValue).toLocaleDateString()}</b><br/>`
+              : `<b>${new Date(axisValue).toLocaleString()}</b><br/>`
+            : ''
           const body = items.map((p: any) => {
             const fmt = datasets[p.seriesIndex]?.seriesConfig?.value_format
             return `${p.marker} ${p.seriesName}: ${formatValue(p.value[1], fmt)}`

@@ -178,6 +178,41 @@ func TestHandlerCreateTracker(t *testing.T) {
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
+
+	t.Run("chart_config with x_axis_type date accepted", func(t *testing.T) {
+		h := newTestHandler(t)
+		cc := `{"x_axis_type":"date"}`
+		req := CreateTrackerRequest{Name: "date_tracker", Visibility: "private", ChartConfig: &cc}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusCreated, h, r)
+
+		var got TrackerModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, cc, got.ChartConfig)
+	})
+
+	t.Run("chart_config with x_axis_type datetime accepted", func(t *testing.T) {
+		h := newTestHandler(t)
+		cc := `{"x_axis_type":"datetime"}`
+		req := CreateTrackerRequest{Name: "datetime_tracker", Visibility: "private", ChartConfig: &cc}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusCreated, h, r)
+
+		var got TrackerModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, cc, got.ChartConfig)
+	})
+
+	t.Run("chart_config with invalid x_axis_type rejected", func(t *testing.T) {
+		h := newTestHandler(t)
+		cc := `{"x_axis_type":"invalid"}`
+		req := CreateTrackerRequest{Name: "bad_xtype", Visibility: "private", ChartConfig: &cc}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
 }
 
 func TestHandlerListTrackers(t *testing.T) {
@@ -460,6 +495,38 @@ func TestHandlerPatchTracker(t *testing.T) {
 		h := newHandler(store, nil)
 		path := fmt.Sprintf("/%d", tr.Id)
 		cc := `{"y_axes":[]}`
+		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("patch chart_config with x_axis_type date accepted", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d", tr.Id)
+		cc := `{"x_axis_type":"date"}`
+		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got TrackerResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, cc, got.ChartConfig)
+	})
+
+	t.Run("patch chart_config with invalid x_axis_type rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1, nil))
+
+		h := newHandler(store, nil)
+		path := fmt.Sprintf("/%d", tr.Id)
+		cc := `{"x_axis_type":"invalid"}`
 		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
