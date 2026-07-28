@@ -192,14 +192,17 @@ export const TrackerCard = ({ tracker, preview, loading }: { tracker: TrackerRes
       axisLabel: { hideOverlap: true },
     }
     if (isDateOnly) {
+      const currentYear = new Date().getFullYear()
       xAxis.axisLabel = {
         hideOverlap: true,
         formatter: (value: number) => {
           const d = new Date(value)
-          const y = d.getFullYear()
           const m = d.getMonth() + 1
           const day = d.getDate()
-          return `${y}/${m}/${day}`
+          if (d.getFullYear() === currentYear) {
+            return `${m}/${day}`
+          }
+          return `${d.getFullYear()}/${m}/${day}`
         },
       }
     }
