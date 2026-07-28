@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { useLoaderData } from 'react-router'
-import { formatRevision, formatRatio, formatTime, CoverageEntryPage, makeCoverageSeries, coverageToDatasets, buildCoverageClickUrl } from './coverage'
+import { useLoaderData, useParams } from 'react-router'
+import { formatRevision, formatRatio, formatTime, CoverageEntryPage, CoverageTrackerList, makeCoverageSeries, coverageToDatasets, buildCoverageClickUrl } from './coverage'
 import { Coverage } from './core'
+import { useUser } from './user-context'
 
 vi.mock('react-router', async () => {
   const actual = await vi.importActual('react-router')
@@ -11,6 +12,10 @@ vi.mock('react-router', async () => {
 
 vi.mock('echarts-for-react', () => ({
   default: () => <div data-testid="echart" />,
+}))
+
+vi.mock('./user-context', () => ({
+  useUser: vi.fn(),
 }))
 
 describe('formatRevision', () => {
@@ -149,5 +154,57 @@ describe('buildCoverageClickUrl', () => {
   it('handles numeric index', () => {
     expect(buildCoverageClickUrl('42', '10', 10, 'py'))
       .toBe('/coverages/10/10/py')
+  })
+})
+
+const mockRepo = { id: 1, url: 'https://example.com/repo', namespace: 'test', name: 'test-repo' }
+
+describe('CoverageTrackerList', () => {
+  beforeEach(() => {
+    vi.mocked(useUser).mockReturnValue({ id: 1, provider: 'local', provider_user_id: 'user1', username: 'testuser', avatar_url: '' })
+    vi.mocked(useParams).mockReturnValue({ trackerId: '42' })
+    vi.mocked(useLoaderData).mockReturnValue({
+      trackerName: 'Test Coverage',
+      repo: mockRepo,
+      coverages: [],
+      liked: false,
+      likeCount: 0,
+      trackerId: 42,
+    })
+  })
+
+  it('renders the like button when user is logged in', () => {
+    render(<CoverageTrackerList />)
+    const button = screen.getByRole('button', { name: 'Like' })
+    expect(button).toBeInTheDocument()
+    expect(button).not.toBeDisabled()
+  })
+
+  it('renders the like button as liked when liked is true', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      trackerName: 'Test Coverage',
+      repo: mockRepo,
+      coverages: [],
+      liked: true,
+      likeCount: 5,
+      trackerId: 42,
+    })
+    render(<CoverageTrackerList />)
+    const button = screen.getByRole('button', { name: 'Unlike' })
+    expect(button).toBeInTheDocument()
+    expect(screen.getByText('5')).toBeInTheDocument()
+  })
+
+  it('disables the like button when user is not logged in', () => {
+    vi.mocked(useUser).mockReturnValue(null)
+    render(<CoverageTrackerList />)
+    const button = screen.getByRole('button', { name: 'Like' })
+    expect(button).toBeDisabled()
+  })
+
+  it('does not render like count when likeCount is 0', () => {
+    render(<CoverageTrackerList />)
+    expect(screen.getByRole('button', { name: 'Like' })).toBeInTheDocument()
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
 })

@@ -7,6 +7,7 @@ import {
   useLoaderData,
   useParams,
 } from 'react-router'
+import { Star } from 'lucide-react'
 
 import { Coverage, CoverageEntry, FileData, Repo } from './core'
 import { TrackerChart } from './chart'
@@ -18,6 +19,8 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
+import { useUser } from './user-context'
+import { likeTracker, unlikeTracker } from './tracker'
 
 interface Point {
   x: string
@@ -137,7 +140,10 @@ export const CoverageEntryPage = (): React.JSX.Element => {
 async function loadCoverageListByTracker({ params }: { params: Params }): Promise<Response | {
   trackerName: string,
   repo: Repo,
-  coverages: Coverage[]
+  coverages: Coverage[],
+  liked: boolean,
+  likeCount: number,
+  trackerId: number,
 }> {
   const url = `/api/coverages/${params.trackerId}`
   const resp = await fetch(url)
@@ -172,9 +178,24 @@ async function loadCoverageListByTracker({ params }: { params: Params }): Promis
   }
 
   const trackerResp = await fetch(`/api/trackers/${params.trackerId}`)
-  const trackerName = trackerResp.ok ? (await trackerResp.json()).name : ''
+  let liked = false
+  let likeCount = 0
+  let trackerName = ''
+  if (trackerResp.ok) {
+    const trackerData = await trackerResp.json()
+    trackerName = trackerData.name
+    liked = trackerData.liked ?? false
+    likeCount = trackerData.like_count ?? 0
+  }
 
-  return { trackerName, repo: data.repo, coverages: coverages }
+  return {
+    trackerName,
+    repo: data.repo,
+    coverages,
+    liked,
+    likeCount,
+    trackerId: parseInt(params.trackerId!, 10),
+  }
 }
 
 interface CoverageSegmentProperty {
@@ -282,13 +303,62 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
 }
 
 export const CoverageTrackerList = (): React.JSX.Element => {
-  const data = useLoaderData() as { trackerName: string, repo: Repo, coverages: Coverage[] }
+  const data = useLoaderData() as {
+    trackerName: string,
+    repo: Repo,
+    coverages: Coverage[],
+    liked: boolean,
+    likeCount: number,
+    trackerId: number,
+  }
   const params = useParams()
+  const user = useUser()
   const [range, setRange] = useState<TimeRangeKey>('all')
+  const [liked, setLiked] = useState(data.liked)
+  const [likeCount, setLikeCount] = useState(data.likeCount)
+  const [likeLoading, setLikeLoading] = useState(false)
   const { min, max } = computeDateRange(range)
+
+  const handleLikeToggle = async () => {
+    setLikeLoading(true)
+    try {
+      if (liked) {
+        await unlikeTracker(data.trackerId)
+        setLiked(false)
+        setLikeCount((c) => Math.max(0, c - 1))
+      } else {
+        await likeTracker(data.trackerId)
+        setLiked(true)
+        setLikeCount((c) => c + 1)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLikeLoading(false)
+    }
+  }
+
   return (
     <div>
-      <h2 className="text-3xl my-4">{data.trackerName}</h2>
+      <div className="flex items-center gap-3 my-4">
+        <h2 className="text-3xl">{data.trackerName}</h2>
+        <button
+          type="button"
+          aria-label={liked ? 'Unlike' : 'Like'}
+          onClick={handleLikeToggle}
+          disabled={likeLoading || !user}
+          className="flex items-center gap-1 p-1.5 rounded hover:bg-accent hover:-translate-y-0.5 hover:shadow-sm transition-all disabled:opacity-50"
+        >
+          <Star
+            className={`w-5 h-5 transition-colors ${liked ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400 fill-gray-200'}`}
+          />
+          {likeCount > 0 && (
+            <span className={`text-sm font-medium ${liked ? 'text-yellow-700' : 'text-gray-500'}`}>
+              {likeCount}
+            </span>
+          )}
+        </button>
+      </div>
       <CoverageListContent
         repo={data.repo} coverages={data.coverages} params={params} min={min} max={max}
         rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}
