@@ -11,6 +11,7 @@ import {
   useMatches,
   useRouteError,
   useSearchParams,
+  useLocation,
 } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import 'react-datepicker/dist/react-datepicker.css'
@@ -101,6 +102,13 @@ const TrackerSearchPage = (): React.JSX.Element => {
     void loadAll()
   }, [trackers])
 
+  // Clear search context when navigating away from top page
+  useEffect(() => {
+    return () => {
+      search?.setSearch({ query: '', results: [], previews: new Map() })
+    }
+  }, [])
+
   const handleSearch = async () => {
     const q = query.trim()
     setSearching(true)
@@ -143,7 +151,7 @@ const TrackerSearchPage = (): React.JSX.Element => {
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {trackers.map((t) => (
-          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} />
+          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} searchQuery={urlQuery} />
         ))}
       </div>
     </div>
@@ -404,7 +412,8 @@ export const makeBredcrumbs = (crumbs: Crumb[]): React.JSX.Element => {
 
 export const Breadcrumbs = (): React.JSX.Element => {
   const matches = useMatches()
-  const search = useSearch()
+  const location = useLocation()
+  const searchQuery = (location.state as any)?.fromSearch as string | undefined
 
   const last = matches[matches.length - 1]
 
@@ -416,20 +425,20 @@ export const Breadcrumbs = (): React.JSX.Element => {
   const isTrackerDetail = hasTrackerId && !isOnEditPage
   const isTrackerEdit = hasTrackerId && isOnEditPage
 
-  // For tracker detail page: add "Search Results" parent if search context exists
-  if (isTrackerDetail && search?.query) {
+  // For tracker detail page: add "Search Results" parent if navigated from search
+  if (isTrackerDetail && searchQuery) {
     crumbs.push({
       label: 'Search Results',
-      link: `/?q=${encodeURIComponent(search.query)}`,
+      link: `/?q=${encodeURIComponent(searchQuery)}`,
     })
   }
 
   // For tracker edit page: always add tracker name, and optionally "Search Results"
   if (isTrackerEdit) {
-    if (search?.query) {
+    if (searchQuery) {
       crumbs.push({
         label: 'Search Results',
-        link: `/?q=${encodeURIComponent(search.query)}`,
+        link: `/?q=${encodeURIComponent(searchQuery)}`,
       })
     }
     // Find the tracker detail match to get tracker name
