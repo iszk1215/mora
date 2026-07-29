@@ -268,4 +268,26 @@ describe('TrackerChart', () => {
     expect(option.yAxis).toHaveLength(1)
     expect(option.yAxis[0].type).toBe('value')
   })
+
+  it('strips time portion from x values when x_axis_type is date', () => {
+    const dateDatasets = [
+      { label: 'go', data: [{ x: '2024-01-15T10:30:00Z', y: '90.0' }] },
+    ]
+    const chartConfig = { x_axis_type: 'date' as const }
+    render(<TrackerChart data={{ datasets: dateDatasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].data[0].value[0]).toBe('2024-01-15')
+  })
+
+  it('preserves time portion in x values when x_axis_type is datetime', () => {
+    const dateDatasets = [
+      { label: 'go', data: [{ x: '2024-01-15T10:30:00Z', y: '90.0' }] },
+    ]
+    const chartConfig = { x_axis_type: 'datetime' as const }
+    render(<TrackerChart data={{ datasets: dateDatasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].data[0].value[0]).toBe('2024-01-15T10:30:00Z')
+  })
 })

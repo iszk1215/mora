@@ -132,7 +132,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
           name: ds.label,
           type: seriesType,
           yAxisIndex,
-          data: ds.data.map((p) => ({ value: [p.x, Number(p.y)], ...p.extra })),
+          data: ds.data.map((p) => ({ value: [isDateOnly ? p.x.substring(0, 10) : p.x, Number(p.y)], ...p.extra })),
         }
         if (seriesType === 'line' && cc?.area !== false) {
           entry.areaStyle = areaGradient(colors[i % colors.length])

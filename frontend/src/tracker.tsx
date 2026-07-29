@@ -227,7 +227,7 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery }: { tracke
           name: ds.label,
           type: seriesType,
           yAxisIndex: ds.seriesConfig?.y_axis_index ?? 0,
-          data: ds.data.map((p) => [p.x, Number(p.y)]),
+          data: ds.data.map((p) => [isDateOnly ? p.x.substring(0, 10) : p.x, Number(p.y)]),
         }
         if (seriesType === 'bar') {
           entry.barMaxWidth = '90%'
