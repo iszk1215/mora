@@ -9,7 +9,7 @@ import {
 } from 'react-router'
 import { Star } from 'lucide-react'
 
-import { Coverage, CoverageEntry, FileData, Repo } from './core'
+import { ChartConfig, Coverage, CoverageEntry, FileData, Repo } from './core'
 import { TrackerChart } from './chart'
 import { Dataset } from './chart'
 import { Browser } from './browser'
@@ -144,6 +144,7 @@ async function loadCoverageListByTracker({ params }: { params: Params }): Promis
   liked: boolean,
   likeCount: number,
   trackerId: number,
+  chartConfig: ChartConfig | null,
 }> {
   const url = `/api/coverages/${params.trackerId}`
   const resp = await fetch(url)
@@ -181,11 +182,13 @@ async function loadCoverageListByTracker({ params }: { params: Params }): Promis
   let liked = false
   let likeCount = 0
   let trackerName = ''
+  let chartConfig: ChartConfig | null = null
   if (trackerResp.ok) {
     const trackerData = await trackerResp.json()
     trackerName = trackerData.name
     liked = trackerData.liked ?? false
     likeCount = trackerData.like_count ?? 0
+    chartConfig = trackerData.chart_config ? JSON.parse(trackerData.chart_config) : null
   }
 
   return {
@@ -195,6 +198,7 @@ async function loadCoverageListByTracker({ params }: { params: Params }): Promis
     liked,
     likeCount,
     trackerId: parseInt(params.trackerId!, 10),
+    chartConfig,
   }
 }
 
@@ -258,13 +262,14 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
     </Card>)
 }
 
-export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSelector }: {
+export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSelector, chartConfig }: {
   repo: Repo
   coverages: Coverage[]
   params: Params
   min?: Date | null
   max?: Date | null
   rangeSelector?: React.ReactNode
+  chartConfig?: ChartConfig | null
 }): React.JSX.Element => {
   const items: React.JSX.Element[] = []
   coverages.forEach((cov: Coverage, i: number) => {
@@ -293,6 +298,7 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
       {rangeSelector}
       <TrackerChart
         data={{ datasets }}
+        chartConfig={chartConfig ?? undefined}
         min={min}
         max={max}
         animation={false}
@@ -310,6 +316,7 @@ export const CoverageTrackerList = (): React.JSX.Element => {
     liked: boolean,
     likeCount: number,
     trackerId: number,
+    chartConfig: ChartConfig | null,
   }
   const params = useParams()
   const user = useUser()
@@ -362,6 +369,7 @@ export const CoverageTrackerList = (): React.JSX.Element => {
       <CoverageListContent
         repo={data.repo} coverages={data.coverages} params={params} min={min} max={max}
         rangeSelector={<TimeRangeSelector value={range} onChange={setRange} />}
+        chartConfig={data.chartConfig}
       />
     </div>
   )
