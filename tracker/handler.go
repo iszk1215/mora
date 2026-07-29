@@ -310,6 +310,7 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	resp := TrackerResponse{
 		Id:          tracker.Id,
 		Name:        tracker.Name,
+		Description: tracker.Description,
 		Visibility:  tracker.Visibility,
 		Type:        tracker.Type,
 		RepoID:      req.RepoID,
@@ -522,7 +523,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	}
 
 	trackerResp := TrackerResponse{
-		Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID,
+		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID,
 		ChartConfig: tracker.ChartConfig,
 	}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
@@ -564,7 +565,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID, ChartConfig: tracker.ChartConfig}
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID, ChartConfig: tracker.ChartConfig}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		_, role, err := h.store.isMember(uid, tracker.Id)
 		if err == nil {
