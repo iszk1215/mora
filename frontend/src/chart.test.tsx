@@ -203,6 +203,14 @@ describe('TrackerChart', () => {
     expect(option.series[0].areaStyle).toBeUndefined()
   })
 
+  it('omits symbol for line series when chartConfig.show_symbols is false', () => {
+    const chartConfig = { show_symbols: false }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].symbol).toBe('none')
+  })
+
   it('renders multiple Y-axes from chartConfig', () => {
     const chartConfig = {
       y_axes: [
