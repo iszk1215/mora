@@ -1038,7 +1038,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 
 	// Create a tracker linked to the repo
 	repoID := repo.Id
-	trk, err := trackerService.CreateTracker("test coverage", "public", 1, "coverage", &repoID, "{}")
+	trk, err := trackerService.CreateTracker("test coverage", "", "public", 1, "coverage", &repoID, "{}")
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).
@@ -1096,7 +1096,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	})
 
 	// Create a private tracker for access control tests
-	privateTrk, err := trackerService.CreateTracker("private coverage", "private", 1, "coverage", &repoID, "{}")
+	privateTrk, err := trackerService.CreateTracker("private coverage", "", "private", 1, "coverage", &repoID, "{}")
 	require.NoError(t, err)
 
 	t.Run("private tracker - anonymous returns 404", func(t *testing.T) {

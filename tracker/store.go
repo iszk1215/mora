@@ -17,6 +17,7 @@ var schemaTracker = `
 CREATE TABLE IF NOT EXISTS tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
     visibility TEXT NOT NULL DEFAULT 'private',
     type TEXT NOT NULL DEFAULT 'tracker',
     chart_config TEXT NOT NULL DEFAULT '{}'
@@ -72,15 +73,16 @@ type (
 
 // TrackerResponse is returned in tracker lists and includes user-specific flags.
 type TrackerResponse struct {
-	Id         int64  `json:"id"    db:"id"`
-	Name       string `json:"name"  db:"name"`
-	Visibility string `json:"visibility"` // "public" | "private"
-	Type       string `json:"type"`
-	RepoID     *int64 `json:"repo_id,omitempty" db:"repo_id"`
+	Id          int64  `json:"id"    db:"id"`
+	Name        string `json:"name"  db:"name"`
+	Description string `json:"description" db:"description"`
+	Visibility  string `json:"visibility"` // "public" | "private"
+	Type        string `json:"type"`
+	RepoID      *int64 `json:"repo_id,omitempty" db:"repo_id"`
 	ChartConfig string `json:"chart_config" db:"chart_config"`
-	Role       string `json:"role"`       // "" | "owner" | "editor"
-	Liked      bool   `json:"liked"`
-	LikeCount  int    `json:"like_count" db:"like_count"`
+	Role        string `json:"role"`       // "" | "owner" | "editor"
+	Liked       bool   `json:"liked"`
+	LikeCount   int    `json:"like_count" db:"like_count"`
 }
 
 func newTrackerStore(db *sqlx.DB) *trackerStore {
@@ -97,9 +99,9 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64, repoID *i
 	if tracker.ChartConfig == "" {
 		tracker.ChartConfig = "{}"
 	}
-	query := "INSERT INTO tracker (name, visibility, type, chart_config) VALUES (?, ?, ?, ?)"
+	query := "INSERT INTO tracker (name, description, visibility, type, chart_config) VALUES (?, ?, ?, ?, ?)"
 
-	res, err := s.db.Exec(query, tracker.Name, tracker.Visibility, tracker.Type, tracker.ChartConfig)
+	res, err := s.db.Exec(query, tracker.Name, tracker.Description, tracker.Visibility, tracker.Type, tracker.ChartConfig)
 	if err != nil {
 		return fmt.Errorf("addTracker insert: %w", err)
 	}
@@ -170,7 +172,7 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 	}
 
 	selectQuery := fmt.Sprintf(`
-		SELECT t.id, t.name, t.visibility, t.type, t.chart_config,
+		SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config,
 		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
@@ -201,7 +203,7 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 }
 
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
-	query := `SELECT t.id, t.name, t.visibility, t.type, t.chart_config, tc.repo_id
+	query := `SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config, tc.repo_id
 		FROM tracker t
 		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		WHERE t.id = ?`
@@ -221,7 +223,7 @@ func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
 
 func (s *trackerStore) findTrackerResponseById(id, userID int64) (*TrackerResponse, error) {
 	query := `
-		SELECT t.id, t.name, t.visibility, t.type, t.chart_config,
+		SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config,
 		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
@@ -265,8 +267,8 @@ func (s *trackerStore) deleteTracker(id int64) error {
 	return nil
 }
 
-func (s *trackerStore) updateTracker(id int64, visibility *string, chartConfig *string) error {
-	if visibility == nil && chartConfig == nil {
+func (s *trackerStore) updateTracker(id int64, visibility, chartConfig, description *string) error {
+	if visibility == nil && chartConfig == nil && description == nil {
 		return nil
 	}
 	query := "UPDATE tracker SET "
@@ -279,6 +281,10 @@ func (s *trackerStore) updateTracker(id int64, visibility *string, chartConfig *
 	if chartConfig != nil {
 		parts = append(parts, "chart_config = ?")
 		args = append(args, *chartConfig)
+	}
+	if description != nil {
+		parts = append(parts, "description = ?")
+		args = append(args, *description)
 	}
 	for i, p := range parts {
 		if i > 0 {
