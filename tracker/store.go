@@ -627,7 +627,7 @@ func (s *trackerStore) migrateCoverageTrackers(adminUserID int64) error {
 		trackerName := r.Namespace + "/" + r.Name + " coverage"
 
 		res, err := s.db.Exec(
-			"INSERT INTO tracker (name, visibility, type, chart_config) VALUES (?, 'public', 'coverage', '{}')",
+			"INSERT INTO tracker (name, visibility, type, chart_config) VALUES (?, 'public', 'coverage', '{\"area\":false}')",
 			trackerName)
 		if err != nil {
 			return fmt.Errorf("migrateCoverageTrackers insert tracker for repo %d: %w", r.ID, err)
