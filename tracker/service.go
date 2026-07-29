@@ -32,8 +32,8 @@ func (s *Service) FindRepoIDByTrackerID(trackerID int64) (*int64, error) {
 	return s.store.findRepoIDByTrackerID(trackerID)
 }
 
-func (s *Service) CreateTracker(name, visibility string, userID int64, trackerType string, repoID *int64, chartConfig string) (*TrackerModel, error) {
-	t := &TrackerModel{Name: name, Visibility: visibility, Type: trackerType, ChartConfig: chartConfig}
+func (s *Service) CreateTracker(name, description, visibility string, userID int64, trackerType string, repoID *int64, chartConfig string) (*TrackerModel, error) {
+	t := &TrackerModel{Name: name, Description: description, Visibility: visibility, Type: trackerType, ChartConfig: chartConfig}
 	if err := s.store.addTracker(t, userID, repoID); err != nil {
 		return nil, fmt.Errorf("CreateTracker: %w", err)
 	}

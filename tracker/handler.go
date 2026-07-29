@@ -22,6 +22,7 @@ type (
 	TrackerModel struct {
 		Id          int64  `json:"id"         db:"id"`
 		Name        string `json:"name"       db:"name"`
+		Description string `json:"description" db:"description"`
 		Visibility  string `json:"visibility" db:"visibility"`
 		Type        string `json:"type"       db:"type"`
 		RepoID      *int64 `json:"repo_id,omitempty" db:"repo_id"`
@@ -45,6 +46,7 @@ type (
 
 	CreateTrackerRequest struct {
 		Name        string  `json:"name"`
+		Description string  `json:"description"`
 		Visibility  string  `json:"visibility"` // required: "public"|"private"
 		Type        string  `json:"type"`       // "tracker" or "coverage", defaults to "tracker"
 		RepoID      *int64  `json:"repo_id"`    // required if type="coverage"
@@ -71,6 +73,7 @@ type (
 	PatchTrackerRequest struct {
 		Visibility  *string `json:"visibility"`
 		ChartConfig *string `json:"chart_config"`
+		Description *string `json:"description"`
 	}
 
 	ListTrackersResponse struct {
@@ -277,8 +280,13 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(req.Description) > 200 {
+		render.BadRequest(w, errors.New("description must be at most 200 characters"))
+		return
+	}
+
 	tracker := TrackerModel{
-		Name: req.Name, Visibility: req.Visibility, Type: req.Type,
+		Name: req.Name, Description: req.Description, Visibility: req.Visibility, Type: req.Type,
 		ChartConfig: "{}",
 	}
 	if req.ChartConfig != nil {
@@ -400,8 +408,13 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if req.Description != nil && len(*req.Description) > 200 {
+		render.BadRequest(w, errors.New("description must be at most 200 characters"))
+		return
+	}
+
 	tracker, _ := trackerFrom(r.Context())
-	err = h.store.updateTracker(tracker.Id, req.Visibility, req.ChartConfig)
+	err = h.store.updateTracker(tracker.Id, req.Visibility, req.ChartConfig, req.Description)
 	if err != nil {
 		log.Error().Err(err).Msg("patchTracker updateTracker")
 		render.InternalError(w, err)
@@ -415,10 +428,14 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	if req.ChartConfig != nil {
 		tracker.ChartConfig = *req.ChartConfig
 	}
+	if req.Description != nil {
+		tracker.Description = *req.Description
+	}
 
 	resp := TrackerResponse{
 		Id:          tracker.Id,
 		Name:        tracker.Name,
+		Description: tracker.Description,
 		Visibility:  tracker.Visibility,
 		Type:        tracker.Type,
 		RepoID:      tracker.RepoID,

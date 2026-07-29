@@ -35,6 +35,29 @@ var trackerNames = []string{
 	"Battery Usage", "Crash Rate", "ANR Rate", "App Start Time", "Screen FPS",
 }
 
+var trackerDescriptions = []string{
+	"Tracks team velocity and sprint progress",
+	"Monitors application error rates and trends",
+	"Measures API response times and latency",
+	"Tracks test coverage metrics across repositories",
+	"Monitors build pipeline status and duration",
+	"Tracks deployment frequency and success rate",
+	"Measures code review turnaround time",
+	"Monitors infrastructure resource utilization",
+	"Tracks customer support ticket volume",
+	"Measures database query performance",
+	"Tracks user engagement and retention metrics",
+	"Monitors security scan findings and resolution",
+	"Tracks memory and CPU usage over time",
+	"Measures network latency and throughput",
+	"Tracks feature adoption and usage metrics",
+	"Monitors uptime and service level objectives",
+	"Tracks release pipeline stages and duration",
+	"Measures cost tracking and budget utilization",
+	"Tracks incident frequency and resolution time",
+	"Monitors page load performance metrics",
+}
+
 var paletteNames = []string{
 	"default", "vintage", "dark", "infographic", "macarons", "essos", "halloween", "purple",
 }
@@ -105,7 +128,8 @@ func (s *MoraServer) seedDemoData() error {
 
 			ccJSON, _ := json.Marshal(cc)
 
-			tracker, err := s.tracker.CreateTracker(tname, visibility, user.ID, "tracker", nil, string(ccJSON))
+			desc := trackerDescriptions[rng.Intn(len(trackerDescriptions))]
+			tracker, err := s.tracker.CreateTracker(tname, desc, visibility, user.ID, "tracker", nil, string(ccJSON))
 			if err != nil {
 				return fmt.Errorf("create demo tracker %s: %w", tname, err)
 			}

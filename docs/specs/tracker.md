@@ -29,7 +29,7 @@ tracker
 | GET | `/api/trackers` | List trackers (paginated, `?q=&page=&per_page=`) | optional |
 | POST | `/api/trackers` | Create tracker | required |
 | DELETE | `/api/trackers/{trackerId}` | Delete tracker | owner |
-| PATCH | `/api/trackers/{trackerId}` | Update visibility/chart_config | owner |
+| PATCH | `/api/trackers/{trackerId}` | Update visibility/chart_config/description | owner |
 | GET | `/api/trackers/{trackerId}/preview` | Preview data (latest 20 values per series) | read perm |
 | GET | `/api/trackers/{trackerId}/series` | List series | read perm |
 | POST | `/api/trackers/{trackerId}/series` | Create series | edit perm |
@@ -82,20 +82,49 @@ Only two values are allowed: `"public"` and `"private"`.
 ### CreateTrackerRequest
 
 ```json
-{ "name": "string", "visibility": "public|private", "type": "tracker|coverage", "repo_id": 1, "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
+{ "name": "string", "description": "string", "visibility": "public|private", "type": "tracker|coverage", "repo_id": 1, "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Tracker name |
+| `description` | string | no | One-line description (max 200 characters) |
+| `visibility` | "public" \| "private" | yes | Access control |
+| `type` | "tracker" \| "coverage" | no, default "tracker" | Tracker type |
+| `repo_id` | number | only if type="coverage" | Repository ID |
+| `chart_config` | string | no | JSON string of ChartConfig |
 
 ### PatchTrackerRequest
 
 ```json
-{ "visibility": "public|private", "chart_config": "{\"x_axis_label\":\"Date\",\"y_axes\":[{\"id\":0,\"label\":\"Count\",\"position\":\"left\"}]}" }
+{ "visibility": "public|private", "chart_config": "{\"x_axis_label\":\"Date\",\"y_axes\":[{\"id\":0,\"label\":\"Count\",\"position\":\"left\"}]}", "description": "Updated description" }
 ```
+
+All fields are optional. Only provided fields are updated.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `visibility` | "public" \| "private" | Access control |
+| `chart_config` | string | JSON string of ChartConfig |
+| `description` | string | One-line description (max 200 characters) |
 
 ### TrackerResponse
 
 ```json
-{ "id": 1, "name": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "role": "owner", "liked": false }
+{ "id": 1, "name": "string", "description": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "role": "owner", "liked": false }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | number | Tracker ID |
+| `name` | string | Tracker name |
+| `description` | string | One-line description |
+| `visibility` | "public" \| "private" | Access control |
+| `type` | "tracker" \| "coverage" | Tracker type |
+| `chart_config` | string | JSON string of ChartConfig |
+| `role` | string | User's role: "" (none), "owner", "editor" |
+| `liked` | boolean | Whether the current user liked this tracker |
+| `like_count` | number | Total like count |
 
 ### ChartConfig (JSON stored in `chart_config`)
 
@@ -172,7 +201,7 @@ When `type="coverage"`, the tracker links to a repository via `tracker_coverage`
 | `/trackers` | TrackerView | Card grid with preview charts |
 | `/trackers/new` | TrackerCreate | Create form |
 | `/trackers/:trackerId` | TrackerDetailView | Detail (tracker type) |
-| `/trackers/:trackerId/edit` | TrackerDetailEdit | Edit visibility/chart |
+| `/trackers/:trackerId/edit` | TrackerDetailEdit | Edit visibility/chart/description |
 
 ## Key Files
 

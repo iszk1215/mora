@@ -73,10 +73,11 @@ export async function fetchPreview(trackerId: number): Promise<PreviewData> {
   if (!resp.ok) throw resp
   return resp.json()
 }
-async function createTracker(name: string, visibility: string, type_?: string, repoId?: number): Promise<TrackerResponse> {
+async function createTracker(name: string, visibility: string, type_?: string, repoId?: number, description?: string): Promise<TrackerResponse> {
   const body: Record<string, unknown> = { name, visibility }
   if (type_) body.type = type_
   if (repoId !== undefined) body.repo_id = repoId
+  if (description) body.description = description
   const resp = await fetch('/api/trackers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -143,7 +144,7 @@ export async function unlikeTracker(trackerId: number): Promise<void> {
   if (!resp.ok) throw resp
 }
 
-export async function patchTracker(trackerId: number, opts: { visibility?: string; chart_config?: string }): Promise<TrackerResponse> {
+export async function patchTracker(trackerId: number, opts: { visibility?: string; chart_config?: string; description?: string }): Promise<TrackerResponse> {
   const resp = await fetch(`/api/trackers/${trackerId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -446,28 +447,33 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="flex items-center gap-3 my-4">
-        <h1 className="text-3xl">{tracker.name}</h1>
-        <button
-          type="button"
-          aria-label={liked ? 'Unlike' : 'Like'}
-          onClick={handleLikeToggle}
-          disabled={likeLoading || !user}
-          className="flex items-center gap-1 p-1.5 rounded hover:bg-accent hover:-translate-y-0.5 hover:shadow-sm transition-all disabled:opacity-50"
-        >
-          <Star
-            className={`w-5 h-5 transition-colors ${liked ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400 fill-gray-200'}`}
-          />
-          {likeCount > 0 && (
-            <span className={`text-sm font-medium ${liked ? 'text-yellow-700' : 'text-gray-500'}`}>
-              {likeCount}
-            </span>
+      <div className="my-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl">{tracker.name}</h1>
+          <button
+            type="button"
+            aria-label={liked ? 'Unlike' : 'Like'}
+            onClick={handleLikeToggle}
+            disabled={likeLoading || !user}
+            className="flex items-center gap-1 p-1.5 rounded hover:bg-accent hover:-translate-y-0.5 hover:shadow-sm transition-all disabled:opacity-50"
+          >
+            <Star
+              className={`w-5 h-5 transition-colors ${liked ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400 fill-gray-200'}`}
+            />
+            {likeCount > 0 && (
+              <span className={`text-sm font-medium ${liked ? 'text-yellow-700' : 'text-gray-500'}`}>
+                {likeCount}
+              </span>
+            )}
+          </button>
+          {tracker.role !== '' && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/trackers/${tracker.id}/edit`}>Edit</Link>
+            </Button>
           )}
-        </button>
-        {tracker.role !== '' && (
-          <Button variant="outline" size="sm" asChild>
-            <Link to={`/trackers/${tracker.id}/edit`}>Edit</Link>
-          </Button>
+        </div>
+        {tracker.description && (
+          <p className="text-muted-foreground mt-1">{tracker.description}</p>
         )}
       </div>
 
@@ -536,6 +542,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       return {}
     }
   }, [savedChartConfig])
+  const [description, setDescription] = useState(tracker.description ?? '')
   const [visibility, setVisibility] = useState(tracker.visibility)
   const [xLabel, setXLabel] = useState(parsedChartConfig.x_axis_label ?? '')
   const [xAxisType, setXAxisType] = useState<'date' | 'datetime'>(parsedChartConfig.x_axis_type ?? 'date')
@@ -551,6 +558,16 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   })
 
   const isCoverage = tracker.type === 'coverage'
+
+  const handleDescriptionBlur = async () => {
+    const trimmed = description.trim()
+    if (trimmed === (tracker.description ?? '')) return
+    try {
+      await patchTracker(tracker.id, { description: trimmed })
+    } catch {
+      setDescription(tracker.description ?? '')
+    }
+  }
 
   const handleVisibilityChange = async (newVisibility: string) => {
     try {
@@ -1050,6 +1067,18 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
         </Button>
       </div>
 
+      {/* Description */}
+      <h2 className="text-xl my-2">Description</h2>
+      <input
+        type="text"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        onBlur={handleDescriptionBlur}
+        placeholder="One-line description (max 200 characters)"
+        maxLength={200}
+        className="border rounded px-2 py-1 mb-4 w-full max-w-md"
+      />
+
       {/* Visibility */}
       <h2 className="text-xl my-2">Visibility</h2>
       <select
@@ -1067,6 +1096,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
 export const TrackerCreate = (): React.JSX.Element => {
   const navigate = useNavigate()
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [visibility, setVisibility] = useState('private')
   const [type, setType] = useState('tracker')
   const [repoId, setRepoId] = useState('')
@@ -1083,6 +1113,7 @@ export const TrackerCreate = (): React.JSX.Element => {
         visibility,
         type,
         type === 'coverage' ? (repoId ? parseInt(repoId) : undefined) : undefined,
+        description.trim() || undefined,
       )
       const path = created.type === 'coverage'
         ? `/coverages/${created.id}`
@@ -1117,6 +1148,19 @@ export const TrackerCreate = (): React.JSX.Element => {
             placeholder="Tracker name"
             className="border rounded px-2 py-1 w-full"
             onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
+            disabled={loading}
+          />
+        </div>
+
+        <div>
+          <label className="block mb-1">Description</label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="One-line description (max 200 characters)"
+            maxLength={200}
+            className="border rounded px-2 py-1 w-full"
             disabled={loading}
           />
         </div>

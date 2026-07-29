@@ -72,6 +72,7 @@ export interface SeriesModel {
 export interface TrackerResponse {
   id: number
   name: string
+  description?: string
   visibility: string
   type: string
   repo_id?: number
