@@ -89,13 +89,21 @@ describe('TrackerChart', () => {
     expect(option.animation).toBeUndefined()
   })
 
-  it('includes dataZoom options', () => {
+  it('includes dataZoom options by default', () => {
     render(<TrackerChart data={{ datasets }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.dataZoom).toHaveLength(2)
     expect(option.dataZoom[0].type).toBe('inside')
     expect(option.dataZoom[1].type).toBe('slider')
+  })
+
+  it('excludes slider when show_slider is false', () => {
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_slider: false }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.dataZoom).toHaveLength(1)
+    expect(option.dataZoom[0].type).toBe('inside')
   })
 
   it('applies chartConfig axis labels', () => {

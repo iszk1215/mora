@@ -167,10 +167,10 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       opt.animation = false
     }
     if (!dataZoomAdded.current) {
-      opt.dataZoom = [
-        { type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const },
-        { type: 'slider' as const, xAxisIndex: 0, bottom: 10, filterMode: 'none' as const },
-      ]
+      opt.dataZoom = [{ type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const }]
+      if (cc?.show_slider !== false) {
+        opt.dataZoom.push({ type: 'slider' as const, xAxisIndex: 0, bottom: 10, filterMode: 'none' as const })
+      }
     }
     if (showLegend) {
       opt.legend = { type: 'scroll' as const, top: 0 }
