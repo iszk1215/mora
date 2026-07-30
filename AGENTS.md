@@ -39,7 +39,9 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 ## Workflow
 
 - All work must be done in `feature/<name>` branches
-- Merge to `main` only when explicitly instructed by the user
+- Merge to `main` only when explicitly instructed by the user (use `merge-feature` skill)
+- Use `proceed-implementation` skill for implementing new features
+- Use `merge-feature` skill for merging completed feature branches into main
 
 ## Notes
 
