@@ -437,6 +437,7 @@ describe('TrackerDetailEdit', () => {
     expect(screen.getByText('Y-Axes')).toBeInTheDocument()
     expect(screen.getByText('Area')).toBeInTheDocument()
     expect(screen.getByText('Legend')).toBeInTheDocument()
+    expect(screen.getByText('Slider')).toBeInTheDocument()
     expect(screen.getByText('Save Chart Options')).toBeInTheDocument()
   })
 

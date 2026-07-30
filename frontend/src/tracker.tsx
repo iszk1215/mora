@@ -549,6 +549,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [area, setArea] = useState(parsedChartConfig.area ?? true)
   const [showLegend, setShowLegend] = useState(parsedChartConfig.show_legend ?? true)
   const [showSymbols, setShowSymbols] = useState(parsedChartConfig.show_symbols ?? true)
+  const [showSlider, setShowSlider] = useState(parsedChartConfig.show_slider ?? true)
   const [palette, setPalette] = useState(parsedChartConfig.palette ?? 'default')
   const [yAxes, setYAxes] = useState<YAxisConfig[]>(() => {
     if (parsedChartConfig.y_axes && parsedChartConfig.y_axes.length > 0) {
@@ -585,6 +586,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     if (!area) cc.area = false
     if (!showLegend) cc.show_legend = false
     if (!showSymbols) cc.show_symbols = false
+    if (!showSlider) cc.show_slider = false
     cc.palette = palette
     cc.y_axes = newYAxes.map((a) => {
       const axis: YAxisConfig = { id: a.id, position: a.position }
@@ -926,6 +928,10 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
         <label className="flex items-center gap-1 text-sm">
           <input type="checkbox" checked={showSymbols} onChange={(e) => setShowSymbols(e.target.checked)} />
           Symbols
+        </label>
+        <label className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={showSlider} onChange={(e) => setShowSlider(e.target.checked)} />
+          Slider
         </label>
         <select
           value={palette}

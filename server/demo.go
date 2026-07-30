@@ -118,6 +118,11 @@ func (s *MoraServer) seedDemoData() error {
 			cc["show_symbols"] = true
 		}
 
+		// ~30% of trackers get slider hidden to mix it up
+		if rng.Intn(10) < 3 {
+			cc["show_slider"] = false
+		}
+
 		// Every 3rd tracker gets a bar or mixed chart with multi-Y-axis
 			if ti%3 == 0 {
 				cc["y_axes"] = []map[string]any{

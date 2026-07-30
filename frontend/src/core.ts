@@ -51,6 +51,7 @@ export interface ChartConfig {
   area?: boolean
   show_legend?: boolean
   show_symbols?: boolean
+  show_slider?: boolean
   palette?: string
   y_axes?: YAxisConfig[]
 }
