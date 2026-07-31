@@ -15,12 +15,11 @@ tracker
   ├── tracker_series (tracker_id FK)
   │    └── tracker_value (series_id FK)
   ├── tracker_member (user_id, tracker_id) — access control
-  ├── tracker_like   (user_id, tracker_id)
-  └── tracker_coverage (tracker_id PK → repository)
+  └── tracker_like   (user_id, tracker_id)
 ```
 
 - **type=`tracker`**: Normal time-series data (tracker -> series -> values)
-- **type=`coverage`**: Links to a repository via `tracker_coverage`. No series/values of its own.
+- **type=`coverage`**: Links to a repository via the `tracker_coverage` table, owned and managed by the coverage package. No series/values of its own.
 
 ## API Endpoints
 
@@ -189,7 +188,7 @@ All fields are optional. Only provided fields are updated.
 
 ## Coverage Type
 
-When `type="coverage"`, the tracker links to a repository via `tracker_coverage`. The preview endpoint fetches data from `CoverageTimelineProvider.Timeline(repoID, 20)` and maps coverage entries as series.
+When `type="coverage"`, the tracker links to a repository via the `tracker_coverage` table, which is owned and managed by the coverage package. Preview data is served by the coverage handler at `GET /api/coverages/{trackerId}/preview`, which fetches from `CoverageStore.Timeline(repoID, 20)` and maps coverage entries as series.
 
 - Series/values endpoints return empty or 400 for coverage trackers
 - Frontend routes to `/coverages/:trackerId` for coverage detail view
@@ -210,7 +209,7 @@ When `type="coverage"`, the tracker links to a repository via `tracker_coverage`
 | `tracker/store.go` | SQLite store, SQL queries |
 | `tracker/handler.go` | HTTP handlers, middleware, models |
 | `tracker/service.go` | Service wrapper, convenience methods |
-| `tracker/provider.go` | `CoverageTimelineProvider` interface |
+| `tracker/provider.go` | `CoverageLinkManager` interface (implemented by coverage) |
 | `tracker/store_test.go` | Store unit tests |
 | `tracker/handler_test.go` | Handler unit tests |
 | `tracker/service_test.go` | Service unit tests |

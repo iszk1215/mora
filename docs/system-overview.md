@@ -98,7 +98,7 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 
 ### injectTrackerCoverage (`/api/coverages/{trackerId}/*`)
 1. Parse `trackerId` from URL
-2. Resolve to `repo_id` via `tracker_coverage` table
+2. Resolve to `repo_id` via `tracker_coverage` table (managed by coverage: `coverage.FindRepoIDByTrackerID()`)
 3. Load repository and repository manager
 4. Verify access
 5. Inject into context
@@ -117,8 +117,8 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 | Subsystem | Tables |
 |-----------|--------|
 | Server | `scm`, `repository`, `user`, `user_auth`, `user_api_key`, `user_password` |
-| Coverage | `coverage`, `coverage_entry`, `coverage_block` |
-| Tracker | `tracker`, `tracker_series`, `tracker_value`, `tracker_member`, `tracker_like`, `tracker_coverage` |
+| Coverage | `coverage`, `coverage_entry`, `coverage_block`, `tracker_coverage` |
+| Tracker | `tracker`, `tracker_series`, `tracker_value`, `tracker_member`, `tracker_like` |
 | UDM | `udm_metric`, `udm_item`, `udm_value` |
 
 ## Frontend

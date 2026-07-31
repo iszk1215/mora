@@ -311,7 +311,7 @@ func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		repoID, err := s.tracker.FindRepoIDByTrackerID(trackerID)
+		repoID, err := s.coverage.FindRepoIDByTrackerID(trackerID)
 		if err != nil {
 			log.Err(err).Msg("failed to find repo_id by tracker_id")
 			render.InternalError(w, errors.New("internal error"))
@@ -373,7 +373,7 @@ func (s *MoraServer) handleCoverageListPublic(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	repoID, err := s.tracker.FindRepoIDByTrackerID(trackerID)
+	repoID, err := s.coverage.FindRepoIDByTrackerID(trackerID)
 	if err != nil {
 		log.Err(err).Msg("failed to find repo_id by tracker_id")
 		render.InternalError(w, errors.New("internal error"))
@@ -443,6 +443,8 @@ func (s *MoraServer) Handler() http.Handler {
 			r.Route("/{trackerId}", func(r chi.Router) {
 				// List endpoint - no SCM auth required, but tracker visibility is checked
 				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission).Get("/", s.handleCoverageListPublic)
+				// Preview endpoint - tracker visibility is checked
+				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission).Get("/preview", s.coverage.HandleCoveragePreview)
 				// Other endpoints - tracker visibility + SCM auth required
 				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission, s.injectTrackerCoverage).Mount("/", s.coverage.Handler())
 			})
@@ -614,7 +616,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	trackerService, err := tracker.NewService(db, coverage.Store())
+	trackerService, err := tracker.NewService(db, coverage)
 	if err != nil {
 		return nil, err
 	}

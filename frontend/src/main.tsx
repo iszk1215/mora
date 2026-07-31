@@ -82,7 +82,7 @@ const TrackerSearchPage = (): React.JSX.Element => {
       const entries = await Promise.all(
         trackers.map(async (t) => {
           try {
-            const data = await fetchPreview(t.id)
+            const data = await fetchPreview(t.id, t.type)
             return [t.id, data] as const
           } catch {
             return null

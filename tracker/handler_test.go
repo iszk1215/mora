@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -31,7 +30,7 @@ func TestMain(m *testing.M) {
 }
 
 func newTestHandler(t *testing.T) http.Handler {
-	return newHandler(initTestStore(t), nil)
+	return newHandler(initTestStore(t))
 }
 
 func superuserCtx() context.Context {
@@ -237,7 +236,7 @@ func TestHandlerListTrackers(t *testing.T) {
 		require.NoError(t, store.addTracker(tr1, 1, nil))
 		require.NoError(t, store.addTracker(tr2, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -255,7 +254,7 @@ func TestHandlerListTrackers(t *testing.T) {
 			require.NoError(t, store.addTracker(tr, 1, nil))
 		}
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodGet, "/?page=1&per_page=2", nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -290,7 +289,7 @@ func TestHandlerListTrackersSearch(t *testing.T) {
 		require.NoError(t, store.addTracker(tr2, 2, nil))
 		require.NoError(t, store.addTracker(tr3, 2, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodGet, "/?q=alpha", nil)
 		res := getResponse(t, http.StatusOK, h, r)
 
@@ -305,7 +304,7 @@ func TestHandlerListTrackersSearch(t *testing.T) {
 		tr := &TrackerModel{Name: "test", Visibility: "public"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		res := getResponse(t, http.StatusOK, h, r)
 
@@ -323,7 +322,7 @@ func TestHandlerListTrackersSearch(t *testing.T) {
 		require.NoError(t, store.addTracker(tr2, 2, nil))
 		require.NoError(t, store.addTracker(tr3, 2, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodGet, "/?q=tracker", nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -342,7 +341,7 @@ func TestHandlerListTrackersSearch(t *testing.T) {
 		require.NoError(t, store.addTracker(tr1, 1, nil))
 		require.NoError(t, store.addTracker(tr2, 2, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -360,7 +359,7 @@ func TestHandlerDeleteTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -372,7 +371,7 @@ func TestHandlerDeleteTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		// anonymous user, no context set -> requireAuth sets ContextWithAuth(ctx, nil)
@@ -382,7 +381,7 @@ func TestHandlerDeleteTracker(t *testing.T) {
 
 	t.Run("delete with invalid URL", func(t *testing.T) {
 		store := initTestStore(t)
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodDelete, "/foo", nil)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
@@ -390,7 +389,7 @@ func TestHandlerDeleteTracker(t *testing.T) {
 
 	t.Run("delete non existing tracker", func(t *testing.T) {
 		store := initTestStore(t)
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := httptest.NewRequest(http.MethodDelete, "/99999", nil)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
@@ -403,7 +402,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		body := PatchTrackerRequest{Visibility: strPtr("public")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -421,7 +420,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		body := PatchTrackerRequest{Visibility: strPtr("public")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -435,7 +434,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPatch, path, PatchTrackerRequest{Visibility: strPtr("invalid")})
 		r = r.WithContext(superuserCtx())
@@ -447,7 +446,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		cc := `{"x_axis_label":"Time","y_axis_label":"Value"}`
 		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
@@ -465,7 +464,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		body := PatchTrackerRequest{ChartConfig: strPtr("not-json")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -478,7 +477,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		cc := `{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"},{"id":2,"position":"left"}]}`
 		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
@@ -492,7 +491,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		cc := `{"y_axes":[]}`
 		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
@@ -506,7 +505,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		cc := `{"x_axis_type":"date"}`
 		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
@@ -524,7 +523,7 @@ func TestHandlerPatchTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
 		cc := `{"x_axis_type":"invalid"}`
 		body := PatchTrackerRequest{ChartConfig: strPtr(cc)}
@@ -540,7 +539,7 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 		tr := &TrackerModel{Name: "test", Visibility: "public"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		getResponse(t, http.StatusOK, h, r)
@@ -553,7 +552,7 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 		tr := &TrackerModel{Name: "test", Visibility: "private"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		getResponse(t, http.StatusNotFound, h, r)
@@ -564,7 +563,7 @@ func TestHandlerRequireReadPermission(t *testing.T) {
 		tr := &TrackerModel{Name: "test", Visibility: "private"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -579,7 +578,7 @@ func TestHandlerInjectTrackerDBError(t *testing.T) {
 
 	require.NoError(t, store.db.Close())
 
-	h := newHandler(store, nil)
+	h := newHandler(store)
 	path := fmt.Sprintf("/%d", tr.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
 	r = r.WithContext(superuserCtx())
@@ -603,7 +602,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "float"})
 		r = r.WithContext(superuserCtx())
@@ -620,7 +619,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s2", DataType: "int"})
 		r = r.WithContext(superuserCtx())
@@ -636,7 +635,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s3"})
 		r = r.WithContext(superuserCtx())
@@ -652,7 +651,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s4", DataType: "binary"})
 		r = r.WithContext(superuserCtx())
@@ -661,7 +660,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 
 	t.Run("non existing tracker", func(t *testing.T) {
 		store := initTestStore(t)
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		r := newRequestWithJSON(t, http.MethodPost, "/99999/series", CreateSeriesRequest{Name: "s1", DataType: "float"})
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
@@ -672,7 +671,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "float"})
 		// anonymous
@@ -685,7 +684,7 @@ func TestHandlerCreateSeries(t *testing.T) {
 		tr := &TrackerModel{Name: "test", ChartConfig: cc}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		cfg := `{"y_axis_index":2}`
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", Config: &cfg})
@@ -700,7 +699,7 @@ func TestHandlerListSeries(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -720,7 +719,7 @@ func TestHandlerListSeries(t *testing.T) {
 		s1 := &SeriesModel{TrackerId: tr.Id, Name: "series1", DataType: "float"}
 		require.NoError(t, store.addSeries(s1))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -742,7 +741,7 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -754,7 +753,7 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/99999", tr.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -771,7 +770,7 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr2.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr1.Id, s.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -788,7 +787,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 		require.Equal(t, "{}", s.Config)
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 		cfg := `{"value_format":"%.2f"}`
 		body := PatchSeriesRequest{Config: strPtr(cfg)}
@@ -808,7 +807,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 		body := PatchSeriesRequest{DataType: strPtr("int")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -827,7 +826,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 		body := PatchSeriesRequest{Name: strPtr("renamed")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -846,7 +845,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 		body := PatchSeriesRequest{Config: strPtr("not-json")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -861,7 +860,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 		body := PatchSeriesRequest{Config: strPtr(`{"value_format":"%.1f"}`)}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -877,7 +876,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 		cfg := `{"y_axis_index":1}`
 		body := PatchSeriesRequest{Config: strPtr(cfg)}
@@ -898,7 +897,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
@@ -918,7 +917,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		now := time.Now().Round(0)
 		r1 := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
@@ -937,7 +936,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString("{invalid}"))
 		r = r.WithContext(superuserCtx())
@@ -951,7 +950,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
@@ -968,7 +967,7 @@ func TestHandlerListValues(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -993,7 +992,7 @@ func TestHandlerListValues(t *testing.T) {
 		require.NoError(t, store.addValue(v1))
 		require.NoError(t, store.addValue(v2))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -1017,7 +1016,7 @@ func TestHandlerListValues(t *testing.T) {
 			require.NoError(t, store.addValue(v))
 		}
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d/values?limit=3", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -1035,7 +1034,7 @@ func TestHandlerListValues(t *testing.T) {
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 		require.NoError(t, store.addSeries(s))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d/values?limit=abc", tr.Id, s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -1056,7 +1055,7 @@ func TestHandlerDeleteValues(t *testing.T) {
 	require.NoError(t, store.addValue(v1))
 	require.NoError(t, store.addValue(v2))
 
-	h := newHandler(store, nil)
+	h := newHandler(store)
 	path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
 	r = r.WithContext(superuserCtx())
@@ -1072,7 +1071,7 @@ func TestHandlerLike(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/like", tr.Id)
 
 		// Like
@@ -1108,7 +1107,7 @@ func TestHandlerLike(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/like", tr.Id)
 		r := httptest.NewRequest(http.MethodPost, path, nil)
 		getResponse(t, http.StatusNotFound, h, r)
@@ -1119,7 +1118,7 @@ func TestHandlerLike(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/like", tr.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		getResponse(t, http.StatusNotFound, h, r)
@@ -1137,7 +1136,7 @@ func TestHandlerLike(t *testing.T) {
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/like", tr.Id)
 
 		r1 := httptest.NewRequest(http.MethodPost, path, nil)
@@ -1168,7 +1167,7 @@ func TestHandlerPreviewTracker(t *testing.T) {
 			require.NoError(t, store.addValue(v))
 		}
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/preview", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -1191,7 +1190,7 @@ func TestHandlerPreviewTracker(t *testing.T) {
 		tr := &TrackerModel{Name: "empty"}
 		require.NoError(t, store.addTracker(tr, 1, nil))
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		path := fmt.Sprintf("/%d/preview", tr.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
@@ -1218,7 +1217,7 @@ func TestHandlerCreateTrackerCoverageType(t *testing.T) {
 		store := initTestStore(t)
 		store.db.MustExec("INSERT INTO repository (id) VALUES (100)")
 
-		h := newHandler(store, nil)
+		h := newHandler(store)
 		repoID := int64(100)
 		r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{
 			Name:       "cov_tracker",
@@ -1277,7 +1276,7 @@ func TestHandlerCreateSeriesCoverageTracker(t *testing.T) {
 	tr := &TrackerModel{Name: "cov", Type: "coverage"}
 	require.NoError(t, store.addTracker(tr, 1, nil))
 
-	h := newHandler(store, nil)
+	h := newHandler(store)
 	path := fmt.Sprintf("/%d/series", tr.Id)
 	r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "float"})
 	r = r.WithContext(superuserCtx())
@@ -1291,7 +1290,7 @@ func TestHandlerDeleteSeriesCoverageTracker(t *testing.T) {
 	s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 	require.NoError(t, store.addSeries(s))
 
-	h := newHandler(store, nil)
+	h := newHandler(store)
 	path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
 	r = r.WithContext(superuserCtx())
@@ -1305,7 +1304,7 @@ func TestHandlerCreateValueCoverageTracker(t *testing.T) {
 	s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 	require.NoError(t, store.addSeries(s))
 
-	h := newHandler(store, nil)
+	h := newHandler(store)
 	path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 	now := time.Now().Round(0)
 	r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 1.0})
@@ -1320,93 +1319,9 @@ func TestHandlerDeleteValuesCoverageTracker(t *testing.T) {
 	s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
 	require.NoError(t, store.addSeries(s))
 
-	h := newHandler(store, nil)
+	h := newHandler(store)
 	path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
 	r = r.WithContext(superuserCtx())
 	getResponse(t, http.StatusBadRequest, h, r)
-}
-
-// ----------------------------------------------------------------------
-// Preview coverage tracker
-
-type mockCoverageProvider struct {
-	timelineFn func(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error)
-}
-
-func (m *mockCoverageProvider) Timeline(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error) {
-	return m.timelineFn(repoID, limit)
-}
-
-func TestHandlerPreviewCoverageTracker(t *testing.T) {
-	t.Run("coverage tracker with timeline data", func(t *testing.T) {
-		store := initTestStore(t)
-		store.db.MustExec("INSERT INTO repository (id) VALUES (100)")
-		repoID := int64(100)
-		tr := &TrackerModel{Name: "cov", Type: "coverage"}
-		require.NoError(t, store.addTracker(tr, 1, &repoID))
-
-		now := time.Now().Round(0)
-		provider := &mockCoverageProvider{
-			timelineFn: func(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error) {
-				return map[string][]CoverageTimelinePoint{
-					"overall": {
-						{Time: now.Add(-2 * time.Hour), Value: 70.0},
-						{Time: now.Add(-time.Hour), Value: 80.0},
-						{Time: now, Value: 90.0},
-					},
-				}, nil
-			},
-		}
-
-		h := newHandler(store, provider)
-		path := fmt.Sprintf("/%d/preview", tr.Id)
-		r := httptest.NewRequest(http.MethodGet, path, nil)
-		r = r.WithContext(superuserCtx())
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got PreviewResponse
-		unmarshalResponse(t, res, &got)
-		require.Equal(t, tr.Id, got.Tracker.Id)
-		require.Len(t, got.Series, 1)
-		require.Equal(t, "overall", got.Series[0].Series.Name)
-		require.Equal(t, `{"value_format":"%.1f%%"}`, got.Series[0].Series.Config)
-	})
-
-	t.Run("coverage tracker without repoID", func(t *testing.T) {
-		store := initTestStore(t)
-		tr := &TrackerModel{Name: "cov", Type: "coverage"}
-		require.NoError(t, store.addTracker(tr, 1, nil))
-
-		h := newHandler(store, nil)
-		path := fmt.Sprintf("/%d/preview", tr.Id)
-		r := httptest.NewRequest(http.MethodGet, path, nil)
-		r = r.WithContext(superuserCtx())
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got PreviewResponse
-		unmarshalResponse(t, res, &got)
-		require.Equal(t, tr.Id, got.Tracker.Id)
-		require.Empty(t, got.Series)
-	})
-
-	t.Run("coverage tracker with provider error", func(t *testing.T) {
-		store := initTestStore(t)
-		store.db.MustExec("INSERT INTO repository (id) VALUES (200)")
-		repoID := int64(200)
-		tr := &TrackerModel{Name: "cov", Type: "coverage"}
-		require.NoError(t, store.addTracker(tr, 1, &repoID))
-
-		provider := &mockCoverageProvider{
-			timelineFn: func(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error) {
-				return nil, errors.New("timeline error")
-			},
-		}
-
-		h := newHandler(store, provider)
-		path := fmt.Sprintf("/%d/preview", tr.Id)
-		r := httptest.NewRequest(http.MethodGet, path, nil)
-		r = r.WithContext(superuserCtx())
-		getResponse(t, http.StatusInternalServerError, h, r)
-	})
 }

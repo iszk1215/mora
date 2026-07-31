@@ -2,7 +2,7 @@
 
 ## Overview
 
-Coverage data is accessed via tracker-based URLs. Each coverage tracker links to a repository through the `tracker_coverage` table.
+Coverage data is accessed via tracker-based URLs. Each coverage tracker links to a repository through the `tracker_coverage` table, which is owned and managed by the coverage package.
 
 ## URL Structure
 
@@ -20,6 +20,7 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 | Pattern | Description |
 |---------|-------------|
 | `/api/coverages/:trackerId` | Coverage list |
+| `/api/coverages/:trackerId/preview` | Preview (timeline as virtual series) |
 | `/api/coverages/:trackerId/:index` | Coverage at index |
 | `/api/coverages/:trackerId/:index/:entry/files` | File list |
 | `/api/coverages/:trackerId/:index/:entry/files/*` | File view |
@@ -29,15 +30,17 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 `injectTrackerCoverage` in `server/server.go`:
 
 1. Parse `trackerId` from URL
-2. Resolve `trackerId` -> `repo_id` via `tracker.FindRepoIDByTrackerID()`
+2. Resolve `trackerId` -> `repo_id` via `coverage.FindRepoIDByTrackerID()`
 3. Load repository and repository manager
 4. Verify access (session or API key)
 5. Inject `core.Repository` and `core.RepositoryClient` into context
 
+`GET /api/coverages/{trackerId}/preview` uses only `requireTrackerAuth` + `InjectTracker` + `RequireReadPermission` (no SCM access needed).
+
 ## Coverage Type Trackers
 
 - Created with `type="coverage"` and `repo_id` referencing a repository
-- Preview: fetches data from `CoverageTimelineProvider.Timeline(repoID, 20)`
+- Preview: served by `CoverageHandler.HandleCoveragePreview` at `/api/coverages/{trackerId}/preview`, fetching from `CoverageStore.Timeline(repoID, 20)`
 - Series/values endpoints return 400 (no direct data management)
 - Detail view: `/coverages/:trackerId` shows coverage charts and file browser
 

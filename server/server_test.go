@@ -1033,7 +1033,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	_, err = coverageService.Store().Put(cov)
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, coverageService.Store())
+	trackerService, err := tracker.NewService(db, coverageService)
 	require.NoError(t, err)
 
 	// Create a tracker linked to the repo
@@ -1141,5 +1141,81 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
 		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
+}
+
+// ----------------------------------------------------------------------
+// handleCoveragePreview
+
+func TestHandleCoveragePreview(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	repo := Repository{
+		Id:                1,
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "repo",
+		Url:               "http://mock.scm/owner/repo",
+	}
+
+	rm := NewMockRepositoryManager(1)
+	rm.client.Repositories = createMockRepoService(controller, repo)
+
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	coverageService, err := coverage.NewCoverageService(db)
+	require.NoError(t, err)
+
+	cov := &coverage.Coverage{
+		RepoID:    repo.Id,
+		Revision:  "abc123",
+		Timestamp: time.Now().Round(0),
+		Entries: []*coverage.CoverageEntry{
+			{Name: "overall", Hits: 70, Lines: 100},
+		},
+	}
+	_, err = coverageService.Store().Put(cov)
+	require.NoError(t, err)
+
+	trackerService, err := tracker.NewService(db, coverageService)
+	require.NoError(t, err)
+
+	repoID := repo.Id
+	trk, err := trackerService.CreateTracker("test coverage", "", "public", 1, "coverage", &repoID, "{}")
+	require.NoError(t, err)
+
+	server := NewMoraServerBuilder(t).
+		WithRepositoryManager(rm).
+		WithRepo(&repo).
+		WithSessionManager().
+		WithTracker(trackerService).
+		WithCoverage(coverageService).
+		Finish()
+
+	handler := server.Handler()
+
+	t.Run("public coverage tracker returns preview series", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d/preview", trk.Id), nil)
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusOK, res.StatusCode)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+
+		var data tracker.PreviewResponse
+		err = json.Unmarshal(body, &data)
+		require.NoError(t, err)
+
+		require.Equal(t, "coverage", data.Tracker.Type)
+		require.Len(t, data.Series, 1)
+		require.Equal(t, "overall", data.Series[0].Series.Name)
+		require.Len(t, data.Series[0].Values, 1)
+		require.Equal(t, 70.0, data.Series[0].Values[0].Value)
 	})
 }

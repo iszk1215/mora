@@ -15,8 +15,7 @@ import (
 
 type (
 	trackerHandler struct {
-		store            *trackerStore
-		coverageProvider CoverageTimelineProvider
+		store *trackerStore
 	}
 
 	TrackerModel struct {
@@ -120,6 +119,11 @@ func withTracker(ctx context.Context, tracker TrackerModel) context.Context {
 func trackerFrom(ctx context.Context) (TrackerModel, bool) {
 	m, ok := ctx.Value(trackerContextKey).(TrackerModel)
 	return m, ok
+}
+
+// TrackerFromContext returns the tracker stored in the context by InjectTracker.
+func TrackerFromContext(ctx context.Context) (TrackerModel, bool) {
+	return trackerFrom(ctx)
 }
 
 func withSeries(ctx context.Context, series SeriesModel) context.Context {
@@ -470,56 +474,23 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 
 	var previews []PreviewSeriesValues
 
-	if tracker.Type == "coverage" {
-		repoID, err := h.store.findRepoIDByTrackerID(tracker.Id)
-		if err != nil {
-			log.Error().Err(err).Msg("tracker.handler.previewTracker findRepoID")
-			render.InternalError(w, err)
-			return
-		}
-		if repoID != nil && h.coverageProvider != nil {
-			timeline, err := h.coverageProvider.Timeline(*repoID, 20)
-			if err != nil {
-				log.Error().Err(err).Msg("tracker.handler.previewTracker Timeline")
-				render.InternalError(w, err)
-				return
-			}
-			for name, points := range timeline {
-				values := make([]ValueModel, len(points))
-				for i, p := range points {
-					values[i] = ValueModel{Timestamp: p.Time, Value: p.Value}
-				}
-				previews = append(previews, PreviewSeriesValues{
-					Series: SeriesModel{
-						Id:        0,
-						TrackerId: tracker.Id,
-						Name:      name,
-						DataType:  "float",
-						Config:    `{"value_format":"%.1f%%"}`,
-					},
-					Values: values,
-				})
-			}
-		}
-	} else {
-		series, err := h.store.listSeries(tracker.Id)
-		if err != nil {
-			log.Error().Err(err).Msg("tracker.handler.previewTracker listSeries")
-			render.InternalError(w, err)
-			return
-		}
+	series, err := h.store.listSeries(tracker.Id)
+	if err != nil {
+		log.Error().Err(err).Msg("tracker.handler.previewTracker listSeries")
+		render.InternalError(w, err)
+		return
+	}
 
-		for _, s := range series {
-			values, err := h.store.listLatestValues(s.Id, 20)
-			if err != nil {
-				log.Error().Err(err).Msg("tracker.handler.previewTracker listLatestValues")
-				continue
-			}
-			previews = append(previews, PreviewSeriesValues{
-				Series: s,
-				Values: values,
-			})
+	for _, s := range series {
+		values, err := h.store.listLatestValues(s.Id, 20)
+		if err != nil {
+			log.Error().Err(err).Msg("tracker.handler.previewTracker listLatestValues")
+			continue
 		}
+		previews = append(previews, PreviewSeriesValues{
+			Series: s,
+			Values: values,
+		})
 	}
 
 	trackerResp := TrackerResponse{
@@ -952,8 +923,8 @@ func (h *trackerHandler) unlikeTracker(w http.ResponseWriter, r *http.Request) {
 	renderNoContent(w)
 }
 
-func newHandler(store *trackerStore, cp CoverageTimelineProvider) http.Handler {
-	h := &trackerHandler{store: store, coverageProvider: cp}
+func newHandler(store *trackerStore) http.Handler {
+	h := &trackerHandler{store: store}
 	r := chi.NewRouter()
 
 	r.Use(h.requireAuth)

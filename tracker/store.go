@@ -57,17 +57,10 @@ CREATE TABLE IF NOT EXISTS tracker_like (
     PRIMARY KEY (user_id, tracker_id)
 )`
 
-var schemaTrackerCoverage = `
-CREATE TABLE IF NOT EXISTS tracker_coverage (
-    tracker_id INTEGER PRIMARY KEY,
-    repo_id    INTEGER NOT NULL,
-    FOREIGN KEY (tracker_id) REFERENCES tracker(id) ON DELETE CASCADE,
-    FOREIGN KEY (repo_id)    REFERENCES repository(id) ON DELETE CASCADE
-)`
-
 type (
 	trackerStore struct {
-		db *sqlx.DB
+		db             *sqlx.DB
+		coverageLinker CoverageLinkManager
 	}
 )
 
@@ -85,8 +78,8 @@ type TrackerResponse struct {
 	LikeCount   int    `json:"like_count" db:"like_count"`
 }
 
-func newTrackerStore(db *sqlx.DB) *trackerStore {
-	return &trackerStore{db: db}
+func newTrackerStore(db *sqlx.DB, cl CoverageLinkManager) *trackerStore {
+	return &trackerStore{db: db, coverageLinker: cl}
 }
 
 // ----------------------------------------------------------------------
@@ -119,11 +112,11 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64, repoID *i
 	}
 
 	if repoID != nil {
-		_, err = s.db.Exec(
-			"INSERT INTO tracker_coverage (tracker_id, repo_id) VALUES (?, ?)",
-			tracker.Id, *repoID)
-		if err != nil {
-			return fmt.Errorf("addTracker addCoverage: %w", err)
+		if s.coverageLinker == nil {
+			return fmt.Errorf("addTracker link coverage: no coverage linker configured")
+		}
+		if err := s.coverageLinker.Link(tracker.Id, *repoID); err != nil {
+			return fmt.Errorf("addTracker link coverage: %w", err)
 		}
 	}
 
@@ -243,19 +236,6 @@ func (s *trackerStore) findTrackerResponseById(id, userID int64) (*TrackerRespon
 		return nil, errorTrackerNotFound
 	}
 	return &rows[0], nil
-}
-
-func (s *trackerStore) findRepoIDByTrackerID(trackerID int64) (*int64, error) {
-	query := "SELECT repo_id FROM tracker_coverage WHERE tracker_id = ?"
-	var repoID int64
-	err := s.db.Get(&repoID, query, trackerID)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("findRepoIDByTrackerID select: %w", err)
-	}
-	return &repoID, nil
 }
 
 func (s *trackerStore) deleteTracker(id int64) error {
@@ -582,11 +562,6 @@ func (s *trackerStore) initialize() error {
 		return fmt.Errorf("initialize schemaLike: %w", err)
 	}
 
-	_, err = s.db.Exec(schemaTrackerCoverage)
-	if err != nil {
-		return fmt.Errorf("initialize schemaTrackerCoverage: %w", err)
-	}
-
 	if err := s.migrateCoverageTrackers(1); err != nil {
 		return fmt.Errorf("initialize migrateCoverageTrackers: %w", err)
 	}
@@ -602,13 +577,11 @@ func (s *trackerStore) migrateCoverageTrackers(adminUserID int64) error {
 		return nil
 	}
 
-	// Clean up orphaned tracker_coverage entries
-	_, err = s.db.Exec(`
-		DELETE FROM tracker_coverage
-		WHERE tracker_id NOT IN (SELECT id FROM tracker)
-	`)
-	if err != nil {
-		return fmt.Errorf("migrateCoverageTrackers cleanup orphaned: %w", err)
+	// Check if tracker_coverage table exists (created by the coverage store);
+	// skip if not yet initialized.
+	err = s.db.Get(&count, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='tracker_coverage'")
+	if err != nil || count == 0 {
+		return nil
 	}
 
 	type repoRow struct {
@@ -651,11 +624,11 @@ func (s *trackerStore) migrateCoverageTrackers(adminUserID int64) error {
 			return fmt.Errorf("migrateCoverageTrackers insert member for repo %d: %w", r.ID, err)
 		}
 
-		_, err = s.db.Exec(
-			"INSERT INTO tracker_coverage (tracker_id, repo_id) VALUES (?, ?)",
-			trackerID, r.ID)
-		if err != nil {
-			return fmt.Errorf("migrateCoverageTrackers insert coverage for repo %d: %w", r.ID, err)
+		if s.coverageLinker == nil {
+			return fmt.Errorf("migrateCoverageTrackers link coverage for repo %d: no coverage linker configured", r.ID)
+		}
+		if err := s.coverageLinker.Link(trackerID, r.ID); err != nil {
+			return fmt.Errorf("migrateCoverageTrackers link coverage for repo %d: %w", r.ID, err)
 		}
 	}
 
