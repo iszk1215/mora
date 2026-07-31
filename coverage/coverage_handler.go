@@ -16,6 +16,7 @@ import (
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage/profile"
 	"github.com/iszk1215/mora/render"
+	"github.com/iszk1215/mora/tracker"
 	"github.com/rs/zerolog/log"
 )
 
@@ -236,6 +237,55 @@ func (s *CoverageHandler) HandleCoverageListPublic(w http.ResponseWriter, r *htt
 	rm, _ := core.RepositoryClientFrom(r.Context())
 	resp := makeCoverageListResponse(rm, repo, coverages)
 	render.JSON(w, resp, http.StatusOK)
+}
+
+// HandleCoveragePreview returns coverage timeline data as virtual series,
+// mirroring the tracker preview response shape.
+func (s *CoverageHandler) HandleCoveragePreview(w http.ResponseWriter, r *http.Request) {
+	tr, ok := tracker.TrackerFromContext(r.Context())
+	if !ok {
+		render.NotFound(w, errors.New("tracker not found"))
+		return
+	}
+
+	var previews []tracker.PreviewSeriesValues
+
+	if tr.RepoID != nil {
+		timeline, err := s.coverages.Timeline(*tr.RepoID, 20)
+		if err != nil {
+			log.Error().Err(err).Msg("coverage.handler.HandleCoveragePreview Timeline")
+			render.InternalError(w, err)
+			return
+		}
+		for name, points := range timeline {
+			values := make([]tracker.ValueModel, len(points))
+			for i, p := range points {
+				values[i] = tracker.ValueModel{Timestamp: p.Time, Value: p.Value}
+			}
+			previews = append(previews, tracker.PreviewSeriesValues{
+				Series: tracker.SeriesModel{
+					Id:        0,
+					TrackerId: tr.Id,
+					Name:      name,
+					DataType:  "float",
+					Config:    `{"value_format":"%.1f%%"}`,
+				},
+				Values: values,
+			})
+		}
+	}
+
+	trackerResp := tracker.TrackerResponse{
+		Id:          tr.Id,
+		Name:        tr.Name,
+		Description: tr.Description,
+		Visibility:  tr.Visibility,
+		Type:        tr.Type,
+		RepoID:      tr.RepoID,
+		ChartConfig: tr.ChartConfig,
+	}
+
+	render.JSON(w, tracker.PreviewResponse{Tracker: trackerResp, Series: previews}, http.StatusOK)
 }
 
 func makeFileListResponse(rm core.RepositoryClient, repo core.Repository, cov *Coverage, entry *CoverageEntry) FileListResponse {

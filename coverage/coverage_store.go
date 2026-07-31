@@ -1,12 +1,12 @@
 package coverage
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/iszk1215/mora/coverage/profile"
-	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -38,6 +38,13 @@ CREATE TABLE IF NOT EXISTS coverage_block (
     lines INTEGER NOT NULL DEFAULT 0,
     blocks TEXT NOT NULL,
     UNIQUE(entry_id, filename)
+);
+
+CREATE TABLE IF NOT EXISTS tracker_coverage (
+    tracker_id INTEGER PRIMARY KEY,
+    repo_id    INTEGER NOT NULL,
+    FOREIGN KEY (tracker_id) REFERENCES tracker(id) ON DELETE CASCADE,
+    FOREIGN KEY (repo_id)    REFERENCES repository(id) ON DELETE CASCADE
 );`
 
 type (
@@ -72,9 +79,13 @@ type (
 	}
 )
 
-func NewCoverageStore(db *sqlx.DB) CoverageStore {
+func newCoverageStoreImpl(db *sqlx.DB) *coverageStoreImpl {
 	query := "SELECT id, repo_id, revision, time FROM coverage"
 	return &coverageStoreImpl{db: db, selectQuery: query}
+}
+
+func NewCoverageStore(db *sqlx.DB) CoverageStore {
+	return newCoverageStoreImpl(db)
 }
 
 func (s *coverageStoreImpl) Init() error {
@@ -89,6 +100,65 @@ func (s *coverageStoreImpl) Init() error {
 		return fmt.Errorf("coverage Init index: %w", err)
 	}
 
+	if err := s.cleanupOrphanedCoverageTrackers(); err != nil {
+		return fmt.Errorf("coverage Init cleanup: %w", err)
+	}
+
+	return nil
+}
+
+// cleanupOrphanedCoverageTrackers removes tracker_coverage rows whose tracker
+// no longer exists. It is skipped when the tracker table has not been created
+// yet (e.g. coverage store initialization runs before the tracker service).
+func (s *coverageStoreImpl) cleanupOrphanedCoverageTrackers() error {
+	var count int
+	err := s.db.Get(&count, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='tracker'")
+	if err != nil {
+		return fmt.Errorf("cleanupOrphanedCoverageTrackers check tracker table: %w", err)
+	}
+	if count == 0 {
+		return nil
+	}
+
+	_, err = s.db.Exec(`
+		DELETE FROM tracker_coverage
+		WHERE tracker_id NOT IN (SELECT id FROM tracker)
+	`)
+	if err != nil {
+		return fmt.Errorf("cleanupOrphanedCoverageTrackers delete: %w", err)
+	}
+	return nil
+}
+
+func (s *coverageStoreImpl) findRepoIDByTrackerID(trackerID int64) (*int64, error) {
+	var repoID int64
+	err := s.db.Get(&repoID, "SELECT repo_id FROM tracker_coverage WHERE tracker_id = ?", trackerID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("findRepoIDByTrackerID select: %w", err)
+	}
+	return &repoID, nil
+}
+
+func (s *coverageStoreImpl) linkTracker(trackerID, repoID int64) error {
+	_, err := s.db.Exec(
+		"INSERT INTO tracker_coverage (tracker_id, repo_id) VALUES (?, ?)",
+		trackerID, repoID)
+	if err != nil {
+		return fmt.Errorf("linkTracker insert: %w", err)
+	}
+	return nil
+}
+
+func (s *coverageStoreImpl) unlinkTracker(trackerID int64) error {
+	_, err := s.db.Exec(
+		"DELETE FROM tracker_coverage WHERE tracker_id = ?",
+		trackerID)
+	if err != nil {
+		return fmt.Errorf("unlinkTracker delete: %w", err)
+	}
 	return nil
 }
 
@@ -270,7 +340,7 @@ func (s *coverageStoreImpl) Put(cov *Coverage) (int64, error) {
 	return id, s.replaceEntries(id, cov.Entries)
 }
 
-func (s *coverageStoreImpl) Timeline(repoID int64, limit int) (map[string][]tracker.CoverageTimelinePoint, error) {
+func (s *coverageStoreImpl) Timeline(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error) {
 	type row struct {
 		Time  time.Time `db:"time"`
 		Name  string    `db:"name"`
@@ -290,7 +360,7 @@ func (s *coverageStoreImpl) Timeline(repoID int64, limit int) (map[string][]trac
 		return nil, fmt.Errorf("Timeline select: %w", err)
 	}
 
-	result := make(map[string][]tracker.CoverageTimelinePoint)
+	result := make(map[string][]CoverageTimelinePoint)
 	counts := make(map[string]int)
 	for _, r := range rows {
 		if limit > 0 && counts[r.Name] >= limit {
@@ -300,7 +370,7 @@ func (s *coverageStoreImpl) Timeline(repoID int64, limit int) (map[string][]trac
 		if r.Lines > 0 {
 			pct = float64(r.Hits) / float64(r.Lines) * 100
 		}
-		result[r.Name] = append(result[r.Name], tracker.CoverageTimelinePoint{Time: r.Time, Value: pct})
+		result[r.Name] = append(result[r.Name], CoverageTimelinePoint{Time: r.Time, Value: pct})
 		counts[r.Name]++
 	}
 

@@ -68,8 +68,12 @@ export async function listTrackers(page?: number, perPage?: number, query?: stri
   return resp.json()
 }
 
-export async function fetchPreview(trackerId: number): Promise<PreviewData> {
-  const resp = await fetch(`/api/trackers/${trackerId}/preview`)
+export async function fetchPreview(trackerId: number, type?: string): Promise<PreviewData> {
+  const path =
+    type === 'coverage'
+      ? `/api/coverages/${trackerId}/preview`
+      : `/api/trackers/${trackerId}/preview`
+  const resp = await fetch(path)
   if (!resp.ok) throw resp
   return resp.json()
 }
@@ -318,7 +322,7 @@ export const TrackerView = (): React.JSX.Element => {
     try {
       const results = await Promise.all(
         trackers.map((t) =>
-          fetchPreview(t.id).then((data) => ({ id: t.id, data } as const)),
+          fetchPreview(t.id, t.type).then((data) => ({ id: t.id, data } as const)),
         ),
       )
       const map = new Map<number, PreviewData>()

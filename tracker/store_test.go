@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"database/sql"
 	"fmt"
 	"testing"
 	"time"
@@ -45,7 +46,17 @@ func initTestStore(t *testing.T) *trackerStore {
 		)
 	`)
 
-	s := newTrackerStore(db)
+	// Create tracker_coverage table as the coverage store would
+	db.MustExec(`
+		CREATE TABLE IF NOT EXISTS tracker_coverage (
+			tracker_id INTEGER PRIMARY KEY,
+			repo_id    INTEGER NOT NULL,
+			FOREIGN KEY (tracker_id) REFERENCES tracker(id) ON DELETE CASCADE,
+			FOREIGN KEY (repo_id)    REFERENCES repository(id) ON DELETE CASCADE
+		)
+	`)
+
+	s := newTrackerStore(db, &testCoverageLinker{db: db})
 
 	err = s.initialize()
 	require.NoError(t, err)
@@ -647,4 +658,36 @@ func TestStoreTrackerSearch(t *testing.T) {
 		require.Empty(t, trackers)
 		require.Equal(t, 0, total)
 	})
+}
+
+// testCoverageLinker is a fake CoverageLinkManager that writes directly to the
+// tracker_coverage table so tracker read queries (JOINs) keep working in tests.
+type testCoverageLinker struct {
+	db *sqlx.DB
+}
+
+func (l *testCoverageLinker) FindRepoIDByTrackerID(trackerID int64) (*int64, error) {
+	var repoID int64
+	err := l.db.Get(&repoID, "SELECT repo_id FROM tracker_coverage WHERE tracker_id = ?", trackerID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &repoID, nil
+}
+
+func (l *testCoverageLinker) Link(trackerID, repoID int64) error {
+	_, err := l.db.Exec(
+		"INSERT INTO tracker_coverage (tracker_id, repo_id) VALUES (?, ?)",
+		trackerID, repoID)
+	return err
+}
+
+func (l *testCoverageLinker) Unlink(trackerID int64) error {
+	_, err := l.db.Exec(
+		"DELETE FROM tracker_coverage WHERE tracker_id = ?",
+		trackerID)
+	return err
 }
