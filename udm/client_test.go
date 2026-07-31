@@ -124,17 +124,17 @@ func TestUdmClientAddMetric(t *testing.T) {
 	api := newMockAPIClient(t)
 	c := &udmClient{client: api}
 
-	metric := metricModel{RepoId: 1215, Name: "metric_name"}
+	metric := MetricModel{RepoId: 1215, Name: "metric_name"}
 
 	api.handleDo(func(method, path string, in any, out any) error {
 		require.Equal(t, method, http.MethodPost)
 		require.Equal(t, path, "/api/repos/1215/udm/metrics")
 		require.NotNil(t, in)
 		require.NotNil(t, out)
-		require.IsType(t, &metricModel{}, in)
-		require.IsType(t, &metricModel{}, out)
+		require.IsType(t, &MetricModel{}, in)
+		require.IsType(t, &MetricModel{}, out)
 
-		got, ok := in.(*metricModel)
+		got, ok := in.(*MetricModel)
 		require.True(t, ok)
 		require.Equal(t, &metric, got)
 
@@ -158,10 +158,10 @@ func TestUdmClientListMetrics(t *testing.T) {
 		require.Nil(t, in)
 		require.NotNil(t, out)
 
-		resp, ok := out.(*listMetricsResponse)
+		resp, ok := out.(*ListMetricsResponse)
 		require.True(t, ok)
 
-		resp.Metrics = append(resp.Metrics, metricModel{Name: "metric"})
+		resp.Metrics = append(resp.Metrics, MetricModel{Name: "metric"})
 		return nil
 	})
 
@@ -175,16 +175,16 @@ func TestUdmClientAddItem(t *testing.T) {
 	api := newMockAPIClient(t)
 	c := &udmClient{client: api}
 
-	item := itemModel{MetricId: 1976, Name: "item_name", ValueType: ValueTypeInt}
+	item := ItemModel{MetricId: 1976, Name: "item_name", ValueType: ValueTypeInt}
 
 	api.handleDo(func(method, path string, in any, out any) error {
 		require.Equal(t, method, http.MethodPost)
 		require.Equal(t, path, "/api/repos/1215/udm/metrics/1976/items")
 		require.NotNil(t, in)
 		require.NotNil(t, out)
-		require.IsType(t, &itemModel{}, out)
+		require.IsType(t, &ItemModel{}, out)
 
-		got, ok := in.(*itemModel)
+		got, ok := in.(*ItemModel)
 		require.True(t, ok)
 		require.Equal(t, &item, got)
 

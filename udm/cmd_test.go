@@ -13,12 +13,12 @@ import (
 )
 
 var (
-	isListMetricsResponse = gomock.AssignableToTypeOf(&listMetricsResponse{})
-	isListItemsResponse   = gomock.AssignableToTypeOf(&listItemsResponse{})
-	isListValuesResponse  = gomock.AssignableToTypeOf(&listValuesResponse{})
-	isMetric              = gomock.AssignableToTypeOf(&metricModel{})
-	isItem                = gomock.AssignableToTypeOf(&itemModel{})
-	isValue               = gomock.AssignableToTypeOf(&valueModel{})
+	isListMetricsResponse = gomock.AssignableToTypeOf(&ListMetricsResponse{})
+	isListItemsResponse   = gomock.AssignableToTypeOf(&ListItemsResponse{})
+	isListValuesResponse  = gomock.AssignableToTypeOf(&ListValuesResponse{})
+	isMetric              = gomock.AssignableToTypeOf(&MetricModel{})
+	isItem                = gomock.AssignableToTypeOf(&ItemModel{})
+	isValue               = gomock.AssignableToTypeOf(&ValueModel{})
 )
 
 func newCommandWithMock(m core.APIClient, repoURL string) *udmCommand {
@@ -45,9 +45,9 @@ type mockListMetricsCall struct {
 	helper *mockHelper
 }
 
-func (c *mockListMetricsCall) Return(metrics ...metricModel) *gomock.Call {
+func (c *mockListMetricsCall) Return(metrics ...MetricModel) *gomock.Call {
 	return c.Do(func(method, path string, in, out any) {
-		resp, _ := out.(*listMetricsResponse)
+		resp, _ := out.(*ListMetricsResponse)
 		resp.Repo = c.helper.repo
 		resp.Metrics = metrics
 	})
@@ -68,11 +68,11 @@ func (h *mockHelper) expectListRepositories2() *mockListRepositoriesCall {
 	return &mcall
 }
 
-func (h *mockHelper) expectListMetrics(metrics ...metricModel) *gomock.Call {
+func (h *mockHelper) expectListMetrics(metrics ...MetricModel) *gomock.Call {
 	return h.mock.EXPECT().
 		Do(http.MethodGet, h.base+"/metrics", nil, isListMetricsResponse).
 		Do(func(method, path string, in, out any) {
-			resp, _ := out.(*listMetricsResponse)
+			resp, _ := out.(*ListMetricsResponse)
 			resp.Metrics = metrics
 		})
 }
@@ -85,31 +85,31 @@ func (h *mockHelper) expectListMetrics2() *mockListMetricsCall {
 	}
 }
 
-func (h *mockHelper) expectAddMetric(metric metricModel, returnId int64) *gomock.Call {
+func (h *mockHelper) expectAddMetric(metric MetricModel, returnId int64) *gomock.Call {
 	return h.mock.EXPECT().
 		Do(http.MethodPost, h.base+"/metrics", &metric, isMetric).
 		Do(func(method, path string, in, out any) {
-			resp, _ := out.(*metricModel)
+			resp, _ := out.(*MetricModel)
 			resp.Id = returnId
 		})
 }
 
-func (h *mockHelper) expectListItems(metricId int64, items ...itemModel) *gomock.Call {
+func (h *mockHelper) expectListItems(metricId int64, items ...ItemModel) *gomock.Call {
 	path := fmt.Sprintf("%s/metrics/%d/items", h.base, metricId)
 	return h.mock.EXPECT().
 		Do(http.MethodGet, path, nil, isListItemsResponse).
 		Do(func(method, path string, in, out any) {
-			resp, _ := out.(*listItemsResponse)
+			resp, _ := out.(*ListItemsResponse)
 			resp.Items = items
 		})
 }
 
-func (h *mockHelper) expectAddItem(metricId int64, item itemModel, returnId int64) *gomock.Call {
+func (h *mockHelper) expectAddItem(metricId int64, item ItemModel, returnId int64) *gomock.Call {
 	path := fmt.Sprintf("%s/metrics/%d/items", h.base, metricId)
 	return h.mock.EXPECT().
 		Do(http.MethodPost, path, &item, isItem).
 		Do(func(method, path string, in, out any) {
-			resp, _ := out.(*itemModel)
+			resp, _ := out.(*ItemModel)
 			resp.Id = returnId
 		})
 }
@@ -119,18 +119,18 @@ func (h *mockHelper) expectDeleteItem(metricId, itemId int64) *gomock.Call {
 	return h.mock.EXPECT().Do(http.MethodDelete, path, nil, nil)
 }
 
-func (h *mockHelper) expectAddValue(metricId, itemId int64, value valueModel) *gomock.Call {
+func (h *mockHelper) expectAddValue(metricId, itemId int64, value ValueModel) *gomock.Call {
 	path := fmt.Sprintf("%s/metrics/%d/items/%d/values", h.base, metricId, itemId)
 	return h.mock.EXPECT().
 		Do(http.MethodPost, path, &value, isValue)
 }
 
-func (h *mockHelper) expectListValues(metricId, itemId int64, values ...valueModel) *gomock.Call {
+func (h *mockHelper) expectListValues(metricId, itemId int64, values ...ValueModel) *gomock.Call {
 	path := fmt.Sprintf("%s/metrics/%d/items/%d/values", h.base, metricId, itemId)
 	return h.mock.EXPECT().
 		Do(http.MethodGet, path, nil, isListValuesResponse).
 		Do(func(method, path string, in, out any) {
-			resp, _ := out.(*listValuesResponse)
+			resp, _ := out.(*ListValuesResponse)
 			resp.Values = values
 		})
 }
@@ -151,8 +151,8 @@ func TestCmdCreateMetric(t *testing.T) {
 		defer ctrl.Finish()
 		h := newMockHelper(ctrl, repo)
 
-		metric := metricModel{Id: 0, Name: "foo"}
-		item := itemModel{Id: 0, Name: "bar", MetricId: 1976, ValueType: ValueTypeInt}
+		metric := MetricModel{Id: 0, Name: "foo"}
+		item := ItemModel{Id: 0, Name: "bar", MetricId: 1976, ValueType: ValueTypeInt}
 
 		gomock.InOrder(
 			h.expectListRepositories2().Return([]core.Repository{h.repo}, nil),
@@ -172,11 +172,11 @@ func TestCmdCreateMetric(t *testing.T) {
 		defer ctrl.Finish()
 		h := newMockHelper(ctrl, repo)
 
-		item := itemModel{Id: 0, Name: "bar", MetricId: 1976, ValueType: ValueTypeInt}
+		item := ItemModel{Id: 0, Name: "bar", MetricId: 1976, ValueType: ValueTypeInt}
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			h.expectListMetrics2().Return(metricModel{Id: 1976, Name: "foo"}),
+			h.expectListMetrics2().Return(MetricModel{Id: 1976, Name: "foo"}),
 			h.expectAddItem(1976, item, 2024),
 		)
 
@@ -213,9 +213,9 @@ func TestCmdListMetrics(t *testing.T) {
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			// h.expectListMetrics(metricModel{Id: 1976, Name: "foo"}),
-			h.expectListMetrics2().Return(metricModel{Id: 1976, Name: "foo"}),
-			h.expectListItems(1976, itemModel{Id: 2024, Name: "bar", MetricId: 1976}),
+			// h.expectListMetrics(MetricModel{Id: 1976, Name: "foo"}),
+			h.expectListMetrics2().Return(MetricModel{Id: 1976, Name: "foo"}),
+			h.expectListItems(1976, ItemModel{Id: 2024, Name: "bar", MetricId: 1976}),
 		)
 
 		cmd := newCommandWithMock(h.mock, repo.Url).newMetricCommand()
@@ -254,8 +254,8 @@ func TestCmdDeleteMetric(t *testing.T) {
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			h.expectListMetrics(metricModel{Id: 1976, Name: "foo"}),
-			h.expectListItems(1976, itemModel{Id: 2024, Name: "bar", MetricId: 1976}),
+			h.expectListMetrics(MetricModel{Id: 1976, Name: "foo"}),
+			h.expectListItems(1976, ItemModel{Id: 2024, Name: "bar", MetricId: 1976}),
 			h.expectDeleteItem(1976, 2024),
 		)
 
@@ -274,15 +274,15 @@ func TestCmdAddValue(t *testing.T) {
 		defer ctrl.Finish()
 		h := newMockHelper(ctrl, repo)
 
-		value := valueModel{
+		value := ValueModel{
 			Id: 0, ItemId: 2024, Value: "10",
 			Timestamp: time.Date(2024, 2, 26, 0, 0, 0, 0, time.UTC)}
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			h.expectListMetrics(metricModel{Id: 1976, Name: "foo"}),
+			h.expectListMetrics(MetricModel{Id: 1976, Name: "foo"}),
 			h.expectListItems(
-				1976, itemModel{Id: 2024, Name: "bar", MetricId: 1976}),
+				1976, ItemModel{Id: 2024, Name: "bar", MetricId: 1976}),
 			h.expectAddValue(1976, 2024, value),
 		)
 
@@ -297,19 +297,19 @@ func TestCmdAddValue(t *testing.T) {
 		defer ctrl.Finish()
 		h := newMockHelper(ctrl, repo)
 
-		want := valueModel{Id: 0, ItemId: 2024, Value: "10"}
+		want := ValueModel{Id: 0, ItemId: 2024, Value: "10"}
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			h.expectListMetrics(metricModel{Id: 1976, Name: "hoge"}),
+			h.expectListMetrics(MetricModel{Id: 1976, Name: "hoge"}),
 			h.expectListItems(
-				1976, itemModel{Id: 2024, Name: "fuga", MetricId: 1976}),
+				1976, ItemModel{Id: 2024, Name: "fuga", MetricId: 1976}),
 			h.mock.EXPECT().
 				Do(
 					http.MethodPost, h.base+"/metrics/1976/items/2024/values",
 					gomock.Any(), isValue).
 				Do(func(method, path string, in, out any) {
-					got, ok := in.(*valueModel)
+					got, ok := in.(*ValueModel)
 					require.True(t, ok)
 					require.Equal(t, want.Id, got.Id)
 					require.Equal(t, want.ItemId, got.ItemId)
@@ -350,15 +350,15 @@ func TestCmdListValues(t *testing.T) {
 		defer ctrl.Finish()
 		h := newMockHelper(ctrl, repo)
 
-		value := valueModel{
+		value := ValueModel{
 			Id: 0, ItemId: 2024, Value: "10",
 			Timestamp: time.Date(2024, 2, 26, 0, 0, 0, 0, time.UTC)}
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			h.expectListMetrics(metricModel{Id: 1976, Name: "foo"}),
+			h.expectListMetrics(MetricModel{Id: 1976, Name: "foo"}),
 			h.expectListItems(
-				1976, itemModel{Id: 2024, Name: "bar", MetricId: 1976}),
+				1976, ItemModel{Id: 2024, Name: "bar", MetricId: 1976}),
 			h.expectListValues(1976, 2024, value),
 		)
 
@@ -375,7 +375,7 @@ func TestCmdListValues(t *testing.T) {
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			h.expectListMetrics(metricModel{Id: 1976, Name: "foo"}),
+			h.expectListMetrics(MetricModel{Id: 1976, Name: "foo"}),
 		)
 
 		cmd := newCommandWithMock(h.mock, repo.Url).newValueCommand()
@@ -393,7 +393,7 @@ func TestCmdListValues(t *testing.T) {
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			h.expectListMetrics(metricModel{Id: 1976, Name: "foo"}),
+			h.expectListMetrics(MetricModel{Id: 1976, Name: "foo"}),
 		)
 
 		cmd := newCommandWithMock(h.mock, repo.Url).newValueCommand()
@@ -433,9 +433,9 @@ func TestCmdClearValues2(t *testing.T) {
 
 		gomock.InOrder(
 			h.expectListRepositories(),
-			h.expectListMetrics(metricModel{Id: 1976, Name: "foo"}),
+			h.expectListMetrics(MetricModel{Id: 1976, Name: "foo"}),
 			h.expectListItems(
-				1976, itemModel{Id: 2024, Name: "bar", MetricId: 1976}),
+				1976, ItemModel{Id: 2024, Name: "bar", MetricId: 1976}),
 			h.expectDeleteValues(1976, 2024),
 		)
 

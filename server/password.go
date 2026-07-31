@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type passwordLoginRequest struct {
+type PasswordLoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
@@ -20,6 +20,13 @@ func PasswordAuthHandler(userStore UserStore) http.Handler {
 	r := chi.NewRouter()
 
 	r.Get("/csrf", func(w http.ResponseWriter, r *http.Request) {
+		// getCSRFToken godoc
+		// @Summary      Get CSRF token
+		// @Description  Generate and return a CSRF token via cookie and JSON body
+		// @Tags         auth
+		// @Produce      json
+		// @Success      200  {object}  map[string]string
+		// @Router       /api/auth/csrf [get]
 		csrfToken, err := generateCSRFToken()
 		if err != nil {
 			log.Error().Err(err).Msg("failed to generate CSRF token")
@@ -37,6 +44,17 @@ func PasswordAuthHandler(userStore UserStore) http.Handler {
 	})
 
 	r.Post("/login", func(w http.ResponseWriter, r *http.Request) {
+		// passwordLogin godoc
+		// @Summary      Log in with username and password
+		// @Description  Authenticate with a username and password, creating a session
+		// @Tags         auth
+		// @Accept       json
+		// @Produce      json
+		// @Param        body  body  server.PasswordLoginRequest  true  "Login credentials"
+		// @Success      200   {object}  server.User
+		// @Failure      400   {object}  core.ErrorResponse
+		// @Failure      403   {object}  core.ErrorResponse
+		// @Router       /api/auth/login [post]
 		sess, ok := MoraSessionFrom(r.Context())
 		if !ok {
 			render.Forbidden(w, render.ErrForbidden)
@@ -49,7 +67,7 @@ func PasswordAuthHandler(userStore UserStore) http.Handler {
 			return
 		}
 
-		var req passwordLoginRequest
+		var req PasswordLoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			log.Warn().Err(err).Msg("invalid password login request body")
 			render.BadRequest(w, errors.New("invalid request body"))

@@ -241,6 +241,16 @@ func (s *CoverageHandler) HandleCoverageListPublic(w http.ResponseWriter, r *htt
 
 // HandleCoveragePreview returns coverage timeline data as virtual series,
 // mirroring the tracker preview response shape.
+//
+// HandleCoveragePreview godoc
+// @Summary      Preview coverage data
+// @Description  Return coverage timeline data as virtual series for a tracker
+// @Tags         coverage
+// @Param        trackerId  path  int  true  "Tracker ID"
+// @Success      200  {object}  tracker.PreviewResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/coverages/{trackerId}/preview [get]
 func (s *CoverageHandler) HandleCoveragePreview(w http.ResponseWriter, r *http.Request) {
 	tr, ok := tracker.TrackerFromContext(r.Context())
 	if !ok {
@@ -312,6 +322,17 @@ func makeFileListResponse(rm core.RepositoryClient, repo core.Repository, cov *C
 	}
 }
 
+// handleFileList godoc
+// @Summary      List files in a coverage entry
+// @Description  Return the file list and metadata for a coverage entry
+// @Tags         coverage
+// @Param        trackerId  path  int     true  "Tracker ID"
+// @Param        id         path  int     true  "Coverage index"
+// @Param        entry      path  string  true  "Entry name"
+// @Success      200  {object}  coverage.FileListResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/coverages/{trackerId}/{id}/{entry}/files [get]
 func handleFileList(w http.ResponseWriter, r *http.Request) {
 	rm, _ := core.RepositoryClientFrom(r.Context())
 	repo, _ := core.RepoFrom(r.Context())
@@ -336,6 +357,18 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 	return content.Data, nil
 }
 
+// handleFile godoc
+// @Summary      Get a source file
+// @Description  Return the source code and coverage blocks for a file in an entry
+// @Tags         coverage
+// @Param        trackerId  path  int     true  "Tracker ID"
+// @Param        id         path  int     true  "Coverage index"
+// @Param        entry      path  string  true  "Entry name"
+// @Param        filepath   path  string  true  "File path"
+// @Success      200  {object}  coverage.CodeResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/coverages/{trackerId}/{id}/{entry}/files/{filepath} [get]
 func handleFile(w http.ResponseWriter, r *http.Request) {
 	repo, _ := core.RepoFrom(r.Context())
 	cov, _ := CoverageFrom(r.Context())
@@ -417,6 +450,19 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 	return entries, nil
 }
 
+// HandleCoverageUpload godoc
+// @Summary      Upload coverage data
+// @Description  Upload coverage entries for a repository linked to a tracker
+// @Tags         coverage
+// @Accept       json
+// @Produce      json
+// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        body       body  coverage.CoverageUploadRequest  true  "Coverage data"
+// @Success      201  {object}  coverage.Coverage
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/coverages/{trackerId} [post]
 func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
 	defer func() {

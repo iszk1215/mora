@@ -365,6 +365,16 @@ func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      403  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/trackers/{trackerId} [patch]
+
+// GetTracker godoc
+// @Summary      Get a tracker
+// @Description  Return a single tracker by ID
+// @Tags         tracker
+// @Param        trackerId  path  int  true  "Tracker ID"
+// @Success      200  {object}  tracker.TrackerResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/trackers/{trackerId} [get]
 func (h *trackerHandler) getTracker(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 	uid, _ := UserIDFromContext(r.Context())

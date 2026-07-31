@@ -76,12 +76,12 @@ func TestHandlerCreateMetric(t *testing.T) {
 		Id: 1215,
 	}
 
-	newRequest := func(metric *metricModel) *http.Request {
+	newRequest := func(metric *MetricModel) *http.Request {
 		return newRequestWithJSON(t, http.MethodPost, "/metrics", metric)
 	}
 
 	t.Run("valid repo id", func(t *testing.T) {
-		metric := &metricModel{
+		metric := &MetricModel{
 			RepoId: repo.Id,
 			Name:   "metric1",
 		}
@@ -90,13 +90,13 @@ func TestHandlerCreateMetric(t *testing.T) {
 		h := newTestHandler(t)
 		res := getReponseWithRepo(t, http.StatusCreated, h, r, repo)
 
-		var got metricModel
+		var got MetricModel
 		unmarshalReponse(t, res, &got)
 		require.Equal(t, int64(1), got.Id)
 	})
 
 	t.Run("repo id zero", func(t *testing.T) {
-		metric := &metricModel{
+		metric := &MetricModel{
 			RepoId: 0,
 			Name:   "metric1",
 		}
@@ -105,14 +105,14 @@ func TestHandlerCreateMetric(t *testing.T) {
 		h := newTestHandler(t)
 		res := getReponseWithRepo(t, http.StatusCreated, h, r, repo)
 
-		var got metricModel
+		var got MetricModel
 		unmarshalReponse(t, res, &got)
 		require.Equal(t, int64(1), got.Id)
 		require.Equal(t, int64(1215), got.RepoId)
 	})
 
 	t.Run("invalid repo id", func(t *testing.T) {
-		metric := &metricModel{
+		metric := &MetricModel{
 			RepoId: 1976,
 			Name:   "metric1",
 		}
@@ -128,7 +128,7 @@ func TestHandlerDeleteMetric(t *testing.T) {
 		Id: 1215,
 	}
 
-	metric := &metricModel{
+	metric := &MetricModel{
 		RepoId: repo.Id,
 		Name:   "metric1",
 	}
@@ -164,7 +164,7 @@ func TestHandlerInjectMetricDBError(t *testing.T) {
 		Id: 1215,
 	}
 
-	metric := &metricModel{
+	metric := &MetricModel{
 		RepoId: repo.Id,
 		Name:   "metric1",
 	}
@@ -197,7 +197,7 @@ func TestHandlerInjectMetricAllPaths(t *testing.T) {
 	repo := core.Repository{Id: 1215}
 
 	t.Run("valid metric ID injects metric into context", func(t *testing.T) {
-		metric := &metricModel{RepoId: repo.Id, Name: "metric1"}
+		metric := &MetricModel{RepoId: repo.Id, Name: "metric1"}
 		store := initTestStore(t)
 		require.NoError(t, store.addMetric(metric))
 
@@ -228,7 +228,7 @@ func TestHandlerInjectMetricAllPaths(t *testing.T) {
 	})
 
 	t.Run("DB error returns InternalError without panic", func(t *testing.T) {
-		metric := &metricModel{RepoId: repo.Id, Name: "metric1"}
+		metric := &MetricModel{RepoId: repo.Id, Name: "metric1"}
 		store := initTestStore(t)
 		require.NoError(t, store.addMetric(metric))
 		require.NoError(t, store.db.Close())
@@ -259,14 +259,14 @@ func TestHandlerListMetric(t *testing.T) {
 		h := newTestHandler(t)
 		res := getReponseWithRepo(t, http.StatusOK, h, request, repo)
 
-		var got listMetricsResponse
+		var got ListMetricsResponse
 		unmarshalReponse(t, res, &got)
 
 		require.Empty(t, got.Metrics)
 	})
 
 	t.Run("valid", func(t *testing.T) {
-		metric := metricModel{
+		metric := MetricModel{
 			RepoId: repo.Id,
 			Name:   "metric1",
 		}
@@ -278,10 +278,10 @@ func TestHandlerListMetric(t *testing.T) {
 		h := newHandler(store)
 		res := getReponseWithRepo(t, http.StatusOK, h, request, repo)
 
-		var got listMetricsResponse
+		var got ListMetricsResponse
 		unmarshalReponse(t, res, &got)
 
-		require.Equal(t, []metricModel{metric}, got.Metrics)
+		require.Equal(t, []MetricModel{metric}, got.Metrics)
 	})
 }
 
@@ -293,7 +293,7 @@ func TestHandlerCreateItem(t *testing.T) {
 		Id: 1215,
 	}
 
-	metrics := []metricModel{
+	metrics := []MetricModel{
 		{
 			RepoId: repo.Id,
 			Name:   "metric1",
@@ -310,7 +310,7 @@ func TestHandlerCreateItem(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	newRequest := func(metricId int64, item itemModel) *http.Request {
+	newRequest := func(metricId int64, item ItemModel) *http.Request {
 		body, err := json.Marshal(item)
 		require.NoError(t, err)
 
@@ -319,7 +319,7 @@ func TestHandlerCreateItem(t *testing.T) {
 	}
 
 	t.Run("success", func(t *testing.T) {
-		item := itemModel{
+		item := ItemModel{
 			MetricId:  metrics[0].Id,
 			Name:      "item1",
 			ValueType: ValueTypeInt,
@@ -329,13 +329,13 @@ func TestHandlerCreateItem(t *testing.T) {
 		h := newHandler(store)
 		res := getReponseWithRepo(t, http.StatusCreated, h, r, repo)
 
-		var got metricModel
+		var got MetricModel
 		unmarshalReponse(t, res, &got)
 		require.Equal(t, int64(1), got.Id)
 	})
 
 	t.Run("invalid metric", func(t *testing.T) {
-		item := itemModel{
+		item := ItemModel{
 			MetricId:  1976, // Invalid
 			Name:      "item1",
 			ValueType: ValueTypeInt,
@@ -347,7 +347,7 @@ func TestHandlerCreateItem(t *testing.T) {
 	})
 
 	t.Run("metric id zero", func(t *testing.T) {
-		item := itemModel{
+		item := ItemModel{
 			MetricId:  0,
 			Name:      "item1",
 			ValueType: ValueTypeInt,
@@ -357,14 +357,14 @@ func TestHandlerCreateItem(t *testing.T) {
 		h := newHandler(store)
 		res := getReponseWithRepo(t, http.StatusCreated, h, r, repo)
 
-		var got itemModel
+		var got ItemModel
 		unmarshalReponse(t, res, &got)
 		require.Equal(t, int64(2), got.Id)
 		require.Equal(t, metrics[1].Id, got.MetricId)
 	})
 
 	t.Run("metric id mismatch", func(t *testing.T) {
-		item := itemModel{
+		item := ItemModel{
 			MetricId:  metrics[0].Id,
 			Name:      "item1",
 			ValueType: ValueTypeInt,
@@ -381,7 +381,7 @@ func TestHandlerListItems(t *testing.T) {
 		Id: 1215,
 	}
 
-	metric := metricModel{
+	metric := MetricModel{
 		RepoId: repo.Id,
 		Name:   "metric1",
 	}
@@ -390,7 +390,7 @@ func TestHandlerListItems(t *testing.T) {
 	err := store.addMetric(&metric)
 	require.NoError(t, err)
 
-	items := []itemModel{
+	items := []ItemModel{
 		{
 			MetricId:  metric.Id,
 			Name:      "item1",
@@ -414,7 +414,7 @@ func TestHandlerListItems(t *testing.T) {
 	h := newHandler(store)
 	res := getReponseWithRepo(t, http.StatusOK, h, r, repo)
 
-	var got listItemsResponse
+	var got ListItemsResponse
 	unmarshalReponse(t, res, &got)
 
 	require.Equal(t, items, got.Items)
@@ -452,7 +452,7 @@ func TestDeleteItem(t *testing.T) {
 		Id: 1215,
 	}
 
-	metric := metricModel{
+	metric := MetricModel{
 		RepoId: repo.Id,
 		Name:   "metric1",
 	}
@@ -461,7 +461,7 @@ func TestDeleteItem(t *testing.T) {
 	err := store.addMetric(&metric)
 	require.NoError(t, err)
 
-	item := itemModel{
+	item := ItemModel{
 		MetricId:  metric.Id,
 		Name:      "item1",
 		ValueType: ValueTypeInt,
@@ -487,7 +487,7 @@ func TestDeleteItem(t *testing.T) {
 	err = store.addItem(&item)
 	require.NoError(t, err)
 
-	value := valueModel{
+	value := ValueModel{
 		ItemId:    item.Id,
 		Timestamp: time.Now().Round(0),
 		Value:     "10",
@@ -529,7 +529,7 @@ func TestHandlerSanitizedErrorMessages(t *testing.T) {
 	})
 
 	t.Run("createItem with invalid JSON", func(t *testing.T) {
-		metric := &metricModel{RepoId: repo.Id, Name: "m"}
+		metric := &MetricModel{RepoId: repo.Id, Name: "m"}
 		store := initTestStore(t)
 		require.NoError(t, store.addMetric(metric))
 		h := newHandler(store)
@@ -550,7 +550,7 @@ func TestHandlerSanitizedErrorMessages(t *testing.T) {
 	t.Run("createValue with itemId mismatch", func(t *testing.T) {
 		store := initTestStore(t)
 		repo, metric, item := setupTestItem(t, store)
-		value := valueModel{ItemId: item.Id + 1, Timestamp: time.Now().Round(0), Value: "10"}
+		value := ValueModel{ItemId: item.Id + 1, Timestamp: time.Now().Round(0), Value: "10"}
 		body, err := json.Marshal(value)
 		require.NoError(t, err)
 		h := newHandler(store)
@@ -567,7 +567,7 @@ func TestHandlerSanitizedErrorMessages(t *testing.T) {
 	})
 
 	t.Run("injectItem with non-existing item", func(t *testing.T) {
-		metric := &metricModel{RepoId: repo.Id, Name: "m"}
+		metric := &MetricModel{RepoId: repo.Id, Name: "m"}
 		store := initTestStore(t)
 		require.NoError(t, store.addMetric(metric))
 		h := newHandler(store)
@@ -580,12 +580,12 @@ func TestHandlerSanitizedErrorMessages(t *testing.T) {
 // ----------------------------------------------------------------------
 // Value
 
-func setupTestItem(t *testing.T, store *udmStore) (core.Repository, metricModel, itemModel) {
+func setupTestItem(t *testing.T, store *udmStore) (core.Repository, MetricModel, ItemModel) {
 	repo := core.Repository{
 		Id: 1215,
 	}
 
-	metric := metricModel{
+	metric := MetricModel{
 		RepoId: repo.Id,
 		Name:   "metric1",
 	}
@@ -593,7 +593,7 @@ func setupTestItem(t *testing.T, store *udmStore) (core.Repository, metricModel,
 	err := store.addMetric(&metric)
 	require.NoError(t, err)
 
-	item := itemModel{
+	item := ItemModel{
 		MetricId:  metric.Id,
 		Name:      "item1",
 		ValueType: ValueTypeInt,
@@ -609,7 +609,7 @@ func TestHandlerCreateValue(t *testing.T) {
 	store := initTestStore(t)
 	repo, metric, item := setupTestItem(t, store)
 
-	value := valueModel{
+	value := ValueModel{
 		ItemId:    metric.Id,
 		Timestamp: time.Now().Round(0),
 		Value:     "10",
@@ -623,18 +623,18 @@ func TestHandlerCreateValue(t *testing.T) {
 	h := newHandler(store)
 	res := getReponseWithRepo(t, http.StatusOK, h, r, repo)
 
-	var got valueModel
+	var got ValueModel
 	unmarshalReponse(t, res, &got)
 
 	require.Equal(t, int64(1), got.Id)
 }
 
-func setupTestValues(t *testing.T, store *udmStore) (core.Repository, metricModel, itemModel, []valueModel) {
+func setupTestValues(t *testing.T, store *udmStore) (core.Repository, MetricModel, ItemModel, []ValueModel) {
 	repo := core.Repository{
 		Id: 1215,
 	}
 
-	metric := metricModel{
+	metric := MetricModel{
 		RepoId: repo.Id,
 		Name:   "metric1",
 	}
@@ -642,7 +642,7 @@ func setupTestValues(t *testing.T, store *udmStore) (core.Repository, metricMode
 	err := store.addMetric(&metric)
 	require.NoError(t, err)
 
-	item := itemModel{
+	item := ItemModel{
 		MetricId:  metric.Id,
 		Name:      "item1",
 		ValueType: ValueTypeInt,
@@ -653,7 +653,7 @@ func setupTestValues(t *testing.T, store *udmStore) (core.Repository, metricMode
 
 	now := time.Now().Round(0)
 
-	values := []valueModel{
+	values := []ValueModel{
 		{
 			ItemId:    item.Id,
 			Timestamp: now.Add(time.Hour * 24),
@@ -679,7 +679,7 @@ func TestHandlerListValues(t *testing.T) {
 	h := newHandler(store)
 	res := getReponseWithRepo(t, http.StatusOK, h, r, repo)
 
-	var got listValuesResponse
+	var got ListValuesResponse
 	unmarshalReponse(t, res, &got)
 
 	require.Equal(t, values, got.Values)
@@ -687,8 +687,8 @@ func TestHandlerListValues(t *testing.T) {
 
 func TestHandlerDeleteValues(t *testing.T) {
 	repo := core.Repository{Id: 1}
-	metric := metricModel{Name: "metric1"}
-	item := itemModel{Name: "item1"}
+	metric := MetricModel{Name: "metric1"}
+	item := ItemModel{Name: "item1"}
 
 	initialzer := storeInitializer{
 		repoId: repo.Id,
@@ -698,7 +698,7 @@ func TestHandlerDeleteValues(t *testing.T) {
 				items: []*itemInitializer{
 					{
 						item: &item,
-						values: []*valueModel{
+						values: []*ValueModel{
 							{Timestamp: time.Now().Round(0), Value: "10"},
 							{Timestamp: time.Now().Round(0), Value: "11"},
 						},

@@ -57,6 +57,10 @@ coverage.html: coverage.out
 generate:
 	go generate mockscm/mock.go
 	go generate udm/mock.go
+	$(MAKE) swagger
+
+swagger:
+	swag init -g main.go -o docs --parseFuncBody
 
 # frontend
 

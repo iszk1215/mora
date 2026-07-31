@@ -19,41 +19,41 @@ type (
 		store *udmStore
 	}
 
-	metricModel struct {
+	MetricModel struct {
 		Id     int64  `json:"id"      db:"id"`
 		RepoId int64  `json:"repo_id" db:"repo_id"`
 		Name   string `json:"name"    db:"name"`
 	}
 
-	itemModel struct {
+	ItemModel struct {
 		Id        int64    `json:"id"        db:"id"`
 		MetricId  int64    `json:"metric_id" db:"metric_id"`
 		Name      string   `json:"name"      db:"name"`
 		ValueType ValueType `json:"type"      db:"type"`
 	}
 
-	valueModel struct {
+	ValueModel struct {
 		Id        int64     `db:"id"`
 		ItemId    int64     `db:"item_id"`
 		Timestamp time.Time `json:"time"     db:"time"`
 		Value     string    `json:"value"    db:"value"`
 	}
 
-	listMetricsResponse struct {
+	ListMetricsResponse struct {
 		Repo    core.Repository `json:"repo"`
-		Metrics []metricModel   `json:"metrics"`
+		Metrics []MetricModel   `json:"metrics"`
 	}
 
-	listItemsResponse struct {
+	ListItemsResponse struct {
 		Repo   core.Repository `json:"repo"`
-		Metric metricModel     `json:"metric"`
-		Items  []itemModel     `json:"items"`
+		Metric MetricModel     `json:"metric"`
+		Items  []ItemModel     `json:"items"`
 	}
 
-	listValuesResponse struct {
+	ListValuesResponse struct {
 		Repo   core.Repository `json:"repo"`
-		Item   itemModel       `json:"items"`
-		Values []valueModel    `json:"values"`
+		Item   ItemModel       `json:"items"`
+		Values []ValueModel    `json:"values"`
 	}
 
 	ContextKey int
@@ -64,21 +64,21 @@ const (
 	itemContextKey
 )
 
-func withMetric(ctx context.Context, metric metricModel) context.Context {
+func withMetric(ctx context.Context, metric MetricModel) context.Context {
 	return context.WithValue(ctx, metricContextKey, metric)
 }
 
-func metricFrom(ctx context.Context) (metricModel, bool) {
-	m, ok := ctx.Value(metricContextKey).(metricModel)
+func metricFrom(ctx context.Context) (MetricModel, bool) {
+	m, ok := ctx.Value(metricContextKey).(MetricModel)
 	return m, ok
 }
 
-func withItem(ctx context.Context, item itemModel) context.Context {
+func withItem(ctx context.Context, item ItemModel) context.Context {
 	return context.WithValue(ctx, itemContextKey, item)
 }
 
-func itemFrom(ctx context.Context) (itemModel, bool) {
-	item, ok := ctx.Value(itemContextKey).(itemModel)
+func itemFrom(ctx context.Context) (ItemModel, bool) {
+	item, ok := ctx.Value(itemContextKey).(ItemModel)
 	return item, ok
 }
 
@@ -89,6 +89,17 @@ func renderNoContent(w http.ResponseWriter) {
 // ----------------------------------------------------------------------
 // Metric
 
+// createMetric godoc
+// @Summary      Create a metric
+// @Description  Create a new UDM metric for the repository
+// @Tags         udm
+// @Accept       json
+// @Produce      json
+// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        body     body  udm.MetricModel  true  "Metric information"
+// @Success      201  {object}  udm.MetricModel
+// @Failure      400  {object}  core.ErrorResponse
+// @Router       /api/repos/{repo_id}/udm/metrics [post]
 func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -97,7 +108,7 @@ func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	var metric metricModel
+	var metric MetricModel
 	err := json.NewDecoder(r.Body).Decode(&metric)
 	if err != nil {
 		log.Warn().Err(err).Msg("invalid metric request body")
@@ -123,6 +134,14 @@ func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, metric, http.StatusCreated)
 }
 
+// listMetrics godoc
+// @Summary      List metrics
+// @Description  Return all UDM metrics for the repository
+// @Tags         udm
+// @Produce      json
+// @Param        repo_id  path  int  true  "Repository ID"
+// @Success      200  {object}  udm.ListMetricsResponse
+// @Router       /api/repos/{repo_id}/udm/metrics [get]
 func (h *udmHandler) listMetrics(w http.ResponseWriter, r *http.Request) {
 	repo, _ := core.RepoFrom(r.Context())
 	metrics, err := h.store.listMetrics(repo.Id)
@@ -132,7 +151,7 @@ func (h *udmHandler) listMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := listMetricsResponse{
+	resp := ListMetricsResponse{
 		Repo:    repo,
 		Metrics: metrics,
 	}
@@ -140,6 +159,15 @@ func (h *udmHandler) listMetrics(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
+// deleteMetric godoc
+// @Summary      Delete a metric
+// @Description  Delete a UDM metric and its items
+// @Tags         udm
+// @Param        repo_id   path  int  true  "Repository ID"
+// @Param        metricId  path  int  true  "Metric ID"
+// @Success      204
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/repos/{repo_id}/udm/metrics/{metricId} [delete]
 func (h *udmHandler) deleteMetric(w http.ResponseWriter, r *http.Request) {
 	metric, _ := metricFrom(r.Context())
 	err := h.store.deleteMetric(metric.Id)
@@ -155,6 +183,19 @@ func (h *udmHandler) deleteMetric(w http.ResponseWriter, r *http.Request) {
 // ----------------------------------------------------------------------
 // item
 
+// createItem godoc
+// @Summary      Create an item
+// @Description  Create a new UDM item for a metric
+// @Tags         udm
+// @Accept       json
+// @Produce      json
+// @Param        repo_id   path  int  true  "Repository ID"
+// @Param        metricId  path  int  true  "Metric ID"
+// @Param        body      body  udm.ItemModel  true  "Item information"
+// @Success      201  {object}  udm.ItemModel
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/repos/{repo_id}/udm/metrics/{metricId}/items [post]
 func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -163,7 +204,7 @@ func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	var item itemModel
+	var item ItemModel
 	err := json.NewDecoder(r.Body).Decode(&item)
 	if err != nil {
 		log.Warn().Err(err).Msg("udm.handler.createItem")
@@ -193,6 +234,16 @@ func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, item, http.StatusCreated)
 }
 
+// listItems godoc
+// @Summary      List items
+// @Description  Return all UDM items for a metric
+// @Tags         udm
+// @Produce      json
+// @Param        repo_id   path  int  true  "Repository ID"
+// @Param        metricId  path  int  true  "Metric ID"
+// @Success      200  {object}  udm.ListItemsResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/repos/{repo_id}/udm/metrics/{metricId}/items [get]
 func (h *udmHandler) listItems(w http.ResponseWriter, r *http.Request) {
 	log.Info().Msg("udmHandler.listItems")
 
@@ -206,7 +257,7 @@ func (h *udmHandler) listItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := listItemsResponse{
+	resp := ListItemsResponse{
 		Repo:   repo,
 		Metric: metric,
 		Items:  items,
@@ -215,6 +266,17 @@ func (h *udmHandler) listItems(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
+// deleteItem godoc
+// @Summary      Delete an item
+// @Description  Delete a UDM item and its values
+// @Tags         udm
+// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        metricId  path  int  true  "Metric ID"
+// @Param        itemId    path  int  true  "Item ID"
+// @Success      204
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/repos/{repo_id}/udm/metrics/{metricId}/items/{itemId} [delete]
 func (h *udmHandler) deleteItem(w http.ResponseWriter, r *http.Request) {
 	item, _ := itemFrom(r.Context())
 
@@ -234,6 +296,19 @@ func (h *udmHandler) deleteItem(w http.ResponseWriter, r *http.Request) {
 // ----------------------------------------------------------------------
 // value
 
+// createValue godoc
+// @Summary      Add a value
+// @Description  Add a value to a UDM item
+// @Tags         udm
+// @Accept       json
+// @Produce      json
+// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        metricId  path  int  true  "Metric ID"
+// @Param        itemId    path  int  true  "Item ID"
+// @Param        body      body  udm.ValueModel  true  "Value information"
+// @Success      200  {object}  udm.ValueModel
+// @Failure      400  {object}  core.ErrorResponse
+// @Router       /api/repos/{repo_id}/udm/metrics/{metricId}/items/{itemId}/values [post]
 func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	defer func() {
@@ -242,7 +317,7 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	var value valueModel
+	var value ValueModel
 	err := json.NewDecoder(r.Body).Decode(&value)
 	if err != nil {
 		log.Warn().Err(err).Msg("invalid value request body")
@@ -266,6 +341,16 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, value, http.StatusOK)
 }
 
+// listValues godoc
+// @Summary      List values
+// @Description  Return all values for a UDM item
+// @Tags         udm
+// @Produce      json
+// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        metricId  path  int  true  "Metric ID"
+// @Param        itemId    path  int  true  "Item ID"
+// @Success      200  {object}  udm.ListValuesResponse
+// @Router       /api/repos/{repo_id}/udm/metrics/{metricId}/items/{itemId}/values [get]
 func (h *udmHandler) listValues(w http.ResponseWriter, r *http.Request) {
 	repo, _ := core.RepoFrom(r.Context())
 	item, _ := itemFrom(r.Context())
@@ -277,7 +362,7 @@ func (h *udmHandler) listValues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := listValuesResponse{
+	resp := ListValuesResponse{
 		Repo:   repo,
 		Item:   item,
 		Values: values,
@@ -286,6 +371,16 @@ func (h *udmHandler) listValues(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
+// deleteValues godoc
+// @Summary      Delete all values
+// @Description  Delete all values for a UDM item
+// @Tags         udm
+// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        metricId  path  int  true  "Metric ID"
+// @Param        itemId    path  int  true  "Item ID"
+// @Success      204
+// @Failure      400  {object}  core.ErrorResponse
+// @Router       /api/repos/{repo_id}/udm/metrics/{metricId}/items/{itemId}/values [delete]
 func (h *udmHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 	item, _ := itemFrom(r.Context())
 	err := h.store.deleteValues(item.Id)
