@@ -60,7 +60,7 @@ func newUdmStore(db *sqlx.DB) *udmStore {
 // ----------------------------------------------------------------------
 // Metric
 
-func (s *udmStore) addMetric(metric *metricModel) error {
+func (s *udmStore) addMetric(metric *MetricModel) error {
 	query := "INSERT INTO udm_metric (repo_id, name) VALUES (?, ?)"
 
 	res, err := s.db.Exec(query, metric.RepoId, metric.Name)
@@ -76,10 +76,10 @@ func (s *udmStore) addMetric(metric *metricModel) error {
 	return nil
 }
 
-func (s *udmStore) listMetrics(repoId int64) ([]metricModel, error) {
+func (s *udmStore) listMetrics(repoId int64) ([]MetricModel, error) {
 	query := "SELECT id,repo_id,name FROM udm_metric WHERE repo_id = ?"
 
-	rows := []metricModel{}
+	rows := []MetricModel{}
 	err := s.db.Select(&rows, query, repoId)
 	if err != nil {
 		return nil, fmt.Errorf("listMetrics select: %w", err)
@@ -88,10 +88,10 @@ func (s *udmStore) listMetrics(repoId int64) ([]metricModel, error) {
 	return rows, nil
 }
 
-func (s *udmStore) findMetricById(id int64) (*metricModel, error) {
+func (s *udmStore) findMetricById(id int64) (*MetricModel, error) {
 	query := "SELECT id,repo_id,name FROM udm_metric WHERE id = ?"
 
-	rows := []*metricModel{}
+	rows := []*MetricModel{}
 	err := s.db.Select(&rows, query, id)
 	if err != nil {
 		return nil, fmt.Errorf("findMetricById select: %w", err)
@@ -125,7 +125,7 @@ func (s *udmStore) deleteMetric(id int64) error {
 // ----------------------------------------------------------------------
 // Item
 
-func (s *udmStore) addItem(item *itemModel) error {
+func (s *udmStore) addItem(item *ItemModel) error {
 	// ensure that metric exists
 	_, err := s.findMetricById(item.MetricId)
 	if err != nil {
@@ -166,10 +166,10 @@ func (s *udmStore) deleteItem(id int64) error {
 	return nil
 }
 
-func (s *udmStore) findItemById(id int64) (*itemModel, error) {
+func (s *udmStore) findItemById(id int64) (*ItemModel, error) {
 	query := "SELECT id,metric_id,name,type FROM udm_item WHERE id = ?"
 
-	rows := []itemModel{}
+	rows := []ItemModel{}
 	err := s.db.Select(&rows, query, id)
 	if err != nil {
 		return nil, fmt.Errorf("findItemById select: %w", err)
@@ -182,10 +182,10 @@ func (s *udmStore) findItemById(id int64) (*itemModel, error) {
 	return &rows[0], nil
 }
 
-func (s *udmStore) listItems(metricId int64) ([]itemModel, error) {
+func (s *udmStore) listItems(metricId int64) ([]ItemModel, error) {
 	query := "SELECT id,metric_id,name,type FROM udm_item WHERE metric_id = ?"
 
-	rows := []itemModel{}
+	rows := []ItemModel{}
 	err := s.db.Select(&rows, query, metricId)
 	if err != nil {
 		return nil, fmt.Errorf("listItems select: %w", err)
@@ -197,7 +197,7 @@ func (s *udmStore) listItems(metricId int64) ([]itemModel, error) {
 // ----------------------------------------------------------------------
 // Value
 
-func (s *udmStore) addValue(value *valueModel) error {
+func (s *udmStore) addValue(value *ValueModel) error {
 	_, err := s.findItemById(value.ItemId)
 	if err != nil {
 		return fmt.Errorf("addValue findItemById: %w", err)
@@ -218,10 +218,10 @@ func (s *udmStore) addValue(value *valueModel) error {
 	return nil
 }
 
-func (s *udmStore) listValues(itemId int64) ([]valueModel, error) {
+func (s *udmStore) listValues(itemId int64) ([]ValueModel, error) {
 	query := "SELECT id,item_id,time,value FROM udm_value WHERE item_id = ? ORDER BY time"
 
-	rows := []valueModel{}
+	rows := []ValueModel{}
 	err := s.db.Select(&rows, query, itemId)
 	if err != nil {
 		return nil, fmt.Errorf("listValues select: %w", err)

@@ -11,11 +11,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type createAPIKeyRequest struct {
+type CreateAPIKeyRequest struct {
 	Name string `json:"name"`
 }
 
-type createAPIKeyResponse struct {
+type CreateAPIKeyResponse struct {
 	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	Key       string `json:"key"`
@@ -27,6 +27,13 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 	r := chi.NewRouter()
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		// listAPIKeys godoc
+		// @Summary      List API keys
+		// @Description  Return API keys for the current user
+		// @Tags         api-key
+		// @Success      200  {array}   server.UserAPIKey
+		// @Failure      401  {object}  core.ErrorResponse
+		// @Router       /api/user/me/api-keys [get]
 		sess, ok := MoraSessionFrom(r.Context())
 		if !ok || sess.UserID() == nil {
 			render.Forbidden(w, render.ErrForbidden)
@@ -46,6 +53,17 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
+		// createAPIKey godoc
+		// @Summary      Create an API key
+		// @Description  Create a new API key for the current user
+		// @Tags         api-key
+		// @Accept       json
+		// @Produce      json
+		// @Param        body  body  server.CreateAPIKeyRequest  true  "API key name"
+		// @Success      201   {object}  server.CreateAPIKeyResponse
+		// @Failure      400   {object}  core.ErrorResponse
+		// @Failure      401   {object}  core.ErrorResponse
+		// @Router       /api/user/me/api-keys [post]
 		if !verifyCSRF(r) {
 			log.Warn().Msg("CSRF token mismatch on API key create")
 			render.Forbidden(w, render.ErrForbidden)
@@ -63,7 +81,7 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 			_ = r.Body.Close()
 		}()
 
-		var req createAPIKeyRequest
+		var req CreateAPIKeyRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
 			render.BadRequest(w, errors.New("invalid request body"))
@@ -90,7 +108,7 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 		}
 
 		created := keys[0]
-		resp := createAPIKeyResponse{
+		resp := CreateAPIKeyResponse{
 			ID:        created.ID,
 			Name:      created.Name,
 			Key:       plaintext,
@@ -101,6 +119,16 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 	})
 
 	r.Delete("/{keyId}", func(w http.ResponseWriter, r *http.Request) {
+		// revokeAPIKey godoc
+		// @Summary      Revoke an API key
+		// @Description  Revoke an API key by ID
+		// @Tags         api-key
+		// @Param        keyId  path  int  true  "API key ID"
+		// @Success      204
+		// @Failure      400  {object}  core.ErrorResponse
+		// @Failure      401  {object}  core.ErrorResponse
+		// @Failure      404  {object}  core.ErrorResponse
+		// @Router       /api/user/me/api-keys/{keyId} [delete]
 		if !verifyCSRF(r) {
 			log.Warn().Msg("CSRF token mismatch on API key revoke")
 			render.Forbidden(w, render.ErrForbidden)

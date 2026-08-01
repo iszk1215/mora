@@ -1,0 +1,1641 @@
+basePath: /
+definitions:
+  core.ErrorResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  core.Repository:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      namespace:
+        type: string
+      scm_id:
+        type: integer
+      url:
+        type: string
+    type: object
+  coverage.CodeResponse:
+    properties:
+      blocks:
+        items:
+          items:
+            type: integer
+          type: array
+        type: array
+      code:
+        type: string
+      filename:
+        type: string
+      repo:
+        $ref: '#/definitions/core.Repository'
+    type: object
+  coverage.Coverage:
+    properties:
+      entries:
+        items:
+          $ref: '#/definitions/coverage.CoverageEntry'
+        type: array
+      id:
+        format: int64
+        type: integer
+      repoID:
+        format: int64
+        type: integer
+      revision:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  coverage.CoverageEntry:
+    properties:
+      hits:
+        type: integer
+      lines:
+        type: integer
+      name:
+        type: string
+      profiles:
+        additionalProperties:
+          $ref: '#/definitions/profile.Profile'
+        type: object
+    type: object
+  coverage.CoverageEntryUploadRequest:
+    properties:
+      entry:
+        type: string
+      hits:
+        type: integer
+      lines:
+        type: integer
+      profiles:
+        items:
+          $ref: '#/definitions/profile.Profile'
+        type: array
+    type: object
+  coverage.CoverageListResponse:
+    properties:
+      coverages:
+        items:
+          $ref: '#/definitions/coverage.CoverageResponse'
+        type: array
+      repo:
+        $ref: '#/definitions/core.Repository'
+    type: object
+  coverage.CoverageResponse:
+    properties:
+      entries:
+        items:
+          $ref: '#/definitions/coverage.CoverageEntry'
+        type: array
+      index:
+        type: integer
+      revision:
+        type: string
+      revision_url:
+        type: string
+      time:
+        type: string
+    type: object
+  coverage.CoverageUploadRequest:
+    properties:
+      entries:
+        items:
+          $ref: '#/definitions/coverage.CoverageEntryUploadRequest'
+        type: array
+      revision:
+        type: string
+      time:
+        type: string
+    type: object
+  coverage.FileListResponse:
+    properties:
+      files:
+        items:
+          $ref: '#/definitions/coverage.FileResponse'
+        type: array
+      meta:
+        $ref: '#/definitions/coverage.MetaResponse'
+      repo:
+        $ref: '#/definitions/core.Repository'
+    type: object
+  coverage.FileResponse:
+    properties:
+      filename:
+        type: string
+      hits:
+        type: integer
+      lines:
+        type: integer
+    type: object
+  coverage.MetaResponse:
+    properties:
+      hits:
+        type: integer
+      lines:
+        type: integer
+      revision:
+        type: string
+      revision_url:
+        type: string
+      time:
+        type: string
+    type: object
+  profile.Profile:
+    properties:
+      blocks:
+        description: StartLine, EndLine, Count
+        items:
+          items:
+            type: integer
+          type: array
+        type: array
+      filename:
+        type: string
+      hits:
+        type: integer
+      lines:
+        type: integer
+    type: object
+  server.ConfigResponse:
+    properties:
+      site_name:
+        type: string
+    type: object
+  server.CreateAPIKeyRequest:
+    properties:
+      name:
+        type: string
+    type: object
+  server.CreateAPIKeyResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      key:
+        type: string
+      key_prefix:
+        type: string
+      name:
+        type: string
+    type: object
+  server.PasswordLoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  server.PendingSignupResponse:
+    properties:
+      avatar_url:
+        type: string
+      provider:
+        type: string
+      username:
+        type: string
+    type: object
+  server.RepositoryManagerResponse:
+    properties:
+      id:
+        type: integer
+      logined:
+        type: boolean
+      name:
+        type: string
+      url:
+        type: string
+    type: object
+  server.User:
+    properties:
+      avatar_url:
+        type: string
+      id:
+        type: integer
+      username:
+        type: string
+    type: object
+  server.UserAPIKey:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      key_prefix:
+        type: string
+      name:
+        type: string
+    type: object
+  tracker.CreateSeriesRequest:
+    properties:
+      config:
+        type: string
+      data_type:
+        type: string
+      name:
+        type: string
+    type: object
+  tracker.CreateTrackerRequest:
+    properties:
+      chart_config:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      repo_id:
+        description: required if type="coverage"
+        type: integer
+      type:
+        description: '"tracker" or "coverage", defaults to "tracker"'
+        type: string
+      visibility:
+        description: 'required: "public"|"private"'
+        type: string
+    type: object
+  tracker.CreateValueRequest:
+    properties:
+      time:
+        type: string
+      value:
+        type: number
+    type: object
+  tracker.ListSeriesResponse:
+    properties:
+      series:
+        items:
+          $ref: '#/definitions/tracker.SeriesModel'
+        type: array
+      tracker:
+        $ref: '#/definitions/tracker.TrackerResponse'
+    type: object
+  tracker.ListTrackersResponse:
+    properties:
+      page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+      trackers:
+        items:
+          $ref: '#/definitions/tracker.TrackerResponse'
+        type: array
+    type: object
+  tracker.ListValuesResponse:
+    properties:
+      series:
+        $ref: '#/definitions/tracker.SeriesModel'
+      values:
+        items:
+          $ref: '#/definitions/tracker.ValueModel'
+        type: array
+    type: object
+  tracker.PatchSeriesRequest:
+    properties:
+      config:
+        type: string
+      data_type:
+        type: string
+      name:
+        type: string
+    type: object
+  tracker.PatchTrackerRequest:
+    properties:
+      chart_config:
+        type: string
+      description:
+        type: string
+      visibility:
+        type: string
+    type: object
+  tracker.PreviewResponse:
+    properties:
+      series:
+        items:
+          $ref: '#/definitions/tracker.PreviewSeriesValues'
+        type: array
+      tracker:
+        $ref: '#/definitions/tracker.TrackerResponse'
+    type: object
+  tracker.PreviewSeriesValues:
+    properties:
+      series:
+        $ref: '#/definitions/tracker.SeriesModel'
+      values:
+        items:
+          $ref: '#/definitions/tracker.ValueModel'
+        type: array
+    type: object
+  tracker.SeriesModel:
+    properties:
+      config:
+        type: string
+      data_type:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      tracker_id:
+        type: integer
+    type: object
+  tracker.TrackerModel:
+    properties:
+      chart_config:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      repo_id:
+        type: integer
+      type:
+        type: string
+      visibility:
+        type: string
+    type: object
+  tracker.TrackerResponse:
+    properties:
+      chart_config:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      like_count:
+        type: integer
+      liked:
+        type: boolean
+      name:
+        type: string
+      repo_id:
+        type: integer
+      role:
+        description: '"" | "owner" | "editor"'
+        type: string
+      type:
+        type: string
+      visibility:
+        description: '"public" | "private"'
+        type: string
+    type: object
+  tracker.ValueModel:
+    properties:
+      id:
+        type: integer
+      seriesId:
+        type: integer
+      time:
+        type: string
+      value:
+        type: number
+    type: object
+  udm.ItemModel:
+    properties:
+      id:
+        type: integer
+      metric_id:
+        type: integer
+      name:
+        type: string
+      type:
+        $ref: '#/definitions/udm.ValueType'
+    type: object
+  udm.ListItemsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/udm.ItemModel'
+        type: array
+      metric:
+        $ref: '#/definitions/udm.MetricModel'
+      repo:
+        $ref: '#/definitions/core.Repository'
+    type: object
+  udm.ListMetricsResponse:
+    properties:
+      metrics:
+        items:
+          $ref: '#/definitions/udm.MetricModel'
+        type: array
+      repo:
+        $ref: '#/definitions/core.Repository'
+    type: object
+  udm.ListValuesResponse:
+    properties:
+      items:
+        $ref: '#/definitions/udm.ItemModel'
+      repo:
+        $ref: '#/definitions/core.Repository'
+      values:
+        items:
+          $ref: '#/definitions/udm.ValueModel'
+        type: array
+    type: object
+  udm.MetricModel:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      repo_id:
+        type: integer
+    type: object
+  udm.ValueModel:
+    properties:
+      id:
+        type: integer
+      itemId:
+        type: integer
+      time:
+        type: string
+      value:
+        type: string
+    type: object
+  udm.ValueType:
+    enum:
+    - 1
+    type: integer
+    x-enum-varnames:
+    - ValueTypeInt
+info:
+  contact: {}
+  description: Mora is a code coverage tracker API.
+  title: Mora API
+  version: "1.0"
+paths:
+  /api/auth/csrf:
+    get:
+      description: Generate and return a CSRF token via cookie and JSON body
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get CSRF token
+      tags:
+      - auth
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate with a username and password, creating a session
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/server.PasswordLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Log in with username and password
+      tags:
+      - auth
+  /api/config:
+    get:
+      description: Return server configuration (e.g. site name)
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.ConfigResponse'
+      summary: Get server config
+      tags:
+      - server
+  /api/coverages/{trackerId}:
+    get:
+      description: Return coverage history for a tracker (public list endpoint)
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/coverage.CoverageListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List coverages for a tracker
+      tags:
+      - coverage
+    post:
+      consumes:
+      - application/json
+      description: Upload coverage entries for a repository linked to a tracker
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Coverage data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/coverage.CoverageUploadRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/coverage.Coverage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Upload coverage data
+      tags:
+      - coverage
+  /api/coverages/{trackerId}/{id}/{entry}/files:
+    get:
+      description: Return the file list and metadata for a coverage entry
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Coverage index
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Entry name
+        in: path
+        name: entry
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/coverage.FileListResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List files in a coverage entry
+      tags:
+      - coverage
+  /api/coverages/{trackerId}/{id}/{entry}/files/{filepath}:
+    get:
+      description: Return the source code and coverage blocks for a file in an entry
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Coverage index
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Entry name
+        in: path
+        name: entry
+        required: true
+        type: string
+      - description: File path
+        in: path
+        name: filepath
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/coverage.CodeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Get a source file
+      tags:
+      - coverage
+  /api/coverages/{trackerId}/preview:
+    get:
+      description: Return coverage timeline data as virtual series for a tracker
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.PreviewResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Preview coverage data
+      tags:
+      - coverage
+  /api/me:
+    get:
+      description: Return the current session user, or 204 if not logged in
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.User'
+        "204":
+          description: No Content
+      summary: Get current user
+      tags:
+      - server
+  /api/providers:
+    get:
+      description: Return configured SCM repository managers and their login status
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/server.RepositoryManagerResponse'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List SCM providers
+      tags:
+      - server
+  /api/repos:
+    get:
+      description: List repositories the current session can access
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/core.Repository'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List repositories
+      tags:
+      - server
+  /api/repos/{repo_id}/udm/metrics:
+    get:
+      description: Return all UDM metrics for the repository
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/udm.ListMetricsResponse'
+      summary: List metrics
+      tags:
+      - udm
+    post:
+      consumes:
+      - application/json
+      description: Create a new UDM metric for the repository
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      - description: Metric information
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/udm.MetricModel'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/udm.MetricModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Create a metric
+      tags:
+      - udm
+  /api/repos/{repo_id}/udm/metrics/{metricId}:
+    delete:
+      description: Delete a UDM metric and its items
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      - description: Metric ID
+        in: path
+        name: metricId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Delete a metric
+      tags:
+      - udm
+  /api/repos/{repo_id}/udm/metrics/{metricId}/items:
+    get:
+      description: Return all UDM items for a metric
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      - description: Metric ID
+        in: path
+        name: metricId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/udm.ListItemsResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List items
+      tags:
+      - udm
+    post:
+      consumes:
+      - application/json
+      description: Create a new UDM item for a metric
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      - description: Metric ID
+        in: path
+        name: metricId
+        required: true
+        type: integer
+      - description: Item information
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/udm.ItemModel'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/udm.ItemModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Create an item
+      tags:
+      - udm
+  /api/repos/{repo_id}/udm/metrics/{metricId}/items/{itemId}:
+    delete:
+      description: Delete a UDM item and its values
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      - description: Metric ID
+        in: path
+        name: metricId
+        required: true
+        type: integer
+      - description: Item ID
+        in: path
+        name: itemId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Delete an item
+      tags:
+      - udm
+  /api/repos/{repo_id}/udm/metrics/{metricId}/items/{itemId}/values:
+    delete:
+      description: Delete all values for a UDM item
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      - description: Metric ID
+        in: path
+        name: metricId
+        required: true
+        type: integer
+      - description: Item ID
+        in: path
+        name: itemId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Delete all values
+      tags:
+      - udm
+    get:
+      description: Return all values for a UDM item
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      - description: Metric ID
+        in: path
+        name: metricId
+        required: true
+        type: integer
+      - description: Item ID
+        in: path
+        name: itemId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/udm.ListValuesResponse'
+      summary: List values
+      tags:
+      - udm
+    post:
+      consumes:
+      - application/json
+      description: Add a value to a UDM item
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repo_id
+        required: true
+        type: integer
+      - description: Metric ID
+        in: path
+        name: metricId
+        required: true
+        type: integer
+      - description: Item ID
+        in: path
+        name: itemId
+        required: true
+        type: integer
+      - description: Value information
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/udm.ValueModel'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/udm.ValueModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Add a value
+      tags:
+      - udm
+  /api/signup/cancel:
+    post:
+      description: Cancel the pending signup for the current session
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Cancel pending signup
+      tags:
+      - auth
+  /api/signup/confirm:
+    post:
+      description: Create a user from the pending signup and log in
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/server.User'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Confirm pending signup
+      tags:
+      - auth
+  /api/signup/pending:
+    get:
+      description: Return the pending signup information for the current session
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.PendingSignupResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Get pending signup
+      tags:
+      - auth
+  /api/trackers:
+    get:
+      description: Return trackers owned, edited, or liked by the current user
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.ListTrackersResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List trackers for current user
+      tags:
+      - tracker
+    post:
+      consumes:
+      - application/json
+      description: Add a new tracker. The name must be unique. Creator becomes owner.
+      parameters:
+      - description: Tracker information
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tracker.CreateTrackerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/tracker.TrackerModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Create a tracker
+      tags:
+      - tracker
+  /api/trackers/{trackerId}:
+    delete:
+      description: Delete the specified tracker. Child series and values are also
+        cascade-deleted.
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Delete a tracker
+      tags:
+      - tracker
+    get:
+      description: Return a single tracker by ID
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.TrackerResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Get a tracker
+      tags:
+      - tracker
+    patch:
+      consumes:
+      - application/json
+      description: Update tracker fields (e.g. visibility). Requires edit permission.
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tracker.PatchTrackerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.TrackerResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Update a tracker
+      tags:
+      - tracker
+  /api/trackers/{trackerId}/like:
+    delete:
+      description: Remove a like from the specified tracker for the current user
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Unlike a tracker
+      tags:
+      - tracker
+    post:
+      description: Add a like to the specified tracker for the current user
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Like a tracker
+      tags:
+      - tracker
+  /api/trackers/{trackerId}/preview:
+    get:
+      description: Return tracker info, all series, and latest values (up to 20 per
+        series) for card previews
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.PreviewResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Preview tracker data
+      tags:
+      - tracker
+  /api/trackers/{trackerId}/series:
+    get:
+      description: Return all series belonging to the specified tracker
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.ListSeriesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List all series
+      tags:
+      - tracker
+    post:
+      consumes:
+      - application/json
+      description: Add a new series under a tracker. data_type must be "int" or "float"
+        (defaults to "float").
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Series information
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tracker.CreateSeriesRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/tracker.SeriesModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Create a series
+      tags:
+      - tracker
+  /api/trackers/{trackerId}/series/{seriesId}:
+    delete:
+      description: Delete the specified series. Child values are also cascade-deleted.
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Series ID
+        in: path
+        name: seriesId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Delete a series
+      tags:
+      - tracker
+    patch:
+      consumes:
+      - application/json
+      description: Update fields of a series (e.g. data_type, config). Requires edit
+        permission.
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Series ID
+        in: path
+        name: seriesId
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tracker.PatchSeriesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.SeriesModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Update a series
+      tags:
+      - tracker
+  /api/trackers/{trackerId}/series/{seriesId}/values:
+    delete:
+      description: Delete all time-series data for the specified series
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Series ID
+        in: path
+        name: seriesId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Delete all values
+      tags:
+      - tracker
+    get:
+      description: Return time-series data for the specified series. The limit parameter
+        restricts the maximum number of results.
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Series ID
+        in: path
+        name: seriesId
+        required: true
+        type: integer
+      - description: Maximum number of results
+        in: query
+        name: limit
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.ListValuesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List all values
+      tags:
+      - tracker
+    post:
+      consumes:
+      - application/json
+      description: Add time-series data to a series. Duplicate timestamps within the
+        same series are not allowed.
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Series ID
+        in: path
+        name: seriesId
+        required: true
+        type: integer
+      - description: Value data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tracker.CreateValueRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/tracker.ValueModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Add a value
+      tags:
+      - tracker
+  /api/user/me/api-keys:
+    get:
+      description: Return API keys for the current user
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/server.UserAPIKey'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List API keys
+      tags:
+      - api-key
+    post:
+      consumes:
+      - application/json
+      description: Create a new API key for the current user
+      parameters:
+      - description: API key name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/server.CreateAPIKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/server.CreateAPIKeyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Create an API key
+      tags:
+      - api-key
+  /api/user/me/api-keys/{keyId}:
+    delete:
+      description: Revoke an API key by ID
+      parameters:
+      - description: API key ID
+        in: path
+        name: keyId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Revoke an API key
+      tags:
+      - api-key
+swagger: "2.0"

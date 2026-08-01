@@ -100,7 +100,7 @@ func TestAPIKeyHandlerCreate(t *testing.T) {
 	handler.ServeHTTP(w, r)
 	require.Equal(t, http.StatusCreated, w.Code)
 
-	var resp createAPIKeyResponse
+	var resp CreateAPIKeyResponse
 	err = json.NewDecoder(w.Result().Body).Decode(&resp)
 	require.NoError(t, err)
 	require.Equal(t, "my key", resp.Name)

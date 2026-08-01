@@ -32,7 +32,7 @@ func unpackMetricName(name string) (string, string, error) {
 // ----------------------------------------------------------------------
 // udmCommand: utils
 
-func (c *udmCommand) resolveMetricByName(repoId int64, name string) (*metricModel, error) {
+func (c *udmCommand) resolveMetricByName(repoId int64, name string) (*MetricModel, error) {
 	metrics, err := c.client.listMetrics(repoId)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (c *udmCommand) resolveMetricByName(repoId int64, name string) (*metricMode
 	return nil, errorMetricNotFound
 }
 
-func (c *udmCommand) resolveItemByName(repoId int64, metricId int64, name string) (*itemModel, error) {
+func (c *udmCommand) resolveItemByName(repoId int64, metricId int64, name string) (*ItemModel, error) {
 	items, err := c.client.listItems(repoId, metricId)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (c *udmCommand) resolveItemByName(repoId int64, metricId int64, name string
 	return nil, errorItemNotFound
 }
 
-func (c *udmCommand) resolveMetric(repoId int64, name string) (*metricModel, *itemModel, error) {
+func (c *udmCommand) resolveMetric(repoId int64, name string) (*MetricModel, *ItemModel, error) {
 	metricName, itemName, err := unpackMetricName(name)
 	if err != nil {
 		return nil, nil, err
@@ -78,7 +78,7 @@ func (c *udmCommand) resolveMetric(repoId int64, name string) (*metricModel, *it
 	return metric, item, err
 }
 
-func (c *udmCommand) resolveMetricAndItemByName(repoId int64, metricName, itemName string) (*metricModel, *itemModel, error) {
+func (c *udmCommand) resolveMetricAndItemByName(repoId int64, metricName, itemName string) (*MetricModel, *ItemModel, error) {
 	metric, err := c.resolveMetricByName(repoId, metricName)
 	if err != nil {
 		return nil, nil, err
@@ -109,7 +109,7 @@ func (c *udmCommand) createMetric(repoId int64, metricName, itemName string, typ
 	metric, err := c.resolveMetricByName(repoId, metricName)
 	if err == errorMetricNotFound {
 		log.Print("udmCommand.createMetric: creating metric: ", metricName)
-		metric = &metricModel{Name: metricName}
+		metric = &MetricModel{Name: metricName}
 		if err = c.client.addMetric(repoId, metric); err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func (c *udmCommand) createMetric(repoId int64, metricName, itemName string, typ
 
 	log.Print("udmCommand.createMetric: metric.Id=", metric.Id)
 
-	item := itemModel{
+	item := ItemModel{
 		MetricId:  metric.Id,
 		Name:      itemName,
 		ValueType: typ,
@@ -177,7 +177,7 @@ func (c *udmCommand) addValue(
 		return err
 	}
 
-	val := &valueModel{
+	val := &ValueModel{
 		ItemId:    item.Id,
 		Timestamp: timestamp,
 		Value:     value,

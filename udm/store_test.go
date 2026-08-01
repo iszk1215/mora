@@ -11,12 +11,12 @@ import (
 
 type (
 	itemInitializer struct {
-		item   *itemModel
-		values []*valueModel
+		item   *ItemModel
+		values []*ValueModel
 	}
 
 	metricInitializer struct {
-		metric *metricModel
+		metric *MetricModel
 		items  []*itemInitializer
 	}
 
@@ -66,7 +66,7 @@ func TestStoreMetric(t *testing.T) {
 	s := initTestStore(t)
 
 	t.Run("store metric", func(t *testing.T) {
-		metric := &metricModel{
+		metric := &MetricModel{
 			RepoId: 1215,
 			Name:   "test_metric",
 		}
@@ -77,7 +77,7 @@ func TestStoreMetric(t *testing.T) {
 	})
 
 	t.Run("store metric with negative repoId", func(t *testing.T) {
-		metric := &metricModel{
+		metric := &MetricModel{
 			RepoId: -1,
 			Name:   "test_metric",
 		}
@@ -88,7 +88,7 @@ func TestStoreMetric(t *testing.T) {
 }
 
 func TestStoreFindMetric(t *testing.T) {
-	metric := &metricModel{
+	metric := &MetricModel{
 		RepoId: 1215,
 		Name:   "test_metric",
 	}
@@ -112,7 +112,7 @@ func TestStoreFindMetric(t *testing.T) {
 	t.Run("list by existing repo id", func(t *testing.T) {
 		metrics, err := s.listMetrics(metric.RepoId)
 		require.NoError(t, err)
-		require.Equal(t, []metricModel{*metric}, metrics)
+		require.Equal(t, []MetricModel{*metric}, metrics)
 	})
 
 	t.Run("list by non existing repo id", func(t *testing.T) {
@@ -123,7 +123,7 @@ func TestStoreFindMetric(t *testing.T) {
 }
 
 func TestStoreDeleteMetric(t *testing.T) {
-	metrics := []*metricModel{
+	metrics := []*MetricModel{
 		{
 			RepoId: 1215,
 			Name:   "metric0",
@@ -140,7 +140,7 @@ func TestStoreDeleteMetric(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	item := &itemModel{
+	item := &ItemModel{
 		MetricId: metrics[1].Id,
 		Name:     "test_item",
 	}
@@ -165,7 +165,7 @@ func TestStoreDeleteMetric(t *testing.T) {
 }
 
 func TestStoreAddItem(t *testing.T) {
-	metric := &metricModel{
+	metric := &MetricModel{
 		RepoId: 1215,
 		Name:   "test_metric",
 	}
@@ -175,7 +175,7 @@ func TestStoreAddItem(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("add item with existing metric id", func(t *testing.T) {
-		item := &itemModel{
+		item := &ItemModel{
 			MetricId: metric.Id,
 			Name:     "test_item",
 		}
@@ -186,7 +186,7 @@ func TestStoreAddItem(t *testing.T) {
 	})
 
 	t.Run("add item with non existing metric id", func(t *testing.T) {
-		item := &itemModel{
+		item := &ItemModel{
 			MetricId: metric.Id + 1,
 			Name:     "test_item",
 		}
@@ -197,7 +197,7 @@ func TestStoreAddItem(t *testing.T) {
 }
 
 func TestStoreFindItem(t *testing.T) {
-	metric := &metricModel{
+	metric := &MetricModel{
 		RepoId: 1215,
 		Name:   "test_metric",
 	}
@@ -206,7 +206,7 @@ func TestStoreFindItem(t *testing.T) {
 	err := s.addMetric(metric)
 	require.NoError(t, err)
 
-	item := &itemModel{
+	item := &ItemModel{
 		MetricId: metric.Id,
 		Name:     "test_item",
 	}
@@ -230,7 +230,7 @@ func TestStoreFindItem(t *testing.T) {
 	t.Run("list items by existing metric id", func(t *testing.T) {
 		items, err := s.listItems(item.MetricId)
 		require.NoError(t, err)
-		require.Equal(t, []itemModel{*item}, items)
+		require.Equal(t, []ItemModel{*item}, items)
 
 	})
 
@@ -242,7 +242,7 @@ func TestStoreFindItem(t *testing.T) {
 }
 
 func TestStoreDeleteItem(t *testing.T) {
-	metric := &metricModel{
+	metric := &MetricModel{
 		RepoId: 1215,
 		Name:   "test_metric",
 	}
@@ -251,7 +251,7 @@ func TestStoreDeleteItem(t *testing.T) {
 	err := s.addMetric(metric)
 	require.NoError(t, err)
 
-	items := []*itemModel{
+	items := []*ItemModel{
 		{
 			MetricId: metric.Id,
 			Name:     "item1",
@@ -269,7 +269,7 @@ func TestStoreDeleteItem(t *testing.T) {
 	}
 
 	// items[0] has a value
-	value := &valueModel{
+	value := &ValueModel{
 		ItemId:    items[0].Id,
 		Timestamp: time.Now().Round(0),
 		Value:     "1976",
@@ -296,7 +296,7 @@ func TestStoreDeleteItem(t *testing.T) {
 }
 
 func TestStoreValue(t *testing.T) {
-	metric := &metricModel{
+	metric := &MetricModel{
 		RepoId: 1215,
 		Name:   "test_metric",
 	}
@@ -305,7 +305,7 @@ func TestStoreValue(t *testing.T) {
 	err := s.addMetric(metric)
 	require.NoError(t, err)
 
-	item := &itemModel{
+	item := &ItemModel{
 		MetricId: metric.Id,
 		Name:     "test_item",
 	}
@@ -313,7 +313,7 @@ func TestStoreValue(t *testing.T) {
 	err = s.addItem(item)
 	require.NoError(t, err)
 
-	value := &valueModel{
+	value := &ValueModel{
 		ItemId:    item.Id,
 		Timestamp: time.Now().Round(0),
 		Value:     "1976",
@@ -331,12 +331,12 @@ func TestStoreValue(t *testing.T) {
 	// existing id
 	values, err = s.listValues(item.Id)
 	require.NoError(t, err)
-	require.Equal(t, []valueModel{*value}, values)
+	require.Equal(t, []ValueModel{*value}, values)
 }
 
 func TestDeleteValues(t *testing.T) {
-	metric := metricModel{Name: "metric1"}
-	item := itemModel{Name: "item1"}
+	metric := MetricModel{Name: "metric1"}
+	item := ItemModel{Name: "item1"}
 
 	initialzer := storeInitializer{
 		repoId: 1,
@@ -346,7 +346,7 @@ func TestDeleteValues(t *testing.T) {
 				items: []*itemInitializer{
 					{
 						item: &item,
-						values: []*valueModel{
+						values: []*ValueModel{
 							{Timestamp: time.Now().Round(0), Value: "10"},
 							{Timestamp: time.Now().Round(0), Value: "11"},
 						},

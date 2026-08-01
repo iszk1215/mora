@@ -80,6 +80,7 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 ├── /logout/*               Logout
 ├── /api/signup/*           User signup
 ├── /api/auth/*             Password auth
+├── /swagger/*              Swagger UI (generated from swaggo annotations)
 └── /                       SPA frontend (static files)
 ```
 

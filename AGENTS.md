@@ -54,6 +54,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - Coverage: `make coverage.html` (requires `coverage.out` from `go test -coverprofile`); frontend coverage via `make frontend-coverage` (outputs `frontend/coverage/lcov.info`)
 - `frontend/Makefile`: renamed `coverage` target to `coverage-report` to avoid collision with `coverage/` directory; uses file-based dependency on `coverage/lcov.info` for incremental builds
 - `upload.sh` post-processes lcov.info paths: `sed -i 's|^SF:src/|SF:frontend/src/|g'` (changes frontend-relative to repo-root-relative for mora upload)
+- Swagger docs: all API handlers carry swaggo annotations; `make swagger` runs `swag init -g main.go -o docs --parseFuncBody` (also part of `make generate`). Generated `docs/` is committed. Swagger UI served at `/swagger/`. Handlers registered as closures (e.g. api-keys, signup, auth) annotate inside the function body, hence `--parseFuncBody` is required.
 - Two remotes: `origin` (GitHub, https://github.com/iszk1215/mora) and `gitea` (http://localhost:3001/kazuhisa/mora)
 
 ## Documentation

@@ -18,12 +18,14 @@ import (
 	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage"
+	_ "github.com/iszk1215/mora/docs"
 	"github.com/iszk1215/mora/render"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/iszk1215/mora/udm"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog/log"
+	"github.com/swaggo/http-swagger/v2"
 )
 
 var (
@@ -95,6 +97,13 @@ func (s *MoraServer) findRepositoryManager(id int64) RepositoryManager {
 
 // API Handler
 
+// handleRepoList godoc
+// @Summary      List repositories
+// @Description  List repositories the current session can access
+// @Tags         server
+// @Success      200  {array}   core.Repository
+// @Failure      403  {object}  core.ErrorResponse
+// @Router       /api/repos [get]
 func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	repositories, err := s.repos.ListAll()
 	if err != nil {
@@ -140,6 +149,13 @@ func (s *MoraServer) handleRepoList(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, resp, http.StatusOK)
 }
 
+// handleRepositoryManagerList godoc
+// @Summary      List SCM providers
+// @Description  Return configured SCM repository managers and their login status
+// @Tags         server
+// @Success      200  {array}   server.RepositoryManagerResponse
+// @Failure      403  {object}  core.ErrorResponse
+// @Router       /api/providers [get]
 func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.Request) {
 	resp := []RepositoryManagerResponse{}
 	sess, ok := MoraSessionFrom(r.Context())
@@ -161,6 +177,13 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 	render.JSON(w, resp, http.StatusOK)
 }
 
+// handleMe godoc
+// @Summary      Get current user
+// @Description  Return the current session user, or 204 if not logged in
+// @Tags         server
+// @Success      200  {object}  server.User
+// @Failure      204
+// @Router       /api/me [get]
 func (s *MoraServer) handleMe(w http.ResponseWriter, r *http.Request) {
 	sess, ok := MoraSessionFrom(r.Context())
 	if !ok || sess.UserID() == nil {
@@ -182,6 +205,12 @@ type ConfigResponse struct {
 	SiteName string `json:"site_name"`
 }
 
+// handleConfig godoc
+// @Summary      Get server config
+// @Description  Return server configuration (e.g. site name)
+// @Tags         server
+// @Success      200  {object}  server.ConfigResponse
+// @Router       /api/config [get]
 func (s *MoraServer) handleConfig(w http.ResponseWriter, r *http.Request) {
 	name := s.siteName
 	if name == "" {
@@ -365,6 +394,15 @@ func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 	})
 }
 
+// handleCoverageListPublic godoc
+// @Summary      List coverages for a tracker
+// @Description  Return coverage history for a tracker (public list endpoint)
+// @Tags         coverage
+// @Param        trackerId  path  int  true  "Tracker ID"
+// @Success      200  {object}  coverage.CoverageListResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/coverages/{trackerId} [get]
 func (s *MoraServer) handleCoverageListPublic(w http.ResponseWriter, r *http.Request) {
 	trackerID, err := strconv.ParseInt(chi.URLParam(r, "trackerId"), 10, 64)
 	if err != nil {
@@ -467,6 +505,8 @@ func (s *MoraServer) Handler() http.Handler {
 	}
 
 	// frontend
+
+	r.Mount("/swagger/", httpSwagger.WrapHandler)
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {

@@ -18,6 +18,14 @@ func SignupHandler(userStore UserStore) http.Handler {
 	r := chi.NewRouter()
 
 	r.Get("/pending", func(w http.ResponseWriter, r *http.Request) {
+		// getPendingSignup godoc
+		// @Summary      Get pending signup
+		// @Description  Return the pending signup information for the current session
+		// @Tags         auth
+		// @Produce      json
+		// @Success      200  {object}  server.PendingSignupResponse
+		// @Failure      404  {object}  core.ErrorResponse
+		// @Router       /api/signup/pending [get]
 		sess, ok := MoraSessionFrom(r.Context())
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
@@ -38,6 +46,14 @@ func SignupHandler(userStore UserStore) http.Handler {
 	})
 
 	r.Post("/cancel", func(w http.ResponseWriter, r *http.Request) {
+		// cancelSignup godoc
+		// @Summary      Cancel pending signup
+		// @Description  Cancel the pending signup for the current session
+		// @Tags         auth
+		// @Success      204
+		// @Failure      403  {object}  core.ErrorResponse
+		// @Failure      404  {object}  core.ErrorResponse
+		// @Router       /api/signup/cancel [post]
 		sess, ok := MoraSessionFrom(r.Context())
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
@@ -63,6 +79,15 @@ func SignupHandler(userStore UserStore) http.Handler {
 	})
 
 	r.Post("/confirm", func(w http.ResponseWriter, r *http.Request) {
+		// confirmSignup godoc
+		// @Summary      Confirm pending signup
+		// @Description  Create a user from the pending signup and log in
+		// @Tags         auth
+		// @Produce      json
+		// @Success      201  {object}  server.User
+		// @Failure      403  {object}  core.ErrorResponse
+		// @Failure      404  {object}  core.ErrorResponse
+		// @Router       /api/signup/confirm [post]
 		sess, ok := MoraSessionFrom(r.Context())
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
