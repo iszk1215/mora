@@ -24,7 +24,6 @@ type (
 		Description string `json:"description" db:"description"`
 		Visibility  string `json:"visibility" db:"visibility"`
 		Type        string `json:"type"       db:"type"`
-		RepoID      *int64 `json:"repo_id,omitempty" db:"repo_id"`
 		ChartConfig string `json:"chart_config" db:"chart_config"`
 	}
 
@@ -317,7 +316,6 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		Description: tracker.Description,
 		Visibility:  tracker.Visibility,
 		Type:        tracker.Type,
-		RepoID:      req.RepoID,
 		ChartConfig: tracker.ChartConfig,
 		Role:        "owner",
 		Liked:       false,
@@ -453,7 +451,6 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 		Description: tracker.Description,
 		Visibility:  tracker.Visibility,
 		Type:        tracker.Type,
-		RepoID:      tracker.RepoID,
 		ChartConfig: tracker.ChartConfig,
 	}
 	if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
@@ -504,7 +501,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	}
 
 	trackerResp := TrackerResponse{
-		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID,
+		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Visibility: tracker.Visibility, Type: tracker.Type,
 		ChartConfig: tracker.ChartConfig,
 	}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
@@ -546,7 +543,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Visibility: tracker.Visibility, Type: tracker.Type, RepoID: tracker.RepoID, ChartConfig: tracker.ChartConfig}
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		_, role, err := h.store.isMember(uid, tracker.Id)
 		if err == nil {

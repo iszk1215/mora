@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS tracker_like (
 
 type (
 	trackerStore struct {
-		db             *sqlx.DB
-		coverageLinker CoverageLinkManager
+		db          *sqlx.DB
+		linkCoverage func(trackerID, repoID int64) error
 	}
 )
 
@@ -71,15 +71,14 @@ type TrackerResponse struct {
 	Description string `json:"description" db:"description"`
 	Visibility  string `json:"visibility"` // "public" | "private"
 	Type        string `json:"type"`
-	RepoID      *int64 `json:"repo_id,omitempty" db:"repo_id"`
 	ChartConfig string `json:"chart_config" db:"chart_config"`
 	Role        string `json:"role"`       // "" | "owner" | "editor"
 	Liked       bool   `json:"liked"`
 	LikeCount   int    `json:"like_count" db:"like_count"`
 }
 
-func newTrackerStore(db *sqlx.DB, cl CoverageLinkManager) *trackerStore {
-	return &trackerStore{db: db, coverageLinker: cl}
+func newTrackerStore(db *sqlx.DB, linkCoverage func(trackerID, repoID int64) error) *trackerStore {
+	return &trackerStore{db: db, linkCoverage: linkCoverage}
 }
 
 // ----------------------------------------------------------------------
@@ -112,10 +111,10 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64, repoID *i
 	}
 
 	if repoID != nil {
-		if s.coverageLinker == nil {
-			return fmt.Errorf("addTracker link coverage: no coverage linker configured")
+		if s.linkCoverage == nil {
+			return fmt.Errorf("addTracker link coverage: no linkCoverage configured")
 		}
-		if err := s.coverageLinker.Link(tracker.Id, *repoID); err != nil {
+		if err := s.linkCoverage(tracker.Id, *repoID); err != nil {
 			return fmt.Errorf("addTracker link coverage: %w", err)
 		}
 	}
@@ -166,12 +165,10 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 
 	selectQuery := fmt.Sprintf(`
 		SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config,
-		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
 		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
 		FROM tracker t
-		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
 		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
 		WHERE %s
@@ -196,9 +193,8 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 }
 
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
-	query := `SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config, tc.repo_id
+	query := `SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config
 		FROM tracker t
-		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		WHERE t.id = ?`
 
 	rows := []TrackerModel{}
@@ -217,12 +213,10 @@ func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
 func (s *trackerStore) findTrackerResponseById(id, userID int64) (*TrackerResponse, error) {
 	query := `
 		SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config,
-		       tc.repo_id,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
 		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
 		FROM tracker t
-		LEFT JOIN tracker_coverage tc ON tc.tracker_id = t.id
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
 		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
 		WHERE t.id = ?`
@@ -560,76 +554,6 @@ func (s *trackerStore) initialize() error {
 	_, err = s.db.Exec(schemaLike)
 	if err != nil {
 		return fmt.Errorf("initialize schemaLike: %w", err)
-	}
-
-	if err := s.migrateCoverageTrackers(1); err != nil {
-		return fmt.Errorf("initialize migrateCoverageTrackers: %w", err)
-	}
-
-	return nil
-}
-
-func (s *trackerStore) migrateCoverageTrackers(adminUserID int64) error {
-	// Check if repository table exists; skip if not (e.g., in tests)
-	var count int
-	err := s.db.Get(&count, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='repository'")
-	if err != nil || count == 0 {
-		return nil
-	}
-
-	// Check if tracker_coverage table exists (created by the coverage store);
-	// skip if not yet initialized.
-	err = s.db.Get(&count, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='tracker_coverage'")
-	if err != nil || count == 0 {
-		return nil
-	}
-
-	type repoRow struct {
-		ID        int64  `db:"id"`
-		Namespace string `db:"namespace"`
-		Name      string `db:"name"`
-	}
-
-	var repos []repoRow
-	err = s.db.Select(&repos, `
-		SELECT r.id, r.namespace, r.name
-		FROM repository r
-		WHERE NOT EXISTS (
-			SELECT 1 FROM tracker_coverage tc WHERE tc.repo_id = r.id
-		)
-	`)
-	if err != nil {
-		return nil
-	}
-
-	for _, r := range repos {
-		trackerName := r.Namespace + "/" + r.Name + " coverage"
-
-		res, err := s.db.Exec(
-			"INSERT INTO tracker (name, visibility, type, chart_config) VALUES (?, 'public', 'coverage', '{\"area\":false}')",
-			trackerName)
-		if err != nil {
-			return fmt.Errorf("migrateCoverageTrackers insert tracker for repo %d: %w", r.ID, err)
-		}
-
-		trackerID, err := res.LastInsertId()
-		if err != nil {
-			return fmt.Errorf("migrateCoverageTrackers LastInsertId for repo %d: %w", r.ID, err)
-		}
-
-		_, err = s.db.Exec(
-			"INSERT INTO tracker_member (user_id, tracker_id, role) VALUES (?, ?, 'owner')",
-			adminUserID, trackerID)
-		if err != nil {
-			return fmt.Errorf("migrateCoverageTrackers insert member for repo %d: %w", r.ID, err)
-		}
-
-		if s.coverageLinker == nil {
-			return fmt.Errorf("migrateCoverageTrackers link coverage for repo %d: no coverage linker configured", r.ID)
-		}
-		if err := s.coverageLinker.Link(trackerID, r.ID); err != nil {
-			return fmt.Errorf("migrateCoverageTrackers link coverage for repo %d: %w", r.ID, err)
-		}
 	}
 
 	return nil

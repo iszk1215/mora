@@ -5,7 +5,7 @@
 Repository-independent time-series data tracking. Provides CRUD for trackers, series, and values with visibility-based access control.
 
 - **Package**: `tracker`
-- **Go files**: `tracker/store.go`, `tracker/handler.go`, `tracker/service.go`, `tracker/provider.go`
+- **Go files**: `tracker/store.go`, `tracker/handler.go`, `tracker/service.go`
 - **Frontend**: `frontend/src/tracker.tsx`, `frontend/src/tracker.test.tsx`
 
 ## Data Model
@@ -209,7 +209,6 @@ When `type="coverage"`, the tracker links to a repository via the `tracker_cover
 | `tracker/store.go` | SQLite store, SQL queries |
 | `tracker/handler.go` | HTTP handlers, middleware, models |
 | `tracker/service.go` | Service wrapper, convenience methods |
-| `tracker/provider.go` | `CoverageLinkManager` interface (implemented by coverage) |
 | `tracker/store_test.go` | Store unit tests |
 | `tracker/handler_test.go` | Handler unit tests |
 | `tracker/service_test.go` | Service unit tests |

@@ -72,7 +72,7 @@ export function formatRatio(hits: number, lines: number) {
   return (hits * 100.0 / lines).toFixed(1)
 }
 
-export function buildCoverageClickUrl(repoId: string | undefined, trackerId: string | undefined, index: number, seriesName: string): string {
+export function buildCoverageClickUrl(trackerId: string | undefined, index: number, seriesName: string): string {
   return `/coverages/${trackerId}/${index}/${seriesName}`
 }
 
@@ -279,11 +279,11 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
     if (rawParams.seriesName !== 'total') {
       const d = rawParams.data
       if (d?.index !== undefined) {
-        const url = buildCoverageClickUrl(params.repo_id, params.trackerId, d.index, d.entryName)
+        const url = buildCoverageClickUrl(params.trackerId, d.index, d.entryName)
         window.location.assign(url)
       }
     }
-  }, [params.repo_id, params.trackerId])
+  }, [params.trackerId])
 
   return (
     <div>

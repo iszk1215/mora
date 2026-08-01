@@ -40,6 +40,7 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 ## Coverage Type Trackers
 
 - Created with `type="coverage"` and `repo_id` referencing a repository
+- On startup, `coverage.MigrateCoverageTrackers` creates a coverage tracker for every repository that has none, creating trackers via the tracker service (which links them through `coverage.Link`)
 - Preview: served by `CoverageHandler.HandleCoveragePreview` at `/api/coverages/{trackerId}/preview`, fetching from `CoverageStore.Timeline(repoID, 20)`
 - Series/values endpoints return 400 (no direct data management)
 - Detail view: `/coverages/:trackerId` shows coverage charts and file browser

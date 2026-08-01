@@ -354,8 +354,6 @@ definitions:
         type: integer
       name:
         type: string
-      repo_id:
-        type: integer
       type:
         type: string
       visibility:
@@ -375,8 +373,6 @@ definitions:
         type: boolean
       name:
         type: string
-      repo_id:
-        type: integer
       role:
         description: '"" | "owner" | "editor"'
         type: string

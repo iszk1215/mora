@@ -260,8 +260,14 @@ func (s *CoverageHandler) HandleCoveragePreview(w http.ResponseWriter, r *http.R
 
 	var previews []tracker.PreviewSeriesValues
 
-	if tr.RepoID != nil {
-		timeline, err := s.coverages.Timeline(*tr.RepoID, 20)
+	repoID, err := s.coverages.FindRepoIDByTrackerID(tr.Id)
+	if err != nil {
+		log.Error().Err(err).Msg("coverage.handler.HandleCoveragePreview FindRepoIDByTrackerID")
+		render.InternalError(w, err)
+		return
+	}
+	if repoID != nil {
+		timeline, err := s.coverages.Timeline(*repoID, 20)
 		if err != nil {
 			log.Error().Err(err).Msg("coverage.handler.HandleCoveragePreview Timeline")
 			render.InternalError(w, err)
@@ -291,7 +297,6 @@ func (s *CoverageHandler) HandleCoveragePreview(w http.ResponseWriter, r *http.R
 		Description: tr.Description,
 		Visibility:  tr.Visibility,
 		Type:        tr.Type,
-		RepoID:      tr.RepoID,
 		ChartConfig: tr.ChartConfig,
 	}
 

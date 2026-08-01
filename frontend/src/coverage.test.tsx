@@ -207,12 +207,12 @@ describe('coverageToDatasets', () => {
 
 describe('buildCoverageClickUrl', () => {
   it('builds url from trackerId', () => {
-    expect(buildCoverageClickUrl('2', '5', 3, 'go'))
+    expect(buildCoverageClickUrl('5', 3, 'go'))
       .toBe('/coverages/5/3/go')
   })
 
   it('handles numeric index', () => {
-    expect(buildCoverageClickUrl('42', '10', 10, 'py'))
+    expect(buildCoverageClickUrl('10', 10, 'py'))
       .toBe('/coverages/10/10/py')
   })
 })

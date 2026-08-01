@@ -130,14 +130,14 @@ func (s *coverageStoreImpl) cleanupOrphanedCoverageTrackers() error {
 	return nil
 }
 
-func (s *coverageStoreImpl) findRepoIDByTrackerID(trackerID int64) (*int64, error) {
+func (s *coverageStoreImpl) FindRepoIDByTrackerID(trackerID int64) (*int64, error) {
 	var repoID int64
 	err := s.db.Get(&repoID, "SELECT repo_id FROM tracker_coverage WHERE tracker_id = ?", trackerID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("findRepoIDByTrackerID select: %w", err)
+		return nil, fmt.Errorf("FindRepoIDByTrackerID select: %w", err)
 	}
 	return &repoID, nil
 }
@@ -148,16 +148,6 @@ func (s *coverageStoreImpl) linkTracker(trackerID, repoID int64) error {
 		trackerID, repoID)
 	if err != nil {
 		return fmt.Errorf("linkTracker insert: %w", err)
-	}
-	return nil
-}
-
-func (s *coverageStoreImpl) unlinkTracker(trackerID int64) error {
-	_, err := s.db.Exec(
-		"DELETE FROM tracker_coverage WHERE tracker_id = ?",
-		trackerID)
-	if err != nil {
-		return fmt.Errorf("unlinkTracker delete: %w", err)
 	}
 	return nil
 }

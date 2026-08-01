@@ -2307,9 +2307,6 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "repo_id": {
-                    "type": "integer"
-                },
                 "type": {
                     "type": "string"
                 },
@@ -2338,9 +2335,6 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
-                },
-                "repo_id": {
-                    "type": "integer"
                 },
                 "role": {
                     "description": "\"\" | \"owner\" | \"editor\"",

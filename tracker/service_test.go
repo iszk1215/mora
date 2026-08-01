@@ -34,22 +34,7 @@ func initTestService(t *testing.T) *Service {
 	db.MustExec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url)
 		VALUES (1, 'system', 'superuser', 'admin', '')`)
 
-	// Create repository and tracker_coverage tables as the coverage store would
-	db.MustExec(`
-		CREATE TABLE IF NOT EXISTS repository (
-			id INTEGER PRIMARY KEY AUTOINCREMENT
-		)
-	`)
-	db.MustExec(`
-		CREATE TABLE IF NOT EXISTS tracker_coverage (
-			tracker_id INTEGER PRIMARY KEY,
-			repo_id    INTEGER NOT NULL,
-			FOREIGN KEY (tracker_id) REFERENCES tracker(id) ON DELETE CASCADE,
-			FOREIGN KEY (repo_id)    REFERENCES repository(id) ON DELETE CASCADE
-		)
-	`)
-
-	svc, err := NewService(db, &testCoverageLinker{db: db})
+	svc, err := NewService(db, testLinkCoverage.Link)
 	require.NoError(t, err)
 	return svc
 }

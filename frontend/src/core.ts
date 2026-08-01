@@ -76,7 +76,6 @@ export interface TrackerResponse {
   description?: string
   visibility: string
   type: string
-  repo_id?: number
   chart_config: string
   role: string
   liked: boolean

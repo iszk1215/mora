@@ -37,6 +37,7 @@ type (
 		List(id int64) ([]*Coverage, error)
 		Put(*Coverage) (int64, error)
 		Timeline(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error)
+		FindRepoIDByTrackerID(trackerID int64) (*int64, error)
 	}
 )
 

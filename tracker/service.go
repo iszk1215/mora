@@ -13,9 +13,14 @@ type Service struct {
 	store *trackerStore
 }
 
-func NewService(db *sqlx.DB, cl CoverageLinkManager) (*Service, error) {
+// linkCoverageFunc links a coverage-type tracker to a repository.
+// It is provided by the coverage package so that tracker_coverage rows are
+// managed by coverage rather than tracker.
+type linkCoverageFunc func(trackerID, repoID int64) error
+
+func NewService(db *sqlx.DB, linkCoverage linkCoverageFunc) (*Service, error) {
 	log.Print("tracker.NewService")
-	store := newTrackerStore(db, cl)
+	store := newTrackerStore(db, linkCoverage)
 	err := store.initialize()
 	if err != nil {
 		return nil, fmt.Errorf("tracker store initialize: %w", err)

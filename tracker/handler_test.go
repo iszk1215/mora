@@ -1215,7 +1215,11 @@ func TestHandlerPreviewTracker(t *testing.T) {
 func TestHandlerCreateTrackerCoverageType(t *testing.T) {
 	t.Run("coverage type with repo_id", func(t *testing.T) {
 		store := initTestStore(t)
-		store.db.MustExec("INSERT INTO repository (id) VALUES (100)")
+		var linkedRepoID int64
+		store.linkCoverage = func(trackerID, repoID int64) error {
+			linkedRepoID = repoID
+			return nil
+		}
 
 		h := newHandler(store)
 		repoID := int64(100)
@@ -1231,8 +1235,12 @@ func TestHandlerCreateTrackerCoverageType(t *testing.T) {
 		var got TrackerResponse
 		unmarshalResponse(t, res, &got)
 		require.Equal(t, "coverage", got.Type)
-		require.NotNil(t, got.RepoID)
-		require.Equal(t, int64(100), *got.RepoID)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.NotContains(t, string(body), "repo_id")
+
+		require.Equal(t, int64(100), linkedRepoID)
 	})
 
 	t.Run("coverage type without repo_id", func(t *testing.T) {

@@ -656,8 +656,15 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	trackerService, err := tracker.NewService(db, coverage)
+	trackerService, err := tracker.NewService(db, coverage.Link)
 	if err != nil {
+		return nil, err
+	}
+
+	// Migrate coverage-type trackers for repositories that have none yet.
+	// Runs after both services exist so that tracker creation goes through
+	// the tracker service while linking is owned by the coverage service.
+	if err := coverage.MigrateCoverageTrackers(trackerService); err != nil {
 		return nil, err
 	}
 

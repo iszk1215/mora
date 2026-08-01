@@ -1033,7 +1033,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	_, err = coverageService.Store().Put(cov)
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, coverageService)
+	trackerService, err := tracker.NewService(db, coverageService.Link)
 	require.NoError(t, err)
 
 	// Create a tracker linked to the repo
@@ -1179,7 +1179,7 @@ func TestHandleCoveragePreview(t *testing.T) {
 	_, err = coverageService.Store().Put(cov)
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, coverageService)
+	trackerService, err := tracker.NewService(db, coverageService.Link)
 	require.NoError(t, err)
 
 	repoID := repo.Id
