@@ -581,7 +581,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 
 	tracker, _ := trackerFrom(r.Context())
 	if tracker.Type != TypeTracker {
-		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
+		render.BadRequest(w, errors.New("cannot modify series for this tracker type"))
 		return
 	}
 
@@ -647,7 +647,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 	if tracker.Type != TypeTracker {
-		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
+		render.BadRequest(w, errors.New("cannot modify series for this tracker type"))
 		return
 	}
 
@@ -688,7 +688,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 
 	tracker, _ := trackerFrom(r.Context())
 	if tracker.Type != TypeTracker {
-		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
+		render.BadRequest(w, errors.New("cannot modify series for this tracker type"))
 		return
 	}
 
@@ -807,7 +807,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 
 	tracker, _ := trackerFrom(r.Context())
 	if tracker.Type != TypeTracker {
-		render.BadRequest(w, errors.New("cannot modify values for coverage tracker"))
+		render.BadRequest(w, errors.New("cannot modify values for this tracker type"))
 		return
 	}
 
@@ -851,7 +851,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 	if tracker.Type != TypeTracker {
-		render.BadRequest(w, errors.New("cannot modify values for coverage tracker"))
+		render.BadRequest(w, errors.New("cannot modify values for this tracker type"))
 		return
 	}
 
