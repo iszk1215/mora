@@ -1,6 +1,7 @@
 package coverage
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -19,8 +20,12 @@ type (
 // TrackerCreator creates trackers via the tracker package.
 // Implemented by tracker.Service.
 type TrackerCreator interface {
-	CreateTracker(name, description, visibility string, userID int64, trackerType string, repoID *int64, chartConfig string) (*tracker.TrackerModel, error)
+	CreateTracker(name, description, visibility string, userID int64, trackerType string, chartConfig string) (*tracker.TrackerModel, error)
 }
+
+// ErrCoverageTrackerAlreadyLinked is returned when a repository already has a
+// coverage tracker, so a new one must not be created.
+var ErrCoverageTrackerAlreadyLinked = errors.New("coverage tracker already exists for repository")
 
 func NewCoverageService(db *sqlx.DB) (*CoverageService, error) {
 
@@ -60,8 +65,7 @@ func (s *CoverageService) Link(trackerID, repoID int64) error {
 
 // MigrateCoverageTrackers creates a coverage-type tracker for every repository
 // that does not have one linked yet. Trackers are created through the tracker
-// service (which links them via this service), so no direct DB writes happen
-// here for tracker rows.
+// service and linked through this service (coverage owns tracker_coverage).
 func (s *CoverageService) MigrateCoverageTrackers(creator TrackerCreator) error {
 	var count int
 	err := s.impl.db.Get(&count, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='repository'")
@@ -94,10 +98,37 @@ func (s *CoverageService) MigrateCoverageTrackers(creator TrackerCreator) error 
 
 	for _, r := range repos {
 		trackerName := r.Namespace + "/" + r.Name + " coverage"
-		if _, err := creator.CreateTracker(trackerName, "", "public", 1, "coverage", &r.ID, `{"area":false}`); err != nil {
+		tr, err := creator.CreateTracker(trackerName, "", "public", 1, tracker.TypeCoverage, `{"area":false}`)
+		if err != nil {
 			return fmt.Errorf("MigrateCoverageTrackers create tracker for repo %d: %w", r.ID, err)
+		}
+		if err := s.Link(tr.Id, r.ID); err != nil {
+			return fmt.Errorf("MigrateCoverageTrackers link tracker for repo %d: %w", r.ID, err)
 		}
 	}
 
 	return nil
+}
+
+// CreateCoverageTracker creates a coverage-type tracker for a repository and
+// links it. It returns ErrCoverageTrackerAlreadyLinked when the repository
+// already has a coverage tracker.
+func (s *CoverageService) CreateCoverageTracker(creator TrackerCreator, name, description, visibility string, userID, repoID int64) (*tracker.TrackerModel, error) {
+	var linked int
+	err := s.impl.db.Get(&linked, "SELECT COUNT(*) FROM tracker_coverage WHERE repo_id = ?", repoID)
+	if err != nil {
+		return nil, fmt.Errorf("CreateCoverageTracker check existing link: %w", err)
+	}
+	if linked > 0 {
+		return nil, ErrCoverageTrackerAlreadyLinked
+	}
+
+	tr, err := creator.CreateTracker(name, description, visibility, userID, tracker.TypeCoverage, `{"area":false}`)
+	if err != nil {
+		return nil, fmt.Errorf("CreateCoverageTracker create tracker: %w", err)
+	}
+	if err := s.Link(tr.Id, repoID); err != nil {
+		return nil, fmt.Errorf("CreateCoverageTracker link tracker: %w", err)
+	}
+	return tr, nil
 }

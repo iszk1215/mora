@@ -19,7 +19,7 @@ tracker
 ```
 
 - **type=`tracker`**: Normal time-series data (tracker -> series -> values)
-- **type=`coverage`**: Links to a repository via the `tracker_coverage` table, owned and managed by the coverage package. No series/values of its own.
+- **type=`coverage`**: Links to a repository via the `tracker_coverage` table, owned and managed by the coverage package. No series/values of its own. Created via the coverage API, not `POST /api/trackers`.
 
 ## API Endpoints
 
@@ -81,7 +81,7 @@ Only two values are allowed: `"public"` and `"private"`.
 ### CreateTrackerRequest
 
 ```json
-{ "name": "string", "description": "string", "visibility": "public|private", "type": "tracker|coverage", "repo_id": 1, "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
+{ "name": "string", "description": "string", "visibility": "public|private", "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
 ```
 
 | Field | Type | Required | Description |
@@ -89,9 +89,9 @@ Only two values are allowed: `"public"` and `"private"`.
 | `name` | string | yes | Tracker name |
 | `description` | string | no | One-line description (max 200 characters) |
 | `visibility` | "public" \| "private" | yes | Access control |
-| `type` | "tracker" \| "coverage" | no, default "tracker" | Tracker type |
-| `repo_id` | number | only if type="coverage" | Repository ID |
 | `chart_config` | string | no | JSON string of ChartConfig |
+
+The tracker type is always `"tracker"`. Coverage-type trackers cannot be created through this endpoint (returns 400); use `POST /api/coverages` instead.
 
 ### PatchTrackerRequest
 
@@ -188,9 +188,11 @@ All fields are optional. Only provided fields are updated.
 
 ## Coverage Type
 
-When `type="coverage"`, the tracker links to a repository via the `tracker_coverage` table, which is owned and managed by the coverage package. Preview data is served by the coverage handler at `GET /api/coverages/{trackerId}/preview`, which fetches from `CoverageStore.Timeline(repoID, 20)` and maps coverage entries as series.
+Coverage-type trackers (`type="coverage"`) are created exclusively through the coverage API (`POST /api/coverages`, see [coverage.md](coverage.md)). The tracker package has no coverage knowledge; it only stores the row.
 
-- Series/values endpoints return empty or 400 for coverage trackers
+- A coverage tracker links to a repository via the `tracker_coverage` table, owned and managed by the coverage package.
+- Preview data is served by the coverage handler at `GET /api/coverages/{trackerId}/preview`, which fetches from `CoverageStore.Timeline(repoID, 20)` and maps coverage entries as series.
+- Series/values endpoints return empty or 400 for non-`tracker` types
 - Frontend routes to `/coverages/:trackerId` for coverage detail view
 
 ## Frontend Routes

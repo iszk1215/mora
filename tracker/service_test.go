@@ -34,7 +34,7 @@ func initTestService(t *testing.T) *Service {
 	db.MustExec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url)
 		VALUES (1, 'system', 'superuser', 'admin', '')`)
 
-	svc, err := NewService(db, testLinkCoverage.Link)
+	svc, err := NewService(db)
 	require.NoError(t, err)
 	return svc
 }
@@ -48,7 +48,7 @@ func TestServiceCreateTracker(t *testing.T) {
 	svc := initTestService(t)
 
 	t.Run("valid tracker", func(t *testing.T) {
-		tr, err := svc.CreateTracker("test_tracker", "", "private", 1, "tracker", nil, "")
+		tr, err := svc.CreateTracker("test_tracker", "", "private", 1, "tracker", "")
 		require.NoError(t, err)
 		require.Equal(t, int64(1), tr.Id)
 		require.Equal(t, "test_tracker", tr.Name)
@@ -58,9 +58,9 @@ func TestServiceCreateTracker(t *testing.T) {
 	})
 
 	t.Run("duplicate name", func(t *testing.T) {
-		_, err := svc.CreateTracker("dup", "", "private", 1, "tracker", nil, "")
+		_, err := svc.CreateTracker("dup", "", "private", 1, "tracker", "")
 		require.NoError(t, err)
-		_, err = svc.CreateTracker("dup", "", "private", 1, "tracker", nil, "")
+		_, err = svc.CreateTracker("dup", "", "private", 1, "tracker", "")
 		require.NoError(t, err)
 	})
 }
@@ -68,7 +68,7 @@ func TestServiceCreateTracker(t *testing.T) {
 func TestServiceCreateSeries(t *testing.T) {
 	svc := initTestService(t)
 
-	tr, err := svc.CreateTracker("test_tracker", "", "private", 1, "tracker", nil, "")
+	tr, err := svc.CreateTracker("test_tracker", "", "private", 1, "tracker", "")
 	require.NoError(t, err)
 
 	t.Run("valid series", func(t *testing.T) {
@@ -88,7 +88,7 @@ func TestServiceCreateSeries(t *testing.T) {
 func TestServiceCreateValue(t *testing.T) {
 	svc := initTestService(t)
 
-	tr, err := svc.CreateTracker("test_tracker", "", "private", 1, "tracker", nil, "")
+	tr, err := svc.CreateTracker("test_tracker", "", "private", 1, "tracker", "")
 	require.NoError(t, err)
 
 	s, err := svc.CreateSeries(tr.Id, "test_series", "float", "")
@@ -118,7 +118,7 @@ func TestServiceHandler(t *testing.T) {
 func TestServiceFindTrackerById(t *testing.T) {
 	svc := initTestService(t)
 
-	tr, err := svc.CreateTracker("findme", "", "public", 1, "tracker", nil, "{}")
+	tr, err := svc.CreateTracker("findme", "", "public", 1, "tracker", "{}")
 	require.NoError(t, err)
 
 	t.Run("found", func(t *testing.T) {
@@ -137,7 +137,7 @@ func TestServiceFindTrackerById(t *testing.T) {
 func TestServiceIsMember(t *testing.T) {
 	svc := initTestService(t)
 
-	tr, err := svc.CreateTracker("member_test", "", "private", 1, "tracker", nil, "{}")
+	tr, err := svc.CreateTracker("member_test", "", "private", 1, "tracker", "{}")
 	require.NoError(t, err)
 
 	// user 1 is owner (added automatically by CreateTracker)
@@ -155,10 +155,10 @@ func TestServiceIsMember(t *testing.T) {
 func TestServiceRequireReadPermission(t *testing.T) {
 	svc := initTestService(t)
 
-	publicTr, err := svc.CreateTracker("public_tracker", "", "public", 1, "tracker", nil, "{}")
+	publicTr, err := svc.CreateTracker("public_tracker", "", "public", 1, "tracker", "{}")
 	require.NoError(t, err)
 
-	privateTr, err := svc.CreateTracker("private_tracker", "", "private", 1, "tracker", nil, "{}")
+	privateTr, err := svc.CreateTracker("private_tracker", "", "private", 1, "tracker", "{}")
 	require.NoError(t, err)
 
 	// Create a second user (non-member, non-superuser)
@@ -253,10 +253,10 @@ func TestServiceRequireReadPermission(t *testing.T) {
 func TestServiceRequireEditPermission(t *testing.T) {
 	svc := initTestService(t)
 
-	publicTr, err := svc.CreateTracker("public_edit", "", "public", 1, "tracker", nil, "{}")
+	publicTr, err := svc.CreateTracker("public_edit", "", "public", 1, "tracker", "{}")
 	require.NoError(t, err)
 
-	privateTr, err := svc.CreateTracker("private_edit", "", "private", 1, "tracker", nil, "{}")
+	privateTr, err := svc.CreateTracker("private_edit", "", "private", 1, "tracker", "{}")
 	require.NoError(t, err)
 
 	db := svc.store.db

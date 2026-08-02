@@ -265,7 +265,7 @@ describe('TrackerCreate', () => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'new-tracker', visibility: 'private', type: 'tracker' }),
+        body: JSON.stringify({ name: 'new-tracker', visibility: 'private' }),
       })
       expect(mockNavigate).toHaveBeenCalledWith('/trackers/42')
     })

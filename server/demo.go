@@ -134,7 +134,7 @@ func (s *MoraServer) seedDemoData() error {
 			ccJSON, _ := json.Marshal(cc)
 
 			desc := trackerDescriptions[rng.Intn(len(trackerDescriptions))]
-			tracker, err := s.tracker.CreateTracker(tname, desc, visibility, user.ID, "tracker", nil, string(ccJSON))
+			tracker, err := s.tracker.CreateTracker(tname, desc, visibility, user.ID, "tracker", string(ccJSON))
 			if err != nil {
 				return fmt.Errorf("create demo tracker %s: %w", tname, err)
 			}

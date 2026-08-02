@@ -62,26 +62,19 @@ func TestCoverageServiceLinkAndFindRepoIDByTrackerID(t *testing.T) {
 type fakeTrackerCreator struct {
 	calls []fakeCreateCall
 	next  int64
-	link  func(trackerID, repoID int64) error
 }
 
 type fakeCreateCall struct {
 	name, description, visibility, trackerType, chartConfig string
 	userID                                                    int64
-	repoID                                                    *int64
 }
 
-func (f *fakeTrackerCreator) CreateTracker(name, description, visibility string, userID int64, trackerType string, repoID *int64, chartConfig string) (*tracker.TrackerModel, error) {
+func (f *fakeTrackerCreator) CreateTracker(name, description, visibility string, userID int64, trackerType string, chartConfig string) (*tracker.TrackerModel, error) {
 	f.calls = append(f.calls, fakeCreateCall{
 		name: name, description: description, visibility: visibility,
-		trackerType: trackerType, chartConfig: chartConfig, userID: userID, repoID: repoID,
+		trackerType: trackerType, chartConfig: chartConfig, userID: userID,
 	})
 	f.next++
-	if repoID != nil && f.link != nil {
-		if err := f.link(f.next, *repoID); err != nil {
-			return nil, err
-		}
-	}
 	return &tracker.TrackerModel{Id: f.next}, nil
 }
 
@@ -103,7 +96,7 @@ func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, svc.Link(10, 1)) // repo 1 already has a tracker
 
-	creator := &fakeTrackerCreator{link: svc.Link}
+	creator := &fakeTrackerCreator{}
 	require.NoError(t, svc.MigrateCoverageTrackers(creator))
 	require.Len(t, creator.calls, 1)
 
@@ -114,8 +107,11 @@ func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 	require.Equal(t, int64(1), call.userID)
 	require.Equal(t, "coverage", call.trackerType)
 	require.Equal(t, `{"area":false}`, call.chartConfig)
-	require.NotNil(t, call.repoID)
-	require.Equal(t, int64(2), *call.repoID)
+
+	repoID, err := svc.FindRepoIDByTrackerID(creator.next)
+	require.NoError(t, err)
+	require.NotNil(t, repoID)
+	require.Equal(t, int64(2), *repoID)
 
 	require.NoError(t, svc.MigrateCoverageTrackers(creator))
 	require.Len(t, creator.calls, 1)
@@ -127,4 +123,31 @@ func TestCoverageServiceMigrateCoverageTrackersSkipsWithoutRepositoryTable(t *te
 	creator := &fakeTrackerCreator{}
 	require.NoError(t, svc.MigrateCoverageTrackers(creator))
 	require.Empty(t, creator.calls)
+}
+
+func TestCoverageServiceCreateCoverageTracker(t *testing.T) {
+	svc := initTestCoverageService(t)
+
+	creator := &fakeTrackerCreator{}
+	tr, err := svc.CreateCoverageTracker(creator, "my coverage", "", "public", 1, 42)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), tr.Id)
+
+	require.Len(t, creator.calls, 1)
+	call := creator.calls[0]
+	require.Equal(t, "my coverage", call.name)
+	require.Equal(t, "", call.description)
+	require.Equal(t, "public", call.visibility)
+	require.Equal(t, int64(1), call.userID)
+	require.Equal(t, "coverage", call.trackerType)
+	require.Equal(t, `{"area":false}`, call.chartConfig)
+
+	repoID, err := svc.FindRepoIDByTrackerID(1)
+	require.NoError(t, err)
+	require.NotNil(t, repoID)
+	require.Equal(t, int64(42), *repoID)
+
+	_, err = svc.CreateCoverageTracker(creator, "again", "", "public", 1, 42)
+	require.ErrorIs(t, err, ErrCoverageTrackerAlreadyLinked)
+	require.Len(t, creator.calls, 1)
 }

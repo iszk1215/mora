@@ -46,8 +46,7 @@ type (
 		Name        string  `json:"name"`
 		Description string  `json:"description"`
 		Visibility  string  `json:"visibility"` // required: "public"|"private"
-		Type        string  `json:"type"`       // "tracker" or "coverage", defaults to "tracker"
-		RepoID      *int64  `json:"repo_id"`    // required if type="coverage"
+		Type        string  `json:"type"`       // "tracker", defaults to "tracker"
 		ChartConfig *string `json:"chart_config"`
 	}
 
@@ -262,18 +261,10 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Type == "" {
-		req.Type = "tracker"
+		req.Type = TypeTracker
 	}
-	if req.Type != "tracker" && req.Type != "coverage" {
-		render.BadRequest(w, errors.New("type must be 'tracker' or 'coverage'"))
-		return
-	}
-	if req.Type == "coverage" && req.RepoID == nil {
-		render.BadRequest(w, errors.New("repo_id is required for coverage type"))
-		return
-	}
-	if req.Type == "tracker" && req.RepoID != nil {
-		render.BadRequest(w, errors.New("repo_id is not allowed for tracker type"))
+	if req.Type != TypeTracker {
+		render.BadRequest(w, errors.New("type must be 'tracker'"))
 		return
 	}
 
@@ -303,7 +294,7 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		}
 		tracker.ChartConfig = *req.ChartConfig
 	}
-	err = h.store.addTracker(&tracker, uid, req.RepoID)
+	err = h.store.addTracker(&tracker, uid)
 	if err != nil {
 		log.Warn().Err(err).Msg("addTracker")
 		render.BadRequest(w, errors.New("failed to create tracker"))
@@ -533,7 +524,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 
 	var series []SeriesModel
-	if tracker.Type != "coverage" {
+	if tracker.Type == TypeTracker {
 		var err error
 		series, err = h.store.listSeries(tracker.Id)
 		if err != nil {
@@ -589,7 +580,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type == "coverage" {
+	if tracker.Type != TypeTracker {
 		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
 		return
 	}
@@ -655,7 +646,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/trackers/{trackerId}/series/{seriesId} [delete]
 func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type == "coverage" {
+	if tracker.Type != TypeTracker {
 		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
 		return
 	}
@@ -696,7 +687,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type == "coverage" {
+	if tracker.Type != TypeTracker {
 		render.BadRequest(w, errors.New("cannot modify series for coverage tracker"))
 		return
 	}
@@ -815,7 +806,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type == "coverage" {
+	if tracker.Type != TypeTracker {
 		render.BadRequest(w, errors.New("cannot modify values for coverage tracker"))
 		return
 	}
@@ -859,7 +850,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/trackers/{trackerId}/series/{seriesId}/values [delete]
 func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type == "coverage" {
+	if tracker.Type != TypeTracker {
 		render.BadRequest(w, errors.New("cannot modify values for coverage tracker"))
 		return
 	}

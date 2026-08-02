@@ -38,7 +38,7 @@ func initTestStore(t *testing.T) *trackerStore {
 			VALUES (?, 'test', ?, ?, '')`, uid, fmt.Sprintf("user%d", uid), fmt.Sprintf("user%d", uid))
 	}
 
-	s := newTrackerStore(db, testLinkCoverage.Link)
+	s := newTrackerStore(db)
 
 	err = s.initialize()
 	require.NoError(t, err)
@@ -58,7 +58,7 @@ func TestStoreTracker(t *testing.T) {
 			Name: "test_tracker",
 		}
 
-		err := s.addTracker(tracker, 1, nil)
+		err := s.addTracker(tracker, 1)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), tracker.Id)
 
@@ -74,7 +74,7 @@ func TestStoreTracker(t *testing.T) {
 			Name: "test_tracker",
 		}
 
-		err := s.addTracker(tracker, 1, nil)
+		err := s.addTracker(tracker, 1)
 		require.NoError(t, err)
 	})
 }
@@ -85,7 +85,7 @@ func TestStoreFindTracker(t *testing.T) {
 	}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1, nil)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), tracker.Id)
 
@@ -120,7 +120,7 @@ func TestStoreFindTracker(t *testing.T) {
 	t.Run("list with pagination", func(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			tr := &TrackerModel{Name: fmt.Sprintf("paginate_%d", i)}
-			require.NoError(t, s.addTracker(tr, 1, nil))
+			require.NoError(t, s.addTracker(tr, 1))
 		}
 		trackers, total, err := s.listTrackers(1, "", 1, 3)
 		require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestStoreDeleteTracker(t *testing.T) {
 	}
 
 	for _, tr := range trackers {
-		err := s.addTracker(tr, 1, nil)
+		err := s.addTracker(tr, 1)
 		require.NoError(t, err)
 	}
 
@@ -157,7 +157,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 	s := initTestStore(t)
 
 	tracker := &TrackerModel{Name: "vis_test"}
-	require.NoError(t, s.addTracker(tracker, 1, nil))
+	require.NoError(t, s.addTracker(tracker, 1))
 
 	t.Run("update to public", func(t *testing.T) {
 		v := "public"
@@ -215,7 +215,7 @@ func TestStoreSeries(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1, nil)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 
 	t.Run("add series with existing tracker", func(t *testing.T) {
@@ -257,7 +257,7 @@ func TestStoreFindSeries(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1, nil)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -298,7 +298,7 @@ func TestStoreDeleteSeries(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1, nil)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -325,7 +325,7 @@ func TestStoreValue(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 
 	s := initTestStore(t)
-	err := s.addTracker(tracker, 1, nil)
+	err := s.addTracker(tracker, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{
@@ -379,7 +379,7 @@ func TestStoreListLatestValues(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackerModel{Name: "test_tracker"}
-	require.NoError(t, s.addTracker(tr, 1, nil))
+	require.NoError(t, s.addTracker(tr, 1))
 
 	series := &SeriesModel{TrackerId: tr.Id, Name: "test_series", DataType: "float"}
 	require.NoError(t, s.addSeries(series))
@@ -418,7 +418,7 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackerModel{Name: "test_tracker"}
-	err := s.addTracker(tr, 1, nil)
+	err := s.addTracker(tr, 1)
 	require.NoError(t, err)
 
 	series := &SeriesModel{TrackerId: tr.Id, Name: "test_series", DataType: "float"}
@@ -439,7 +439,7 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 
 	// Delete tracker should cascade delete series
 	tr2 := &TrackerModel{Name: "test_tracker2"}
-	err = s.addTracker(tr2, 1, nil)
+	err = s.addTracker(tr2, 1)
 	require.NoError(t, err)
 
 	series2 := &SeriesModel{TrackerId: tr2.Id, Name: "test_series2", DataType: "float"}
@@ -468,7 +468,7 @@ func TestStoreMember(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackerModel{Name: "test_tracker"}
-	err := s.addTracker(tr, 1, nil)
+	err := s.addTracker(tr, 1)
 	require.NoError(t, err)
 
 	t.Run("non-member", func(t *testing.T) {
@@ -490,7 +490,7 @@ func TestStoreLike(t *testing.T) {
 	s := initTestStore(t)
 
 	tr := &TrackerModel{Name: "test_tracker"}
-	err := s.addTracker(tr, 1, nil)
+	err := s.addTracker(tr, 1)
 	require.NoError(t, err)
 
 	t.Run("add like", func(t *testing.T) {
@@ -535,10 +535,10 @@ func TestStoreTrackerListUserScoped(t *testing.T) {
 
 	// Create trackers owned by user 1
 	tr1 := &TrackerModel{Name: "tracker1"}
-	require.NoError(t, s.addTracker(tr1, 1, nil))
+	require.NoError(t, s.addTracker(tr1, 1))
 
 	tr2 := &TrackerModel{Name: "tracker2"}
-	require.NoError(t, s.addTracker(tr2, 1, nil))
+	require.NoError(t, s.addTracker(tr2, 1))
 
 	// User 2 likes tracker1
 	require.NoError(t, s.addLike(2, tr1.Id))
@@ -584,14 +584,14 @@ func TestStoreTrackerSearch(t *testing.T) {
 
 	// User 1 owns "tracker_alpha" (private) and "tracker_beta" (public)
 	tr1 := &TrackerModel{Name: "tracker_alpha", Visibility: "private"}
-	require.NoError(t, s.addTracker(tr1, 1, nil))
+	require.NoError(t, s.addTracker(tr1, 1))
 
 	tr2 := &TrackerModel{Name: "tracker_beta", Visibility: "public"}
-	require.NoError(t, s.addTracker(tr2, 1, nil))
+	require.NoError(t, s.addTracker(tr2, 1))
 
 	// User 2 owns "public_gamma"
 	tr3 := &TrackerModel{Name: "public_gamma", Visibility: "public"}
-	require.NoError(t, s.addTracker(tr3, 2, nil))
+	require.NoError(t, s.addTracker(tr3, 2))
 
 	t.Run("logged in, no query returns user's trackers", func(t *testing.T) {
 		trackers, total, err := s.listTrackers(1, "", 0, 0)
@@ -641,19 +641,3 @@ func TestStoreTrackerSearch(t *testing.T) {
 		require.Equal(t, 0, total)
 	})
 }
-
-// testCoverageLinker records coverage link calls in memory.
-type testCoverageLinker struct {
-	links map[int64]int64 // trackerID -> repoID
-}
-
-func (l *testCoverageLinker) Link(trackerID, repoID int64) error {
-	if l.links == nil {
-		l.links = map[int64]int64{}
-	}
-	l.links[trackerID] = repoID
-	return nil
-}
-
-// testLinkCoverage is a package-level recorder used by default in test stores.
-var testLinkCoverage testCoverageLinker

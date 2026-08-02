@@ -75,7 +75,9 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 │   ├── GET  /              Repository list
 │   └── /{repo_id}/udm/*    UDM (injectRepo middleware)
 ├── /api/trackers/*         Tracker (requireTrackerAuth)
-├── /api/coverages/{trackerId}/*  Coverage (injectTrackerCoverage)
+├── /api/coverages
+│   ├── POST /              Create coverage tracker (requireTrackerAuth)
+│   └── /{trackerId}/*      Coverage (injectTrackerCoverage)
 ├── /login/*                OAuth login
 ├── /logout/*               Logout
 ├── /api/signup/*           User signup
@@ -103,6 +105,8 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 3. Load repository and repository manager
 4. Verify access
 5. Inject into context
+
+Coverage-type trackers are created via `POST /api/coverages` (the tracker package has no coverage knowledge). `coverage.CreateCoverageTracker` creates a `tracker` row through the `TrackerCreator` interface and links it via `coverage.Link`, returning 409 when the repository already has a coverage tracker.
 
 ## Authentication
 

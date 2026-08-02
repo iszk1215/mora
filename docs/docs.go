@@ -101,6 +101,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/coverages": {
+            "post": {
+                "description": "Create a coverage-type tracker linked to a repository. The repository must not already have a coverage tracker.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "coverage"
+                ],
+                "summary": "Create a coverage tracker",
+                "parameters": [
+                    {
+                        "description": "Coverage tracker information",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.createCoverageTrackerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/tracker.TrackerModel"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/coverages/{trackerId}": {
             "get": {
                 "description": "Return coverage history for a tracker (public list endpoint)",
@@ -2117,6 +2181,20 @@ const docTemplate = `{
                 }
             }
         },
+        "server.createCoverageTrackerRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "repo_id": {
+                    "type": "integer"
+                },
+                "visibility": {
+                    "type": "string"
+                }
+            }
+        },
         "tracker.CreateSeriesRequest": {
             "type": "object",
             "properties": {
@@ -2143,12 +2221,8 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "repo_id": {
-                    "description": "required if type=\"coverage\"",
-                    "type": "integer"
-                },
                 "type": {
-                    "description": "\"tracker\" or \"coverage\", defaults to \"tracker\"",
+                    "description": "\"tracker\", defaults to \"tracker\"",
                     "type": "string"
                 },
                 "visibility": {

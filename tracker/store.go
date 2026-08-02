@@ -13,6 +13,13 @@ var (
 	errorSeriesNotFound  = errors.New("no series found")
 )
 
+const (
+	// TypeTracker is the regular tracker type that manages its own series/values.
+	TypeTracker = "tracker"
+	// TypeCoverage is the coverage-type tracker, managed by the coverage package.
+	TypeCoverage = "coverage"
+)
+
 var schemaTracker = `
 CREATE TABLE IF NOT EXISTS tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,8 +66,7 @@ CREATE TABLE IF NOT EXISTS tracker_like (
 
 type (
 	trackerStore struct {
-		db          *sqlx.DB
-		linkCoverage func(trackerID, repoID int64) error
+		db *sqlx.DB
 	}
 )
 
@@ -77,16 +83,19 @@ type TrackerResponse struct {
 	LikeCount   int    `json:"like_count" db:"like_count"`
 }
 
-func newTrackerStore(db *sqlx.DB, linkCoverage func(trackerID, repoID int64) error) *trackerStore {
-	return &trackerStore{db: db, linkCoverage: linkCoverage}
+func newTrackerStore(db *sqlx.DB) *trackerStore {
+	return &trackerStore{db: db}
 }
 
 // ----------------------------------------------------------------------
 // Tracker
 
-func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64, repoID *int64) error {
+func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 	if tracker.Visibility == "" {
 		tracker.Visibility = "private"
+	}
+	if tracker.Type == "" {
+		tracker.Type = TypeTracker
 	}
 	if tracker.ChartConfig == "" {
 		tracker.ChartConfig = "{}"
@@ -108,15 +117,6 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64, repoID *i
 		userID, tracker.Id)
 	if err != nil {
 		return fmt.Errorf("addTracker addMember: %w", err)
-	}
-
-	if repoID != nil {
-		if s.linkCoverage == nil {
-			return fmt.Errorf("addTracker link coverage: no linkCoverage configured")
-		}
-		if err := s.linkCoverage(tracker.Id, *repoID); err != nil {
-			return fmt.Errorf("addTracker link coverage: %w", err)
-		}
 	}
 
 	return nil

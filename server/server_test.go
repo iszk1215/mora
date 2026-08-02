@@ -843,7 +843,7 @@ func TestTrackerEndpointIsMounted(t *testing.T) {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, nil)
+	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).
@@ -892,7 +892,7 @@ func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, nil)
+	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).
@@ -931,7 +931,7 @@ func TestRequireTrackerAuth_APIKey(t *testing.T) {
 	key, err := userStore.CreateAPIKey(1, "test-key")
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, nil)
+	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).
@@ -958,7 +958,7 @@ func TestRequireTrackerAuth_AnonymousFallback(t *testing.T) {
 	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, nil)
+	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).
@@ -1033,17 +1033,26 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	_, err = coverageService.Store().Put(cov)
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, coverageService.Link)
+	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
 	// Create a tracker linked to the repo
 	repoID := repo.Id
-	trk, err := trackerService.CreateTracker("test coverage", "", "public", 1, "coverage", &repoID, "{}")
+	trk, err := coverageService.CreateCoverageTracker(trackerService, "test coverage", "", "public", 1, repoID)
 	require.NoError(t, err)
+
+	privateRepo := Repository{
+		Id:                2,
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "private-repo",
+		Url:               "http://mock.scm/owner/private-repo",
+	}
+	rm.client.Repositories = createMockRepoService(controller, repo, privateRepo)
 
 	server := NewMoraServerBuilder(t).
 		WithRepositoryManager(rm).
-		WithRepo(&repo).
+		WithRepo(&repo, &privateRepo).
 		WithSessionManager().
 		WithTracker(trackerService).
 		WithCoverage(coverageService).
@@ -1096,7 +1105,13 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	})
 
 	// Create a private tracker for access control tests
-	privateTrk, err := trackerService.CreateTracker("private coverage", "", "private", 1, "coverage", &repoID, "{}")
+	_, err = coverageService.Store().Put(&coverage.Coverage{
+		RepoID:    privateRepo.Id,
+		Revision:  "def456",
+		Timestamp: time.Now().Round(0),
+	})
+	require.NoError(t, err)
+	privateTrk, err := coverageService.CreateCoverageTracker(trackerService, "private coverage", "", "private", 1, privateRepo.Id)
 	require.NoError(t, err)
 
 	t.Run("private tracker - anonymous returns 404", func(t *testing.T) {
@@ -1145,6 +1160,127 @@ func TestHandleCoverageListPublic(t *testing.T) {
 }
 
 // ----------------------------------------------------------------------
+// handleCreateCoverageTracker
+
+func TestHandleCreateCoverageTracker(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	repo := Repository{
+		Id:                1,
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "repo",
+		Url:               "http://mock.scm/owner/repo",
+	}
+
+	rm := NewMockRepositoryManager(1)
+	rm.client.Repositories = createMockRepoService(controller, repo)
+
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	coverageService, err := coverage.NewCoverageService(db)
+	require.NoError(t, err)
+
+	trackerService, err := tracker.NewService(db)
+	require.NoError(t, err)
+
+	server := NewMoraServerBuilder(t).
+		WithRepositoryManager(rm).
+		WithRepo(&repo).
+		WithSessionManager().
+		WithTracker(trackerService).
+		WithCoverage(coverageService).
+		Finish()
+
+	handler := server.Handler()
+
+	authedRequest := func(body string) *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/api/coverages", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-create-coverage"})
+		sess := NewMoraSessionWithTokenFor(rm)
+		sess.SetUserID(1)
+		server.sessionManager.store["test-sess-create-coverage"] = sess
+		return r
+	}
+
+	t.Run("requires auth", func(t *testing.T) {
+		body := `{"name":"cov","visibility":"public","repo_id":1}`
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/api/coverages", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusForbidden, res.StatusCode)
+	})
+
+	t.Run("validation errors", func(t *testing.T) {
+		cases := []struct {
+			name string
+			body string
+		}{
+			{name: "missing name", body: `{"visibility":"public","repo_id":1}`},
+			{name: "missing repo_id", body: `{"name":"cov","visibility":"public"}`},
+			{name: "invalid visibility", body: `{"name":"cov","visibility":"secret","repo_id":1}`},
+			{name: "malformed body", body: `not-json`},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				handler.ServeHTTP(w, authedRequest(tc.body))
+				res := w.Result()
+				defer func() { _ = res.Body.Close() }()
+				require.Equal(t, http.StatusBadRequest, res.StatusCode)
+			})
+		}
+	})
+
+	t.Run("repository not found", func(t *testing.T) {
+		body := `{"name":"cov","visibility":"public","repo_id":999}`
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, authedRequest(body))
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
+
+	t.Run("creates and links coverage tracker", func(t *testing.T) {
+		body := `{"name":"my cov tracker","visibility":"public","repo_id":1}`
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, authedRequest(body))
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusCreated, res.StatusCode)
+
+		raw, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		var trk tracker.TrackerModel
+		require.NoError(t, json.Unmarshal(raw, &trk))
+		require.Equal(t, "my cov tracker", trk.Name)
+		require.Equal(t, "coverage", trk.Type)
+		require.Equal(t, "public", trk.Visibility)
+
+		repoID, err := coverageService.FindRepoIDByTrackerID(trk.Id)
+		require.NoError(t, err)
+		require.NotNil(t, repoID)
+		require.Equal(t, int64(1), *repoID)
+	})
+
+	t.Run("already linked returns conflict", func(t *testing.T) {
+		body := `{"name":"duplicate","visibility":"public","repo_id":1}`
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, authedRequest(body))
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusConflict, res.StatusCode)
+	})
+}
+
+// ----------------------------------------------------------------------
 // handleCoveragePreview
 
 func TestHandleCoveragePreview(t *testing.T) {
@@ -1179,11 +1315,11 @@ func TestHandleCoveragePreview(t *testing.T) {
 	_, err = coverageService.Store().Put(cov)
 	require.NoError(t, err)
 
-	trackerService, err := tracker.NewService(db, coverageService.Link)
+	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
 	repoID := repo.Id
-	trk, err := trackerService.CreateTracker("test coverage", "", "public", 1, "coverage", &repoID, "{}")
+	trk, err := coverageService.CreateCoverageTracker(trackerService, "test coverage", "", "public", 1, repoID)
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).

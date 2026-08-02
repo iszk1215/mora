@@ -77,10 +77,8 @@ export async function fetchPreview(trackerId: number, type?: string): Promise<Pr
   if (!resp.ok) throw resp
   return resp.json()
 }
-async function createTracker(name: string, visibility: string, type_?: string, repoId?: number, description?: string): Promise<TrackerResponse> {
+async function createTracker(name: string, visibility: string, description?: string): Promise<TrackerResponse> {
   const body: Record<string, unknown> = { name, visibility }
-  if (type_) body.type = type_
-  if (repoId !== undefined) body.repo_id = repoId
   if (description) body.description = description
   const resp = await fetch('/api/trackers', {
     method: 'POST',
@@ -1108,8 +1106,6 @@ export const TrackerCreate = (): React.JSX.Element => {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [visibility, setVisibility] = useState('private')
-  const [type, setType] = useState('tracker')
-  const [repoId, setRepoId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -1121,14 +1117,9 @@ export const TrackerCreate = (): React.JSX.Element => {
       const created = await createTracker(
         name.trim(),
         visibility,
-        type,
-        type === 'coverage' ? (repoId ? parseInt(repoId) : undefined) : undefined,
         description.trim() || undefined,
       )
-      const path = created.type === 'coverage'
-        ? `/coverages/${created.id}`
-        : `/trackers/${created.id}`
-      navigate(path)
+      navigate(`/trackers/${created.id}`)
     } catch {
       setError('Failed to create tracker. Please try again.')
     } finally {
@@ -1187,33 +1178,6 @@ export const TrackerCreate = (): React.JSX.Element => {
             <option value="public">Public</option>
           </select>
         </div>
-
-        <div>
-          <label className="block mb-1">Type</label>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="border rounded px-2 py-1 w-full"
-            disabled={loading}
-          >
-            <option value="tracker">Tracker</option>
-            <option value="coverage">Coverage</option>
-          </select>
-        </div>
-
-        {type === 'coverage' && (
-          <div>
-            <label className="block mb-1">Repository ID</label>
-            <input
-              type="number"
-              value={repoId}
-              onChange={(e) => setRepoId(e.target.value)}
-              placeholder="Repository ID"
-              className="border rounded px-2 py-1 w-full"
-              disabled={loading}
-            />
-          </div>
-        )}
 
         <div className="flex gap-2">
           <Button variant="outline" asChild>

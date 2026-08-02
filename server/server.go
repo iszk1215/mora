@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -445,6 +446,73 @@ func (s *MoraServer) handleCoverageListPublic(w http.ResponseWriter, r *http.Req
 	s.coverage.HandleCoverageListPublic(w, r.WithContext(ctx))
 }
 
+type createCoverageTrackerRequest struct {
+	Name       string `json:"name"`
+	Visibility string `json:"visibility"`
+	RepoID     int64  `json:"repo_id"`
+}
+
+// handleCreateCoverageTracker godoc
+//
+//	@Summary		Create a coverage tracker
+//	@Description	Create a coverage-type tracker linked to a repository. The repository must not already have a coverage tracker.
+//	@Tags			coverage
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		createCoverageTrackerRequest	true	"Coverage tracker information"
+//	@Success		201		{object}	tracker.TrackerModel
+//	@Failure		400		{object}	core.ErrorResponse
+//	@Failure		401		{object}	core.ErrorResponse
+//	@Failure		403		{object}	core.ErrorResponse
+//	@Failure		404		{object}	core.ErrorResponse
+//	@Failure		409		{object}	core.ErrorResponse
+//	@Router			/api/coverages [post]
+func (s *MoraServer) handleCreateCoverageTracker(w http.ResponseWriter, r *http.Request) {
+	uid, ok := tracker.UserIDFromContext(r.Context())
+	if !ok {
+		render.Forbidden(w, render.ErrForbidden)
+		return
+	}
+
+	var req createCoverageTrackerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn().Err(err).Msg("invalid coverage tracker request body")
+		render.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if req.Name == "" {
+		render.BadRequest(w, errors.New("name is required"))
+		return
+	}
+	if req.Visibility != "public" && req.Visibility != "private" {
+		render.BadRequest(w, errors.New("visibility must be one of: public, private"))
+		return
+	}
+	if req.RepoID == 0 {
+		render.BadRequest(w, errors.New("repo_id is required"))
+		return
+	}
+
+	if _, err := s.repos.Find(req.RepoID); err != nil {
+		render.NotFound(w, errors.New("repository not found"))
+		return
+	}
+
+	tr, err := s.coverage.CreateCoverageTracker(s.tracker, req.Name, "", req.Visibility, uid, req.RepoID)
+	if err != nil {
+		if errors.Is(err, coverage.ErrCoverageTrackerAlreadyLinked) {
+			render.Conflict(w, errors.New("repository already has a coverage tracker"))
+			return
+		}
+		log.Err(err).Msg("handleCreateCoverageTracker")
+		render.InternalError(w, errors.New("internal error"))
+		return
+	}
+
+	render.JSON(w, tr, http.StatusCreated)
+}
+
 func (s *MoraServer) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -478,6 +546,7 @@ func (s *MoraServer) Handler() http.Handler {
 
 	if s.coverage != nil {
 		r.Route("/api/coverages", func(r chi.Router) {
+			r.With(s.requireTrackerAuth).Post("/", s.handleCreateCoverageTracker)
 			r.Route("/{trackerId}", func(r chi.Router) {
 				// List endpoint - no SCM auth required, but tracker visibility is checked
 				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission).Get("/", s.handleCoverageListPublic)
@@ -656,7 +725,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
-	trackerService, err := tracker.NewService(db, coverage.Link)
+	trackerService, err := tracker.NewService(db)
 	if err != nil {
 		return nil, err
 	}

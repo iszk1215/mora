@@ -13,14 +13,9 @@ type Service struct {
 	store *trackerStore
 }
 
-// linkCoverageFunc links a coverage-type tracker to a repository.
-// It is provided by the coverage package so that tracker_coverage rows are
-// managed by coverage rather than tracker.
-type linkCoverageFunc func(trackerID, repoID int64) error
-
-func NewService(db *sqlx.DB, linkCoverage linkCoverageFunc) (*Service, error) {
+func NewService(db *sqlx.DB) (*Service, error) {
 	log.Print("tracker.NewService")
-	store := newTrackerStore(db, linkCoverage)
+	store := newTrackerStore(db)
 	err := store.initialize()
 	if err != nil {
 		return nil, fmt.Errorf("tracker store initialize: %w", err)
@@ -32,9 +27,9 @@ func (s *Service) Handler() http.Handler {
 	return newHandler(s.store)
 }
 
-func (s *Service) CreateTracker(name, description, visibility string, userID int64, trackerType string, repoID *int64, chartConfig string) (*TrackerModel, error) {
+func (s *Service) CreateTracker(name, description, visibility string, userID int64, trackerType string, chartConfig string) (*TrackerModel, error) {
 	t := &TrackerModel{Name: name, Description: description, Visibility: visibility, Type: trackerType, ChartConfig: chartConfig}
-	if err := s.store.addTracker(t, userID, repoID); err != nil {
+	if err := s.store.addTracker(t, userID); err != nil {
 		return nil, fmt.Errorf("CreateTracker: %w", err)
 	}
 	return t, nil

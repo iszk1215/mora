@@ -19,6 +19,7 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 
 | Pattern | Description |
 |---------|-------------|
+| `POST /api/coverages` | Create a coverage tracker for a repository |
 | `/api/coverages/:trackerId` | Coverage list |
 | `/api/coverages/:trackerId/preview` | Preview (timeline as virtual series) |
 | `/api/coverages/:trackerId/:index` | Coverage at index |
@@ -39,8 +40,35 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 
 ## Coverage Type Trackers
 
-- Created with `type="coverage"` and `repo_id` referencing a repository
-- On startup, `coverage.MigrateCoverageTrackers` creates a coverage tracker for every repository that has none, creating trackers via the tracker service (which links them through `coverage.Link`)
+Coverage trackers are created through the coverage API; the tracker package has no coverage knowledge.
+
+### `POST /api/coverages`
+
+Creates a coverage-type tracker and links it to a repository. Requires authentication.
+
+Request:
+
+```json
+{ "name": "string", "visibility": "public|private", "repo_id": 1 }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Tracker name (user-supplied) |
+| `visibility` | "public" \| "private" | yes | Access control |
+| `repo_id` | number | yes | Repository ID to link |
+
+Responses:
+
+| Status | Condition |
+|--------|-----------|
+| 201 | Tracker created and linked (`tracker.TrackerModel`) |
+| 400 | Invalid body, missing/invalid fields |
+| 403 | Not authenticated |
+| 404 | Repository not found |
+| 409 | Repository already has a coverage tracker |
+
+- On startup, `coverage.MigrateCoverageTrackers` creates a coverage tracker for every repository that has none, creating trackers via the tracker service and linking them through `coverage.Link`
 - Preview: served by `CoverageHandler.HandleCoveragePreview` at `/api/coverages/{trackerId}/preview`, fetching from `CoverageStore.Timeline(repoID, 20)`
 - Series/values endpoints return 400 (no direct data management)
 - Detail view: `/coverages/:trackerId` shows coverage charts and file browser

@@ -118,6 +118,12 @@ func BadRequestf(w http.ResponseWriter, format string, a ...interface{}) {
 	ErrorCode(w, fmt.Errorf(format, a...), 400)
 }
 
+// Conflict writes the json-encoded error message to the response
+// with a 409 conflict status code.
+func Conflict(w http.ResponseWriter, err error) {
+	ErrorCode(w, err, 409)
+}
+
 // JSON writes the json-encoded error message to the response
 // with a 400 bad request status code.
 func JSON(w http.ResponseWriter, v interface{}, status int) {
