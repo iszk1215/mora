@@ -20,7 +20,7 @@ type (
 // TrackerCreator creates trackers via the tracker package.
 // Implemented by tracker.Service.
 type TrackerCreator interface {
-	CreateTracker(name, description, visibility string, userID int64, trackerType string, chartConfig string) (*tracker.TrackerModel, error)
+	CreateTracker(name, description, body, visibility string, userID int64, trackerType string, chartConfig string) (*tracker.TrackerModel, error)
 }
 
 // ErrCoverageTrackerAlreadyLinked is returned when a repository already has a
@@ -98,7 +98,7 @@ func (s *CoverageService) MigrateCoverageTrackers(creator TrackerCreator) error 
 
 	for _, r := range repos {
 		trackerName := r.Namespace + "/" + r.Name + " coverage"
-		tr, err := creator.CreateTracker(trackerName, "", "public", 1, tracker.TypeCoverage, `{"area":false}`)
+		tr, err := creator.CreateTracker(trackerName, "", "", "public", 1, tracker.TypeCoverage, `{"area":false}`)
 		if err != nil {
 			return fmt.Errorf("MigrateCoverageTrackers create tracker for repo %d: %w", r.ID, err)
 		}
@@ -123,7 +123,7 @@ func (s *CoverageService) CreateCoverageTracker(creator TrackerCreator, name, de
 		return nil, ErrCoverageTrackerAlreadyLinked
 	}
 
-	tr, err := creator.CreateTracker(name, description, visibility, userID, tracker.TypeCoverage, `{"area":false}`)
+	tr, err := creator.CreateTracker(name, description, "", visibility, userID, tracker.TypeCoverage, `{"area":false}`)
 	if err != nil {
 		return nil, fmt.Errorf("CreateCoverageTracker create tracker: %w", err)
 	}

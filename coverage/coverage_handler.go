@@ -295,6 +295,7 @@ func (s *CoverageHandler) HandleCoveragePreview(w http.ResponseWriter, r *http.R
 		Id:          tr.Id,
 		Name:        tr.Name,
 		Description: tr.Description,
+		Body:        tr.Body,
 		Visibility:  tr.Visibility,
 		Type:        tr.Type,
 		ChartConfig: tr.ChartConfig,

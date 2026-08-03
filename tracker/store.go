@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
     visibility TEXT NOT NULL DEFAULT 'private',
     type TEXT NOT NULL DEFAULT 'tracker',
     chart_config TEXT NOT NULL DEFAULT '{}'
@@ -75,6 +76,7 @@ type TrackerResponse struct {
 	Id          int64  `json:"id"    db:"id"`
 	Name        string `json:"name"  db:"name"`
 	Description string `json:"description" db:"description"`
+	Body        string `json:"body" db:"body"`
 	Visibility  string `json:"visibility"` // "public" | "private"
 	Type        string `json:"type"`
 	ChartConfig string `json:"chart_config" db:"chart_config"`
@@ -100,9 +102,9 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 	if tracker.ChartConfig == "" {
 		tracker.ChartConfig = "{}"
 	}
-	query := "INSERT INTO tracker (name, description, visibility, type, chart_config) VALUES (?, ?, ?, ?, ?)"
+	query := "INSERT INTO tracker (name, description, body, visibility, type, chart_config) VALUES (?, ?, ?, ?, ?, ?)"
 
-	res, err := s.db.Exec(query, tracker.Name, tracker.Description, tracker.Visibility, tracker.Type, tracker.ChartConfig)
+	res, err := s.db.Exec(query, tracker.Name, tracker.Description, tracker.Body, tracker.Visibility, tracker.Type, tracker.ChartConfig)
 	if err != nil {
 		return fmt.Errorf("addTracker insert: %w", err)
 	}
@@ -164,7 +166,7 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 	}
 
 	selectQuery := fmt.Sprintf(`
-		SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config,
+		SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
 		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
@@ -193,7 +195,7 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 }
 
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
-	query := `SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config
+	query := `SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config
 		FROM tracker t
 		WHERE t.id = ?`
 
@@ -212,7 +214,7 @@ func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
 
 func (s *trackerStore) findTrackerResponseById(id, userID int64) (*TrackerResponse, error) {
 	query := `
-		SELECT t.id, t.name, t.description, t.visibility, t.type, t.chart_config,
+		SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
 		       COALESCE(m.role, '') AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
 		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
@@ -241,8 +243,8 @@ func (s *trackerStore) deleteTracker(id int64) error {
 	return nil
 }
 
-func (s *trackerStore) updateTracker(id int64, visibility, chartConfig, description *string) error {
-	if visibility == nil && chartConfig == nil && description == nil {
+func (s *trackerStore) updateTracker(id int64, visibility, chartConfig, description, body *string) error {
+	if visibility == nil && chartConfig == nil && description == nil && body == nil {
 		return nil
 	}
 	query := "UPDATE tracker SET "
@@ -259,6 +261,10 @@ func (s *trackerStore) updateTracker(id int64, visibility, chartConfig, descript
 	if description != nil {
 		parts = append(parts, "description = ?")
 		args = append(args, *description)
+	}
+	if body != nil {
+		parts = append(parts, "body = ?")
+		args = append(args, *body)
 	}
 	for i, p := range parts {
 		if i > 0 {
@@ -530,10 +536,49 @@ func (s *trackerStore) countLikes(trackerID int64) (int, error) {
 // ----------------------------------------------------------------------
 // Init
 
+// migrate applies additive schema changes to databases created by older
+// versions of the schema (schemaTracker only creates new tables).
+func (s *trackerStore) migrate() error {
+	if !s.hasColumn("tracker", "body") {
+		_, err := s.db.Exec("ALTER TABLE tracker ADD COLUMN body TEXT NOT NULL DEFAULT ''")
+		if err != nil {
+			return fmt.Errorf("migrate tracker body column: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *trackerStore) hasColumn(table, column string) bool {
+	rows, err := s.db.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return false
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notNull, pk int
+		var dfltValue *string
+		if err := rows.Scan(&cid, &name, &ctype, &notNull, &dfltValue, &pk); err != nil {
+			return false
+		}
+		if name == column {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *trackerStore) initialize() error {
 	_, err := s.db.Exec(schemaTracker)
 	if err != nil {
 		return fmt.Errorf("initialize schemaTracker: %w", err)
+	}
+
+	// Migrations for databases created before new columns were introduced.
+	if err := s.migrate(); err != nil {
+		return err
 	}
 
 	_, err = s.db.Exec(schemaSeries)

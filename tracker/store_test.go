@@ -77,6 +77,24 @@ func TestStoreTracker(t *testing.T) {
 		err := s.addTracker(tracker, 1)
 		require.NoError(t, err)
 	})
+
+	t.Run("store body", func(t *testing.T) {
+		tracker := &TrackerModel{
+			Name: "body_tracker",
+			Body: "# Title\n\nMarkdown body",
+		}
+
+		err := s.addTracker(tracker, 1)
+		require.NoError(t, err)
+
+		got, err := s.findTrackerById(tracker.Id)
+		require.NoError(t, err)
+		require.Equal(t, tracker.Body, got.Body)
+
+		resp, err := s.findTrackerResponseById(tracker.Id, 1)
+		require.NoError(t, err)
+		require.Equal(t, tracker.Body, resp.Body)
+	})
 }
 
 func TestStoreFindTracker(t *testing.T) {
@@ -161,7 +179,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("update to public", func(t *testing.T) {
 		v := "public"
-		err := s.updateTracker(tracker.Id, &v, nil, nil)
+		err := s.updateTracker(tracker.Id, &v, nil, nil, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -171,7 +189,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("update description", func(t *testing.T) {
 		desc := "test description"
-		err := s.updateTracker(tracker.Id, nil, nil, &desc)
+		err := s.updateTracker(tracker.Id, nil, nil, &desc, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -181,7 +199,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("update to private", func(t *testing.T) {
 		v := "private"
-		err := s.updateTracker(tracker.Id, &v, nil, nil)
+		err := s.updateTracker(tracker.Id, &v, nil, nil, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -191,13 +209,13 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("non-existing tracker returns error", func(t *testing.T) {
 		v := "public"
-		err := s.updateTracker(99999, &v, nil, nil)
+		err := s.updateTracker(99999, &v, nil, nil, nil)
 		require.ErrorIs(t, err, errorTrackerNotFound)
 	})
 
 	t.Run("update chart_config", func(t *testing.T) {
 		cc := `{"x_axis_label":"Time"}`
-		err := s.updateTracker(tracker.Id, nil, &cc, nil)
+		err := s.updateTracker(tracker.Id, nil, &cc, nil, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -205,8 +223,18 @@ func TestStoreUpdateTracker(t *testing.T) {
 		require.Equal(t, cc, got.ChartConfig)
 	})
 
+	t.Run("update body", func(t *testing.T) {
+		body := "## Overview\n\nSome markdown content"
+		err := s.updateTracker(tracker.Id, nil, nil, nil, &body)
+		require.NoError(t, err)
+
+		got, err := s.findTrackerById(tracker.Id)
+		require.NoError(t, err)
+		require.Equal(t, body, got.Body)
+	})
+
 	t.Run("nil fields is no-op", func(t *testing.T) {
-		err := s.updateTracker(tracker.Id, nil, nil, nil)
+		err := s.updateTracker(tracker.Id, nil, nil, nil, nil)
 		require.NoError(t, err)
 	})
 }

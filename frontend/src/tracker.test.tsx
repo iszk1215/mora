@@ -362,6 +362,25 @@ describe('TrackerDetailView', () => {
     expect(screen.queryByText('Edit')).not.toBeInTheDocument()
   })
 
+  it('renders markdown body below the chart', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '## Overview\n\nSome **notes** here' },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByRole('heading', { name: 'Overview', level: 2 })).toBeInTheDocument()
+    expect(screen.getByText('notes')).toBeInTheDocument()
+  })
+
+  it('does not render body when empty', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '' },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.queryByRole('heading', { name: 'Overview' })).not.toBeInTheDocument()
+  })
+
 })
 
 
@@ -664,6 +683,48 @@ describe('TrackerDetailEdit', () => {
 
     await vi.waitFor(() => {
       expect(screen.getAllByText('Remove')).toHaveLength(2)
+    })
+  })
+
+  it('renders Body editor with current body value', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: 'existing body' },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const editor = screen.getByPlaceholderText('Write the body in Markdown...') as HTMLTextAreaElement
+    expect(editor).toBeInTheDocument()
+    expect(editor.value).toBe('existing body')
+    expect(screen.getByText('Save Body')).toBeInTheDocument()
+  })
+
+  it('saves body via PATCH request', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: 'old body' },
+      series: [],
+    })
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        const reqBody = JSON.parse(opts.body as string)
+        return {
+          ok: true,
+          json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: reqBody.body }),
+        } as Response
+      }
+      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
+    })
+
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const editor = screen.getByPlaceholderText('Write the body in Markdown...') as HTMLTextAreaElement
+    fireEvent.change(editor, { target: { value: 'new body' } })
+    fireEvent.click(screen.getByText('Save Body'))
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: 'new body' }),
+      })
     })
   })
 })

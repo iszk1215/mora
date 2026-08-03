@@ -65,13 +65,13 @@ type fakeTrackerCreator struct {
 }
 
 type fakeCreateCall struct {
-	name, description, visibility, trackerType, chartConfig string
-	userID                                                    int64
+	name, description, body, visibility, trackerType, chartConfig string
+	userID                                                        int64
 }
 
-func (f *fakeTrackerCreator) CreateTracker(name, description, visibility string, userID int64, trackerType string, chartConfig string) (*tracker.TrackerModel, error) {
+func (f *fakeTrackerCreator) CreateTracker(name, description, body, visibility string, userID int64, trackerType string, chartConfig string) (*tracker.TrackerModel, error) {
 	f.calls = append(f.calls, fakeCreateCall{
-		name: name, description: description, visibility: visibility,
+		name: name, description: description, body: body, visibility: visibility,
 		trackerType: trackerType, chartConfig: chartConfig, userID: userID,
 	})
 	f.next++

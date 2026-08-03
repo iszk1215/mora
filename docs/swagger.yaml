@@ -250,6 +250,8 @@ definitions:
     type: object
   tracker.CreateTrackerRequest:
     properties:
+      body:
+        type: string
       chart_config:
         type: string
       description:
@@ -312,6 +314,8 @@ definitions:
     type: object
   tracker.PatchTrackerRequest:
     properties:
+      body:
+        type: string
       chart_config:
         type: string
       description:
@@ -352,6 +356,8 @@ definitions:
     type: object
   tracker.TrackerModel:
     properties:
+      body:
+        type: string
       chart_config:
         type: string
       description:
@@ -367,6 +373,8 @@ definitions:
     type: object
   tracker.TrackerResponse:
     properties:
+      body:
+        type: string
       chart_config:
         type: string
       description:
