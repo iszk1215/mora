@@ -67,20 +67,21 @@ swagger:
 frontend-build: ${FRONTEND_OUT}
 
 $(FRONTEND_OUT): $(FRONTEND_SRCS)
-	$(MAKE) -C frontend build
+	cd frontend && npm run build
 
 frontend-test:
-	$(MAKE) -C frontend test
-	# staticcheck ./...
-	
-frontend-lint:
-	$(MAKE) -C frontend lint
+	cd frontend && npm run test
 
-frontend-coverage:
-	$(MAKE) -C frontend coverage-report
+frontend-lint:
+	cd frontend && npm run lint
+
+frontend-coverage: frontend/coverage/lcov.info
+
+frontend/coverage/lcov.info: $(FRONTEND_SRCS)
+	cd frontend && npm run test:coverage
 
 frontend-e2e: $(EXE) bin/mock-provider frontend-build
-	$(MAKE) -C frontend test-e2e
+	cd frontend && npm run test:e2e
 
 # others
 

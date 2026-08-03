@@ -131,7 +131,7 @@ Coverage-type trackers are created via `POST /api/coverages` (the tracker packag
 - React Router v7 with `RouterProvider` (not `react-router-dom`)
 - ECharts for charts (not chart.js)
 - Build output: `server/static/public/` (committed to git)
-- Dev server: `make -C frontend dev`
+- Dev server: `cd frontend && npm run dev -- --no-open`
 - All source files must contain only ASCII characters
 
 ## Build & Test
