@@ -491,7 +491,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
       )}
 
       {tracker.body?.trim() && (
-        <div className="mt-8 border-t pt-6">
+        <div className="mt-8 border-t pt-6 md-body">
           <MDEditor.Markdown source={tracker.body} />
         </div>
       )}

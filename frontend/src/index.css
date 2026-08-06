@@ -128,3 +128,15 @@
     @apply font-sans;
     }
 }
+
+.md-body .wmde-markdown {
+  background-color: transparent;
+}
+
+.wmde-markdown ul {
+  list-style-type: disc;
+}
+
+.wmde-markdown ol {
+  list-style-type: decimal;
+}
