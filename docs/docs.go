@@ -2212,6 +2212,9 @@ const docTemplate = `{
         "tracker.CreateTrackerRequest": {
             "type": "object",
             "properties": {
+                "body": {
+                    "type": "string"
+                },
                 "chart_config": {
                     "type": "string"
                 },
@@ -2307,6 +2310,9 @@ const docTemplate = `{
         "tracker.PatchTrackerRequest": {
             "type": "object",
             "properties": {
+                "body": {
+                    "type": "string"
+                },
                 "chart_config": {
                     "type": "string"
                 },
@@ -2369,6 +2375,9 @@ const docTemplate = `{
         "tracker.TrackerModel": {
             "type": "object",
             "properties": {
+                "body": {
+                    "type": "string"
+                },
                 "chart_config": {
                     "type": "string"
                 },
@@ -2392,6 +2401,9 @@ const docTemplate = `{
         "tracker.TrackerResponse": {
             "type": "object",
             "properties": {
+                "body": {
+                    "type": "string"
+                },
                 "chart_config": {
                     "type": "string"
                 },

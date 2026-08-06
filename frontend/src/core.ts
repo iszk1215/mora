@@ -74,6 +74,7 @@ export interface TrackerResponse {
   id: number
   name: string
   description?: string
+  body?: string
   visibility: string
   type: string
   chart_config: string

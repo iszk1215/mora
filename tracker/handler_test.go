@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,6 +150,27 @@ func TestHandlerCreateTracker(t *testing.T) {
 		var got TrackerModel
 		unmarshalResponse(t, res, &got)
 		require.Equal(t, cc, got.ChartConfig)
+	})
+
+	t.Run("with body", func(t *testing.T) {
+		h := newTestHandler(t)
+		body := "# Title\n\nMarkdown body"
+		req := CreateTrackerRequest{Name: "body_tracker", Visibility: "private", Body: body}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusCreated, h, r)
+
+		var got TrackerModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, body, got.Body)
+	})
+
+	t.Run("body over 100000 characters rejected", func(t *testing.T) {
+		h := newTestHandler(t)
+		req := CreateTrackerRequest{Name: "big_body", Visibility: "private", Body: strings.Repeat("a", 100001)}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
 	})
 
 	t.Run("invalid chart_config JSON", func(t *testing.T) {
@@ -457,6 +479,41 @@ func TestHandlerPatchTracker(t *testing.T) {
 		var got TrackerResponse
 		unmarshalResponse(t, res, &got)
 		require.Equal(t, cc, got.ChartConfig)
+	})
+
+	t.Run("patch body", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := "## Notes\n\nUpdated body"
+		bodyReq := PatchTrackerRequest{Body: strPtr(body)}
+		r := newRequestWithJSON(t, http.MethodPatch, path, bodyReq)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got TrackerResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, body, got.Body)
+
+		stored, err := store.findTrackerById(tr.Id)
+		require.NoError(t, err)
+		require.Equal(t, body, stored.Body)
+	})
+
+	t.Run("patch body over 100000 characters rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		bodyReq := PatchTrackerRequest{Body: strPtr(strings.Repeat("a", 100001))}
+		r := newRequestWithJSON(t, http.MethodPatch, path, bodyReq)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
 	})
 
 	t.Run("patch chart_config invalid JSON", func(t *testing.T) {

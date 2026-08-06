@@ -2205,6 +2205,9 @@
         "tracker.CreateTrackerRequest": {
             "type": "object",
             "properties": {
+                "body": {
+                    "type": "string"
+                },
                 "chart_config": {
                     "type": "string"
                 },
@@ -2300,6 +2303,9 @@
         "tracker.PatchTrackerRequest": {
             "type": "object",
             "properties": {
+                "body": {
+                    "type": "string"
+                },
                 "chart_config": {
                     "type": "string"
                 },
@@ -2362,6 +2368,9 @@
         "tracker.TrackerModel": {
             "type": "object",
             "properties": {
+                "body": {
+                    "type": "string"
+                },
                 "chart_config": {
                     "type": "string"
                 },
@@ -2385,6 +2394,9 @@
         "tracker.TrackerResponse": {
             "type": "object",
             "properties": {
+                "body": {
+                    "type": "string"
+                },
                 "chart_config": {
                     "type": "string"
                 },

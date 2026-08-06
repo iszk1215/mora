@@ -81,13 +81,14 @@ Only two values are allowed: `"public"` and `"private"`.
 ### CreateTrackerRequest
 
 ```json
-{ "name": "string", "description": "string", "visibility": "public|private", "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
+{ "name": "string", "description": "string", "body": "string", "visibility": "public|private", "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | yes | Tracker name |
 | `description` | string | no | One-line description (max 200 characters) |
+| `body` | string | no | Free-form Markdown body shown below the chart (max 100000 characters) |
 | `visibility` | "public" \| "private" | yes | Access control |
 | `chart_config` | string | no | JSON string of ChartConfig |
 
@@ -96,7 +97,7 @@ The tracker type is always `"tracker"`. Coverage-type trackers cannot be created
 ### PatchTrackerRequest
 
 ```json
-{ "visibility": "public|private", "chart_config": "{\"x_axis_label\":\"Date\",\"y_axes\":[{\"id\":0,\"label\":\"Count\",\"position\":\"left\"}]}", "description": "Updated description" }
+{ "visibility": "public|private", "chart_config": "{\"x_axis_label\":\"Date\",\"y_axes\":[{\"id\":0,\"label\":\"Count\",\"position\":\"left\"}]}", "description": "Updated description", "body": "## Notes\n\nUpdated body" }
 ```
 
 All fields are optional. Only provided fields are updated.
@@ -106,11 +107,12 @@ All fields are optional. Only provided fields are updated.
 | `visibility` | "public" \| "private" | Access control |
 | `chart_config` | string | JSON string of ChartConfig |
 | `description` | string | One-line description (max 200 characters) |
+| `body` | string | Free-form Markdown body (max 100000 characters) |
 
 ### TrackerResponse
 
 ```json
-{ "id": 1, "name": "string", "description": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "role": "owner", "liked": false }
+{ "id": 1, "name": "string", "description": "string", "body": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "role": "owner", "liked": false }
 ```
 
 | Field | Type | Description |
@@ -118,6 +120,7 @@ All fields are optional. Only provided fields are updated.
 | `id` | number | Tracker ID |
 | `name` | string | Tracker name |
 | `description` | string | One-line description |
+| `body` | string | Free-form Markdown body shown below the chart |
 | `visibility` | "public" \| "private" | Access control |
 | `type` | "tracker" \| "coverage" | Tracker type |
 | `chart_config` | string | JSON string of ChartConfig |

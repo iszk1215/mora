@@ -58,6 +58,13 @@ var trackerDescriptions = []string{
 	"Monitors page load performance metrics",
 }
 
+var demoBodies = []string{
+	"## Overview\n\nThis tracker captures the metric over time.\n\n- Updated weekly\n- Source: automated pipeline\n\nSee [docs](https://example.com) for details.\n",
+	"## How to read this chart\n\n1. Hover points for exact values\n2. Use the time range selector to zoom\n\n```\nslope = (y2 - y1) / (x2 - x1)\n```\n",
+	"## Notes\n\n> A rising trend is expected during release weeks.\n\n**Watch for** sudden drops in the value.\n",
+	"## Goals\n\n- [x] Baseline established\n- [ ] Reach target next quarter\n\n| Quarter | Target |\n|---------|--------|\n| Q1      | 80%    |\n| Q2      | 90%    |\n",
+}
+
 var paletteNames = []string{
 	"default", "vintage", "dark", "infographic", "macarons", "essos", "halloween", "purple",
 }
@@ -134,7 +141,14 @@ func (s *MoraServer) seedDemoData() error {
 			ccJSON, _ := json.Marshal(cc)
 
 			desc := trackerDescriptions[rng.Intn(len(trackerDescriptions))]
-			tracker, err := s.tracker.CreateTracker(tname, desc, visibility, user.ID, "tracker", string(ccJSON))
+
+			// ~30% of trackers get a markdown body to showcase the feature
+			var body string
+			if rng.Intn(10) < 3 {
+				body = demoBodies[rng.Intn(len(demoBodies))]
+			}
+
+			tracker, err := s.tracker.CreateTracker(tname, desc, body, visibility, user.ID, "tracker", string(ccJSON))
 			if err != nil {
 				return fmt.Errorf("create demo tracker %s: %w", tname, err)
 			}

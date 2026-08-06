@@ -22,6 +22,7 @@ type (
 		Id          int64  `json:"id"         db:"id"`
 		Name        string `json:"name"       db:"name"`
 		Description string `json:"description" db:"description"`
+		Body        string `json:"body"       db:"body"`
 		Visibility  string `json:"visibility" db:"visibility"`
 		Type        string `json:"type"       db:"type"`
 		ChartConfig string `json:"chart_config" db:"chart_config"`
@@ -45,6 +46,7 @@ type (
 	CreateTrackerRequest struct {
 		Name        string  `json:"name"`
 		Description string  `json:"description"`
+		Body        string  `json:"body"`
 		Visibility  string  `json:"visibility"` // required: "public"|"private"
 		Type        string  `json:"type"`       // "tracker", defaults to "tracker"
 		ChartConfig *string `json:"chart_config"`
@@ -71,6 +73,7 @@ type (
 		Visibility  *string `json:"visibility"`
 		ChartConfig *string `json:"chart_config"`
 		Description *string `json:"description"`
+		Body        *string `json:"body"`
 	}
 
 	ListTrackersResponse struct {
@@ -278,9 +281,13 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		render.BadRequest(w, errors.New("description must be at most 200 characters"))
 		return
 	}
+	if len(req.Body) > 100000 {
+		render.BadRequest(w, errors.New("body must be at most 100000 characters"))
+		return
+	}
 
 	tracker := TrackerModel{
-		Name: req.Name, Description: req.Description, Visibility: req.Visibility, Type: req.Type,
+		Name: req.Name, Description: req.Description, Body: req.Body, Visibility: req.Visibility, Type: req.Type,
 		ChartConfig: "{}",
 	}
 	if req.ChartConfig != nil {
@@ -305,6 +312,7 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 		Id:          tracker.Id,
 		Name:        tracker.Name,
 		Description: tracker.Description,
+		Body:        tracker.Body,
 		Visibility:  tracker.Visibility,
 		Type:        tracker.Type,
 		ChartConfig: tracker.ChartConfig,
@@ -417,8 +425,13 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Body != nil && len(*req.Body) > 100000 {
+		render.BadRequest(w, errors.New("body must be at most 100000 characters"))
+		return
+	}
+
 	tracker, _ := trackerFrom(r.Context())
-	err = h.store.updateTracker(tracker.Id, req.Visibility, req.ChartConfig, req.Description)
+	err = h.store.updateTracker(tracker.Id, req.Visibility, req.ChartConfig, req.Description, req.Body)
 	if err != nil {
 		log.Error().Err(err).Msg("patchTracker updateTracker")
 		render.InternalError(w, err)
@@ -435,11 +448,15 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	if req.Description != nil {
 		tracker.Description = *req.Description
 	}
+	if req.Body != nil {
+		tracker.Body = *req.Body
+	}
 
 	resp := TrackerResponse{
 		Id:          tracker.Id,
 		Name:        tracker.Name,
 		Description: tracker.Description,
+		Body:        tracker.Body,
 		Visibility:  tracker.Visibility,
 		Type:        tracker.Type,
 		ChartConfig: tracker.ChartConfig,
@@ -492,7 +509,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	}
 
 	trackerResp := TrackerResponse{
-		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Visibility: tracker.Visibility, Type: tracker.Type,
+		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type,
 		ChartConfig: tracker.ChartConfig,
 	}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
@@ -534,7 +551,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig}
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		_, role, err := h.store.isMember(uid, tracker.Id)
 		if err == nil {

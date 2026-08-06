@@ -27,8 +27,8 @@ func (s *Service) Handler() http.Handler {
 	return newHandler(s.store)
 }
 
-func (s *Service) CreateTracker(name, description, visibility string, userID int64, trackerType string, chartConfig string) (*TrackerModel, error) {
-	t := &TrackerModel{Name: name, Description: description, Visibility: visibility, Type: trackerType, ChartConfig: chartConfig}
+func (s *Service) CreateTracker(name, description, body, visibility string, userID int64, trackerType string, chartConfig string) (*TrackerModel, error) {
+	t := &TrackerModel{Name: name, Description: description, Body: body, Visibility: visibility, Type: trackerType, ChartConfig: chartConfig}
 	if err := s.store.addTracker(t, userID); err != nil {
 		return nil, fmt.Errorf("CreateTracker: %w", err)
 	}

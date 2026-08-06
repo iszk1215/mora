@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 
 import ReactECharts from 'echarts-for-react'
+import MDEditor from '@uiw/react-md-editor'
+import '@uiw/react-md-editor/markdown-editor.css'
 import { Star } from 'lucide-react'
 
 import {
@@ -146,7 +148,7 @@ export async function unlikeTracker(trackerId: number): Promise<void> {
   if (!resp.ok) throw resp
 }
 
-export async function patchTracker(trackerId: number, opts: { visibility?: string; chart_config?: string; description?: string }): Promise<TrackerResponse> {
+export async function patchTracker(trackerId: number, opts: { visibility?: string; chart_config?: string; description?: string; body?: string }): Promise<TrackerResponse> {
   const resp = await fetch(`/api/trackers/${trackerId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -487,6 +489,12 @@ export const TrackerDetailView = (): React.JSX.Element => {
       ) : (
         <p className="text-muted-foreground">No data to display</p>
       )}
+
+      {tracker.body?.trim() && (
+        <div className="mt-8 border-t pt-6">
+          <MDEditor.Markdown source={tracker.body} />
+        </div>
+      )}
     </div>
   )
 }
@@ -545,6 +553,8 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     }
   }, [savedChartConfig])
   const [description, setDescription] = useState(tracker.description ?? '')
+  const [body, setBody] = useState(tracker.body ?? '')
+  const [bodySaved, setBodySaved] = useState(false)
   const [visibility, setVisibility] = useState(tracker.visibility)
   const [xLabel, setXLabel] = useState(parsedChartConfig.x_axis_label ?? '')
   const [xAxisType, setXAxisType] = useState<'date' | 'datetime'>(parsedChartConfig.x_axis_type ?? 'date')
@@ -569,6 +579,17 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       await patchTracker(tracker.id, { description: trimmed })
     } catch {
       setDescription(tracker.description ?? '')
+    }
+  }
+
+  const handleBodySave = async () => {
+    setBodySaved(false)
+    try {
+      const updated = await patchTracker(tracker.id, { body })
+      setBody(updated.body ?? '')
+      setBodySaved(true)
+    } catch {
+      setBody(tracker.body ?? '')
     }
   }
 
@@ -1086,6 +1107,26 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
         maxLength={200}
         className="border rounded px-2 py-1 mb-4 w-full max-w-md"
       />
+
+      {/* Body */}
+      <h2 className="text-xl my-2">Body</h2>
+      <p className="text-sm text-muted-foreground mb-2">
+        Markdown is supported. This content is shown below the chart on the detail page.
+      </p>
+      <div data-color-mode="light" className="mb-2">
+        <MDEditor
+          value={body}
+          onChange={(v) => { setBody(v ?? ''); setBodySaved(false) }}
+          preview="live"
+          height={300}
+          textareaProps={{ placeholder: 'Write the body in Markdown...' }}
+        />
+      </div>
+      <div className="flex items-center gap-2 mb-4">
+        <Button size="sm" onClick={handleBodySave}>
+          {bodySaved ? 'Saved' : 'Save Body'}
+        </Button>
+      </div>
 
       {/* Visibility */}
       <h2 className="text-xl my-2">Visibility</h2>
