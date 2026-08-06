@@ -142,9 +142,9 @@ func (s *MoraServer) seedDemoData() error {
 
 			desc := trackerDescriptions[rng.Intn(len(trackerDescriptions))]
 
-			// ~30% of trackers get a markdown body to showcase the feature
+			// ~70% of trackers get a markdown body to showcase the feature
 			var body string
-			if rng.Intn(10) < 3 {
+			if rng.Intn(10) < 7 {
 				body = demoBodies[rng.Intn(len(demoBodies))]
 			}
 
