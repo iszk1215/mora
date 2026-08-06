@@ -367,9 +367,23 @@ describe('TrackerDetailView', () => {
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '## Overview\n\nSome **notes** here' },
       series: [],
     })
-    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    const { container } = render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
     expect(screen.getByRole('heading', { name: 'Overview', level: 2 })).toBeInTheDocument()
     expect(screen.getByText('notes')).toBeInTheDocument()
+    const body = container.querySelector('.md-body')
+    expect(body).toBeInTheDocument()
+    expect(body!.querySelector('.wmde-markdown')).toBeInTheDocument()
+  })
+
+  it('renders markdown lists in the body', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '- first\n- second\n\n1. one\n2. two' },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+    expect(screen.getByText('first')).toBeInTheDocument()
+    expect(screen.getByText('one')).toBeInTheDocument()
   })
 
   it('does not render body when empty', () => {
