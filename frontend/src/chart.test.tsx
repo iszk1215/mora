@@ -98,12 +98,27 @@ describe('TrackerChart', () => {
     expect(option.dataZoom[1].type).toBe('slider')
   })
 
+  it('reserves larger bottom margin when slider is shown', () => {
+    render(<TrackerChart data={{ datasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.bottom).toBe(80)
+    expect(option.dataZoom[1].bottom).toBe(10)
+  })
+
   it('excludes slider when show_slider is false', () => {
     render(<TrackerChart data={{ datasets }} chartConfig={{ show_slider: false }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.dataZoom).toHaveLength(1)
     expect(option.dataZoom[0].type).toBe('inside')
+  })
+
+  it('reduces bottom margin when slider is hidden', () => {
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_slider: false }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.bottom).toBe(30)
   })
 
   it('applies chartConfig axis labels', () => {

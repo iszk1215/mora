@@ -93,11 +93,12 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
 
   const option = useMemo(() => {
     const showLegend = cc?.show_legend !== false && datasets.length > 1
+    const showSlider = cc?.show_slider !== false
     const yAxes = buildYAxes(cc?.y_axes)
     const hasRightAxis = yAxes.some((a) => a.position === 'right')
     const isDateOnly = cc?.x_axis_type === 'date'
 
-    const grid: any = { left: 60, right: 20, top: showLegend ? 40 : 20, bottom: 60 }
+    const grid: any = { left: 60, right: 20, top: showLegend ? 40 : 20, bottom: showSlider ? 80 : 30 }
     if (hasRightAxis) grid.right = 60
 
     const xAxis: any = {
