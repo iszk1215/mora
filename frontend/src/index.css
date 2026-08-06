@@ -143,5 +143,5 @@
 
 .wmde-markdown h1,
 .wmde-markdown h2 {
-  border-bottom: none;
+  border-bottom: none !important;
 }
