@@ -10,7 +10,7 @@ Tracker search on the top page (`/`). Users search trackers by name. Replaces th
 |-------|-------|---------|
 | Not logged in | None | Empty |
 | Not logged in | Provided | Public trackers matching name |
-| Logged in | None | User's trackers (members + liked) |
+| Logged in | None | User's trackers (owner + members + liked) |
 | Logged in | Provided | User's trackers + public trackers, filtered by name |
 
 ## API
@@ -27,8 +27,8 @@ Tracker search on the top page (`/`). Users search trackers by name. Replaces th
 
 `listTrackers` adds `query string` parameter. SQL WHERE clause branches:
 
-- No query + logged in: `WHERE m.user_id IS NOT NULL OR l.user_id IS NOT NULL`
-- Query + logged in: `WHERE (members OR public) AND name LIKE ?`
+- No query + logged in: `t.owner_id = ? OR EXISTS(member) OR EXISTS(like)`
+- Query + logged in: `(owner OR member OR liked OR public) AND name LIKE ?`
 - Query + not logged in: `WHERE public AND name LIKE ?`
 
 ### tracker/handler.go
