@@ -68,7 +68,7 @@ Responses:
 | 404 | Repository not found |
 | 409 | Repository already has a coverage tracker |
 
-- On startup, `coverage.MigrateCoverageTrackers` creates a coverage tracker for every repository that has none, creating trackers via the tracker service and linking them through `coverage.Link`
+- On startup, `coverage.MigrateCoverageTrackers` creates a coverage tracker for every repository that has none, creating trackers via the tracker service and linking them through `coverage.Link`. Coverage trackers are owned by the superuser (`coverage.CoverageTrackerOwnerID`, id=1).
 - Preview: served by `CoverageHandler.HandleCoveragePreview` at `/api/coverages/{trackerId}/preview`, fetching from `CoverageStore.Timeline(repoID, 20)`
 - Series/values endpoints return 400 (no direct data management)
 - Detail view: `/coverages/:trackerId` shows coverage charts and file browser
@@ -76,6 +76,8 @@ Responses:
 ## Upload
 
 Upload command specifies tracker ID via `--tracker` flag and POSTs to `/api/coverages/:trackerId`.
+
+A successful upload (`CoverageStore.Put`) also bumps the `last_updated_at` of the linked coverage tracker, so the tracker list reflects the latest upload. It is a no-op if the `tracker`/`tracker_coverage` tables do not exist.
 
 ## Key Files
 
