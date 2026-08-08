@@ -19,13 +19,16 @@ type (
 	}
 
 	TrackerModel struct {
-		Id          int64  `json:"id"         db:"id"`
-		Name        string `json:"name"       db:"name"`
-		Description string `json:"description" db:"description"`
-		Body        string `json:"body"       db:"body"`
-		Visibility  string `json:"visibility" db:"visibility"`
-		Type        string `json:"type"       db:"type"`
-		ChartConfig string `json:"chart_config" db:"chart_config"`
+		Id            int64     `json:"id"         db:"id"`
+		Name          string    `json:"name"       db:"name"`
+		Description   string    `json:"description" db:"description"`
+		Body          string    `json:"body"       db:"body"`
+		Visibility    string    `json:"visibility" db:"visibility"`
+		Type          string    `json:"type"       db:"type"`
+		ChartConfig   string    `json:"chart_config" db:"chart_config"`
+		OwnerId       int64     `json:"owner_id"   db:"owner_id"`
+		CreatedAt     time.Time `json:"created_at" db:"created_at"`
+		LastUpdatedAt time.Time `json:"last_updated_at" db:"last_updated_at"`
 	}
 
 	SeriesModel struct {
@@ -309,22 +312,28 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := TrackerResponse{
-		Id:          tracker.Id,
-		Name:        tracker.Name,
-		Description: tracker.Description,
-		Body:        tracker.Body,
-		Visibility:  tracker.Visibility,
-		Type:        tracker.Type,
-		ChartConfig: tracker.ChartConfig,
-		Role:        "owner",
-		Liked:       false,
+		Id:            tracker.Id,
+		Name:          tracker.Name,
+		Description:   tracker.Description,
+		Body:          tracker.Body,
+		Visibility:    tracker.Visibility,
+		Type:          tracker.Type,
+		ChartConfig:   tracker.ChartConfig,
+		OwnerId:       tracker.OwnerId,
+		CreatedAt:     tracker.CreatedAt,
+		LastUpdatedAt: tracker.LastUpdatedAt,
+		Role:          "owner",
+		Liked:         false,
+	}
+	if ownerName, err := h.store.findUsername(tracker.OwnerId); err == nil {
+		resp.OwnerName = ownerName
 	}
 	render.JSON(w, resp, http.StatusCreated)
 }
 
 // DeleteTracker godoc
 // @Summary      Delete a tracker
-// @Description  Delete the specified tracker. Child series and values are also cascade-deleted.
+// @Description  Delete the specified tracker. Child series and values are also cascade-deleted. Owner only.
 // @Tags         tracker
 // @Param        trackerId  path  int  true  "Tracker ID"
 // @Success      204
@@ -350,7 +359,7 @@ func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 
 // PatchTracker godoc
 // @Summary      Update a tracker
-// @Description  Update tracker fields (e.g. visibility). Requires edit permission.
+// @Description  Update tracker fields (e.g. visibility). Requires owner permission.
 // @Tags         tracker
 // @Accept       json
 // @Produce      json
@@ -453,13 +462,19 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := TrackerResponse{
-		Id:          tracker.Id,
-		Name:        tracker.Name,
-		Description: tracker.Description,
-		Body:        tracker.Body,
-		Visibility:  tracker.Visibility,
-		Type:        tracker.Type,
-		ChartConfig: tracker.ChartConfig,
+		Id:            tracker.Id,
+		Name:          tracker.Name,
+		Description:   tracker.Description,
+		Body:          tracker.Body,
+		Visibility:    tracker.Visibility,
+		Type:          tracker.Type,
+		ChartConfig:   tracker.ChartConfig,
+		OwnerId:       tracker.OwnerId,
+		CreatedAt:     tracker.CreatedAt,
+		LastUpdatedAt: tracker.LastUpdatedAt,
+	}
+	if ownerName, err := h.store.findUsername(tracker.OwnerId); err == nil {
+		resp.OwnerName = ownerName
 	}
 	if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
 		resp.Role = role
@@ -511,6 +526,10 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	trackerResp := TrackerResponse{
 		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type,
 		ChartConfig: tracker.ChartConfig,
+		OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt,
+	}
+	if ownerName, err := h.store.findUsername(tracker.OwnerId); err == nil {
+		trackerResp.OwnerName = ownerName
 	}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
@@ -551,7 +570,10 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig}
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig, OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt}
+	if ownerName, err := h.store.findUsername(tracker.OwnerId); err == nil {
+		trackerResp.OwnerName = ownerName
+	}
 	if uid, ok := UserIDFromContext(r.Context()); ok {
 		_, role, err := h.store.isMember(uid, tracker.Id)
 		if err == nil {
@@ -952,8 +974,8 @@ func newHandler(store *trackerStore) http.Handler {
 			r.Use(func(next http.Handler) http.Handler { return InjectTracker(h.store, next) })
 			r.Use(func(next http.Handler) http.Handler { return RequireReadPermission(h.store, next) })
 			r.Get("/", h.getTracker)
-			r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Delete("/", h.deleteTracker)
-			r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Patch("/", h.patchTracker)
+			r.With(func(next http.Handler) http.Handler { return RequireOwnerPermission(h.store, next) }).Delete("/", h.deleteTracker)
+			r.With(func(next http.Handler) http.Handler { return RequireOwnerPermission(h.store, next) }).Patch("/", h.patchTracker)
 			r.Post("/like", h.likeTracker)
 			r.Delete("/like", h.unlikeTracker)
 			r.Get("/preview", h.previewTracker)

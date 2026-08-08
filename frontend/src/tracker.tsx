@@ -297,6 +297,12 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery }: { tracke
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
         )}
       </div>
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span className="truncate">{tracker.owner_name ? `@${tracker.owner_name}` : ''}</span>
+        <span className="flex-shrink-0">
+          {tracker.last_updated_at ? new Date(tracker.last_updated_at).toLocaleDateString() : ''}
+        </span>
+      </div>
     </Link>
   )
 }

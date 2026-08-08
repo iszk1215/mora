@@ -1072,7 +1072,7 @@ const docTemplate = `{
                 }
             },
             "delete": {
-                "description": "Delete the specified tracker. Child series and values are also cascade-deleted.",
+                "description": "Delete the specified tracker. Child series and values are also cascade-deleted. Owner only.",
                 "tags": [
                     "tracker"
                 ],
@@ -1117,7 +1117,7 @@ const docTemplate = `{
                 }
             },
             "patch": {
-                "description": "Update tracker fields (e.g. visibility). Requires edit permission.",
+                "description": "Update tracker fields (e.g. visibility). Requires owner permission.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2381,14 +2381,23 @@ const docTemplate = `{
                 "chart_config": {
                     "type": "string"
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
                 },
+                "last_updated_at": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
                 },
                 "type": {
                     "type": "string"
@@ -2407,11 +2416,17 @@ const docTemplate = `{
                 "chart_config": {
                     "type": "string"
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
                 "id": {
                     "type": "integer"
+                },
+                "last_updated_at": {
+                    "type": "string"
                 },
                 "like_count": {
                     "type": "integer"
@@ -2420,6 +2435,12 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "owner_name": {
                     "type": "string"
                 },
                 "role": {

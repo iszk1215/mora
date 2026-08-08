@@ -14,9 +14,12 @@ Repository-independent time-series data tracking. Provides CRUD for trackers, se
 tracker
   ├── tracker_series (tracker_id FK)
   │    └── tracker_value (series_id FK)
-  ├── tracker_member (user_id, tracker_id) — access control
+  ├── tracker_member (user_id, tracker_id) — editor access
   └── tracker_like   (user_id, tracker_id)
 ```
+
+- `tracker.owner_id`: FK to `user.id`, `NOT NULL`, `ON DELETE CASCADE`. The owner is the sole authority for DELETE and PATCH on the tracker; `tracker_member` rows grant editor (edit-only) access.
+- `tracker.created_at` / `tracker.last_updated_at`: RFC3339 timestamps. `last_updated_at` is set at creation and bumped whenever a value is added (`POST values`) or coverage data is uploaded for a linked repository.
 
 - **type=`tracker`**: Normal time-series data (tracker -> series -> values)
 - **type=`coverage`**: Links to a repository via the `tracker_coverage` table, owned and managed by the coverage package. No series/values of its own. Created via the coverage API, not `POST /api/trackers`.
@@ -47,7 +50,7 @@ POST returns 201, DELETE returns 204.
 Three-layer middleware in `tracker/handler.go`:
 
 ```
-requireAuth -> requireReadPermission -> requireEditPermission
+requireAuth -> requireReadPermission -> requireEditPermission -> requireOwnerPermission
 ```
 
 ### requireReadPermission
@@ -62,6 +65,17 @@ requireAuth -> requireReadPermission -> requireEditPermission
 - Anonymous users cannot edit
 - Superuser (id=1): full access
 - Members (owner/editor): can edit
+
+### requireOwnerPermission
+
+Applied to DELETE and PATCH on `/api/trackers/{trackerId}`.
+
+- Anonymous users and non-members: 404
+- Superuser (id=1): full access
+- Owner (`tracker.owner_id == uid`): allowed
+- Editors and other members: 404
+
+Series and value endpoints remain edit-permission only (owner or editor).
 
 ### Authentication sources (server.go)
 
@@ -112,7 +126,7 @@ All fields are optional. Only provided fields are updated.
 ### TrackerResponse
 
 ```json
-{ "id": 1, "name": "string", "description": "string", "body": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "role": "owner", "liked": false }
+{ "id": 1, "name": "string", "description": "string", "body": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "owner_id": 1, "owner_name": "string", "created_at": "2024-01-01T00:00:00Z", "last_updated_at": "2024-01-01T00:00:00Z", "role": "owner", "liked": false }
 ```
 
 | Field | Type | Description |
@@ -124,6 +138,10 @@ All fields are optional. Only provided fields are updated.
 | `visibility` | "public" \| "private" | Access control |
 | `type` | "tracker" \| "coverage" | Tracker type |
 | `chart_config` | string | JSON string of ChartConfig |
+| `owner_id` | number | Owner user ID |
+| `owner_name` | string | Owner username |
+| `created_at` | string | Creation timestamp (RFC3339) |
+| `last_updated_at` | string | Last value-added timestamp (RFC3339) |
 | `role` | string | User's role: "" (none), "owner", "editor" |
 | `liked` | boolean | Whether the current user liked this tracker |
 | `like_count` | number | Total like count |
@@ -181,7 +199,7 @@ All fields are optional. Only provided fields are updated.
 
 ```json
 {
-  "tracker": { "id": 1, "name": "string", "type": "tracker", "chart_config": "{}", "role": "owner", "liked": false },
+  "tracker": { "id": 1, "name": "string", "type": "tracker", "chart_config": "{}", "owner_id": 1, "owner_name": "string", "created_at": "2024-01-01T00:00:00Z", "last_updated_at": "2024-01-01T00:00:00Z", "role": "owner", "liked": false },
   "series": [
     { "series": { "id": 1, "name": "string", "data_type": "float", "config": "{}" },
       "values": [{ "time": "2024-01-01T00:00:00Z", "value": 45.0 }] }

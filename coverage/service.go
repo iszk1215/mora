@@ -27,6 +27,10 @@ type TrackerCreator interface {
 // coverage tracker, so a new one must not be created.
 var ErrCoverageTrackerAlreadyLinked = errors.New("coverage tracker already exists for repository")
 
+// CoverageTrackerOwnerID is the user that owns coverage trackers created during
+// migration (the superuser/admin account).
+const CoverageTrackerOwnerID int64 = 1
+
 func NewCoverageService(db *sqlx.DB) (*CoverageService, error) {
 
 	impl := newCoverageStoreImpl(db)
@@ -98,7 +102,7 @@ func (s *CoverageService) MigrateCoverageTrackers(creator TrackerCreator) error 
 
 	for _, r := range repos {
 		trackerName := r.Namespace + "/" + r.Name + " coverage"
-		tr, err := creator.CreateTracker(trackerName, "", "", "public", 1, tracker.TypeCoverage, `{"area":false}`)
+		tr, err := creator.CreateTracker(trackerName, "", "", "public", CoverageTrackerOwnerID, tracker.TypeCoverage, `{"area":false}`)
 		if err != nil {
 			return fmt.Errorf("MigrateCoverageTrackers create tracker for repo %d: %w", r.ID, err)
 		}

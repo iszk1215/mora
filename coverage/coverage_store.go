@@ -327,7 +327,29 @@ func (s *coverageStoreImpl) Put(cov *Coverage) (int64, error) {
 		return 0, fmt.Errorf("Put select coverage id: %w", err)
 	}
 
-	return id, s.replaceEntries(id, cov.Entries)
+	if err := s.replaceEntries(id, cov.Entries); err != nil {
+		return 0, err
+	}
+
+	s.touchLinkedTracker(cov.RepoID)
+	return id, nil
+}
+
+// touchLinkedTracker updates the last_updated_at of the coverage tracker
+// linked to a repository, if any. It is a no-op when the tracker or
+// tracker_coverage table does not exist (e.g. coverage store initialization
+// runs before the tracker service).
+func (s *coverageStoreImpl) touchLinkedTracker(repoID int64) {
+	for _, table := range []string{"tracker", "tracker_coverage"} {
+		var count int
+		if err := s.db.Get(&count, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", table); err != nil || count == 0 {
+			return
+		}
+	}
+	_, _ = s.db.Exec(
+		`UPDATE tracker SET last_updated_at = ?
+		 WHERE id = (SELECT tracker_id FROM tracker_coverage WHERE repo_id = ?)`,
+		time.Now(), repoID)
 }
 
 func (s *coverageStoreImpl) Timeline(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error) {

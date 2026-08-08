@@ -79,3 +79,9 @@ func (s *Service) RequireReadPermission(next http.Handler) http.Handler {
 func (s *Service) RequireEditPermission(next http.Handler) http.Handler {
 	return RequireEditPermission(s.store, next)
 }
+
+// RequireOwnerPermission checks tracker ownership (superuser is always allowed).
+// Returns 404 for unauthorized access to avoid leaking tracker existence.
+func (s *Service) RequireOwnerPermission(next http.Handler) http.Handler {
+	return RequireOwnerPermission(s.store, next)
+}

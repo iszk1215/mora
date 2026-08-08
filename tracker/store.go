@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -28,7 +30,10 @@ CREATE TABLE IF NOT EXISTS tracker (
     body TEXT NOT NULL DEFAULT '',
     visibility TEXT NOT NULL DEFAULT 'private',
     type TEXT NOT NULL DEFAULT 'tracker',
-    chart_config TEXT NOT NULL DEFAULT '{}'
+    chart_config TEXT NOT NULL DEFAULT '{}',
+    owner_id INTEGER NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+    created_at DATETIME NOT NULL,
+    last_updated_at DATETIME NOT NULL
 )`
 
 var schemaSeries = `
@@ -73,16 +78,20 @@ type (
 
 // TrackerResponse is returned in tracker lists and includes user-specific flags.
 type TrackerResponse struct {
-	Id          int64  `json:"id"    db:"id"`
-	Name        string `json:"name"  db:"name"`
-	Description string `json:"description" db:"description"`
-	Body        string `json:"body" db:"body"`
-	Visibility  string `json:"visibility"` // "public" | "private"
-	Type        string `json:"type"`
-	ChartConfig string `json:"chart_config" db:"chart_config"`
-	Role        string `json:"role"`       // "" | "owner" | "editor"
-	Liked       bool   `json:"liked"`
-	LikeCount   int    `json:"like_count" db:"like_count"`
+	Id            int64     `json:"id"    db:"id"`
+	Name          string    `json:"name"  db:"name"`
+	Description   string    `json:"description" db:"description"`
+	Body          string    `json:"body" db:"body"`
+	Visibility    string    `json:"visibility"` // "public" | "private"
+	Type          string    `json:"type"`
+	ChartConfig   string    `json:"chart_config" db:"chart_config"`
+	OwnerId       int64     `json:"owner_id" db:"owner_id"`
+	OwnerName     string    `json:"owner_name" db:"owner_name"`
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+	LastUpdatedAt time.Time `json:"last_updated_at" db:"last_updated_at"`
+	Role          string    `json:"role"`       // "" | "owner" | "editor"
+	Liked         bool      `json:"liked"`
+	LikeCount     int       `json:"like_count" db:"like_count"`
 }
 
 func newTrackerStore(db *sqlx.DB) *trackerStore {
@@ -102,9 +111,13 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 	if tracker.ChartConfig == "" {
 		tracker.ChartConfig = "{}"
 	}
-	query := "INSERT INTO tracker (name, description, body, visibility, type, chart_config) VALUES (?, ?, ?, ?, ?, ?)"
+	now := time.Now()
+	tracker.OwnerId = userID
+	tracker.CreatedAt = now
+	tracker.LastUpdatedAt = now
+	query := "INSERT INTO tracker (name, description, body, visibility, type, chart_config, owner_id, created_at, last_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
-	res, err := s.db.Exec(query, tracker.Name, tracker.Description, tracker.Body, tracker.Visibility, tracker.Type, tracker.ChartConfig)
+	res, err := s.db.Exec(query, tracker.Name, tracker.Description, tracker.Body, tracker.Visibility, tracker.Type, tracker.ChartConfig, tracker.OwnerId, tracker.CreatedAt, tracker.LastUpdatedAt)
 	if err != nil {
 		return fmt.Errorf("addTracker insert: %w", err)
 	}
@@ -114,13 +127,6 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 		return fmt.Errorf("addTracker LastInsertId: %w", err)
 	}
 
-	_, err = s.db.Exec(
-		"INSERT INTO tracker_member (user_id, tracker_id, role) VALUES (?, ?, 'owner')",
-		userID, tracker.Id)
-	if err != nil {
-		return fmt.Errorf("addTracker addMember: %w", err)
-	}
-
 	return nil
 }
 
@@ -128,61 +134,65 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 	loggedIn := userID > 0
 	hasQuery := searchQuery != ""
 
-	var whereClause string
-	var args []interface{}
+	// userScope uses EXISTS subqueries instead of LEFT JOINs with OR
+	// conditions. SQLite's OR-optimizer returns wrong results when an OR
+	// expression containing bound parameters is combined with another bound
+	// parameter (e.g. a LIKE) in the same WHERE clause.
+	userScope := "(t.owner_id = ? OR EXISTS (SELECT 1 FROM tracker_member m2 WHERE m2.tracker_id = t.id AND m2.user_id = ?) OR EXISTS (SELECT 1 FROM tracker_like l2 WHERE l2.tracker_id = t.id AND l2.user_id = ?))"
 
-	// JOIN args are always needed (userID for member/like joins)
-	joinArgs := []interface{}{userID, userID}
+	var whereClause string
+	var whereArgs []interface{}
 
 	switch {
 	case !hasQuery && loggedIn:
-		// No query, logged in: user's trackers only (members + liked)
-		whereClause = "(m.user_id IS NOT NULL OR l.user_id IS NOT NULL)"
-		args = joinArgs
+		// No query, logged in: user's trackers only (owned + members + liked)
+		whereClause = userScope
+		whereArgs = []interface{}{userID, userID, userID}
 	case hasQuery && loggedIn:
 		// Query provided, logged in: user's trackers + public, filtered by name
-		whereClause = "((m.user_id IS NOT NULL OR l.user_id IS NOT NULL) OR t.visibility = 'public') AND t.name LIKE ?"
-		args = append(joinArgs, "%"+searchQuery+"%")
+		whereClause = "(" + userScope + " OR t.visibility = 'public') AND t.name LIKE ?"
+		whereArgs = []interface{}{userID, userID, userID, "%" + searchQuery + "%"}
 	case hasQuery && !loggedIn:
 		// Query provided, not logged in: public only, filtered by name
 		whereClause = "t.visibility = 'public' AND t.name LIKE ?"
-		args = append(joinArgs, "%"+searchQuery+"%")
+		whereArgs = []interface{}{"%" + searchQuery + "%"}
 	default:
 		// No query, not logged in: empty result
 		return []TrackerResponse{}, 0, nil
 	}
 
-	countQuery := fmt.Sprintf(`
-		SELECT COUNT(*)
-		FROM tracker t
-		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
-		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
-		WHERE %s`, whereClause)
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM tracker t WHERE %s`, whereClause)
 
 	var total int
-	err := s.db.Get(&total, countQuery, args...)
+	err := s.db.Get(&total, countQuery, whereArgs...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("listTrackers count: %w", err)
 	}
 
 	selectQuery := fmt.Sprintf(`
 		SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
-		       COALESCE(m.role, '') AS role,
+		       t.owner_id, u.username AS owner_name, t.created_at, t.last_updated_at,
+		       CASE WHEN t.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, '') END AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
 		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
 		FROM tracker t
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
 		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
+		LEFT JOIN user u ON u.id = t.owner_id
 		WHERE %s
 		ORDER BY t.name`, whereClause)
 
-	selectArgs := make([]interface{}, len(args))
-	copy(selectArgs, args)
+	selectArgs := make([]interface{}, 0, len(whereArgs)+3)
+	selectArgs = append(selectArgs, userID)  // owner_id in role CASE
+	selectArgs = append(selectArgs, userID)  // m.user_id in member join
+	selectArgs = append(selectArgs, userID)  // l.user_id in like join
+	selectArgs = append(selectArgs, whereArgs...)
 
+	// Inline pagination as literal integers: SQLite returns wrong row counts
+	// when LIMIT/OFFSET are bound parameters on a query with LEFT JOINs
+	// (observed with mattn/go-sqlite3). page/perPage are validated ints.
 	if perPage > 0 {
-		selectQuery += " LIMIT ? OFFSET ?"
-		offset := (page - 1) * perPage
-		selectArgs = append(selectArgs, perPage, offset)
+		selectQuery += " LIMIT " + strconv.Itoa(perPage) + " OFFSET " + strconv.Itoa((page-1)*perPage)
 	}
 
 	rows := []TrackerResponse{}
@@ -195,7 +205,8 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 }
 
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
-	query := `SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config
+	query := `SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
+		t.owner_id, t.created_at, t.last_updated_at
 		FROM tracker t
 		WHERE t.id = ?`
 
@@ -215,16 +226,18 @@ func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
 func (s *trackerStore) findTrackerResponseById(id, userID int64) (*TrackerResponse, error) {
 	query := `
 		SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
-		       COALESCE(m.role, '') AS role,
+		       t.owner_id, u.username AS owner_name, t.created_at, t.last_updated_at,
+		       CASE WHEN t.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, '') END AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
 		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
 		FROM tracker t
 		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
 		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
+		LEFT JOIN user u ON u.id = t.owner_id
 		WHERE t.id = ?`
 
 	rows := []TrackerResponse{}
-	err := s.db.Select(&rows, query, userID, userID, id)
+	err := s.db.Select(&rows, query, userID, userID, userID, id)
 	if err != nil {
 		return nil, fmt.Errorf("findTrackerResponseById select: %w", err)
 	}
@@ -401,7 +414,7 @@ func (s *trackerStore) updateSeries(id int64, name *string, dataType *string, co
 // Value
 
 func (s *trackerStore) addValue(value *ValueModel) error {
-	_, err := s.findSeriesById(value.SeriesId)
+	series, err := s.findSeriesById(value.SeriesId)
 	if err != nil {
 		return fmt.Errorf("addValue findSeriesById: %w", err)
 	}
@@ -418,6 +431,19 @@ func (s *trackerStore) addValue(value *ValueModel) error {
 		return fmt.Errorf("addValue LastInsertId: %w", err)
 	}
 
+	if err := s.touchTracker(series.TrackerId); err != nil {
+		return fmt.Errorf("addValue touchTracker: %w", err)
+	}
+
+	return nil
+}
+
+// touchTracker sets the tracker's last_updated_at to now.
+func (s *trackerStore) touchTracker(trackerID int64) error {
+	_, err := s.db.Exec("UPDATE tracker SET last_updated_at = ? WHERE id = ?", time.Now(), trackerID)
+	if err != nil {
+		return fmt.Errorf("touchTracker update: %w", err)
+	}
 	return nil
 }
 
@@ -478,9 +504,16 @@ func (s *trackerStore) deleteValues(seriesId int64) error {
 // Member
 
 func (s *trackerStore) isMember(userID, trackerID int64) (bool, string, error) {
+	tracker, err := s.findTrackerById(trackerID)
+	if err != nil {
+		return false, "", err
+	}
+	if tracker.OwnerId == userID {
+		return true, "owner", nil
+	}
 	query := "SELECT role FROM tracker_member WHERE user_id = ? AND tracker_id = ?"
 	var role string
-	err := s.db.Get(&role, query, userID, trackerID)
+	err = s.db.Get(&role, query, userID, trackerID)
 	if err == sql.ErrNoRows {
 		return false, "", nil
 	}
@@ -488,6 +521,15 @@ func (s *trackerStore) isMember(userID, trackerID int64) (bool, string, error) {
 		return false, "", fmt.Errorf("isMember select: %w", err)
 	}
 	return true, role, nil
+}
+
+func (s *trackerStore) findUsername(userID int64) (string, error) {
+	var username string
+	err := s.db.Get(&username, "SELECT username FROM user WHERE id = ?", userID)
+	if err != nil {
+		return "", fmt.Errorf("findUsername select: %w", err)
+	}
+	return username, nil
 }
 
 // ----------------------------------------------------------------------
@@ -599,6 +641,12 @@ func (s *trackerStore) initialize() error {
 	_, err = s.db.Exec(schemaLike)
 	if err != nil {
 		return fmt.Errorf("initialize schemaLike: %w", err)
+	}
+
+	// Index for owner-based queries (e.g. user pages listing owned trackers).
+	_, err = s.db.Exec("CREATE INDEX IF NOT EXISTS idx_tracker_owner_id ON tracker(owner_id)")
+	if err != nil {
+		return fmt.Errorf("initialize idx_tracker_owner_id: %w", err)
 	}
 
 	return nil

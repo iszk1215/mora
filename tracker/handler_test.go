@@ -416,6 +416,34 @@ func TestHandlerDeleteTracker(t *testing.T) {
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
 	})
+
+	t.Run("owner (non-superuser) can delete", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 2))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		var uid int64 = 2
+		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
+		getResponse(t, http.StatusNoContent, h, r)
+	})
+
+	t.Run("editor member cannot delete", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		_, err := store.db.Exec("INSERT INTO tracker_member (user_id, tracker_id, role) VALUES (2, ?, 'editor')", tr.Id)
+		require.NoError(t, err)
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		r := httptest.NewRequest(http.MethodDelete, path, nil)
+		var uid int64 = 2
+		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
+		getResponse(t, http.StatusNotFound, h, r)
+	})
 }
 
 func TestHandlerPatchTracker(t *testing.T) {
@@ -441,6 +469,45 @@ func TestHandlerPatchTracker(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := PatchTrackerRequest{Visibility: strPtr("public")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		var uid int64 = 2
+		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
+		getResponse(t, http.StatusNotFound, h, r)
+	})
+
+	t.Run("owner (non-superuser) can patch", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 2))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := PatchTrackerRequest{Visibility: strPtr("public")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		var uid int64 = 2
+		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got TrackerResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, "public", got.Visibility)
+		require.Equal(t, int64(2), got.OwnerId)
+		require.Equal(t, "user2", got.OwnerName)
+		require.Equal(t, "owner", got.Role)
+		require.False(t, got.CreatedAt.IsZero())
+		require.False(t, got.LastUpdatedAt.IsZero())
+	})
+
+	t.Run("editor member cannot patch", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		_, err := store.db.Exec("INSERT INTO tracker_member (user_id, tracker_id, role) VALUES (2, ?, 'editor')", tr.Id)
+		require.NoError(t, err)
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d", tr.Id)
