@@ -341,21 +341,14 @@ func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 			return
 		}
 
-		repoID, err := s.coverage.FindRepoIDByTrackerID(trackerID)
+		repo, err := s.coverage.FindRepoByTrackerID(trackerID)
 		if err != nil {
-			log.Err(err).Msg("failed to find repo_id by tracker_id")
+			log.Err(err).Msg("failed to find repo by tracker_id")
 			render.InternalError(w, errors.New("internal error"))
 			return
 		}
-		if repoID == nil {
+		if repo == nil {
 			render.NotFound(w, errors.New("tracker has no associated repository"))
-			return
-		}
-
-		repo, err := s.repos.Find(*repoID)
-		if err != nil {
-			log.Err(err).Msg("failed to find repository")
-			render.NotFound(w, errors.New("repository not found"))
 			return
 		}
 
@@ -376,7 +369,7 @@ func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 				render.Forbidden(w, render.ErrForbidden)
 				return
 			}
-			err = checkRepoAccess(sess, rm, repo)
+			err = checkRepoAccess(sess, rm, *repo)
 			if errors.Is(err, errorTokenNotFound) {
 				render.Forbidden(w, render.ErrForbidden)
 				return
@@ -390,7 +383,7 @@ func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 		}
 
 		ctx = core.WithRepositoryClient(ctx, rm)
-		ctx = core.WithRepo(ctx, repo)
+		ctx = core.WithRepo(ctx, *repo)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -412,31 +405,24 @@ func (s *MoraServer) handleCoverageListPublic(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	repoID, err := s.coverage.FindRepoIDByTrackerID(trackerID)
+	repo, err := s.coverage.FindRepoByTrackerID(trackerID)
 	if err != nil {
-		log.Err(err).Msg("failed to find repo_id by tracker_id")
+		log.Err(err).Msg("failed to find repo by tracker_id")
 		render.InternalError(w, errors.New("internal error"))
 		return
 	}
-	if repoID == nil {
+	if repo == nil {
 		render.NotFound(w, errors.New("tracker has no associated repository"))
 		return
 	}
 
-	repo, err := s.repos.Find(*repoID)
-	if err != nil {
-		log.Err(err).Msg("failed to find repository")
-		render.NotFound(w, errors.New("repository not found"))
-		return
-	}
-
-	ctx := core.WithRepo(r.Context(), repo)
+	ctx := core.WithRepo(r.Context(), *repo)
 
 	rm := s.findRepositoryManager(repo.RepositoryManager)
 	if rm != nil {
 		sess, ok := MoraSessionFrom(r.Context())
 		if ok {
-			if err := checkRepoAccess(sess, rm, repo); err == nil {
+			if err := checkRepoAccess(sess, rm, *repo); err == nil {
 				ctx, _ = sess.WithToken(ctx, rm.ID())
 				ctx = core.WithRepositoryClient(ctx, rm)
 			}
@@ -494,12 +480,13 @@ func (s *MoraServer) handleCreateCoverageTracker(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if _, err := s.repos.Find(req.RepoID); err != nil {
+	repo, err := s.repos.Find(req.RepoID)
+	if err != nil {
 		render.NotFound(w, errors.New("repository not found"))
 		return
 	}
 
-	tr, err := s.coverage.CreateCoverageTracker(s.tracker, req.Name, "", req.Visibility, uid, req.RepoID)
+	tr, err := s.coverage.CreateCoverageTracker(s.tracker, req.Name, "", req.Visibility, uid, repo)
 	if err != nil {
 		if errors.Is(err, coverage.ErrCoverageTrackerAlreadyLinked) {
 			render.Conflict(w, errors.New("repository already has a coverage tracker"))

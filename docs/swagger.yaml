@@ -42,13 +42,13 @@ definitions:
       id:
         format: int64
         type: integer
-      repoID:
-        format: int64
-        type: integer
       revision:
         type: string
       timestamp:
         type: string
+      trackerID:
+        format: int64
+        type: integer
     type: object
   coverage.CoverageEntry:
     properties:
