@@ -110,7 +110,12 @@ func TestStoreFindTracker(t *testing.T) {
 	t.Run("find by existing id", func(t *testing.T) {
 		got, err := s.findTrackerById(tracker.Id)
 		require.NoError(t, err)
-		require.Equal(t, tracker, got)
+		require.Equal(t, tracker.Id, got.Id)
+		require.Equal(t, tracker.Name, got.Name)
+		require.Equal(t, tracker.Visibility, got.Visibility)
+		require.Equal(t, tracker.OwnerId, got.OwnerId)
+		require.True(t, got.CreatedAt.Equal(tracker.CreatedAt))
+		require.True(t, got.LastUpdatedAt.Equal(tracker.LastUpdatedAt))
 	})
 
 	t.Run("find by non existing id", func(t *testing.T) {
@@ -667,5 +672,72 @@ func TestStoreTrackerSearch(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, trackers)
 		require.Equal(t, 0, total)
+	})
+}
+
+func TestStoreTrackerOwner(t *testing.T) {
+	s := initTestStore(t)
+
+	t.Run("addTracker sets owner and timestamps", func(t *testing.T) {
+		tr := &TrackerModel{Name: "owner_tracker"}
+		require.NoError(t, s.addTracker(tr, 2))
+		require.Equal(t, int64(2), tr.OwnerId)
+		require.False(t, tr.CreatedAt.IsZero())
+		require.True(t, tr.LastUpdatedAt.Equal(tr.CreatedAt))
+
+		got, err := s.findTrackerById(tr.Id)
+		require.NoError(t, err)
+		require.Equal(t, int64(2), got.OwnerId)
+
+		// owner is derived from owner_id, not stored as a tracker_member row
+		member, role, err := s.isMember(2, tr.Id)
+		require.NoError(t, err)
+		require.True(t, member)
+		require.Equal(t, "owner", role)
+
+		var memberRows int
+		err = s.db.Get(&memberRows, "SELECT COUNT(*) FROM tracker_member WHERE tracker_id = ?", tr.Id)
+		require.NoError(t, err)
+		require.Equal(t, 0, memberRows)
+	})
+
+	t.Run("non-owner member is editor", func(t *testing.T) {
+		tr := &TrackerModel{Name: "editor_tracker"}
+		require.NoError(t, s.addTracker(tr, 1))
+		_, err := s.db.Exec("INSERT INTO tracker_member (user_id, tracker_id, role) VALUES (2, ?, 'editor')", tr.Id)
+		require.NoError(t, err)
+
+		member, role, err := s.isMember(2, tr.Id)
+		require.NoError(t, err)
+		require.True(t, member)
+		require.Equal(t, "editor", role)
+	})
+
+	t.Run("addValue updates last_updated_at", func(t *testing.T) {
+		tr := &TrackerModel{Name: "touch_tracker"}
+		require.NoError(t, s.addTracker(tr, 1))
+		ser := &SeriesModel{TrackerId: tr.Id, Name: "s", DataType: "float"}
+		require.NoError(t, s.addSeries(ser))
+
+		time.Sleep(5 * time.Millisecond)
+		v := &ValueModel{SeriesId: ser.Id, Timestamp: time.Now(), Value: 1.0}
+		require.NoError(t, s.addValue(v))
+
+		got, err := s.findTrackerById(tr.Id)
+		require.NoError(t, err)
+		require.True(t, got.LastUpdatedAt.After(tr.LastUpdatedAt))
+	})
+
+	t.Run("list includes owner info", func(t *testing.T) {
+		tr := &TrackerModel{Name: "owner_list"}
+		require.NoError(t, s.addTracker(tr, 2))
+		trackers, _, err := s.listTrackers(2, "owner_list", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, int64(2), trackers[0].OwnerId)
+		require.Equal(t, "user2", trackers[0].OwnerName)
+		require.Equal(t, "owner", trackers[0].Role)
+		require.True(t, trackers[0].CreatedAt.Equal(tr.CreatedAt))
+		require.True(t, trackers[0].LastUpdatedAt.Equal(tr.LastUpdatedAt))
 	})
 }

@@ -98,6 +98,30 @@ func RequireEditPermission(store *trackerStore, next http.Handler) http.Handler 
 	})
 }
 
+func RequireOwnerPermission(store *trackerStore, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uid, ok := UserIDFromContext(r.Context())
+		if !ok || uid == 0 {
+			render.NotFound(w, errors.New("tracker not found"))
+			return
+		}
+		if uid == 1 {
+			next.ServeHTTP(w, r)
+			return
+		}
+		tracker, ok := trackerFrom(r.Context())
+		if !ok {
+			render.BadRequest(w, errors.New("no tracker in context"))
+			return
+		}
+		if tracker.OwnerId != uid {
+			render.NotFound(w, errors.New("tracker not found"))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func InjectSeries(store *trackerStore, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seriesId, err := strconv.ParseInt(chi.URLParam(r, "seriesId"), 10, 64)

@@ -196,6 +196,31 @@ describe('TrackerView', () => {
     expect(screen.getByText('owner')).toBeInTheDocument()
   })
 
+  it('shows owner name and last updated date on cards', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      trackers: [
+        {
+          id: 1,
+          name: 'my-tracker',
+          visibility: 'private',
+          type: 'tracker',
+          chart_config: '{}',
+          role: 'owner',
+          liked: false,
+          owner_id: 2,
+          owner_name: 'alice',
+          created_at: '2026-01-01T00:00:00Z',
+          last_updated_at: '2026-02-03T00:00:00Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 12,
+    })
+    render(<MemoryRouter><TrackerView /></MemoryRouter>)
+    expect(screen.getByText('@alice')).toBeInTheDocument()
+  })
+
   it('shows empty state when no trackers', () => {
     vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
     render(<MemoryRouter><TrackerView /></MemoryRouter>)

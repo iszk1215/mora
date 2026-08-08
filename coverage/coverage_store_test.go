@@ -223,6 +223,44 @@ func TestCoverageStore_Put_Update(t *testing.T) {
 		"timestamp should be updated on UPSERT conflict")
 }
 
+func TestCoverageStore_Put_TouchesLinkedTracker(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+
+	db.MustExec(`CREATE TABLE user (id INTEGER PRIMARY KEY, username TEXT NOT NULL)`)
+	db.MustExec(`INSERT INTO user (id, username) VALUES (1, 'admin')`)
+	db.MustExec(`CREATE TABLE tracker (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		owner_id INTEGER NOT NULL,
+		created_at DATETIME NOT NULL,
+		last_updated_at DATETIME NOT NULL
+	)`)
+	db.MustExec(`INSERT INTO tracker (name, owner_id, created_at, last_updated_at)
+		VALUES ('t', 1, datetime('now'), datetime('now'))`)
+
+	s := newCoverageStoreImpl(db)
+	require.NoError(t, s.Init())
+	require.NoError(t, s.linkTracker(1, 1))
+
+	var before time.Time
+	require.NoError(t, db.Get(&before, "SELECT last_updated_at FROM tracker WHERE id = 1"))
+
+	time.Sleep(5 * time.Millisecond)
+	_, err = s.Put(&Coverage{RepoID: 1, Revision: "abc", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
+	require.NoError(t, err)
+
+	var after time.Time
+	require.NoError(t, db.Get(&after, "SELECT last_updated_at FROM tracker WHERE id = 1"))
+	require.True(t, after.After(before), "linked tracker last_updated_at should be updated by Put")
+
+	t.Run("Put without a link does not fail", func(t *testing.T) {
+		_, err := s.Put(&Coverage{RepoID: 2, Revision: "def", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
+		require.NoError(t, err)
+	})
+}
+
 // --- Timeline tests ---
 
 func TestCoverageStore_Timeline(t *testing.T) {
