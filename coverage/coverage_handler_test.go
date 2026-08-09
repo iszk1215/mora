@@ -19,6 +19,7 @@ import (
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/mockscm"
 	"github.com/iszk1215/mora/coverage/profile"
+	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,6 +64,28 @@ func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 	return store
 }
 
+// trackerContextRouter mounts a coverage handler under /{trackerId} with a real
+// tracker injected into the request context, mirroring the production mount in
+// server/server.go.
+func trackerContextRouter(t *testing.T, s *CoverageHandler) http.Handler {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	trackerService, err := tracker.NewService(db)
+	require.NoError(t, err)
+	_, err = trackerService.CreateTracker("test coverage", "", "", "public", 1, tracker.TypeCoverage, `{"area":false}`)
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Route("/{trackerId}", func(r chi.Router) {
+		r.Use(trackerService.InjectTracker)
+		r.Get("/", s.handleCoverageList)
+		r.Get("/public", s.HandleCoverageListPublic)
+		r.Post("/", s.HandleCoverageUpload)
+	})
+	return r
+}
+
 // Test Cases
 
 func Test_injectCoverage(t *testing.T) {
@@ -76,7 +99,7 @@ func Test_injectCoverage(t *testing.T) {
 
 	want := &Coverage{
 		Revision:  "revision",
-		RepoID:    1215,
+		TrackerID:    1215,
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
 	}
@@ -120,7 +143,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	}
 
 	cov := &Coverage{
-		RepoID:    repo.Id,
+		TrackerID:    repo.Id,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -182,16 +205,17 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := &Coverage{ID: 0, RepoID: repo.Id, Timestamp: time0, Revision: "abc123"}
-	cov1 := &Coverage{ID: 1, RepoID: repo.Id, Timestamp: time1, Revision: "abc124"}
+	cov0 := &Coverage{ID: 0, TrackerID: 1, Timestamp: time0, Revision: "abc123"}
+	cov1 := &Coverage{ID: 1, TrackerID: 1, Timestamp: time1, Revision: "abc124"}
 
 	store := setupCoverageStore(t, cov0, cov1)
 	s := newCoverageHandler(store)
+	r := trackerContextRouter(t, s)
 
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r = r.WithContext(core.WithRepo(core.WithRepositoryClient(r.Context(), rm), repo))
+	req := httptest.NewRequest(http.MethodGet, "/1", nil)
+	req = req.WithContext(core.WithRepo(core.WithRepositoryClient(req.Context(), rm), repo))
 	w := httptest.NewRecorder()
-	s.Handler().ServeHTTP(w, r)
+	r.ServeHTTP(w, req)
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
 
@@ -215,11 +239,12 @@ func Test_CoverageHandler_CoverageList_Empty(t *testing.T) {
 
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
+	r := trackerContextRouter(t, s)
 
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r = r.WithContext(core.WithRepo(core.WithRepositoryClient(r.Context(), rm), repo))
+	req := httptest.NewRequest(http.MethodGet, "/1", nil)
+	req = req.WithContext(core.WithRepo(core.WithRepositoryClient(req.Context(), rm), repo))
 	w := httptest.NewRecorder()
-	s.Handler().ServeHTTP(w, r)
+	r.ServeHTTP(w, req)
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
 
@@ -238,20 +263,21 @@ func Test_CoverageHandler_HandleCoverageListPublic(t *testing.T) {
 
 	time0 := time.Now().Round(0)
 	time1 := time0.Add(-10 * time.Hour * 24)
-	cov0 := &Coverage{ID: 0, RepoID: repo.Id, Timestamp: time0, Revision: "abc123"}
-	cov1 := &Coverage{ID: 1, RepoID: repo.Id, Timestamp: time1, Revision: "abc124"}
+	cov0 := &Coverage{ID: 0, TrackerID: 1, Timestamp: time0, Revision: "abc123"}
+	cov1 := &Coverage{ID: 1, TrackerID: 1, Timestamp: time1, Revision: "abc124"}
 
 	store := setupCoverageStore(t, cov0, cov1)
 	s := newCoverageHandler(store)
+	r := trackerContextRouter(t, s)
 
 	t.Run("with RepositoryClient", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		ctx := core.WithRepo(r.Context(), repo)
+		req := httptest.NewRequest(http.MethodGet, "/1/public", nil)
+		ctx := core.WithRepo(req.Context(), repo)
 		ctx = core.WithRepositoryClient(ctx, rm)
-		r = r.WithContext(ctx)
+		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 
-		s.HandleCoverageListPublic(w, r)
+		r.ServeHTTP(w, req)
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
 
@@ -270,12 +296,12 @@ func Test_CoverageHandler_HandleCoverageListPublic(t *testing.T) {
 	})
 
 	t.Run("without RepositoryClient", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		ctx := core.WithRepo(r.Context(), repo)
-		r = r.WithContext(ctx)
+		req := httptest.NewRequest(http.MethodGet, "/1/public", nil)
+		ctx := core.WithRepo(req.Context(), repo)
+		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 
-		s.HandleCoverageListPublic(w, r)
+		r.ServeHTTP(w, req)
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
 
@@ -308,7 +334,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	cov := &Coverage{
 		ID:        -1,
-		RepoID:    repo.Id,
+		TrackerID:    repo.Id,
 		Revision:  revision,
 		Timestamp: timestamp,
 		Entries: []*CoverageEntry{
@@ -414,7 +440,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 	repo := core.Repository{Id: 1215, Namespace: orgName, Name: repoName, Url: repoURL}
 
 	cov := &Coverage{
-		RepoID:    repo.Id,
+		TrackerID:    repo.Id,
 		Revision:  revision,
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -497,7 +523,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 
 func TestCoverageHandler_AddCoverage(t *testing.T) {
 	cov := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "012345",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -530,7 +556,7 @@ func TestCoverageHandler_AddCoverage(t *testing.T) {
 
 func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	existing := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "012345",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -551,7 +577,7 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	}
 
 	added := Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "012345",
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -572,7 +598,7 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	}
 
 	want := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "012345",
 		Timestamp: added.Timestamp,
 		Entries: []*CoverageEntry{
@@ -616,15 +642,13 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	want.ID = got.ID
 	saved, err := store.Find(want.ID)
 	require.NoError(t, err)
-	assert.Equal(t, want.RepoID, saved.RepoID)
+	assert.Equal(t, want.TrackerID, saved.TrackerID)
 	assert.Equal(t, want.Revision, saved.Revision)
 	assert.True(t, want.Timestamp.Equal(saved.Timestamp))
 	assert.Equal(t, want.Entries, saved.Entries)
 }
 
 func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
-	repo := core.Repository{Id: 1215}
-
 	entryGo := &CoverageEntryUploadRequest{
 		Name:  "go",
 		Hits:  13,
@@ -644,20 +668,20 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
+	r := trackerContextRouter(t, s)
 
 	makeUpload := func(revision string, entry *CoverageEntryUploadRequest) *httptest.ResponseRecorder {
 		req := &CoverageUploadRequest{
 			Revision:  revision,
-		Timestamp: time.Now().Round(0),
+			Timestamp: time.Now().Round(0),
 			Entries:   []*CoverageEntryUploadRequest{entry},
 		}
 		body, err := json.Marshal(req)
 		require.NoError(t, err)
 
-		r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
-		r = r.WithContext(core.WithRepo(r.Context(), repo))
+		request := httptest.NewRequest(http.MethodPost, "/1", bytes.NewBuffer(body))
 		w := httptest.NewRecorder()
-		s.Handler().ServeHTTP(w, r)
+		r.ServeHTTP(w, request)
 		return w
 	}
 
@@ -683,7 +707,7 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 
 func TestCoverageHandler_HandleUpload(t *testing.T) {
 	cov := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1,
 		Revision:  "012345",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -720,12 +744,12 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
+	r := trackerContextRouter(t, s)
 
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
-	req = req.WithContext(core.WithRepo(req.Context(), core.Repository{Id: cov.RepoID}))
+	req := httptest.NewRequest(http.MethodPost, "/1", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
-	s.Handler().ServeHTTP(w, req)
+	r.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusCreated, w.Result().StatusCode)
 	cov.ID = 1 // 1 will be assigned by the server
@@ -769,9 +793,9 @@ func TestValidateCoverageUploadRequest(t *testing.T) {
 }
 
 func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
-	repo := core.Repository{Id: 1215}
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
+	r := trackerContextRouter(t, s)
 
 	assertBadRequestMessage := func(t *testing.T, body []byte, expected string) {
 		var errResp core.ErrorResponse
@@ -780,10 +804,9 @@ func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 	}
 
 	t.Run("invalid JSON body returns sanitized message", func(t *testing.T) {
-		r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("{invalid}"))
-		r = r.WithContext(core.WithRepo(r.Context(), repo))
+		request := httptest.NewRequest(http.MethodPost, "/1", bytes.NewBufferString("{invalid}"))
 		w := httptest.NewRecorder()
-		s.Handler().ServeHTTP(w, r)
+		r.ServeHTTP(w, request)
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
 		body, _ := io.ReadAll(res.Body)
@@ -798,10 +821,9 @@ func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 		}
 		body, err := json.Marshal(req)
 		require.NoError(t, err)
-		r := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
-		r = r.WithContext(core.WithRepo(r.Context(), repo))
+		request := httptest.NewRequest(http.MethodPost, "/1", bytes.NewBuffer(body))
 		w := httptest.NewRecorder()
-		s.Handler().ServeHTTP(w, r)
+		r.ServeHTTP(w, request)
 		res := w.Result()
 		defer func() { _ = res.Body.Close() }()
 		resBody, _ := io.ReadAll(res.Body)
@@ -824,7 +846,7 @@ func TestInjectCoverageNotFound(t *testing.T) {
 
 func TestInjectCoverageEntryEntryNotFound(t *testing.T) {
 	cov := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "abcdef",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
@@ -883,7 +905,7 @@ func TestHandleFileProfileNotFound(t *testing.T) {
 	}
 
 	cov := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "abcdef",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{entry},

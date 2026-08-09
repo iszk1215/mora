@@ -200,8 +200,9 @@ func makeCoverageListResponse(
 func (s *CoverageHandler) handleCoverageList(w http.ResponseWriter, r *http.Request) {
 	rm, _ := core.RepositoryClientFrom(r.Context())
 	repo, _ := core.RepoFrom(r.Context())
+	tr, _ := tracker.TrackerFromContext(r.Context())
 
-	coverages, err := s.coverages.List(repo.Id)
+	coverages, err := s.coverages.List(tr.Id)
 	if err != nil {
 		log.Warn().Err(err).Msg("failed to list coverages")
 		render.NotFound(w, render.ErrNotFound)
@@ -222,8 +223,13 @@ func (s *CoverageHandler) HandleCoverageListPublic(w http.ResponseWriter, r *htt
 		render.NotFound(w, errors.New("repository not found"))
 		return
 	}
+	tr, ok := tracker.TrackerFromContext(r.Context())
+	if !ok {
+		render.NotFound(w, errors.New("tracker not found"))
+		return
+	}
 
-	coverages, err := s.coverages.List(repo.Id)
+	coverages, err := s.coverages.List(tr.Id)
 	if err != nil {
 		log.Warn().Err(err).Msg("failed to list coverages")
 		render.NotFound(w, render.ErrNotFound)
@@ -260,35 +266,27 @@ func (s *CoverageHandler) HandleCoveragePreview(w http.ResponseWriter, r *http.R
 
 	var previews []tracker.PreviewSeriesValues
 
-	repoID, err := s.coverages.FindRepoIDByTrackerID(tr.Id)
+	timeline, err := s.coverages.Timeline(tr.Id, 20)
 	if err != nil {
-		log.Error().Err(err).Msg("coverage.handler.HandleCoveragePreview FindRepoIDByTrackerID")
+		log.Error().Err(err).Msg("coverage.handler.HandleCoveragePreview Timeline")
 		render.InternalError(w, err)
 		return
 	}
-	if repoID != nil {
-		timeline, err := s.coverages.Timeline(*repoID, 20)
-		if err != nil {
-			log.Error().Err(err).Msg("coverage.handler.HandleCoveragePreview Timeline")
-			render.InternalError(w, err)
-			return
+	for name, points := range timeline {
+		values := make([]tracker.ValueModel, len(points))
+		for i, p := range points {
+			values[i] = tracker.ValueModel{Timestamp: p.Time, Value: p.Value}
 		}
-		for name, points := range timeline {
-			values := make([]tracker.ValueModel, len(points))
-			for i, p := range points {
-				values[i] = tracker.ValueModel{Timestamp: p.Time, Value: p.Value}
-			}
-			previews = append(previews, tracker.PreviewSeriesValues{
-				Series: tracker.SeriesModel{
-					Id:        0,
-					TrackerId: tr.Id,
-					Name:      name,
-					DataType:  "float",
-					Config:    `{"value_format":"%.1f%%"}`,
-				},
-				Values: values,
-			})
-		}
+		previews = append(previews, tracker.PreviewSeriesValues{
+			Series: tracker.SeriesModel{
+				Id:        0,
+				TrackerId: tr.Id,
+				Name:      name,
+				DataType:  "float",
+				Config:    `{"value_format":"%.1f%%"}`,
+			},
+			Values: values,
+		})
 	}
 
 	trackerResp := tracker.TrackerResponse{
@@ -407,7 +405,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *CoverageHandler) AddCoverage(cov *Coverage) (*Coverage, error) {
-	found, err := s.coverages.FindRevision(cov.RepoID, cov.Revision)
+	found, err := s.coverages.FindRevision(cov.TrackerID, cov.Revision)
 	if err != nil {
 		return nil, fmt.Errorf("AddCoverage FindRevision: %w", err)
 	}
@@ -487,7 +485,11 @@ func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	repo, _ := core.RepoFrom(r.Context())
+	tr, ok := tracker.TrackerFromContext(r.Context())
+	if !ok {
+		render.NotFound(w, errors.New("tracker not found"))
+		return
+	}
 
 	entries, err := parseCoverageEntryUploadRequests(request.Entries)
 	if err != nil {
@@ -497,7 +499,7 @@ func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Re
 	}
 
 	cov := &Coverage{}
-	cov.RepoID = repo.Id
+	cov.TrackerID = tr.Id
 	cov.Revision = request.Revision
 	cov.Entries = entries
 	cov.Timestamp = request.Timestamp

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage/profile"
 )
 
@@ -34,7 +35,7 @@ func TestCoverageStore_New(t *testing.T) {
 func TestCoverageStore_Find(t *testing.T) {
 	s := initCoverageStore(t)
 	want := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "123abc",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -111,7 +112,7 @@ func TestCoverageStore_Init_CreatesUniqueConstraint(t *testing.T) {
 
 func TestCoverageStore_Put_Insert(t *testing.T) {
 	want := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
@@ -131,7 +132,7 @@ func TestCoverageStore_Put_Insert(t *testing.T) {
 
 func TestCoverageStore_Put_InsertWithEntry(t *testing.T) {
 	want := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -158,7 +159,7 @@ func TestCoverageStore_Put_InsertWithEntry(t *testing.T) {
 func TestCoverageStore_Put_Concurrent(t *testing.T) {
 	s := initCoverageStore(t)
 	cov := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "same-revision",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
@@ -193,14 +194,14 @@ func TestCoverageStore_Put_Concurrent(t *testing.T) {
 
 func TestCoverageStore_Put_Update(t *testing.T) {
 	cov := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
 	}
 
 	want := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
@@ -242,13 +243,13 @@ func TestCoverageStore_Put_TouchesLinkedTracker(t *testing.T) {
 
 	s := newCoverageStoreImpl(db)
 	require.NoError(t, s.Init())
-	require.NoError(t, s.linkTracker(1, 1))
+	require.NoError(t, s.linkTracker(1, core.Repository{Id: 1, RepositoryManager: 1, Namespace: "acme", Name: "alpha", Url: "http://example.com/acme/alpha"}))
 
 	var before time.Time
 	require.NoError(t, db.Get(&before, "SELECT last_updated_at FROM tracker WHERE id = 1"))
 
 	time.Sleep(5 * time.Millisecond)
-	_, err = s.Put(&Coverage{RepoID: 1, Revision: "abc", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
+	_, err = s.Put(&Coverage{TrackerID: 1, Revision: "abc", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
 	require.NoError(t, err)
 
 	var after time.Time
@@ -256,7 +257,7 @@ func TestCoverageStore_Put_TouchesLinkedTracker(t *testing.T) {
 	require.True(t, after.After(before), "linked tracker last_updated_at should be updated by Put")
 
 	t.Run("Put without a link does not fail", func(t *testing.T) {
-		_, err := s.Put(&Coverage{RepoID: 2, Revision: "def", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
+		_, err := s.Put(&Coverage{TrackerID: 2, Revision: "def", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
 		require.NoError(t, err)
 	})
 }
@@ -275,14 +276,14 @@ func TestCoverageStore_Timeline(t *testing.T) {
 
 	// Insert coverage at two different timestamps
 	id1, err := s.Put(&Coverage{
-		RepoID:    1215, Revision: "abc", Timestamp: now.Add(-2 * time.Hour),
+		TrackerID:    1215, Revision: "abc", Timestamp: now.Add(-2 * time.Hour),
 		Entries: []*CoverageEntry{{Name: "go", Hits: 30, Lines: 100}},
 	})
 	require.NoError(t, err)
 	require.Equal(t, int64(1), id1)
 
 	id2, err := s.Put(&Coverage{
-		RepoID: 1215, Revision: "def", Timestamp: now,
+		TrackerID: 1215, Revision: "def", Timestamp: now,
 		Entries: []*CoverageEntry{entry},
 	})
 	require.NoError(t, err)
@@ -305,7 +306,7 @@ func TestCoverageStore_Timeline(t *testing.T) {
 	t.Run("limit restricts number of points per entry", func(t *testing.T) {
 		// Insert a third point
 		_, err := s.Put(&Coverage{
-			RepoID: 1215, Revision: "ghi", Timestamp: now.Add(-time.Hour),
+			TrackerID: 1215, Revision: "ghi", Timestamp: now.Add(-time.Hour),
 			Entries: []*CoverageEntry{{Name: "go", Hits: 40, Lines: 100}},
 		})
 		require.NoError(t, err)
@@ -319,7 +320,7 @@ func TestCoverageStore_Timeline(t *testing.T) {
 
 	t.Run("multiple entries", func(t *testing.T) {
 		_, err := s.Put(&Coverage{
-			RepoID: 1215, Revision: "jkl", Timestamp: now,
+			TrackerID: 1215, Revision: "jkl", Timestamp: now,
 			Entries: []*CoverageEntry{
 				{Name: "go", Hits: 50, Lines: 100},
 				{Name: "python", Hits: 80, Lines: 100},
@@ -342,7 +343,7 @@ func TestCoverageStore_Timeline(t *testing.T) {
 	t.Run("zero lines produces zero percentage", func(t *testing.T) {
 		s2 := initCoverageStore(t)
 		_, err := s2.Put(&Coverage{
-			RepoID:    1,
+			TrackerID:    1,
 			Revision: "abc",
 			Timestamp: now,
 			Entries:   []*CoverageEntry{{Name: "zero", Hits: 0, Lines: 0}},
@@ -367,7 +368,7 @@ func TestCoverageStore_Timeline_DBError(t *testing.T) {
 
 func TestCoverageStore_ReplaceEntries_BeginTxError(t *testing.T) {
 	cov := &Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "abc",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{{Name: "go", Hits: 10, Lines: 20}},
@@ -402,7 +403,7 @@ func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
 
 	// Put a coverage entry, then corrupt its block data directly
 	_, err = s.Put(&Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "abc",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -425,4 +426,125 @@ func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
 	_, err = s.Find(1)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "loadCoverage unmarshal blocks")
+}
+
+// oldSchema recreates the tracker_coverage schema used before Issue #157 so
+// migration from an existing database can be exercised.
+const oldSchema = `
+CREATE TABLE coverage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_id INTEGER NOT NULL,
+    revision TEXT NOT NULL,
+    time DATETIME NOT NULL,
+    contents TEXT NOT NULL,
+    UNIQUE(repo_id, revision)
+);
+
+CREATE TABLE tracker_coverage (
+    tracker_id INTEGER PRIMARY KEY,
+    repo_id    INTEGER NOT NULL,
+    FOREIGN KEY (tracker_id) REFERENCES tracker(id) ON DELETE CASCADE,
+    FOREIGN KEY (repo_id)    REFERENCES repository(id) ON DELETE CASCADE
+);`
+
+func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+
+	db.MustExec(`CREATE TABLE repository (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		scm INTEGER NOT NULL,
+		namespace TEXT NOT NULL,
+		name TEXT NOT NULL,
+		url TEXT NOT NULL UNIQUE
+	)`)
+	db.MustExec(`INSERT INTO repository (id, scm, namespace, name, url)
+		VALUES (1, 2, 'acme', 'alpha', 'http://example.com/acme/alpha')`)
+	db.MustExec(`CREATE TABLE tracker (id INTEGER PRIMARY KEY AUTOINCREMENT)`)
+	db.MustExec(`INSERT INTO tracker (id) VALUES (10)`)
+
+	db.MustExec(oldSchema)
+	db.MustExec(`INSERT INTO coverage (repo_id, revision, time, contents)
+		VALUES (1, 'abc', '2024-01-01', '[]')`)
+	db.MustExec(`INSERT INTO tracker_coverage (tracker_id, repo_id) VALUES (10, 1)`)
+
+	s := NewCoverageStore(db)
+	require.NoError(t, s.Init())
+
+	impl := s.(*coverageStoreImpl)
+	require.False(t, impl.hasColumn("coverage", "repo_id"))
+	require.True(t, impl.hasColumn("coverage", "tracker_id"))
+	require.False(t, impl.hasColumn("tracker_coverage", "repo_id"))
+	require.True(t, impl.hasColumn("tracker_coverage", "url"))
+
+	repo, err := s.FindRepoByTrackerID(10)
+	require.NoError(t, err)
+	require.NotNil(t, repo)
+	require.Equal(t, &core.Repository{
+		Id:                10,
+		RepositoryManager: 2,
+		Namespace:         "acme",
+		Name:              "alpha",
+		Url:               "http://example.com/acme/alpha",
+	}, repo)
+
+	cov, err := s.Find(1)
+	require.NoError(t, err)
+	require.NotNil(t, cov)
+	require.Equal(t, int64(1), cov.TrackerID)
+
+	// Re-running Init is idempotent.
+	require.NoError(t, s.Init())
+}
+
+func TestCoverageStore_DeleteTrackerCascadesCoverage(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+	db.MustExec("PRAGMA foreign_keys = ON")
+
+	db.MustExec(`CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL)`)
+	db.MustExec(`CREATE TABLE tracker (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		owner_id INTEGER NOT NULL,
+		created_at DATETIME NOT NULL,
+		last_updated_at DATETIME NOT NULL
+	)`)
+	db.MustExec(`INSERT INTO tracker (name, owner_id, created_at, last_updated_at)
+		VALUES ('t', 1, datetime('now'), datetime('now'))`)
+
+	s := newCoverageStoreImpl(db)
+	require.NoError(t, s.Init())
+	require.NoError(t, s.linkTracker(1, core.Repository{
+		Id: 1, RepositoryManager: 1, Namespace: "acme", Name: "alpha", Url: "http://example.com/acme/alpha"}))
+
+	_, err = s.Put(&Coverage{TrackerID: 1, Revision: "abc", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
+	require.NoError(t, err)
+	_, err = s.Put(&Coverage{TrackerID: 1, Revision: "def", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
+	require.NoError(t, err)
+
+	_, err = db.Exec("DELETE FROM tracker WHERE id = 1")
+	require.NoError(t, err)
+
+	var count int
+	require.NoError(t, db.Get(&count, "SELECT COUNT(*) FROM coverage"))
+	require.Zero(t, count, "deleting a tracker must cascade to its coverage rows")
+
+	require.NoError(t, db.Get(&count, "SELECT COUNT(*) FROM tracker_coverage"))
+	require.Zero(t, count, "deleting a tracker must cascade to its tracker_coverage row")
+}
+
+func TestCoverageStore_Put_FailsForMissingTrackerWithForeignKeys(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+	db.MustExec("PRAGMA foreign_keys = ON")
+
+	s := newCoverageStoreImpl(db)
+	require.NoError(t, s.Init())
+
+	_, err = s.Put(&Coverage{TrackerID: 999, Revision: "abc", Timestamp: time.Now(), Entries: []*CoverageEntry{}})
+	require.Error(t, err)
 }

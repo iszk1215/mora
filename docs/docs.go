@@ -1891,15 +1891,15 @@ const docTemplate = `{
                     "type": "integer",
                     "format": "int64"
                 },
-                "repoID": {
-                    "type": "integer",
-                    "format": "int64"
-                },
                 "revision": {
                     "type": "string"
                 },
                 "timestamp": {
                     "type": "string"
+                },
+                "trackerID": {
+                    "type": "integer",
+                    "format": "int64"
                 }
             }
         },

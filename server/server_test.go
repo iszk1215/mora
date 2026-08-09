@@ -1025,20 +1025,19 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	coverageService, err := coverage.NewCoverageService(db)
 	require.NoError(t, err)
 
-	cov := &coverage.Coverage{
-		RepoID:    repo.Id,
-		Revision:  "abc123",
-		Timestamp: time.Now().Round(0),
-	}
-	_, err = coverageService.Store().Put(cov)
-	require.NoError(t, err)
-
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
 	// Create a tracker linked to the repo
-	repoID := repo.Id
-	trk, err := coverageService.CreateCoverageTracker(trackerService, "test coverage", "", "public", 1, repoID)
+	trk, err := coverageService.CreateCoverageTracker(trackerService, "test coverage", "", "public", 1, repo)
+	require.NoError(t, err)
+
+	cov := &coverage.Coverage{
+		TrackerID: trk.Id,
+		Revision:  "abc123",
+		Timestamp: time.Now().Round(0),
+	}
+	_, err = coverageService.Store().Put(cov)
 	require.NoError(t, err)
 
 	privateRepo := Repository{
@@ -1105,13 +1104,13 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	})
 
 	// Create a private tracker for access control tests
+	privateTrk, err := coverageService.CreateCoverageTracker(trackerService, "private coverage", "", "private", 1, privateRepo)
+	require.NoError(t, err)
 	_, err = coverageService.Store().Put(&coverage.Coverage{
-		RepoID:    privateRepo.Id,
+		TrackerID: privateTrk.Id,
 		Revision:  "def456",
 		Timestamp: time.Now().Round(0),
 	})
-	require.NoError(t, err)
-	privateTrk, err := coverageService.CreateCoverageTracker(trackerService, "private coverage", "", "private", 1, privateRepo.Id)
 	require.NoError(t, err)
 
 	t.Run("private tracker - anonymous returns 404", func(t *testing.T) {
@@ -1264,10 +1263,10 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 		require.Equal(t, "coverage", trk.Type)
 		require.Equal(t, "public", trk.Visibility)
 
-		repoID, err := coverageService.FindRepoIDByTrackerID(trk.Id)
+		got, err := coverageService.FindRepoByTrackerID(trk.Id)
 		require.NoError(t, err)
-		require.NotNil(t, repoID)
-		require.Equal(t, int64(1), *repoID)
+		require.NotNil(t, got)
+		require.Equal(t, "http://mock.scm/owner/repo", got.Url)
 	})
 
 	t.Run("already linked returns conflict", func(t *testing.T) {
@@ -1304,8 +1303,14 @@ func TestHandleCoveragePreview(t *testing.T) {
 	coverageService, err := coverage.NewCoverageService(db)
 	require.NoError(t, err)
 
+	trackerService, err := tracker.NewService(db)
+	require.NoError(t, err)
+
+	trk, err := coverageService.CreateCoverageTracker(trackerService, "test coverage", "", "public", 1, repo)
+	require.NoError(t, err)
+
 	cov := &coverage.Coverage{
-		RepoID:    repo.Id,
+		TrackerID: trk.Id,
 		Revision:  "abc123",
 		Timestamp: time.Now().Round(0),
 		Entries: []*coverage.CoverageEntry{
@@ -1313,13 +1318,6 @@ func TestHandleCoveragePreview(t *testing.T) {
 		},
 	}
 	_, err = coverageService.Store().Put(cov)
-	require.NoError(t, err)
-
-	trackerService, err := tracker.NewService(db)
-	require.NoError(t, err)
-
-	repoID := repo.Id
-	trk, err := coverageService.CreateCoverageTracker(trackerService, "test coverage", "", "public", 1, repoID)
 	require.NoError(t, err)
 
 	server := NewMoraServerBuilder(t).

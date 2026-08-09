@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elliotchance/pie/v2"
+	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage/profile"
 )
 
@@ -24,7 +25,7 @@ type (
 
 	Coverage struct {
 		ID        int64
-		RepoID    int64
+		TrackerID int64
 		Revision  string
 		Timestamp time.Time
 		Entries   []*CoverageEntry
@@ -36,8 +37,8 @@ type (
 		FindRevision(id int64, revision string) (*Coverage, error)
 		List(id int64) ([]*Coverage, error)
 		Put(*Coverage) (int64, error)
-		Timeline(repoID int64, limit int) (map[string][]CoverageTimelinePoint, error)
-		FindRepoIDByTrackerID(trackerID int64) (*int64, error)
+		Timeline(trackerID int64, limit int) (map[string][]CoverageTimelinePoint, error)
+		FindRepoByTrackerID(trackerID int64) (*core.Repository, error)
 	}
 )
 
@@ -52,8 +53,8 @@ func (c *Coverage) FindEntry(name string) *CoverageEntry {
 }
 
 func mergeCoverage(a, b *Coverage) (*Coverage, error) {
-	if a.RepoID != b.RepoID || a.Revision != b.Revision {
-		return nil, fmt.Errorf("can not merge two coverages with different URLs and/or revisions")
+	if a.TrackerID != b.TrackerID || a.Revision != b.Revision {
+		return nil, fmt.Errorf("can not merge two coverages with different trackers and/or revisions")
 	}
 
 	entries := map[string]*CoverageEntry{}
@@ -78,7 +79,7 @@ func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 	})
 
 	merged := &Coverage{
-		RepoID:    a.RepoID,
+		TrackerID: a.TrackerID,
 		Revision:  a.Revision,
 		Timestamp: b.Timestamp,
 		Entries:   tmp,

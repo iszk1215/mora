@@ -101,7 +101,7 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 
 ### injectTrackerCoverage (`/api/coverages/{trackerId}/*`)
 1. Parse `trackerId` from URL
-2. Resolve to `repo_id` via `tracker_coverage` table (managed by coverage: `coverage.FindRepoIDByTrackerID()`)
+2. Resolve to the linked repository via the `tracker_coverage` table (managed by coverage: `coverage.FindRepoByTrackerID()`), which stores the scm/namespace/name/url directly
 3. Load repository and repository manager
 4. Verify access
 5. Inject into context

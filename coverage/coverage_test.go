@@ -13,7 +13,7 @@ func TestMergeCoverage(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  revision,
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -34,7 +34,7 @@ func TestMergeCoverage(t *testing.T) {
 	}
 
 	coverage1 := Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  revision,
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -58,7 +58,7 @@ func TestMergeCoverage(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  revision,
 		Timestamp: coverage1.Timestamp,
 		Entries: []*CoverageEntry{ // alphabetical
@@ -98,14 +98,14 @@ func TestMergeCoverageErrorUrl(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  revision,
 		Timestamp: time.Now(),
 		Entries:   nil,
 	}
 
 	coverage1 := Coverage{
-		RepoID:    1976,
+		TrackerID:    1976,
 		Revision:  revision,
 		Timestamp: time.Now(),
 	}
@@ -118,14 +118,14 @@ func TestMergeCoverageErrorRevision(t *testing.T) {
 	revision := "012345"
 
 	coverage0 := Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  revision,
 		Timestamp: time.Now(),
 		Entries:   nil,
 	}
 
 	coverage1 := Coverage{
-		RepoID:    1215,
+		TrackerID:    1215,
 		Revision:  "3456",
 		Timestamp: time.Now(),
 	}

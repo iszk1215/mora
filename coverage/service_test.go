@@ -3,6 +3,7 @@ package coverage
 import (
 	"testing"
 
+	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -29,7 +30,7 @@ func TestCoverageServiceStore(t *testing.T) {
 	require.NotNil(t, s)
 
 	cov := &Coverage{
-		RepoID:    1,
+		TrackerID: 1,
 		Revision:  "abc123",
 		Entries:   []*CoverageEntry{},
 	}
@@ -44,17 +45,30 @@ func TestCoverageServiceHandler(t *testing.T) {
 	require.NotNil(t, h)
 }
 
-func TestCoverageServiceLinkAndFindRepoIDByTrackerID(t *testing.T) {
+func TestCoverageServiceLinkAndFindRepoByTrackerID(t *testing.T) {
 	svc := initTestCoverageService(t)
 
-	require.NoError(t, svc.Link(7, 42))
+	repo := core.Repository{
+		Id:                42,
+		RepositoryManager: 1,
+		Namespace:         "acme",
+		Name:              "alpha",
+		Url:               "http://example.com/acme/alpha",
+	}
+	require.NoError(t, svc.Link(7, repo))
 
-	repoID, err := svc.FindRepoIDByTrackerID(7)
+	got, err := svc.FindRepoByTrackerID(7)
 	require.NoError(t, err)
-	require.NotNil(t, repoID)
-	require.Equal(t, int64(42), *repoID)
+	require.NotNil(t, got)
+	require.Equal(t, &core.Repository{
+		Id:                7, // the returned repo mirrors the tracker id
+		RepositoryManager: 1,
+		Namespace:         "acme",
+		Name:              "alpha",
+		Url:               "http://example.com/acme/alpha",
+	}, got)
 
-	missing, err := svc.FindRepoIDByTrackerID(999)
+	missing, err := svc.FindRepoByTrackerID(999)
 	require.NoError(t, err)
 	require.Nil(t, missing)
 }
@@ -84,17 +98,20 @@ func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 	db.MustExec(`
 		CREATE TABLE IF NOT EXISTS repository (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			scm INTEGER NOT NULL DEFAULT 0,
 			namespace TEXT NOT NULL DEFAULT '',
 			name TEXT NOT NULL DEFAULT '',
 			url TEXT NOT NULL DEFAULT ''
 		)
 	`)
-	db.MustExec(`INSERT INTO repository (id, namespace, name) VALUES (1, 'acme', 'alpha')`)
-	db.MustExec(`INSERT INTO repository (id, namespace, name) VALUES (2, 'acme', 'beta')`)
+	db.MustExec(`INSERT INTO repository (id, scm, namespace, name, url) VALUES (1, 1, 'acme', 'alpha', 'http://example.com/acme/alpha')`)
+	db.MustExec(`INSERT INTO repository (id, scm, namespace, name, url) VALUES (2, 1, 'acme', 'beta', 'http://example.com/acme/beta')`)
+	db.MustExec(`CREATE TABLE tracker (id INTEGER PRIMARY KEY AUTOINCREMENT)`)
 
 	svc, err := NewCoverageService(db)
 	require.NoError(t, err)
-	require.NoError(t, svc.Link(10, 1)) // repo 1 already has a tracker
+	require.NoError(t, svc.Link(10, core.Repository{
+		Id: 1, RepositoryManager: 1, Namespace: "acme", Name: "alpha", Url: "http://example.com/acme/alpha"})) // repo 1 already has a tracker
 
 	creator := &fakeTrackerCreator{}
 	require.NoError(t, svc.MigrateCoverageTrackers(creator))
@@ -108,10 +125,16 @@ func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 	require.Equal(t, "coverage", call.trackerType)
 	require.Equal(t, `{"area":false}`, call.chartConfig)
 
-	repoID, err := svc.FindRepoIDByTrackerID(creator.next)
+	got, err := svc.FindRepoByTrackerID(creator.next)
 	require.NoError(t, err)
-	require.NotNil(t, repoID)
-	require.Equal(t, int64(2), *repoID)
+	require.NotNil(t, got)
+	require.Equal(t, &core.Repository{
+		Id:                1, // the new tracker id
+		RepositoryManager: 1,
+		Namespace:         "acme",
+		Name:              "beta",
+		Url:               "http://example.com/acme/beta",
+	}, got)
 
 	require.NoError(t, svc.MigrateCoverageTrackers(creator))
 	require.Len(t, creator.calls, 1)
@@ -129,7 +152,14 @@ func TestCoverageServiceCreateCoverageTracker(t *testing.T) {
 	svc := initTestCoverageService(t)
 
 	creator := &fakeTrackerCreator{}
-	tr, err := svc.CreateCoverageTracker(creator, "my coverage", "", "public", 1, 42)
+	repo := core.Repository{
+		Id:                42,
+		RepositoryManager: 1,
+		Namespace:         "acme",
+		Name:              "alpha",
+		Url:               "http://example.com/acme/alpha",
+	}
+	tr, err := svc.CreateCoverageTracker(creator, "my coverage", "", "public", 1, repo)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), tr.Id)
 
@@ -142,12 +172,18 @@ func TestCoverageServiceCreateCoverageTracker(t *testing.T) {
 	require.Equal(t, "coverage", call.trackerType)
 	require.Equal(t, `{"area":false}`, call.chartConfig)
 
-	repoID, err := svc.FindRepoIDByTrackerID(1)
+	got, err := svc.FindRepoByTrackerID(1)
 	require.NoError(t, err)
-	require.NotNil(t, repoID)
-	require.Equal(t, int64(42), *repoID)
+	require.NotNil(t, got)
+	require.Equal(t, &core.Repository{
+		Id:                1,
+		RepositoryManager: 1,
+		Namespace:         "acme",
+		Name:              "alpha",
+		Url:               "http://example.com/acme/alpha",
+	}, got)
 
-	_, err = svc.CreateCoverageTracker(creator, "again", "", "public", 1, 42)
+	_, err = svc.CreateCoverageTracker(creator, "again", "", "public", 1, repo)
 	require.ErrorIs(t, err, ErrCoverageTrackerAlreadyLinked)
 	require.Len(t, creator.calls, 1)
 }
