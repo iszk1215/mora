@@ -69,8 +69,10 @@ func (s *CoverageService) Link(trackerID int64, repo core.Repository) error {
 }
 
 // MigrateCoverageTrackers creates a coverage-type tracker for every repository
-// that does not have one linked yet, and re-keys existing coverage history
-// from the repository id to the linked tracker id. Trackers are created
+// that does not have one linked yet, and re-keys existing coverage history to
+// the linked tracker id. Rows that migrateCoverage marked with a negative
+// repository id are resolved to the tracker created for their repository, and
+// rows whose repository no longer exists are removed. Trackers are created
 // through the tracker service and linked through this service (coverage owns
 // tracker_coverage).
 func (s *CoverageService) MigrateCoverageTrackers(creator TrackerCreator) error {
@@ -124,19 +126,25 @@ func (s *CoverageService) MigrateCoverageTrackers(creator TrackerCreator) error 
 			if err := s.Link(tr.Id, repo); err != nil {
 				return fmt.Errorf("MigrateCoverageTrackers link tracker for repo %d: %w", r.ID, err)
 			}
-			trackerID = tr.Id
 		}
+	}
 
-		// Re-key coverage history from the repository id to the tracker id.
-		// The NOT EXISTS guard makes the migration idempotent and prevents
-		// touching rows that already reference a real tracker.
-		if _, err := s.impl.db.Exec(
-			`UPDATE coverage SET tracker_id = ?
-			 WHERE tracker_id = ?
-			   AND NOT EXISTS (SELECT 1 FROM tracker t WHERE t.id = coverage.tracker_id)`,
-			trackerID, r.ID); err != nil {
-			return fmt.Errorf("MigrateCoverageTrackers re-key coverage for repo %d: %w", r.ID, err)
-		}
+	// Resolve coverage history that migrateCoverage marked with a negative
+	// repository id to the tracker created for its repository. Real tracker ids
+	// are always positive, so only unlinked rows from the old schema match.
+	if _, err := s.impl.db.Exec(`
+		UPDATE coverage SET tracker_id = (
+			SELECT tc.tracker_id FROM tracker_coverage tc
+			JOIN repository r ON r.url = tc.url
+			WHERE r.id = -coverage.tracker_id)
+		WHERE coverage.tracker_id < 0
+		  AND EXISTS (SELECT 1 FROM repository r WHERE r.id = -coverage.tracker_id)`); err != nil {
+		return fmt.Errorf("MigrateCoverageTrackers re-key coverage: %w", err)
+	}
+
+	// Rows whose repository no longer exists have no tracker to resolve to.
+	if _, err := s.impl.db.Exec("DELETE FROM coverage WHERE tracker_id < 0"); err != nil {
+		return fmt.Errorf("MigrateCoverageTrackers delete orphaned coverage: %w", err)
 	}
 
 	return nil

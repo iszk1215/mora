@@ -153,9 +153,12 @@ func (s *coverageStoreImpl) migrate() error {
 
 // migrateCoverage rebuilds the coverage table when it still has a repo_id
 // column: the column is renamed to tracker_id and the table is rebuilt so
-// tracker_id carries a foreign key to tracker(id) ON DELETE CASCADE. Foreign
-// key enforcement is temporarily disabled because the tracker table may not
-// have been created yet at this point.
+// tracker_id carries a foreign key to tracker(id) ON DELETE CASCADE. Rows
+// linked through the old tracker_coverage table keep their real tracker id;
+// unlinked rows are marked with a negative repository id that
+// MigrateCoverageTrackers resolves to a freshly created tracker at startup.
+// Foreign key enforcement is temporarily disabled because the tracker table
+// may not have been created yet at this point.
 func (s *coverageStoreImpl) migrateCoverage() error {
 	if !s.hasColumn("coverage", "repo_id") {
 		return nil
@@ -180,9 +183,25 @@ func (s *coverageStoreImpl) migrateCoverage() error {
 	if _, err := s.db.Exec(schemaCoverage); err != nil {
 		return fmt.Errorf("migrateCoverage create: %w", err)
 	}
-	if _, err := s.db.Exec(`
+
+	// Rows that still have a link in the old tracker_coverage table are copied
+	// with their real tracker id. Rows without a link are marked with a negative
+	// repository id so MigrateCoverageTrackers can resolve them to the tracker
+	// created for the repository at startup; tracker ids are always positive,
+	// so the negative marker can never collide with a real tracker id.
+	copyQuery := `
 		INSERT INTO coverage (id, tracker_id, revision, time, contents)
-		SELECT id, tracker_id, revision, time, contents FROM coverage_old`); err != nil {
+		SELECT id, -tracker_id, revision, time, contents FROM coverage_old`
+	if s.hasColumn("tracker_coverage", "repo_id") {
+		copyQuery = `
+			INSERT INTO coverage (id, tracker_id, revision, time, contents)
+			SELECT c.id,
+			       COALESCE((SELECT tc.tracker_id FROM tracker_coverage tc
+			                 WHERE tc.repo_id = c.tracker_id LIMIT 1), -c.tracker_id),
+			       c.revision, c.time, c.contents
+			FROM coverage_old c`
+	}
+	if _, err := s.db.Exec(copyQuery); err != nil {
 		return fmt.Errorf("migrateCoverage copy: %w", err)
 	}
 	if _, err := s.db.Exec("DROP TABLE coverage_old"); err != nil {
