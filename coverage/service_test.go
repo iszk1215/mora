@@ -1,6 +1,7 @@
 package coverage
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/iszk1215/mora/core"
@@ -138,6 +139,58 @@ func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 
 	require.NoError(t, svc.MigrateCoverageTrackers(creator))
 	require.Len(t, creator.calls, 1)
+}
+
+// TestCoverageServiceMigrateCoverageTrackersFromOldSchemaNoLinks reproduces the
+// migration from a database that has repository and coverage entries but no
+// tracker_coverage table: a coverage tracker must be created for every
+// repository and existing coverage history re-keyed to the tracker assigned to
+// that repository. The old repo ids collide with existing tracker ids (1..3),
+// which the previous re-keying guard silently skipped.
+func TestCoverageServiceMigrateCoverageTrackersFromOldSchemaNoLinks(t *testing.T) {
+	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	require.NoError(t, err)
+
+	db.MustExec(`CREATE TABLE repository (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		scm INTEGER NOT NULL DEFAULT 0,
+		namespace TEXT NOT NULL DEFAULT '',
+		name TEXT NOT NULL DEFAULT '',
+		url TEXT NOT NULL DEFAULT ''
+	)`)
+	for id := 1; id <= 4; id++ {
+		db.MustExec(`INSERT INTO repository (id, scm, namespace, name, url) VALUES (?, 1, 'acme', ?, ?)`,
+			id, fmt.Sprintf("repo%d", id), fmt.Sprintf("http://example.com/acme/repo%d", id))
+	}
+	db.MustExec(`CREATE TABLE tracker (id INTEGER PRIMARY KEY AUTOINCREMENT)`)
+	for id := 1; id <= 3; id++ {
+		db.MustExec(`INSERT INTO tracker (id) VALUES (?)`, id)
+	}
+
+	// Old schema: coverage keyed by repo_id, no tracker_coverage table.
+	db.MustExec(`CREATE TABLE coverage (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		repo_id INTEGER NOT NULL,
+		revision TEXT NOT NULL,
+		time DATETIME NOT NULL,
+		contents TEXT NOT NULL,
+		UNIQUE(repo_id, revision)
+	)`)
+	for repoID := 1; repoID <= 4; repoID++ {
+		db.MustExec(`INSERT INTO coverage (repo_id, revision, time, contents) VALUES (?, ?, '2024-01-01', '[]')`,
+			repoID, fmt.Sprintf("rev-%d", repoID))
+	}
+
+	svc, err := NewCoverageService(db)
+	require.NoError(t, err)
+
+	creator := &fakeTrackerCreator{next: 3} // created trackers get ids 4..7
+	require.NoError(t, svc.MigrateCoverageTrackers(creator))
+	require.Len(t, creator.calls, 4)
+
+	var got []int64
+	require.NoError(t, db.Select(&got, "SELECT tracker_id FROM coverage ORDER BY id"))
+	require.Equal(t, []int64{4, 5, 6, 7}, got)
 }
 
 func TestCoverageServiceMigrateCoverageTrackersSkipsWithoutRepositoryTable(t *testing.T) {

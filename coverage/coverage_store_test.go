@@ -461,12 +461,16 @@ func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
 	)`)
 	db.MustExec(`INSERT INTO repository (id, scm, namespace, name, url)
 		VALUES (1, 2, 'acme', 'alpha', 'http://example.com/acme/alpha')`)
+	db.MustExec(`INSERT INTO repository (id, scm, namespace, name, url)
+		VALUES (2, 2, 'acme', 'beta', 'http://example.com/acme/beta')`)
 	db.MustExec(`CREATE TABLE tracker (id INTEGER PRIMARY KEY AUTOINCREMENT)`)
 	db.MustExec(`INSERT INTO tracker (id) VALUES (10)`)
 
 	db.MustExec(oldSchema)
 	db.MustExec(`INSERT INTO coverage (repo_id, revision, time, contents)
 		VALUES (1, 'abc', '2024-01-01', '[]')`)
+	db.MustExec(`INSERT INTO coverage (repo_id, revision, time, contents)
+		VALUES (2, 'def', '2024-01-01', '[]')`)
 	db.MustExec(`INSERT INTO tracker_coverage (tracker_id, repo_id) VALUES (10, 1)`)
 
 	s := NewCoverageStore(db)
@@ -492,7 +496,14 @@ func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
 	cov, err := s.Find(1)
 	require.NoError(t, err)
 	require.NotNil(t, cov)
-	require.Equal(t, int64(1), cov.TrackerID)
+	require.Equal(t, int64(10), cov.TrackerID)
+
+	// A row whose repository has no link is marked with a negative
+	// repository id and resolved by MigrateCoverageTrackers at startup.
+	unlinked, err := s.Find(2)
+	require.NoError(t, err)
+	require.NotNil(t, unlinked)
+	require.Equal(t, int64(-2), unlinked.TrackerID)
 
 	// Re-running Init is idempotent.
 	require.NoError(t, s.Init())

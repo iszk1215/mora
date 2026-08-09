@@ -36,7 +36,7 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 4. Verify access (session or API key)
 5. Inject `core.Repository` and `core.RepositoryClient` into context
 
-The `tracker_coverage` table is owned by the coverage package and stores the repository description (scm, namespace, name, url) directly, keyed by `tracker_id` with a foreign key to `tracker(id) ON DELETE CASCADE`. The `coverage` table is keyed by `tracker_id` (foreign key to `tracker(id) ON DELETE CASCADE`) instead of `repo_id`; on startup the coverage store migrates databases that still use the old `repo_id` schema (renaming the column, rebuilding the table, and carrying over existing `tracker_coverage` links).
+The `tracker_coverage` table is owned by the coverage package and stores the repository description (scm, namespace, name, url) directly, keyed by `tracker_id` with a foreign key to `tracker(id) ON DELETE CASCADE`. The `coverage` table is keyed by `tracker_id` (foreign key to `tracker(id) ON DELETE CASCADE`) instead of `repo_id`; on startup the coverage store migrates databases that still use the old `repo_id` schema (renaming the column, rebuilding the table, carrying over existing `tracker_coverage` links, and marking rows without a link with a negative repository id that is resolved to the tracker created for the repository at startup).
 
 `GET /api/coverages/{trackerId}/preview` uses only `requireTrackerAuth` + `InjectTracker` + `RequireReadPermission` (no SCM access needed).
 
@@ -70,7 +70,7 @@ Responses:
 | 404 | Repository not found |
 | 409 | Repository already has a coverage tracker |
 
-- On startup, `coverage.MigrateCoverageTrackers` creates a coverage tracker for every repository that has none, creating trackers via the tracker service and linking them through `coverage.Link`. Coverage trackers are owned by the superuser (`coverage.CoverageTrackerOwnerID`, id=1).
+- On startup, `coverage.MigrateCoverageTrackers` creates a coverage tracker for every repository that has none, creating trackers via the tracker service and linking them through `coverage.Link`. It then re-keys coverage history that the schema migration marked with a negative repository id to the linked tracker id, and deletes rows whose repository no longer exists. Coverage trackers are owned by the superuser (`coverage.CoverageTrackerOwnerID`, id=1).
 - Preview: served by `CoverageHandler.HandleCoveragePreview` at `/api/coverages/{trackerId}/preview`, fetching from `CoverageStore.Timeline(trackerID, 20)`
 - Series/values endpoints return 400 (no direct data management)
 - Detail view: `/coverages/:trackerId` shows coverage charts and file browser
