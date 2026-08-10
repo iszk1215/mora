@@ -125,6 +125,23 @@ Coverage-type trackers are created via `POST /api/coverages` (the tracker packag
 | Coverage | `coverage`, `coverage_entry`, `coverage_block`, `tracker_coverage` |
 | Tracker | `tracker`, `tracker_series`, `tracker_value`, `tracker_member`, `tracker_like` |
 | UDM | `udm_metric`, `udm_item`, `udm_value` |
+| Migrations | `schema_migrations` |
+
+## Data Migrations
+
+`mora migrate` (see `cmd/migrate.go`, `udm/migrate.go`) runs one-time, non-destructive
+data migrations directly against the database file from the server config
+(`mora.conf`, flag `-c`). Applied migrations are recorded in the
+`schema_migrations` table, so re-running the command is a no-op.
+
+Current migrations:
+
+- **`udm_to_tracker`**: migrates repository-scoped UDM data
+  (`udm_metric` -> `udm_item` -> `udm_value`) into repository-independent
+  trackers (`tracker` -> `tracker_series` -> `tracker_value`). Each metric
+  becomes a `public` `tracker` owned by the admin user (id=1), each item becomes
+  an `int` series, and values are copied as floats. UDM tables/API/CLI are left
+  intact; migration tracks are created via `tracker.NewService` first.
 
 ## Frontend
 

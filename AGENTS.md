@@ -70,3 +70,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 Tracks custom metrics beyond code coverage. Data model: Metric → Item → Value (stored in `udm_metric`, `udm_item`, `udm_value` tables).
 
 CLI: `mora udm metric [--create|--delete|--list]` / `mora udm value [--add|--list|--clear]`
+
+## Data Migrations
+
+`mora migrate -c mora.conf` runs one-time non-destructive data migrations directly on the DB file (recorded in `schema_migrations`). Currently `udm_to_tracker`: migrates UDM metrics/items/values into public `tracker`/`tracker_series`/`tracker_value` rows owned by the admin (id=1).

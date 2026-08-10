@@ -30,6 +30,7 @@ func New() *cobra.Command {
 	cmd.PersistentFlags().Bool("debug", false, "debug log")
 
 	cmd.AddCommand(NewWebCommand())
+	cmd.AddCommand(NewMigrateCommand())
 	cmd.AddCommand(coverage.NewCommand())
 	cmd.AddCommand(udm.NewCommand())
 
