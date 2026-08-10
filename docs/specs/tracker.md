@@ -223,7 +223,7 @@ Coverage-type trackers (`type="coverage"`) are created exclusively through the c
 | `/trackers` | TrackerView | Card grid with preview charts |
 | `/trackers/new` | TrackerCreate | Create form |
 | `/trackers/:trackerId` | TrackerDetailView | Detail (tracker type) |
-| `/trackers/:trackerId/edit` | TrackerDetailEdit | Edit visibility/chart/description |
+| `/trackers/:trackerId/edit` | TrackerDetailEdit | Edit visibility/chart/description. Guarded by edit permission: users with `role == ""` get a 403 |
 
 ## Key Files
 

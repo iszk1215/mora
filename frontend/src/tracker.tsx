@@ -1279,6 +1279,14 @@ const TrackerDetailRouter = (): React.JSX.Element => {
   return <TrackerDetailView />
 }
 
+export const TrackerDetailEditRouter = (): React.JSX.Element => {
+  const data = useLoaderData() as TrackerDetailData
+  if (data.tracker.role === '') {
+    throw new Response('Forbidden', { status: 403 })
+  }
+  return <TrackerDetailEdit />
+}
+
 export const trackerRoute = [
   {
     index: true,
@@ -1302,7 +1310,7 @@ export const trackerRoute = [
   {
     path: ':trackerId/edit',
     loader: loadTrackerDetail,
-    element: <TrackerDetailEdit />,
+    element: <TrackerDetailEditRouter />,
     handle: {
       crumb: () => ({ label: 'Edit' }),
     },
