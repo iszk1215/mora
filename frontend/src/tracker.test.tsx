@@ -7,6 +7,7 @@ import {
   TrackerView,
   TrackerDetailView,
   TrackerDetailEdit,
+  TrackerDetailEditRouter,
   TrackerCard,
   loadTrackerList,
   loadTrackerDetail,
@@ -422,6 +423,53 @@ describe('TrackerDetailView', () => {
 
 })
 
+
+describe('TrackerDetailEditRouter', () => {
+  beforeEach(() => {
+    vi.mocked(useLoaderData).mockReset()
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ values: [] }),
+    } as Response)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('throws 403 Forbidden when user has no role', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'public', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      series: [],
+    })
+    let thrown: unknown
+    try {
+      render(<MemoryRouter><TrackerDetailEditRouter /></MemoryRouter>)
+    } catch (e) {
+      thrown = e
+    }
+    expect(thrown).toBeInstanceOf(Response)
+    expect((thrown as Response).status).toBe(403)
+  })
+
+  it('renders edit page for owner', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEditRouter /></MemoryRouter>)
+    expect(screen.getByPlaceholderText('Series name')).toBeInTheDocument()
+  })
+
+  it('renders edit page for editor', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEditRouter /></MemoryRouter>)
+    expect(screen.getByPlaceholderText('Series name')).toBeInTheDocument()
+  })
+})
 
 describe('TrackerDetailEdit', () => {
   beforeEach(() => {
