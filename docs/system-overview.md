@@ -117,6 +117,21 @@ Coverage-type trackers are created via `POST /api/coverages` (the tracker packag
 | API Key | Bearer token | Programmatic access (`user_api_key` table) |
 | Session | Cookie-based | Browser sessions (`MoraSession`) |
 
+## Usernames
+
+- Usernames are unique (case-insensitive, enforced by the
+  `idx_user_username` UNIQUE index on `user.username`).
+- A username must be a URL-safe string: lowercase ASCII letters, digits,
+  `-` and `_`, 1-32 characters, starting and ending with a letter or digit.
+- A set of reserved names (`admin`, `api`, `login`, ...) cannot be claimed.
+- On signup the provider username is used as the default but sanitized to
+  conform to the rules; when the chosen name is taken, the confirm endpoint
+  returns `409` with a `suggested_username` alternative.
+- Usernames are currently immutable. The validation/suggestion logic lives in
+  `server/username.go` as pure functions so a future rename feature can reuse
+  it; `user.id` remains the stable identifier (usernames are not yet used in
+  URLs).
+
 ## Database Tables
 
 | Subsystem | Tables |

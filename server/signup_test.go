@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -102,6 +104,28 @@ func TestSignupHandler_GetPending(t *testing.T) {
 	require.Equal(t, "https://example.com/avatar.jpg", got.AvatarURL)
 }
 
+func TestSignupHandler_GetPending_SanitizesUsername(t *testing.T) {
+	h := SignupHandler(nil)
+	sess := NewMoraSession()
+	sess.SetPendingSignup(&pendingSignup{
+		provider: "github",
+		username: "Octo Cat",
+	})
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/pending", nil)
+	r = r.WithContext(WithMoraSession(r.Context(), sess))
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	body, _ := io.ReadAll(res.Body)
+	var got PendingSignupResponse
+	require.NoError(t, json.Unmarshal(body, &got))
+	require.Equal(t, "octo-cat", got.Username)
+}
+
 func TestSignupHandler_Cancel(t *testing.T) {
 	h := SignupHandler(nil)
 	sess := NewMoraSession()
@@ -179,7 +203,7 @@ func TestSignupHandler_Confirm_Success(t *testing.T) {
 	})
 
 	csrfToken := "test-csrf"
-	body := strings.NewReader("csrf_token=" + csrfToken)
+	body := strings.NewReader("csrf_token=" + csrfToken + "&username=confirmeduser")
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodPost, "/confirm", body)
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -202,3 +226,125 @@ func TestSignupHandler_Confirm_Success(t *testing.T) {
 	require.Nil(t, sess.PendingSignup())
 }
 
+func TestSignupHandler_Confirm_EmptyUsernameFallsBackToProvider(t *testing.T) {
+	store := newTestUserStore(t)
+	h := SignupHandler(store)
+	sess := NewMoraSession()
+	sess.SetPendingSignup(&pendingSignup{
+		provider:       "gitea",
+		providerUserID: "42",
+		username:       "Octo Cat",
+		avatarURL:      "https://example.com/av.jpg",
+	})
+
+	csrfToken := "test-csrf"
+	body := strings.NewReader("csrf_token=" + csrfToken)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/confirm", body)
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(&http.Cookie{Name: csrfCookieName, Value: csrfToken, Path: "/", HttpOnly: false})
+	r = r.WithContext(WithMoraSession(r.Context(), sess))
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusCreated, res.StatusCode)
+
+	user, err := store.FindByUsername("octo-cat")
+	require.NoError(t, err)
+	require.Equal(t, "octo-cat", user.Username)
+}
+
+func TestSignupHandler_Confirm_UsernameTaken(t *testing.T) {
+	store := newTestUserStore(t)
+	_, err := store.CreateUser("takenuser", "")
+	require.NoError(t, err)
+
+	h := SignupHandler(store)
+	sess := NewMoraSession()
+	sess.SetPendingSignup(&pendingSignup{
+		provider:       "gitea",
+		providerUserID: "42",
+		username:       "takenuser",
+	})
+
+	csrfToken := "test-csrf"
+	body := strings.NewReader("csrf_token=" + csrfToken + "&username=takenuser")
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/confirm", body)
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(&http.Cookie{Name: csrfCookieName, Value: csrfToken, Path: "/", HttpOnly: false})
+	r = r.WithContext(WithMoraSession(r.Context(), sess))
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusConflict, res.StatusCode)
+
+	var got SignupConfirmErrorResponse
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&got))
+	require.Contains(t, got.Message, "takenuser")
+	require.Equal(t, "takenuser-2", got.SuggestedUsername)
+
+	require.Nil(t, sess.UserID())
+	require.NotNil(t, sess.PendingSignup())
+}
+
+func TestSignupHandler_Confirm_ReservedUsername(t *testing.T) {
+	store := newTestUserStore(t)
+	h := SignupHandler(store)
+	sess := NewMoraSession()
+	sess.SetPendingSignup(&pendingSignup{
+		provider:       "gitea",
+		providerUserID: "42",
+		username:       "octocat",
+	})
+
+	csrfToken := "test-csrf"
+	body := strings.NewReader("csrf_token=" + csrfToken + "&username=admin")
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/confirm", body)
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(&http.Cookie{Name: csrfCookieName, Value: csrfToken, Path: "/", HttpOnly: false})
+	r = r.WithContext(WithMoraSession(r.Context(), sess))
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	require.Nil(t, sess.UserID())
+	require.NotNil(t, sess.PendingSignup())
+}
+
+func TestSignupHandler_Confirm_MultipartBody(t *testing.T) {
+	store := newTestUserStore(t)
+	h := SignupHandler(store)
+	sess := NewMoraSession()
+	sess.SetPendingSignup(&pendingSignup{
+		provider:       "gitea",
+		providerUserID: "42",
+		username:       "provideruser",
+	})
+
+	csrfToken := "test-csrf"
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	require.NoError(t, mw.WriteField("csrf_token", csrfToken))
+	require.NoError(t, mw.WriteField("username", "chosenuser"))
+	require.NoError(t, mw.Close())
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/confirm", &buf)
+	r.Header.Set("Content-Type", mw.FormDataContentType())
+	r.AddCookie(&http.Cookie{Name: csrfCookieName, Value: csrfToken, Path: "/", HttpOnly: false})
+	r = r.WithContext(WithMoraSession(r.Context(), sess))
+	h.ServeHTTP(w, r)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusCreated, res.StatusCode)
+
+	user, err := store.FindByUsername("chosenuser")
+	require.NoError(t, err)
+	require.Equal(t, "chosenuser", user.Username)
+}

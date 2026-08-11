@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,13 @@ type PendingSignupResponse struct {
 	Provider  string `json:"provider"`
 	Username  string `json:"username"`
 	AvatarURL string `json:"avatar_url"`
+}
+
+// SignupConfirmErrorResponse is returned with a 409 when the chosen username is
+// already taken. SuggestedUsername offers an available alternative.
+type SignupConfirmErrorResponse struct {
+	Message           string `json:"message"`
+	SuggestedUsername string `json:"suggested_username"`
 }
 
 func SignupHandler(userStore UserStore) http.Handler {
@@ -40,7 +48,7 @@ func SignupHandler(userStore UserStore) http.Handler {
 
 		render.JSON(w, PendingSignupResponse{
 			Provider:  p.provider,
-			Username:  p.username,
+			Username:  sanitizeUsername(p.username),
 			AvatarURL: p.avatarURL,
 		}, http.StatusOK)
 	})
@@ -83,10 +91,15 @@ func SignupHandler(userStore UserStore) http.Handler {
 		// @Summary      Confirm pending signup
 		// @Description  Create a user from the pending signup and log in
 		// @Tags         auth
+		// @Accept       multipart/form-data
 		// @Produce      json
+		// @Param        csrf_token formData string true  "CSRF token"
+		// @Param        username    formData string false "Username (defaults to a sanitized provider username)"
 		// @Success      201  {object}  server.User
+		// @Failure      400  {object}  core.ErrorResponse
 		// @Failure      403  {object}  core.ErrorResponse
 		// @Failure      404  {object}  core.ErrorResponse
+		// @Failure      409  {object}  server.SignupConfirmErrorResponse
 		// @Router       /api/signup/confirm [post]
 		sess, ok := MoraSessionFrom(r.Context())
 		if !ok {
@@ -106,8 +119,27 @@ func SignupHandler(userStore UserStore) http.Handler {
 			return
 		}
 
-		user, err := userStore.CreateUser(p.username, p.avatarURL)
+		username := r.PostFormValue("username")
+		if username == "" {
+			username = p.username
+		}
+		username = sanitizeUsername(username)
+		if err := validateUsername(username); err != nil {
+			render.BadRequest(w, err)
+			return
+		}
+
+		if _, err := userStore.FindByUsername(username); err == nil {
+			writeUsernameConflict(w, userStore, username)
+			return
+		}
+
+		user, err := userStore.CreateUser(username, p.avatarURL)
 		if err != nil {
+			if isUniqueConstraintError(err) {
+				writeUsernameConflict(w, userStore, username)
+				return
+			}
 			log.Error().Err(err).Msg("failed to create user during signup")
 			render.InternalError(w, err)
 			return
@@ -127,4 +159,19 @@ func SignupHandler(userStore UserStore) http.Handler {
 	})
 
 	return r
+}
+
+func writeUsernameConflict(w http.ResponseWriter, userStore UserStore, username string) {
+	suggested, err := suggestUsername(userStore, username)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to suggest username on conflict")
+		render.InternalError(w, err)
+		return
+	}
+
+	log.Info().Str("username", username).Msg("username already taken during signup")
+	render.JSON(w, SignupConfirmErrorResponse{
+		Message:           fmt.Sprintf("username %q is already taken", username),
+		SuggestedUsername: suggested,
+	}, http.StatusConflict)
 }

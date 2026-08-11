@@ -82,6 +82,14 @@ func (s *userStore) Init() error {
 	}
 
 	_, err = s.db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_user_username
+		ON user (username COLLATE NOCASE)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS user_auth (
 			id               INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id          INTEGER NOT NULL REFERENCES user(id),
@@ -186,7 +194,7 @@ func (s *userStore) CreateUser(username, avatarURL string) (*User, error) {
 func (s *userStore) FindByUsername(username string) (*User, error) {
 	var user User
 	err := s.db.Get(&user,
-		"SELECT * FROM user WHERE username = ?", username)
+		"SELECT * FROM user WHERE username = ? COLLATE NOCASE", username)
 	if err != nil {
 		return nil, err
 	}
