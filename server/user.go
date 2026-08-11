@@ -71,19 +71,11 @@ func (s *userStore) Init() error {
 	_, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS user (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			username   TEXT    NOT NULL,
+			username   TEXT    NOT NULL UNIQUE COLLATE NOCASE,
 			avatar_url TEXT    NOT NULL DEFAULT '',
 			created_at TEXT    NOT NULL DEFAULT (datetime('now')),
 			updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 		)
-	`)
-	if err != nil {
-		return err
-	}
-
-	_, err = s.db.Exec(`
-		CREATE UNIQUE INDEX IF NOT EXISTS idx_user_username
-		ON user (username COLLATE NOCASE)
 	`)
 	if err != nil {
 		return err
