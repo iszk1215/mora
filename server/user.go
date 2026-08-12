@@ -71,7 +71,7 @@ func (s *userStore) Init() error {
 	_, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS user (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			username   TEXT    NOT NULL,
+			username   TEXT    NOT NULL UNIQUE COLLATE NOCASE,
 			avatar_url TEXT    NOT NULL DEFAULT '',
 			created_at TEXT    NOT NULL DEFAULT (datetime('now')),
 			updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -186,7 +186,7 @@ func (s *userStore) CreateUser(username, avatarURL string) (*User, error) {
 func (s *userStore) FindByUsername(username string) (*User, error) {
 	var user User
 	err := s.db.Get(&user,
-		"SELECT * FROM user WHERE username = ?", username)
+		"SELECT * FROM user WHERE username = ? COLLATE NOCASE", username)
 	if err != nil {
 		return nil, err
 	}

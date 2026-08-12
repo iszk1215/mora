@@ -912,6 +912,9 @@ const docTemplate = `{
         "/api/signup/confirm": {
             "post": {
                 "description": "Create a user from the pending signup and log in",
+                "consumes": [
+                    "multipart/form-data"
+                ],
                 "produces": [
                     "application/json"
                 ],
@@ -919,11 +922,32 @@ const docTemplate = `{
                     "auth"
                 ],
                 "summary": "Confirm pending signup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "CSRF token",
+                        "name": "csrf_token",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Username (defaults to a sanitized provider username)",
+                        "name": "username",
+                        "in": "formData"
+                    }
+                ],
                 "responses": {
                     "201": {
                         "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/server.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
                         }
                     },
                     "403": {
@@ -936,6 +960,12 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/server.SignupConfirmErrorResponse"
                         }
                     }
                 }
@@ -2146,6 +2176,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "server.SignupConfirmErrorResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "suggested_username": {
                     "type": "string"
                 }
             }

@@ -210,6 +210,13 @@ definitions:
       url:
         type: string
     type: object
+  server.SignupConfirmErrorResponse:
+    properties:
+      message:
+        type: string
+      suggested_username:
+        type: string
+    type: object
   server.User:
     properties:
       avatar_url:
@@ -1093,7 +1100,19 @@ paths:
       - auth
   /api/signup/confirm:
     post:
+      consumes:
+      - multipart/form-data
       description: Create a user from the pending signup and log in
+      parameters:
+      - description: CSRF token
+        in: formData
+        name: csrf_token
+        required: true
+        type: string
+      - description: Username (defaults to a sanitized provider username)
+        in: formData
+        name: username
+        type: string
       produces:
       - application/json
       responses:
@@ -1101,6 +1120,10 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/server.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
         "403":
           description: Forbidden
           schema:
@@ -1109,6 +1132,10 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/core.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/server.SignupConfirmErrorResponse'
       summary: Confirm pending signup
       tags:
       - auth

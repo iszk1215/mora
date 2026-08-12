@@ -2,6 +2,8 @@ import { useLoaderData, useNavigate } from 'react-router'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 
+const MAX_USERNAME_LENGTH = 32
+
 interface PendingSignupData {
   provider: string
   username: string
@@ -14,10 +16,34 @@ export async function loadPendingSignup(): Promise<PendingSignupData | null> {
   return resp.json()
 }
 
+// sanitizeUsername mirrors the server-side rule: lowercase, keep only
+// [a-z0-9_-], replace runs of other characters with '-', trim leading/trailing
+// '-'/'_', cap length and fall back to "user" when empty.
+export function sanitizeUsername(input: string): string {
+  let result = ''
+  for (const ch of input.toLowerCase()) {
+    if (/[a-z0-9_-]/.test(ch)) {
+      result += ch
+    } else if (result.length === 0 || result[result.length - 1] !== '-') {
+      result += '-'
+    }
+  }
+
+  let name = result.replace(/^[-_]+|[-_]+$/g, '')
+  if (name === '') return 'user'
+  if (name.length > MAX_USERNAME_LENGTH) {
+    name = name.slice(0, MAX_USERNAME_LENGTH).replace(/[-_]+$/, '')
+    if (name === '') return 'user'
+  }
+  return name
+}
+
 export const SignupPage = (): React.JSX.Element => {
   const navigate = useNavigate()
   const pending = useLoaderData() as PendingSignupData | null
+  const [username, setUsername] = useState(sanitizeUsername(pending?.username ?? ''))
   const [error, setError] = useState<string | null>(null)
+  const [suggested, setSuggested] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -40,9 +66,24 @@ export const SignupPage = (): React.JSX.Element => {
     navigate('/auth', { replace: true })
   }
 
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUsername(sanitizeUsername(e.target.value))
+    setError(null)
+    setSuggested(null)
+  }
+
+  const useSuggested = () => {
+    if (suggested) {
+      setUsername(suggested)
+      setError(null)
+      setSuggested(null)
+    }
+  }
+
   const handleConfirm = async () => {
     setSubmitting(true)
     setError(null)
+    setSuggested(null)
 
     const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
     if (!match) {
@@ -53,6 +94,7 @@ export const SignupPage = (): React.JSX.Element => {
 
     const formData = new FormData()
     formData.append('csrf_token', match[1])
+    formData.append('username', username)
 
     const resp = await fetch('/api/signup/confirm', {
       method: 'POST',
@@ -61,11 +103,17 @@ export const SignupPage = (): React.JSX.Element => {
 
     if (resp.ok) {
       navigate('/', { replace: true })
-    } else {
-      const data = await resp.json().catch(() => ({ message: 'Signup failed' }))
-      setError(data.message || 'Signup failed')
-      setSubmitting(false)
+      return
     }
+
+    const data = await resp.json().catch(() => null)
+    if (resp.status === 409 && data?.suggested_username) {
+      setSuggested(data.suggested_username)
+      setError(data.message || 'Username is already taken')
+    } else {
+      setError(data?.message || 'Signup failed')
+    }
+    setSubmitting(false)
   }
 
   return (
@@ -89,9 +137,31 @@ export const SignupPage = (): React.JSX.Element => {
         </div>
       </div>
 
+      <div className="mb-4">
+        <label htmlFor="username" className="block text-sm font-medium mb-1">
+          Username
+        </label>
+        <input
+          id="username"
+          type="text"
+          value={username}
+          onChange={handleUsernameChange}
+          autoComplete="username"
+          className="w-full border rounded px-3 py-2"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          Only lowercase letters, digits, '-' and '_'.
+        </p>
+      </div>
+
       {error && (
         <div className="bg-red-100 text-red-700 rounded p-3 mb-4 text-sm">
-          {error}
+          <span>{error}</span>
+          {suggested && (
+            <button type="button" className="underline ml-2" onClick={useSuggested}>
+              Use suggested: {suggested}
+            </button>
+          )}
         </div>
       )}
 

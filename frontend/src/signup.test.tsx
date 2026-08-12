@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
-import { SignupPage, loadPendingSignup } from './signup'
+import { SignupPage, loadPendingSignup, sanitizeUsername } from './signup'
 
 const mockNavigate = vi.fn()
 vi.mock('react-router', async () => {
@@ -50,6 +50,32 @@ describe('loadPendingSignup', () => {
   })
 })
 
+describe('sanitizeUsername', () => {
+  it('lowercases the input', () => {
+    expect(sanitizeUsername('Octocat')).toBe('octocat')
+  })
+
+  it('replaces invalid characters with a single hyphen', () => {
+    expect(sanitizeUsername('山田 tarou')).toBe('tarou')
+    expect(sanitizeUsername('John.Doe')).toBe('john-doe')
+    expect(sanitizeUsername('a  b')).toBe('a-b')
+  })
+
+  it('trims leading and trailing separators', () => {
+    expect(sanitizeUsername('-foo_')).toBe('foo')
+  })
+
+  it('falls back to user when empty', () => {
+    expect(sanitizeUsername('!!!@@#')).toBe('user')
+    expect(sanitizeUsername('')).toBe('user')
+  })
+
+  it('truncates to 32 characters', () => {
+    const long = 'a'.repeat(40)
+    expect(sanitizeUsername(long)).toBe('a'.repeat(32))
+  })
+})
+
 describe('SignupPage', () => {
   beforeEach(() => {
     vi.mocked(useLoaderData).mockReset()
@@ -92,6 +118,81 @@ describe('SignupPage', () => {
     const img = document.querySelector('img') as HTMLImageElement
     expect(img.src).toBe(avatarUrl)
     expect(img.className).toContain('rounded-full')
+  })
+
+  it('defaults the username input to the sanitized pending username', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      provider: 'github',
+      username: 'Octocat',
+      avatar_url: avatarUrl,
+    })
+    render(<MemoryRouter><SignupPage /></MemoryRouter>)
+    const input = screen.getByLabelText('Username') as HTMLInputElement
+    expect(input.value).toBe('octocat')
+  })
+
+  it('sanitizes the username while typing', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      provider: 'github',
+      username: 'octocat',
+      avatar_url: '',
+    })
+    render(<MemoryRouter><SignupPage /></MemoryRouter>)
+    const input = screen.getByLabelText('Username') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'New.User!' } })
+    expect(input.value).toBe('new-user')
+  })
+
+  it('includes the username in the confirm request', async () => {
+    document.cookie = 'csrf_token=abc123; path=/'
+    vi.mocked(useLoaderData).mockReturnValue({
+      provider: 'github',
+      username: 'test',
+      avatar_url: '',
+    })
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true } as Response)
+
+    render(<MemoryRouter><SignupPage /></MemoryRouter>)
+
+    const input = screen.getByLabelText('Username') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'octocat' } })
+
+    screen.getByRole('button', { name: 'Create Account' }).click()
+
+    await vi.waitFor(() => {
+      const [, init] = vi.mocked(globalThis.fetch).mock.calls[0]
+      expect(init).toBeDefined()
+      const form = init?.body as FormData
+      expect(form.get('username')).toBe('octocat')
+    })
+  })
+
+  it('shows a suggested username on 409 and applies it on click', async () => {
+    document.cookie = 'csrf_token=abc123; path=/'
+    vi.mocked(useLoaderData).mockReturnValue({
+      provider: 'github',
+      username: 'test',
+      avatar_url: '',
+    })
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: () => Promise.resolve({ message: 'username "test" is already taken', suggested_username: 'test-2' }),
+    } as Response)
+
+    render(<MemoryRouter><SignupPage /></MemoryRouter>)
+
+    screen.getByRole('button', { name: 'Create Account' }).click()
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('username "test" is already taken')).toBeInTheDocument()
+    })
+
+    screen.getByRole('button', { name: 'Use suggested: test-2' }).click()
+    const input = screen.getByLabelText('Username') as HTMLInputElement
+    await vi.waitFor(() => {
+      expect(input.value).toBe('test-2')
+    })
   })
 
   it('posts to cancel API and navigates to /auth on Cancel', async () => {
