@@ -61,6 +61,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - [docs/system-overview.md](docs/system-overview.md) - Architecture, packages, routes, middleware, auth
 - [docs/specs/tracker.md](docs/specs/tracker.md) - Tracker API spec (endpoints, auth, data model)
 - [docs/specs/tracker-search.md](docs/specs/tracker-search.md) - Tracker search spec (top page search feature)
+- [docs/specs/user-page.md](docs/specs/user-page.md) - User page spec (/users/:userName)
 - [docs/specs/coverage.md](docs/specs/coverage.md) - Coverage URL spec (URLs, middleware, upload)
 - [docs/decisions/0001-use-sqlite3.md](docs/decisions/0001-use-sqlite3.md) - ADR: SQLite3
 - [docs/decisions/0002-use-go-chi.md](docs/decisions/0002-use-go-chi.md) - ADR: chi router
