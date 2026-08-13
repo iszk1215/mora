@@ -89,7 +89,7 @@ type TrackerResponse struct {
 	OwnerName     string    `json:"owner_name" db:"owner_name"`
 	CreatedAt     time.Time `json:"created_at" db:"created_at"`
 	LastUpdatedAt time.Time `json:"last_updated_at" db:"last_updated_at"`
-	Role          string    `json:"role"`       // "" | "owner" | "editor"
+	Role          string    `json:"role"` // "" | "owner" | "editor"
 	Liked         bool      `json:"liked"`
 	LikeCount     int       `json:"like_count" db:"like_count"`
 }
@@ -183,9 +183,9 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 		ORDER BY t.name`, whereClause)
 
 	selectArgs := make([]interface{}, 0, len(whereArgs)+3)
-	selectArgs = append(selectArgs, userID)  // owner_id in role CASE
-	selectArgs = append(selectArgs, userID)  // m.user_id in member join
-	selectArgs = append(selectArgs, userID)  // l.user_id in like join
+	selectArgs = append(selectArgs, userID) // owner_id in role CASE
+	selectArgs = append(selectArgs, userID) // m.user_id in member join
+	selectArgs = append(selectArgs, userID) // l.user_id in like join
 	selectArgs = append(selectArgs, whereArgs...)
 
 	// Inline pagination as literal integers: SQLite returns wrong row counts
@@ -495,6 +495,15 @@ func (s *trackerStore) touchTracker(trackerID int64) error {
 	_, err := s.db.Exec("UPDATE tracker SET last_updated_at = ? WHERE id = ?", time.Now(), trackerID)
 	if err != nil {
 		return fmt.Errorf("touchTracker update: %w", err)
+	}
+	return nil
+}
+
+// setLastUpdatedAt sets the tracker's last_updated_at to the given time.
+func (s *trackerStore) setLastUpdatedAt(trackerID int64, ts time.Time) error {
+	_, err := s.db.Exec("UPDATE tracker SET last_updated_at = ? WHERE id = ?", ts, trackerID)
+	if err != nil {
+		return fmt.Errorf("setLastUpdatedAt update: %w", err)
 	}
 	return nil
 }

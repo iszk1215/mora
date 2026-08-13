@@ -55,6 +55,11 @@ func (s *Service) Like(userID, trackerID int64) error {
 	return s.store.addLike(userID, trackerID)
 }
 
+// SetLastUpdatedAt sets the tracker's last_updated_at timestamp.
+func (s *Service) SetLastUpdatedAt(trackerID int64, ts time.Time) error {
+	return s.store.setLastUpdatedAt(trackerID, ts)
+}
+
 // ListTrackersByOwner lists trackers owned by `ownerID`, filtered by the
 // viewer's access (private trackers only visible to the owner) and an
 // optional name search query. Used by the user page (/users/:userName).
