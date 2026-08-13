@@ -321,7 +321,7 @@ export const Header = (): React.JSX.Element => {
 
   return (
     <header className="sticky top-0 mb-2 bg-black text-white py-1 z-10">
-      <div className="w-8/12 m-auto">
+      <div className="px-4 sm:px-8">
         <nav className="flex justify-between">
           <HeaderLink to={'/'}>{siteName}</HeaderLink>
           <div className="flex items-center gap-2">
