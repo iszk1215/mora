@@ -219,7 +219,32 @@ describe('TrackerView', () => {
       per_page: 12,
     })
     render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('@alice')).toBeInTheDocument()
+    expect(screen.getByText('alice')).toBeInTheDocument()
+  })
+
+  it('links owner name to user page', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      trackers: [
+        {
+          id: 1,
+          name: 'my-tracker',
+          visibility: 'private',
+          type: 'tracker',
+          chart_config: '{}',
+          role: 'owner',
+          liked: false,
+          owner_id: 2,
+          owner_name: 'alice',
+          last_updated_at: '2026-02-03T00:00:00Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 12,
+    })
+    render(<MemoryRouter><TrackerView /></MemoryRouter>)
+    const link = screen.getByText('alice').closest('a')
+    expect(link).toHaveAttribute('href', '/users/alice')
   })
 
   it('shows empty state when no trackers', () => {
