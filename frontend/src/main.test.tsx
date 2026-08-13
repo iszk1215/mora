@@ -472,6 +472,80 @@ describe('Breadcrumbs', () => {
     expect(link).toHaveAttribute('href', '/?q=foo%20bar')
   })
 
+  it('shows username crumb for user page without @ prefix', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/users/:userName', pathname: '/users/alice', params: { userName: 'alice' },
+        data: { user: { id: 2, username: 'alice', avatar_url: '' } }, loaderData: undefined,
+        handle: { crumb: (params: any, data: any) => ({ label: data?.user?.username ?? params.userName }) },
+      },
+    ])
+    render(
+      <MemoryRouter initialEntries={['/users/alice']}>
+        <Breadcrumbs />
+      </MemoryRouter>
+    )
+    expect(screen.getByText('alice')).toBeInTheDocument()
+    expect(screen.queryByText('@alice')).toBeNull()
+  })
+
+  it('shows Search Results crumb linking to user page when navigated from user search', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' },
+        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
+        handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
+      },
+    ])
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/1', state: { fromSearch: 'foo', fromUser: 'alice' } }]}>
+        <Breadcrumbs />
+      </MemoryRouter>
+    )
+    expect(screen.getByText('Search Results')).toBeInTheDocument()
+    expect(screen.getByText('My Tracker')).toBeInTheDocument()
+    expect(screen.queryByText('@alice')).toBeNull()
+    const link = screen.getByText('Search Results').closest('a')
+    expect(link).toHaveAttribute('href', '/users/alice?q=foo')
+  })
+
+  it('shows Search Results crumb linking to user page on edit page with fromUser', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' },
+        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId/edit', pathname: '/trackers/1/edit', params: { trackerId: '1' },
+        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        handle: { crumb: () => ({ label: 'Edit' }) },
+      },
+    ])
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit', state: { fromSearch: 'foo', fromUser: 'alice' } }]}>
+        <Breadcrumbs />
+      </MemoryRouter>
+    )
+    expect(screen.getByText('Search Results')).toBeInTheDocument()
+    expect(screen.getByText('My Tracker')).toBeInTheDocument()
+    expect(screen.getByText('Edit')).toBeInTheDocument()
+    const searchLink = screen.getByText('Search Results').closest('a')
+    expect(searchLink).toHaveAttribute('href', '/users/alice?q=foo')
+  })
+
   // Tests using React Router v7 auto-generated numeric IDs (e.g. "0-4-2")
   describe('with React Router v7 numeric route IDs', () => {
     it('shows Search Results crumb on tracker detail page with query (real IDs)', () => {

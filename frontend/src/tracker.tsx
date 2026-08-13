@@ -167,7 +167,7 @@ export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise
   return listSeries(parseInt(params.trackerId))
 }
 
-export const TrackerCard = ({ tracker, preview, loading, searchQuery }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean; searchQuery?: string }): React.JSX.Element => {
+export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean; searchQuery?: string; fromUser?: string }): React.JSX.Element => {
   const chartConfig = useMemo(() => {
     try { return JSON.parse(preview?.tracker?.chart_config ?? '{}') as ChartConfig }
     catch { return {} as ChartConfig }
@@ -269,7 +269,11 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery }: { tracke
   const linkTo = tracker.type === 'coverage'
     ? `/coverages/${tracker.id}`
     : `/trackers/${tracker.id}`
-  const linkState = searchQuery ? { fromSearch: searchQuery } : undefined
+  const linkState = fromUser
+    ? { fromSearch: searchQuery, fromUser }
+    : searchQuery
+      ? { fromSearch: searchQuery }
+      : undefined
 
   return (
     <Link to={linkTo} state={linkState} className="block bg-card border rounded-lg p-4 hover:shadow-md transition-shadow">

@@ -24,6 +24,7 @@ import type { SearchState } from './search-context'
 import { coverageTrackerRoute } from './coverage'
 import { udmRoute } from './udm'
 import { trackerRoute, listTrackers, TrackerCard, fetchPreview, PreviewData } from './tracker'
+import { userPageRoute } from './user'
 import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
 import { PasswordLoginForm } from './auth'
@@ -414,6 +415,7 @@ export const Breadcrumbs = (): React.JSX.Element => {
   const matches = useMatches()
   const location = useLocation()
   const searchQuery = (location.state as any)?.fromSearch as string | undefined
+  const fromUser = (location.state as any)?.fromUser as string | undefined
 
   const last = matches[matches.length - 1]
 
@@ -425,13 +427,15 @@ export const Breadcrumbs = (): React.JSX.Element => {
   const isTrackerDetail = hasTrackerId && !isOnEditPage
   const isTrackerEdit = hasTrackerId && isOnEditPage
 
-  // For tracker detail page: add "Search Results" parent if navigated from search,
-  // otherwise add the owner username as the parent crumb
+  // For tracker detail page: add "Search Results" parent if navigated from a search
+  // (top page or user page), otherwise add the owner username as the parent crumb
   if (isTrackerDetail) {
     if (searchQuery) {
       crumbs.push({
         label: 'Search Results',
-        link: `/?q=${encodeURIComponent(searchQuery)}`,
+        link: fromUser
+          ? `/users/${encodeURIComponent(fromUser)}?q=${encodeURIComponent(searchQuery)}`
+          : `/?q=${encodeURIComponent(searchQuery)}`,
       })
     } else {
       const ownerName = (last.data as any)?.tracker?.owner_name as string | undefined
@@ -446,7 +450,9 @@ export const Breadcrumbs = (): React.JSX.Element => {
     if (searchQuery) {
       crumbs.push({
         label: 'Search Results',
-        link: `/?q=${encodeURIComponent(searchQuery)}`,
+        link: fromUser
+          ? `/users/${encodeURIComponent(fromUser)}?q=${encodeURIComponent(searchQuery)}`
+          : `/?q=${encodeURIComponent(searchQuery)}`,
       })
     } else {
       const ownerName = (last.data as any)?.tracker?.owner_name as string | undefined
@@ -575,6 +581,10 @@ const router = createBrowserRouter([
       {
         path: '/trackers',
         children: trackerRoute,
+      },
+      {
+        path: '/users/:userName',
+        children: userPageRoute,
       },
       {
         path: '/coverages/:trackerId',

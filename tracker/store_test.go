@@ -675,6 +675,80 @@ func TestStoreTrackerSearch(t *testing.T) {
 	})
 }
 
+func TestStoreListTrackersByOwner(t *testing.T) {
+	s := initTestStore(t)
+
+	// User 2 owns a public and a private tracker
+	pub := &TrackerModel{Name: "user2_public", Visibility: "public"}
+	require.NoError(t, s.addTracker(pub, 2))
+
+	priv := &TrackerModel{Name: "user2_private", Visibility: "private"}
+	require.NoError(t, s.addTracker(priv, 2))
+
+	// User 3 owns a public tracker
+	other := &TrackerModel{Name: "user3_public", Visibility: "public"}
+	require.NoError(t, s.addTracker(other, 3))
+
+	t.Run("anonymous viewer sees public only", func(t *testing.T) {
+		trackers, total, err := s.listTrackersByOwner(2, 0, "", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 1, total)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, pub.Id, trackers[0].Id)
+	})
+
+	t.Run("owner viewer sees public and private", func(t *testing.T) {
+		trackers, total, err := s.listTrackersByOwner(2, 2, "", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 2, total)
+		require.Equal(t, 2, len(trackers))
+	})
+
+	t.Run("other logged-in viewer sees public only", func(t *testing.T) {
+		trackers, total, err := s.listTrackersByOwner(2, 3, "", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 1, total)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, pub.Id, trackers[0].Id)
+	})
+
+	t.Run("search filters within owner's trackers", func(t *testing.T) {
+		trackers, total, err := s.listTrackersByOwner(2, 0, "private", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 0, total)
+		require.Empty(t, trackers)
+
+		trackers, total, err = s.listTrackersByOwner(2, 0, "public", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 1, total)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, pub.Id, trackers[0].Id)
+	})
+
+	t.Run("search does not match other user's trackers", func(t *testing.T) {
+		trackers, total, err := s.listTrackersByOwner(2, 0, "user3", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 0, total)
+		require.Empty(t, trackers)
+	})
+
+	t.Run("pagination", func(t *testing.T) {
+		trackers, total, err := s.listTrackersByOwner(2, 2, "", 1, 1)
+		require.NoError(t, err)
+		require.Equal(t, 2, total)
+		require.Equal(t, 1, len(trackers))
+	})
+
+	t.Run("role and owner info", func(t *testing.T) {
+		trackers, _, err := s.listTrackersByOwner(2, 2, "user2_public", 0, 0)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(trackers))
+		require.Equal(t, int64(2), trackers[0].OwnerId)
+		require.Equal(t, "user2", trackers[0].OwnerName)
+		require.Equal(t, "owner", trackers[0].Role)
+	})
+}
+
 func TestStoreTrackerOwner(t *testing.T) {
 	s := initTestStore(t)
 

@@ -204,6 +204,58 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 	return rows, total, nil
 }
 
+// listTrackersByOwner lists trackers owned by `ownerID`. Public trackers are
+// visible to everyone; private ones only to the page owner (viewerID == ownerID).
+// A search query filters by tracker name (LIKE '%query%').
+func (s *trackerStore) listTrackersByOwner(ownerID, viewerID int64, searchQuery string, page, perPage int) ([]TrackerResponse, int, error) {
+	whereClause := "t.owner_id = ? AND (t.visibility = 'public' OR t.owner_id = ?)"
+	whereArgs := []interface{}{ownerID, viewerID}
+
+	if searchQuery != "" {
+		whereClause += " AND t.name LIKE ?"
+		whereArgs = append(whereArgs, "%"+searchQuery+"%")
+	}
+
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM tracker t WHERE %s`, whereClause)
+
+	var total int
+	err := s.db.Get(&total, countQuery, whereArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("listTrackersByOwner count: %w", err)
+	}
+
+	selectQuery := fmt.Sprintf(`
+		SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
+		       t.owner_id, u.username AS owner_name, t.created_at, t.last_updated_at,
+		       CASE WHEN t.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, '') END AS role,
+		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
+		       (SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count
+		FROM tracker t
+		LEFT JOIN tracker_member m ON t.id = m.tracker_id AND m.user_id = ?
+		LEFT JOIN tracker_like l ON t.id = l.tracker_id AND l.user_id = ?
+		LEFT JOIN user u ON u.id = t.owner_id
+		WHERE %s
+		ORDER BY t.name`, whereClause)
+
+	selectArgs := make([]interface{}, 0, len(whereArgs)+3)
+	selectArgs = append(selectArgs, viewerID) // owner_id in role CASE
+	selectArgs = append(selectArgs, viewerID) // m.user_id in member join
+	selectArgs = append(selectArgs, viewerID) // l.user_id in like join
+	selectArgs = append(selectArgs, whereArgs...)
+
+	if perPage > 0 {
+		selectQuery += " LIMIT " + strconv.Itoa(perPage) + " OFFSET " + strconv.Itoa((page-1)*perPage)
+	}
+
+	rows := []TrackerResponse{}
+	err = s.db.Select(&rows, selectQuery, selectArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("listTrackersByOwner select: %w", err)
+	}
+
+	return rows, total, nil
+}
+
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
 	query := `SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
 		t.owner_id, t.created_at, t.last_updated_at

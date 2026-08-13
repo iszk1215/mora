@@ -531,6 +531,13 @@ func (s *MoraServer) Handler() http.Handler {
 		r.With(s.requireTrackerAuth).Mount("/api/trackers", s.tracker.Handler())
 	}
 
+	if s.tracker != nil && s.userStore != nil {
+		r.Route("/api/users", func(r chi.Router) {
+			r.With(s.requireTrackerAuth).Get("/{userName}", s.handleUserGet)
+			r.With(s.requireTrackerAuth).Get("/{userName}/trackers", s.handleUserTrackers)
+		})
+	}
+
 	if s.coverage != nil {
 		r.Route("/api/coverages", func(r chi.Router) {
 			r.With(s.requireTrackerAuth).Post("/", s.handleCreateCoverageTracker)

@@ -55,6 +55,13 @@ func (s *Service) Like(userID, trackerID int64) error {
 	return s.store.addLike(userID, trackerID)
 }
 
+// ListTrackersByOwner lists trackers owned by `ownerID`, filtered by the
+// viewer's access (private trackers only visible to the owner) and an
+// optional name search query. Used by the user page (/users/:userName).
+func (s *Service) ListTrackersByOwner(ownerID, viewerID int64, searchQuery string, page, perPage int) ([]TrackerResponse, int, error) {
+	return s.store.listTrackersByOwner(ownerID, viewerID, searchQuery, page, perPage)
+}
+
 func (s *Service) FindTrackerById(id int64) (*TrackerModel, error) {
 	return s.store.findTrackerById(id)
 }
