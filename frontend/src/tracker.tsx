@@ -495,21 +495,23 @@ export const TrackerDetailView = (): React.JSX.Element => {
           )}
         </div>
         {tracker.description && (
-          <p className="text-muted-foreground mt-1">{tracker.description}</p>
+          <p className="mt-1">{tracker.description}</p>
         )}
       </div>
 
-      {datasets.length > 0 ? (
-        <>
-          <TimeRangeSelector value={range} onChange={setRange} />
-          <TrackerChart data={{ datasets }} chartConfig={viewChartConfig} min={min} max={max} />
-        </>
-      ) : (
-        <p className="text-muted-foreground">No data to display</p>
-      )}
+      <div className="bg-card border rounded-lg p-4">
+        {datasets.length > 0 ? (
+          <>
+            <TimeRangeSelector value={range} onChange={setRange} />
+            <TrackerChart data={{ datasets }} chartConfig={viewChartConfig} min={min} max={max} />
+          </>
+        ) : (
+          <p className="text-muted-foreground">No data to display</p>
+        )}
+      </div>
 
       {tracker.body?.trim() && (
-        <div className="mt-8 pt-6 md-body">
+        <div className="mt-4 bg-card border rounded-lg p-4 md-body">
           <MDEditor.Markdown source={tracker.body} />
         </div>
       )}
@@ -934,11 +936,13 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       {/* Chart */}
       <h2 className="text-xl my-2">Chart</h2>
 
-      {datasets.length > 0 ? (
-        <TrackerChart data={{ datasets }} chartConfig={chartConfigForChart} />
-      ) : (
-        <p className="text-muted-foreground">No data to display</p>
-      )}
+      <div className="bg-card border rounded-lg p-4 mb-4">
+        {datasets.length > 0 ? (
+          <TrackerChart data={{ datasets }} chartConfig={chartConfigForChart} />
+        ) : (
+          <p className="text-muted-foreground">No data to display</p>
+        )}
+      </div>
 
       {/* Chart Options */}
       <h2 className="text-xl my-2">Chart Options</h2>
@@ -1131,7 +1135,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       <p className="text-sm text-muted-foreground mb-2">
         Markdown is supported. This content is shown below the chart on the detail page.
       </p>
-      <div data-color-mode="light" className="mb-2">
+      <div data-color-mode="light" className="mb-2 bg-card border rounded-lg p-4">
         <MDEditor
           value={body}
           onChange={(v) => { setBody(v ?? ''); setBodySaved(false) }}

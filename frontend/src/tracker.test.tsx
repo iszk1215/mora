@@ -446,6 +446,40 @@ describe('TrackerDetailView', () => {
     expect(screen.queryByRole('heading', { name: 'Overview' })).not.toBeInTheDocument()
   })
 
+  it('renders description in the same foreground color as the title', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, description: 'Short description' },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    const desc = screen.getByText('Short description')
+    expect(desc).toBeInTheDocument()
+    expect(desc.className).not.toContain('text-muted-foreground')
+  })
+
+  it('renders chart section inside a card', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    const noData = screen.getByText('No data to display')
+    const chartCard = noData.closest('.bg-card')
+    expect(chartCard).toBeInTheDocument()
+    expect(chartCard!.className).toContain('border rounded-lg')
+  })
+
+  it('renders markdown body inside a card', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '## Overview\n\nSome **notes** here' },
+      series: [],
+    })
+    const { container } = render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    const body = container.querySelector('.md-body')
+    expect(body).toBeInTheDocument()
+    expect(body!.className).toContain('bg-card')
+  })
+
 })
 
 
@@ -808,6 +842,28 @@ describe('TrackerDetailEdit', () => {
     expect(editor).toBeInTheDocument()
     expect(editor.value).toBe('existing body')
     expect(screen.getByText('Save Body')).toBeInTheDocument()
+  })
+
+  it('renders chart section inside a card', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const noData = screen.getByText('No data to display')
+    const chartCard = noData.closest('.bg-card')
+    expect(chartCard).toBeInTheDocument()
+    expect(chartCard!.className).toContain('border rounded-lg')
+  })
+
+  it('renders body editor inside a card', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: 'Some body' },
+      series: [],
+    })
+    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
+    const editor = screen.getByPlaceholderText('Write the body in Markdown...')
+    expect(editor.closest('.bg-card')).toBeInTheDocument()
   })
 
   it('saves body via PATCH request', async () => {
