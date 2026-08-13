@@ -111,26 +111,26 @@ func (s *MoraServer) seedDemoData() error {
 			if rng.Intn(2) == 0 {
 				xAxisType = "datetime"
 			}
-		cc := map[string]any{"palette": palette, "x_axis_type": xAxisType}
+			cc := map[string]any{"palette": palette, "x_axis_type": xAxisType}
 
-		// ~25% of trackers get area fill disabled
-		if rng.Intn(4) == 0 {
-			cc["area"] = false
-		}
+			// ~25% of trackers get area fill disabled
+			if rng.Intn(4) == 0 {
+				cc["area"] = false
+			}
 
-		// ~50% of trackers get symbols hidden, rest get symbols shown
-		if rng.Intn(2) == 0 {
-			cc["show_symbols"] = false
-		} else {
-			cc["show_symbols"] = true
-		}
+			// ~50% of trackers get symbols hidden, rest get symbols shown
+			if rng.Intn(2) == 0 {
+				cc["show_symbols"] = false
+			} else {
+				cc["show_symbols"] = true
+			}
 
-		// ~30% of trackers get slider hidden to mix it up
-		if rng.Intn(10) < 3 {
-			cc["show_slider"] = false
-		}
+			// ~30% of trackers get slider hidden to mix it up
+			if rng.Intn(10) < 3 {
+				cc["show_slider"] = false
+			}
 
-		// Every 3rd tracker gets a bar or mixed chart with multi-Y-axis
+			// Every 3rd tracker gets a bar or mixed chart with multi-Y-axis
 			if ti%3 == 0 {
 				cc["y_axes"] = []map[string]any{
 					{"id": 0, "label": "Count", "position": "left"},
@@ -176,6 +176,8 @@ func (s *MoraServer) seedDemoData() error {
 
 			hasYAxes := ti%3 == 0
 
+			var maxTs time.Time
+
 			for si := 0; si < seriesCount; si++ {
 				sd := seriesDefs[si]
 
@@ -200,27 +202,31 @@ func (s *MoraServer) seedDemoData() error {
 				}
 				log.Debug().Int64("series_id", series.Id).Str("name", sd.name).Msg("Created demo series")
 
-			seriesSeed := int(series.Id*7 + tracker.Id*13)
-			valueCount := 10 + rng.Intn(11) // 10-20 values per series
-			var daysList []int
-		if xAxisType == "date" {
-			daysList = rng.Perm(90)[:valueCount]
-			sort.Ints(daysList)
-		}
-			for vi := 0; vi < valueCount; vi++ {
-				var daysAgo int
+				seriesSeed := int(series.Id*7 + tracker.Id*13)
+				valueCount := 10 + rng.Intn(11) // 10-20 values per series
+				var daysList []int
 				if xAxisType == "date" {
-					daysAgo = daysList[vi]
-				} else {
-					daysAgo = rng.Intn(90)
+					daysList = rng.Perm(90)[:valueCount]
+					sort.Ints(daysList)
 				}
-				hour := 0
-				min := 0
-				if xAxisType == "datetime" {
-					hour = rng.Intn(24)
-					min = rng.Intn(60)
-				}
-				ts := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()).AddDate(0, 0, -daysAgo)
+				for vi := 0; vi < valueCount; vi++ {
+					var daysAgo int
+					if xAxisType == "date" {
+						daysAgo = daysList[vi]
+					} else {
+						daysAgo = rng.Intn(90)
+					}
+					hour := 0
+					min := 0
+					if xAxisType == "datetime" {
+						hour = rng.Intn(24)
+						min = rng.Intn(60)
+					}
+					ts := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()).AddDate(0, 0, -daysAgo)
+
+					if ts.After(maxTs) {
+						maxTs = ts
+					}
 
 					var val float64
 					vi64 := float64(vi)
@@ -251,6 +257,12 @@ func (s *MoraServer) seedDemoData() error {
 					if _, err := s.tracker.CreateValue(series.Id, ts, val); err != nil {
 						return fmt.Errorf("create demo value: %w", err)
 					}
+				}
+			}
+
+			if !maxTs.IsZero() {
+				if err := s.tracker.SetLastUpdatedAt(tracker.Id, maxTs); err != nil {
+					return fmt.Errorf("set demo tracker last_updated_at: %w", err)
 				}
 			}
 		}
