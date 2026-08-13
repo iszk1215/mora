@@ -276,38 +276,46 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
       : undefined
 
   return (
-    <Link to={linkTo} state={linkState} className="block bg-card border rounded-lg p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-2 mb-2">
-        <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
-        {tracker.role && (
-          <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tracker.role}</span>
-        )}
-        {tracker.type === 'coverage' && (
-          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
-        )}
-        {(tracker.like_count ?? 0) > 0 && (
-          <span className="relative ml-auto flex-shrink-0">
-            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-            <span className="absolute -bottom-1 -right-1.5 text-[10px] leading-none font-medium text-yellow-700 bg-yellow-50 rounded px-0.5">{tracker.like_count}</span>
-          </span>
-        )}
-      </div>
-      <div className="h-[120px]">
-        {loading ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
-        ) : option.series.length > 0 ? (
-          <ReactECharts option={option} style={{ width: '100%', height: 120 }} opts={{ renderer: 'svg' }} />
+    <div className="bg-card border rounded-lg p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between gap-2 mb-1 text-xs text-muted-foreground">
+        {tracker.owner_name ? (
+          <Link to={`/users/${encodeURIComponent(tracker.owner_name)}`} className="truncate hover:text-primary hover:underline">
+            {tracker.owner_name}
+          </Link>
         ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
+          <span />
         )}
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span className="truncate">{tracker.owner_name ? `@${tracker.owner_name}` : ''}</span>
         <span className="flex-shrink-0">
           {tracker.last_updated_at ? new Date(tracker.last_updated_at).toLocaleDateString() : ''}
         </span>
       </div>
-    </Link>
+      <Link to={linkTo} state={linkState} className="block">
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
+          {tracker.role && (
+            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tracker.role}</span>
+          )}
+          {tracker.type === 'coverage' && (
+            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
+          )}
+          {(tracker.like_count ?? 0) > 0 && (
+            <span className="relative ml-auto flex-shrink-0">
+              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+              <span className="absolute -bottom-1 -right-1.5 text-[10px] leading-none font-medium text-yellow-700 bg-yellow-50 rounded px-0.5">{tracker.like_count}</span>
+            </span>
+          )}
+        </div>
+        <div className="h-[120px]">
+          {loading ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
+          ) : option.series.length > 0 ? (
+            <ReactECharts option={option} style={{ width: '100%', height: 120 }} opts={{ renderer: 'svg' }} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
+          )}
+        </div>
+      </Link>
+    </div>
   )
 }
 
