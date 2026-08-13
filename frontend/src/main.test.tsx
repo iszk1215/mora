@@ -281,7 +281,29 @@ describe('Breadcrumbs', () => {
     expect(screen.queryByText('hidden')).toBeNull()
   })
 
-  it('shows only Tracker Name when no search location state', () => {
+  it('shows @Username > Tracker Name when no search location state', () => {
+    vi.mocked(useMatches).mockReturnValue([
+      {
+        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
+        handle: {},
+      },
+      {
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
+        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
+        handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
+      },
+    ])
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/1' }]}>
+        <Breadcrumbs />
+      </MemoryRouter>
+    )
+    expect(screen.getByText('@alice')).toBeInTheDocument()
+    expect(screen.getByText('My Tracker')).toBeInTheDocument()
+    expect(screen.queryByText('Search Results')).toBeNull()
+  })
+
+  it('shows only Tracker Name when owner_name is missing and no search location state', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -299,6 +321,7 @@ describe('Breadcrumbs', () => {
       </MemoryRouter>
     )
     expect(screen.getByText('My Tracker')).toBeInTheDocument()
+    expect(screen.queryByText('@')).toBeNull()
     expect(screen.queryByText('Search Results')).toBeNull()
   })
 
@@ -310,7 +333,7 @@ describe('Breadcrumbs', () => {
       },
       {
         id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
@@ -321,6 +344,7 @@ describe('Breadcrumbs', () => {
     )
     expect(screen.getByText('Search Results')).toBeInTheDocument()
     expect(screen.getByText('My Tracker')).toBeInTheDocument()
+    expect(screen.queryByText('@alice')).toBeNull()
     const link = screen.getByText('Search Results').closest('a')
     expect(link).toHaveAttribute('href', '/?q=foo')
   })
@@ -356,7 +380,7 @@ describe('Breadcrumbs', () => {
     expect(trackerLink).toHaveAttribute('href', '/trackers/1')
   })
 
-  it('shows Tracker Name > Edit for edit page without fromSearch', () => {
+  it('shows @Username > Tracker Name > Edit for edit page without fromSearch', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -364,12 +388,12 @@ describe('Breadcrumbs', () => {
       },
       {
         id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
         handle: {},
       },
       {
         id: 'routes/trackers/:trackerId/edit', pathname: '/trackers/1/edit', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
         handle: { crumb: () => ({ label: 'Edit' }) },
       },
     ])
@@ -379,6 +403,7 @@ describe('Breadcrumbs', () => {
       </MemoryRouter>
     )
     expect(screen.queryByText('Search Results')).toBeNull()
+    expect(screen.getByText('@alice')).toBeInTheDocument()
     expect(screen.getByText('My Tracker')).toBeInTheDocument()
     expect(screen.getByText('Edit')).toBeInTheDocument()
     const trackerLink = screen.getByText('My Tracker').closest('a')
@@ -476,7 +501,7 @@ describe('Breadcrumbs', () => {
       expect(link).toHaveAttribute('href', '/?q=foo')
     })
 
-    it('shows only Tracker Name on tracker detail page without fromSearch (real IDs)', () => {
+    it('shows @Username > Tracker Name on tracker detail page without fromSearch (real IDs)', () => {
       vi.mocked(useMatches).mockReturnValue([
         {
           id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -488,7 +513,7 @@ describe('Breadcrumbs', () => {
         },
         {
           id: '0-4-2', pathname: '/trackers/1', params: { trackerId: '1' },
-          data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+          data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
           handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
         },
       ])
@@ -498,6 +523,7 @@ describe('Breadcrumbs', () => {
         </MemoryRouter>
       )
       expect(screen.queryByText('Search Results')).toBeNull()
+      expect(screen.getByText('@alice')).toBeInTheDocument()
       expect(screen.getByText('My Tracker')).toBeInTheDocument()
     })
 
@@ -531,7 +557,7 @@ describe('Breadcrumbs', () => {
       expect(trackerLink).toHaveAttribute('href', '/trackers/1')
     })
 
-    it('shows Tracker Name > Edit on edit page without fromSearch (real IDs)', () => {
+    it('shows @Username > Tracker Name > Edit on edit page without fromSearch (real IDs)', () => {
       vi.mocked(useMatches).mockReturnValue([
         {
           id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -543,7 +569,7 @@ describe('Breadcrumbs', () => {
         },
         {
           id: '0-4-3', pathname: '/trackers/1/edit', params: { trackerId: '1' },
-          data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+          data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
           handle: { crumb: () => ({ label: 'Edit' }) },
         },
       ])
@@ -553,6 +579,7 @@ describe('Breadcrumbs', () => {
         </MemoryRouter>
       )
       expect(screen.queryByText('Search Results')).toBeNull()
+      expect(screen.getByText('@alice')).toBeInTheDocument()
       expect(screen.getByText('My Tracker')).toBeInTheDocument()
       expect(screen.getByText('Edit')).toBeInTheDocument()
     })

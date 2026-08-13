@@ -425,21 +425,34 @@ export const Breadcrumbs = (): React.JSX.Element => {
   const isTrackerDetail = hasTrackerId && !isOnEditPage
   const isTrackerEdit = hasTrackerId && isOnEditPage
 
-  // For tracker detail page: add "Search Results" parent if navigated from search
-  if (isTrackerDetail && searchQuery) {
-    crumbs.push({
-      label: 'Search Results',
-      link: `/?q=${encodeURIComponent(searchQuery)}`,
-    })
+  // For tracker detail page: add "Search Results" parent if navigated from search,
+  // otherwise add the owner username as the parent crumb
+  if (isTrackerDetail) {
+    if (searchQuery) {
+      crumbs.push({
+        label: 'Search Results',
+        link: `/?q=${encodeURIComponent(searchQuery)}`,
+      })
+    } else {
+      const ownerName = (last.data as any)?.tracker?.owner_name as string | undefined
+      if (ownerName) {
+        crumbs.push({ label: `@${ownerName}` })
+      }
+    }
   }
 
-  // For tracker edit page: always add tracker name, and optionally "Search Results"
+  // For tracker edit page: always add tracker name, plus "Search Results" or owner username
   if (isTrackerEdit) {
     if (searchQuery) {
       crumbs.push({
         label: 'Search Results',
         link: `/?q=${encodeURIComponent(searchQuery)}`,
       })
+    } else {
+      const ownerName = (last.data as any)?.tracker?.owner_name as string | undefined
+      if (ownerName) {
+        crumbs.push({ label: `@${ownerName}` })
+      }
     }
     // Find the tracker detail match to get tracker name
     const trackerMatch = matches.find((m: any) => Boolean(m.params?.trackerId))
