@@ -129,14 +129,14 @@ export const UserPage = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="flex justify-center items-center gap-2 mb-6">
+      <div className="flex flex-wrap justify-center items-center gap-2 mb-6">
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Search trackers..."
-          className="w-96 border rounded px-3 py-2"
+          className="w-full sm:w-96 border rounded px-3 py-2"
         />
         <Button onClick={handleSearch}>Search</Button>
       </div>
