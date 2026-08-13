@@ -431,6 +431,9 @@ export const Breadcrumbs = (): React.JSX.Element => {
   // (top page or user page), otherwise add the owner username (linking to the user page)
   if (isTrackerDetail) {
     if (searchQuery) {
+      if (fromUser) {
+        crumbs.push({ label: fromUser, link: `/users/${encodeURIComponent(fromUser)}` })
+      }
       crumbs.push({
         label: 'Search Results',
         link: fromUser
@@ -448,6 +451,9 @@ export const Breadcrumbs = (): React.JSX.Element => {
   // For tracker edit page: always add tracker name, plus "Search Results" or owner username
   if (isTrackerEdit) {
     if (searchQuery) {
+      if (fromUser) {
+        crumbs.push({ label: fromUser, link: `/users/${encodeURIComponent(fromUser)}` })
+      }
       crumbs.push({
         label: 'Search Results',
         link: fromUser

@@ -474,7 +474,7 @@ describe('Breadcrumbs', () => {
     expect(link).toHaveAttribute('href', '/?q=foo%20bar')
   })
 
-  it('shows Search Results crumb linking to user page when navigated from user search', () => {
+  it('shows Username > Search Results > Tracker Name when navigated from user search', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -491,14 +491,15 @@ describe('Breadcrumbs', () => {
         <Breadcrumbs />
       </MemoryRouter>
     )
+    expect(screen.getByText('alice')).toBeInTheDocument()
+    expect(screen.getByText('alice').closest('a')).toHaveAttribute('href', '/users/alice')
     expect(screen.getByText('Search Results')).toBeInTheDocument()
     expect(screen.getByText('My Tracker')).toBeInTheDocument()
-    expect(screen.queryByText('@alice')).toBeNull()
     const link = screen.getByText('Search Results').closest('a')
     expect(link).toHaveAttribute('href', '/users/alice?q=foo')
   })
 
-  it('shows Search Results crumb linking to user page on edit page with fromUser', () => {
+  it('shows Username > Search Results > Tracker Name > Edit on edit page with fromUser', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
@@ -520,6 +521,8 @@ describe('Breadcrumbs', () => {
         <Breadcrumbs />
       </MemoryRouter>
     )
+    expect(screen.getByText('alice')).toBeInTheDocument()
+    expect(screen.getByText('alice').closest('a')).toHaveAttribute('href', '/users/alice')
     expect(screen.getByText('Search Results')).toBeInTheDocument()
     expect(screen.getByText('My Tracker')).toBeInTheDocument()
     expect(screen.getByText('Edit')).toBeInTheDocument()
