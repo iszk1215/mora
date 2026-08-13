@@ -474,27 +474,6 @@ describe('Breadcrumbs', () => {
     expect(link).toHaveAttribute('href', '/?q=foo%20bar')
   })
 
-  it('shows username crumb for user page without @ prefix', () => {
-    vi.mocked(useMatches).mockReturnValue([
-      {
-        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-        handle: {},
-      },
-      {
-        id: 'routes/users/:userName', pathname: '/users/alice', params: { userName: 'alice' },
-        data: { user: { id: 2, username: 'alice', avatar_url: '' } }, loaderData: undefined,
-        handle: { crumb: (params: any, data: any) => ({ label: data?.user?.username ?? params.userName }) },
-      },
-    ])
-    render(
-      <MemoryRouter initialEntries={['/users/alice']}>
-        <Breadcrumbs />
-      </MemoryRouter>
-    )
-    expect(screen.getByText('alice')).toBeInTheDocument()
-    expect(screen.queryByText('@alice')).toBeNull()
-  })
-
   it('shows Search Results crumb linking to user page when navigated from user search', () => {
     vi.mocked(useMatches).mockReturnValue([
       {

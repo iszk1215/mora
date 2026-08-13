@@ -42,7 +42,7 @@ User page (`/users/:userName`) shows the trackers owned by a user. Anyone can vi
 
 ### user.tsx
 
-- `UserPage` component: avatar + username header, search box (scoped to the user), tracker card grid, Prev/Next pagination
+- `UserPage` component: search box at the top, username heading, tracker card grid, Prev/Next pagination (no breadcrumb, no avatar)
 - `loadUserPage` loader: fetch `/api/users/:userName`, throw 404 response when missing
 - Cards pass `fromUser` navigation state so the tracker detail breadcrumb can return to this user's search
 

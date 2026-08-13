@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { LoaderFunctionArgs, Params, useLoaderData, useSearchParams } from 'react-router'
+import { LoaderFunctionArgs, useLoaderData, useSearchParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { TrackerCard, PreviewData, fetchPreview } from './tracker'
@@ -129,17 +129,6 @@ export const UserPage = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
-        {user.avatar_url ? (
-          <img src={user.avatar_url} alt={user.username} className="w-12 h-12 rounded-full" />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center text-xl font-bold text-white select-none">
-            {user.username.charAt(0).toUpperCase()}
-          </div>
-        )}
-        <h1 className="text-3xl">{user.username}</h1>
-      </div>
-
       <div className="flex justify-center items-center gap-2 mb-6">
         <input
           type="search"
@@ -151,6 +140,8 @@ export const UserPage = (): React.JSX.Element => {
         />
         <Button onClick={handleSearch}>Search</Button>
       </div>
+
+      <h1 className="text-3xl mb-6">{user.username}</h1>
 
       {loading && <p className="text-muted-foreground">Loading...</p>}
       {!loading && trackers.length === 0 && (
@@ -184,8 +175,5 @@ export const userPageRoute = [
     path: '/users/:userName',
     loader: loadUserPage,
     element: <UserPage />,
-    handle: {
-      crumb: (params: Params, data: any) => ({ label: data?.user?.username ?? params.userName }),
-    },
   },
 ]
