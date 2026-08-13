@@ -276,7 +276,7 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
       : undefined
 
   return (
-    <div className="bg-card border rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="bg-card border rounded-lg py-4 pl-3 pr-3.5 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between gap-2 mb-1 text-xs text-muted-foreground">
         {tracker.owner_name ? (
           <Link to={`/users/${encodeURIComponent(tracker.owner_name)}`} className="truncate hover:text-primary hover:underline">
