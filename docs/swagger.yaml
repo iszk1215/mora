@@ -1732,4 +1732,59 @@ paths:
       summary: Revoke an API key
       tags:
       - api-key
+  /api/users/{userName}:
+    get:
+      description: Return the public user profile for the given username
+      parameters:
+      - description: Username
+        in: path
+        name: userName
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.User'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Get a user by username
+      tags:
+      - server
+  /api/users/{userName}/trackers:
+    get:
+      description: Return trackers owned by the user. Public trackers are visible
+        to everyone; private ones only to the owner.
+      parameters:
+      - description: Username
+        in: path
+        name: userName
+        required: true
+        type: string
+      - description: Search query (partial match on tracker name)
+        in: query
+        name: q
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: per_page
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.ListTrackersResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: List trackers owned by a user
+      tags:
+      - server
 swagger: "2.0"

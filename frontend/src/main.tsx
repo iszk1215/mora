@@ -24,6 +24,7 @@ import type { SearchState } from './search-context'
 import { coverageTrackerRoute } from './coverage'
 import { udmRoute } from './udm'
 import { trackerRoute, listTrackers, TrackerCard, fetchPreview, PreviewData } from './tracker'
+import { userPageRoute } from './user'
 import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
 import { PasswordLoginForm } from './auth'
@@ -414,6 +415,7 @@ export const Breadcrumbs = (): React.JSX.Element => {
   const matches = useMatches()
   const location = useLocation()
   const searchQuery = (location.state as any)?.fromSearch as string | undefined
+  const fromUser = (location.state as any)?.fromUser as string | undefined
 
   const last = matches[matches.length - 1]
 
@@ -425,18 +427,23 @@ export const Breadcrumbs = (): React.JSX.Element => {
   const isTrackerDetail = hasTrackerId && !isOnEditPage
   const isTrackerEdit = hasTrackerId && isOnEditPage
 
-  // For tracker detail page: add "Search Results" parent if navigated from search,
-  // otherwise add the owner username as the parent crumb
+  // For tracker detail page: add "Search Results" parent if navigated from a search
+  // (top page or user page), otherwise add the owner username (linking to the user page)
   if (isTrackerDetail) {
     if (searchQuery) {
+      if (fromUser) {
+        crumbs.push({ label: fromUser, link: `/users/${encodeURIComponent(fromUser)}` })
+      }
       crumbs.push({
         label: 'Search Results',
-        link: `/?q=${encodeURIComponent(searchQuery)}`,
+        link: fromUser
+          ? `/users/${encodeURIComponent(fromUser)}?q=${encodeURIComponent(searchQuery)}`
+          : `/?q=${encodeURIComponent(searchQuery)}`,
       })
     } else {
       const ownerName = (last.data as any)?.tracker?.owner_name as string | undefined
       if (ownerName) {
-        crumbs.push({ label: `@${ownerName}` })
+        crumbs.push({ label: ownerName, link: `/users/${encodeURIComponent(ownerName)}` })
       }
     }
   }
@@ -444,14 +451,19 @@ export const Breadcrumbs = (): React.JSX.Element => {
   // For tracker edit page: always add tracker name, plus "Search Results" or owner username
   if (isTrackerEdit) {
     if (searchQuery) {
+      if (fromUser) {
+        crumbs.push({ label: fromUser, link: `/users/${encodeURIComponent(fromUser)}` })
+      }
       crumbs.push({
         label: 'Search Results',
-        link: `/?q=${encodeURIComponent(searchQuery)}`,
+        link: fromUser
+          ? `/users/${encodeURIComponent(fromUser)}?q=${encodeURIComponent(searchQuery)}`
+          : `/?q=${encodeURIComponent(searchQuery)}`,
       })
     } else {
       const ownerName = (last.data as any)?.tracker?.owner_name as string | undefined
       if (ownerName) {
-        crumbs.push({ label: `@${ownerName}` })
+        crumbs.push({ label: ownerName, link: `/users/${encodeURIComponent(ownerName)}` })
       }
     }
     // Find the tracker detail match to get tracker name
@@ -575,6 +587,10 @@ const router = createBrowserRouter([
       {
         path: '/trackers',
         children: trackerRoute,
+      },
+      {
+        path: '/users/:userName',
+        children: userPageRoute,
       },
       {
         path: '/coverages/:trackerId',
