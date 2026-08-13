@@ -499,7 +499,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
         )}
       </div>
 
-      <div className="bg-card border rounded-lg p-4">
+      <div className="bg-card border rounded-lg p-4 shadow-md">
         {datasets.length > 0 ? (
           <>
             <TimeRangeSelector value={range} onChange={setRange} />
@@ -511,7 +511,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
       </div>
 
       {tracker.body?.trim() && (
-        <div className="mt-4 bg-card border rounded-lg p-4 md-body">
+        <div className="mt-6 bg-card border rounded-lg p-4 shadow-md md-body">
           <MDEditor.Markdown source={tracker.body} />
         </div>
       )}
@@ -936,7 +936,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       {/* Chart */}
       <h2 className="text-xl my-2">Chart</h2>
 
-      <div className="bg-card border rounded-lg p-4 mb-4">
+      <div className="bg-card border rounded-lg p-4 mb-4 shadow-md">
         {datasets.length > 0 ? (
           <TrackerChart data={{ datasets }} chartConfig={chartConfigForChart} />
         ) : (
@@ -1135,7 +1135,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       <p className="text-sm text-muted-foreground mb-2">
         Markdown is supported. This content is shown below the chart on the detail page.
       </p>
-      <div data-color-mode="light" className="mb-2 bg-card border rounded-lg p-4">
+      <div data-color-mode="light" className="mb-2 bg-card border rounded-lg p-4 shadow-md">
         <MDEditor
           value={body}
           onChange={(v) => { setBody(v ?? ''); setBodySaved(false) }}
