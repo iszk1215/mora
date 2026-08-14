@@ -215,7 +215,7 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
     return {
       animation: false,
       color: colors,
-      grid: { left: 50, right: hasRightAxis ? 50 : 10, top: 10, bottom: 25 },
+      grid: { left: 40, right: hasRightAxis ? 50 : 10, top: 10, bottom: 25 },
       xAxis,
       yAxis: yAxes.map((a) => ({
         type: 'value' as const,
@@ -276,8 +276,8 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
       : undefined
 
   return (
-    <div className="bg-card border rounded-lg p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between gap-2 mb-1 text-xs text-muted-foreground">
+    <div className="bg-card border rounded-lg py-4 pl-2 pr-3 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between gap-2 mb-1 pl-2 text-xs text-muted-foreground">
         {tracker.owner_name ? (
           <Link to={`/users/${encodeURIComponent(tracker.owner_name)}`} className="truncate hover:text-primary hover:underline">
             {tracker.owner_name}
@@ -290,7 +290,7 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
         </span>
       </div>
       <Link to={linkTo} state={linkState} className="block">
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 pl-2">
           <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
           {tracker.role && (
             <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tracker.role}</span>

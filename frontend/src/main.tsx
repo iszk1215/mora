@@ -133,14 +133,14 @@ const TrackerSearchPage = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="flex justify-center items-center gap-2 mb-6">
+      <div className="flex flex-wrap justify-center items-center gap-2 mb-6">
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           placeholder="Search trackers..."
-          className="w-96 border rounded px-3 py-2"
+          className="w-full sm:w-96 border rounded px-3 py-2"
         />
         <Button onClick={handleSearch} disabled={searching}>
           Search
@@ -515,7 +515,7 @@ const Root = (): React.JSX.Element => {
         <div>
           <ScrollRestoration />
           <Header />
-          <div className="w-8/12 m-auto">
+          <div className="w-full sm:w-8/12 m-auto px-4 sm:px-0">
             <Breadcrumbs />
             <Outlet />
           </div>
@@ -535,7 +535,7 @@ export const ErrorPage = (): React.JSX.Element => {
     <div>
       <ScrollRestoration />
       <Header />
-      <div className="w-8/12 m-auto">
+      <div className="w-full sm:w-8/12 m-auto px-4 sm:px-0">
         <h1>Error</h1>
         <p>Sorry, unexpected error has happend. Back to the top page.</p>
         <p>{message}</p>
