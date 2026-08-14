@@ -499,7 +499,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
         )}
       </div>
 
-      <div className="bg-card border rounded-lg p-4 shadow-md">
+      <div className="bg-card border rounded-lg py-4 pl-2 pr-3 sm:px-4 shadow-md">
         {datasets.length > 0 ? (
           <>
             <TimeRangeSelector value={range} onChange={setRange} />
@@ -936,7 +936,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       {/* Chart */}
       <h2 className="text-xl my-2">Chart</h2>
 
-      <div className="bg-card border rounded-lg p-4 mb-4 shadow-md">
+      <div className="bg-card border rounded-lg py-4 pl-2 pr-3 sm:px-4 mb-4 shadow-md">
         {datasets.length > 0 ? (
           <TrackerChart data={{ datasets }} chartConfig={chartConfigForChart} />
         ) : (
