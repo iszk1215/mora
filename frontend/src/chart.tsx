@@ -98,8 +98,8 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     const hasRightAxis = yAxes.some((a) => a.position === 'right')
     const isDateOnly = cc?.x_axis_type === 'date'
 
-    const grid: any = { left: 60, right: 20, top: showLegend ? 40 : 20, bottom: showSlider ? 80 : 30 }
-    if (hasRightAxis) grid.right = 60
+    const grid: any = { left: 40, right: 10, top: showLegend ? 40 : 20, bottom: showSlider ? 80 : 30 }
+    if (hasRightAxis) grid.right = 50
 
     const xAxis: any = {
       type: 'time' as const,
