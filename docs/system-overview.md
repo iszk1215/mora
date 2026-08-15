@@ -67,7 +67,7 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 
 ```
 /                           Session middleware
-├── GET  /api/providers     SCM list
+├── GET  /api/providers     SCM/login provider list
 ├── GET  /api/me            Current user
 ├── GET  /api/config        Server config
 ├── /api/user/me/api-keys/* API key management
@@ -112,10 +112,16 @@ Coverage-type trackers are created via `POST /api/coverages` (the tracker packag
 
 | Method | Mechanism | Usage |
 |--------|-----------|-------|
-| OAuth2 | GitHub/Gitea OAuth | Web login (session cookie) |
+| OAuth2 | GitHub/Gitea/Google OAuth | Web login (session cookie); Google is login-only (no repository access) |
 | Password | bcrypt hash | Alternative login (`user_password` table) |
 | API Key | Bearer token | Programmatic access (`user_api_key` table) |
 | Session | Cookie-based | Browser sessions (`MoraSession`) |
+
+Google is configured as an `[[scm]]` entry with `scm = "google"` (login-only
+provider, no SCM client). The default endpoints point at Google's OAuth2
+endpoints; a non-Google `url` (e.g. for E2E mocks) derives the endpoints from
+the configured URL. On signup the suggested username is derived from the
+email's local part (sanitized), since Google accounts have no username.
 
 ## Usernames
 

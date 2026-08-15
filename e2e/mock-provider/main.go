@@ -78,6 +78,28 @@ func handleUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func handleGoogleUser(w http.ResponseWriter, r *http.Request) {
+	auth := r.Header.Get("Authorization")
+	if !strings.HasPrefix(auth, "Bearer ") {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "http"
+	}
+	avatarURL := fmt.Sprintf("%s://%s/avatar.png", scheme, r.Host)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":      "mock-google-user-id",
+		"email":   "googleuser@example.com",
+		"name":    "Test User",
+		"picture": avatarURL,
+	})
+}
+
 func handleAvatar(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -100,6 +122,9 @@ func main() {
 	http.HandleFunc("/login/oauth/authorize", handleAuthorize)
 	http.HandleFunc("/login/oauth/access_token", handleToken)
 	http.HandleFunc("/api/v1/user", handleUser)
+	http.HandleFunc("/o/oauth2/v2/auth", handleAuthorize)
+	http.HandleFunc("/o/oauth2/v2/token", handleToken)
+	http.HandleFunc("/oauth2/v2/userinfo", handleGoogleUser)
 	http.HandleFunc("/avatar.png", handleAvatar)
 
 	addr := fmt.Sprintf(":%d", *port)
