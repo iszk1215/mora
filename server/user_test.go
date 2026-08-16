@@ -482,6 +482,111 @@ func TestFetchProviderUserInfo_Gitea(t *testing.T) {
 	require.Equal(t, "gitearoute", info.Username)
 }
 
+func TestFetchGoogleUserInfo_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/oauth2/v2/userinfo", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"11223344556677889900","email":"testuser@example.com","picture":"https://av.com/p","name":"Test User"}`))
+	}))
+	defer srv.Close()
+
+	info, err := fetchGoogleUserInfo(srv.URL+"/oauth2/v2/userinfo", "testtoken")
+	require.NoError(t, err)
+	require.Equal(t, "google", info.Provider)
+	require.Equal(t, "11223344556677889900", info.ProviderUserID)
+	require.Equal(t, "testuser", info.Username)
+	require.Equal(t, "https://av.com/p", info.AvatarURL)
+}
+
+func TestFetchGoogleUserInfo_SanitizesUsername(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"1","email":"First.Last+tag@example.com","picture":"","name":""}`))
+	}))
+	defer srv.Close()
+
+	info, err := fetchGoogleUserInfo(srv.URL+"/oauth2/v2/userinfo", "testtoken")
+	require.NoError(t, err)
+	require.Equal(t, "first-last-tag", info.Username)
+}
+
+func TestFetchGoogleUserInfo_FallbackToName(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"2","email":"","picture":"","name":"John Doe"}`))
+	}))
+	defer srv.Close()
+
+	info, err := fetchGoogleUserInfo(srv.URL+"/oauth2/v2/userinfo", "testtoken")
+	require.NoError(t, err)
+	require.Equal(t, "john-doe", info.Username)
+}
+
+func TestFetchGoogleUserInfo_NoID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"email":"noid@example.com","picture":"","name":""}`))
+	}))
+	defer srv.Close()
+
+	_, err := fetchGoogleUserInfo(srv.URL+"/oauth2/v2/userinfo", "testtoken")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no id")
+}
+
+func TestFetchGoogleUserInfo_HTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	_, err := fetchGoogleUserInfo(srv.URL+"/oauth2/v2/userinfo", "testtoken")
+	require.Error(t, err)
+}
+
+func TestFetchProviderUserInfo_Google(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/oauth2/v2/userinfo", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"200","email":"gitearoute@example.com","picture":"","name":""}`))
+	}))
+	defer srv.Close()
+
+	rm := NewMockRepositoryManager(1)
+	rm.driver = "google"
+	rm.url, _ = url.Parse(srv.URL)
+	token := &scm.Token{Token: "testtoken"}
+
+	info, err := fetchProviderUserInfo(rm, token)
+	require.NoError(t, err)
+	require.Equal(t, "google", info.Provider)
+	require.Equal(t, "gitearoute", info.Username)
+	require.Equal(t, "200", info.ProviderUserID)
+}
+
+func TestCreateUserForSession_GoogleNewUser(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"999","email":"newuser@example.com","picture":"https://av.com/new","name":""}`))
+	}))
+	defer srv.Close()
+
+	store := newTestUserStore(t)
+	sess := NewMoraSession()
+	rm := NewMockRepositoryManager(1)
+	rm.driver = "google"
+	rm.url, _ = url.Parse(srv.URL)
+	token := &scm.Token{Token: "testtoken"}
+
+	createUserForSession(sess, rm, token, store)
+	require.Nil(t, sess.UserID())
+	require.NotNil(t, sess.PendingSignup())
+	require.Equal(t, "google", sess.PendingSignup().provider)
+	require.Equal(t, "newuser", sess.PendingSignup().username)
+	require.Equal(t, "999", sess.PendingSignup().providerUserID)
+	require.Equal(t, "https://av.com/new", sess.PendingSignup().avatarURL)
+}
+
 func TestCreateUserForSession_ExistingUser(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

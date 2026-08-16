@@ -31,4 +31,19 @@ test.describe('Login flow', () => {
     await page.waitForURL('/')
     await expect(page.locator('header img')).toBeVisible({ timeout: 10_000 })
   })
+
+  test('displays avatar after Google login', async ({ page }) => {
+    await page.goto('/auth')
+
+    await page.getByRole('link', { name: /Login with Google/ }).click()
+
+    await page.waitForURL('/signup', { timeout: 15_000 })
+
+    await expect(page.getByRole('heading', { name: 'Create Account' })).toBeVisible()
+    await expect(page.getByText('First time logging in with google.')).toBeVisible()
+    await page.getByRole('button', { name: 'Create Account' }).click()
+
+    await page.waitForURL('/')
+    await expect(page.locator('header img')).toBeVisible({ timeout: 10_000 })
+  })
 })

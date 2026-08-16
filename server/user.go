@@ -351,6 +351,10 @@ type providerUserInfo struct {
 }
 
 func fetchProviderUserInfo(rm RepositoryManager, token *scm.Token) (*providerUserInfo, error) {
+	if rm.Driver() == "google" {
+		return fetchGoogleUserInfo(googleUserInfoURL(rm.URL().String()), token.Token)
+	}
+
 	rmURL := rm.URL().String()
 
 	switch {
@@ -370,7 +374,7 @@ type rawUserResponse struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-func fetchRawUser(apiURL, accessToken string) (*rawUserResponse, error) {
+func fetchRawBody(apiURL, accessToken string) ([]byte, error) {
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -392,6 +396,15 @@ func fetchRawUser(apiURL, accessToken string) (*rawUserResponse, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return body, nil
+}
+
+func fetchRawUser(apiURL, accessToken string) (*rawUserResponse, error) {
+	body, err := fetchRawBody(apiURL, accessToken)
+	if err != nil {
+		return nil, err
 	}
 
 	var ru rawUserResponse
@@ -422,6 +435,41 @@ func fetchGitHubUserInfo(accessToken string) (*providerUserInfo, error) {
 		return nil, err
 	}
 	return githubUserInfoFromRaw(ru), nil
+}
+
+type googleUserResponse struct {
+	ID      string `json:"id"`
+	Email   string `json:"email"`
+	Picture string `json:"picture"`
+	Name    string `json:"name"`
+}
+
+func fetchGoogleUserInfo(apiURL, accessToken string) (*providerUserInfo, error) {
+	body, err := fetchRawBody(apiURL, accessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	var gu googleUserResponse
+	if err := json.Unmarshal(body, &gu); err != nil {
+		return nil, fmt.Errorf("parse Google user response: %w", err)
+	}
+	if gu.ID == "" {
+		return nil, fmt.Errorf("no id in Google user response")
+	}
+
+	usernameBase := gu.Name
+	if gu.Email != "" {
+		usernameBase = strings.SplitN(gu.Email, "@", 2)[0]
+	}
+	username := sanitizeUsername(usernameBase)
+
+	return &providerUserInfo{
+		Provider:       "google",
+		ProviderUserID: gu.ID,
+		Username:       username,
+		AvatarURL:      gu.Picture,
+	}, nil
 }
 
 func fetchGiteaUserInfo(baseURL, accessToken string) (*providerUserInfo, error) {

@@ -222,6 +222,15 @@ describe('SCMList', () => {
     const link = screen.getByText('Login with Gitea')
     expect(link.closest('a')).toHaveAttribute('href', '/login/2')
   })
+
+  it('renders Login with Google link for Google provider', () => {
+    vi.mocked(useLoaderData).mockReturnValue([
+      { id: 3, url: 'https://accounts.google.com', name: 'google', logined: false },
+    ])
+    render(<MemoryRouter><SCMList /></MemoryRouter>)
+    const loginEl = screen.getByText('Login with Google')
+    expect(loginEl.closest('a')).toHaveAttribute('href', '/login/3')
+  })
 })
 
 describe('Breadcrumbs', () => {

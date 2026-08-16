@@ -590,6 +590,10 @@ func initRepositoryManager(cfg config.RepositoryManagerConfig, baseURL string, s
 		cfg.URL = "https://github.com"
 	}
 
+	if cfg.Driver == "google" && cfg.URL == "" {
+		cfg.URL = "https://accounts.google.com"
+	}
+
 	if cfg.URL == "" {
 		return nil, fmt.Errorf("ConfigError: rm.url is empty")
 	}
@@ -625,6 +629,8 @@ func initRepositoryManager(cfg config.RepositoryManagerConfig, baseURL string, s
 			cfg.InsecureSkipVerify)
 	case "github":
 		return NewGithubFromFile(id, cfg.URL, cfg.SecretFilename, baseURL+"/login")
+	case "google":
+		return NewGoogleFromFile(id, cfg.URL, cfg.SecretFilename, baseURL+"/login")
 	default:
 		return nil, fmt.Errorf("ConfigError: unknown repository manager: %s", cfg.Driver)
 	}
