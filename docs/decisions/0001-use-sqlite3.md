@@ -14,8 +14,8 @@ The original implementation used SQLite3 via `github.com/mattn/go-sqlite3` (CGo 
 
 Use libSQL via `github.com/tursodatabase/go-libsql` (CGo driver) with `github.com/jmoiron/sqlx` as the query builder. All new code and tests use the `libsql` driver exclusively — `mattn/go-sqlite3` is no longer directly imported.
 
-- **Production (Cloud Run):** Remote connection via `libsql://<db>.turso.io?authToken=<token>`, configured via `TursoURL` / `TursoAuthToken` in `mora.conf` (or `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` environment variables).
-- **Development (local):** Local file via `file:mora.db` or `file::memory:`, configured via `DatabaseFilename` (empty defaults to in-memory).
+- **Production (Cloud Run):** Remote connection via `libsql://<db>.turso.io?authToken=<token>`, configured via `turso_url` / `turso_token` in `mora.conf` (or `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN` environment variables).
+- **Development (local):** Local file via `file:mora.db` or `file::memory:`, configured via `database_filename` (empty defaults to in-memory).
 - **Docker / external DB:** Connect to any libSQL-compatible server (`libsql://` or `https://` scheme).
 
 ## Consequences

@@ -48,8 +48,8 @@ func TestReadMoraConfig_FullConfig(t *testing.T) {
 	defer func() { _ = os.Remove(f.Name()) }()
 
 	_, err = f.Write([]byte(`
-DatabaseFilename = "test.db"
-Debug = true
+database_filename = "test.db"
+debug = true
 
 [server]
 url = "http://localhost:9090"
