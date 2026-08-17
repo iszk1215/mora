@@ -13,8 +13,9 @@ import (
 )
 
 func setupUserPageServer(t *testing.T) (*MoraServer, http.Handler) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())

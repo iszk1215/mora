@@ -49,7 +49,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - Binary output: `bin/mora`
 - Default config: `mora.conf` (flag: `-c`)
 - Server default port: 4000 (flag: `-p`)
-- Tests use in-memory sqlite3 (`sqlite3`, `:memory:?_loc=auto`)
+- Tests use in-memory libsql (`libsql`, `:memory:`)
 - Static files embedded in `server/static`
 - Coverage: `make coverage.html` (requires `coverage.out` from `go test -coverprofile`); frontend coverage via `make frontend-coverage` (outputs `frontend/coverage/lcov.info`)
 - Frontend coverage: `make frontend-coverage` uses a file-based dependency on `frontend/coverage/lcov.info` for incremental builds

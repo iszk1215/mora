@@ -8,8 +8,9 @@ import (
 )
 
 func setupScmStore(t *testing.T) RepositoryManagerStore {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	s := NewRepositoryManagerStore(db)
 	err = s.Init()
@@ -62,8 +63,9 @@ func TestScmStore_FindURL_AfterInsert(t *testing.T) {
 }
 
 func TestScmStore_Init_DBError(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	require.NoError(t, db.Close())
 
 	s := NewRepositoryManagerStore(db)

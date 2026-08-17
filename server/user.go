@@ -20,11 +20,11 @@ import (
 )
 
 type User struct {
-	ID        int64  `db:"id" json:"id"`
-	Username  string `db:"username" json:"username"`
-	AvatarURL string `db:"avatar_url" json:"avatar_url"`
-	CreatedAt string `db:"created_at" json:"-"`
-	UpdatedAt string `db:"updated_at" json:"-"`
+	ID        int64     `db:"id" json:"id"`
+	Username  string    `db:"username" json:"username"`
+	AvatarURL string    `db:"avatar_url" json:"avatar_url"`
+	CreatedAt time.Time `db:"created_at" json:"-"`
+	UpdatedAt time.Time `db:"updated_at" json:"-"`
 }
 
 type UserAuth struct {
@@ -35,12 +35,12 @@ type UserAuth struct {
 }
 
 type UserAPIKey struct {
-	ID        int64  `db:"id" json:"id"`
-	UserID    int64  `db:"user_id" json:"-"`
-	Name      string `db:"name" json:"name"`
-	KeyHash   string `db:"key_hash" json:"-"`
-	KeyPrefix string `db:"key_prefix" json:"key_prefix"`
-	CreatedAt string `db:"created_at" json:"created_at"`
+	ID        int64     `db:"id" json:"id"`
+	UserID    int64     `db:"user_id" json:"-"`
+	Name      string    `db:"name" json:"name"`
+	KeyHash   string    `db:"key_hash" json:"-"`
+	KeyPrefix string    `db:"key_prefix" json:"key_prefix"`
+	CreatedAt time.Time `db:"created_at" json:"created_at"`
 }
 
 type UserStore interface {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/render"
@@ -16,11 +17,11 @@ type CreateAPIKeyRequest struct {
 }
 
 type CreateAPIKeyResponse struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	Key       string `json:"key"`
-	KeyPrefix string `json:"key_prefix"`
-	CreatedAt string `json:"created_at"`
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Key       string    `json:"key"`
+	KeyPrefix string    `json:"key_prefix"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func APIKeyHandler(userStore UserStore) http.Handler {

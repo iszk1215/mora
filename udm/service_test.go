@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
 )
 
 func initTestUDMService(t *testing.T) *Service {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	svc, err := NewService(db)
 	require.NoError(t, err)

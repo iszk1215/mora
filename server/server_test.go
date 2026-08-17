@@ -27,8 +27,9 @@ import (
 )
 
 func setupRepositoryStore(t *testing.T, repos ...*Repository) RepositoryStore {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	store := NewRepositoryStore(db)
 	err = store.Init()
@@ -313,8 +314,9 @@ func Test_initRepositoryManager_EmptySecretFile(t *testing.T) {
 }
 
 func Test_initRepositoryManager_UnknownDriver(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	store := NewRepositoryManagerStore(db)
 	err = store.Init()
 	require.NoError(t, err)
@@ -770,8 +772,9 @@ insecure_skip_verify = false
 }
 
 func TestHandleMe_Anonymous(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
@@ -790,8 +793,9 @@ func TestHandleMe_Anonymous(t *testing.T) {
 }
 
 func TestHandleMe_NoSession(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
@@ -807,8 +811,9 @@ func TestHandleMe_NoSession(t *testing.T) {
 }
 
 func TestHandleMe_LoggedIn(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
@@ -840,8 +845,9 @@ func TestHandleMe_LoggedIn(t *testing.T) {
 }
 
 func TestTrackerEndpointIsMounted(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
@@ -889,8 +895,9 @@ func TestTrackerEndpointIsMounted(t *testing.T) {
 // requireTrackerAuth
 
 func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
@@ -921,8 +928,9 @@ func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
 }
 
 func TestRequireTrackerAuth_APIKey(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	userStore := newTestUserStore(t)
 	_, err = userStore.CreateUser("apiuser", "")
@@ -955,8 +963,9 @@ func TestRequireTrackerAuth_APIKey(t *testing.T) {
 }
 
 func TestRequireTrackerAuth_AnonymousFallback(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
@@ -1019,8 +1028,9 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	rm := NewMockRepositoryManager(1)
 	rm.client.Repositories = createMockRepoService(controller, repo)
 
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	coverageService, err := coverage.NewCoverageService(db)
 	require.NoError(t, err)
@@ -1176,8 +1186,9 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 	rm := NewMockRepositoryManager(1)
 	rm.client.Repositories = createMockRepoService(controller, repo)
 
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	coverageService, err := coverage.NewCoverageService(db)
 	require.NoError(t, err)
@@ -1297,8 +1308,9 @@ func TestHandleCoveragePreview(t *testing.T) {
 	rm := NewMockRepositoryManager(1)
 	rm.client.Repositories = createMockRepoService(controller, repo)
 
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	coverageService, err := coverage.NewCoverageService(db)
 	require.NoError(t, err)

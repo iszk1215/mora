@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/mattn/go-sqlite3"
 )
 
 // maxUsernameLength is the maximum length of a username.
@@ -126,13 +124,13 @@ func suggestUsername(userStore UserStore, base string) (string, error) {
 	}
 }
 
-// isUniqueConstraintError reports whether err is a SQLite UNIQUE constraint
-// violation (e.g. inserting a duplicate username).
+// isUniqueConstraintError reports whether err is a UNIQUE constraint
+// violation (e.g. inserting a duplicate username). libSQL wraps the
+// constraint violation in a generic error message, so the check falls back
+// to a string match.
 func isUniqueConstraintError(err error) bool {
-	var sqliteErr sqlite3.Error
-	if errors.As(err, &sqliteErr) {
-		return sqliteErr.Code == sqlite3.ErrConstraint &&
-			sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique
+	if err == nil {
+		return false
 	}
-	return false
+	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }

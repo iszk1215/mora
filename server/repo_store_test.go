@@ -8,8 +8,9 @@ import (
 )
 
 func setupRepoStore(t *testing.T) RepositoryStore {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	s := NewRepositoryStore(db)
 	err = s.Init()
@@ -141,8 +142,9 @@ func TestRepoStore_ListAll_Empty(t *testing.T) {
 }
 
 func TestRepoStore_Init_DBError(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	require.NoError(t, db.Close())
 
 	s := NewRepositoryStore(db)

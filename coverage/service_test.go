@@ -7,13 +7,14 @@ import (
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
 )
 
 func initTestCoverageService(t *testing.T) *CoverageService {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	svc, err := NewCoverageService(db)
 	require.NoError(t, err)
@@ -94,8 +95,9 @@ func (f *fakeTrackerCreator) CreateTracker(name, description, body, visibility s
 }
 
 func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	db.MustExec(`
 		CREATE TABLE IF NOT EXISTS repository (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,8 +150,9 @@ func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 // that repository. The old repo ids collide with existing tracker ids (1..3),
 // which the previous re-keying guard silently skipped.
 func TestCoverageServiceMigrateCoverageTrackersFromOldSchemaNoLinks(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	db.MustExec(`CREATE TABLE repository (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,

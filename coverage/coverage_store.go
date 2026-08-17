@@ -9,7 +9,6 @@ import (
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage/profile"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 var schema = `
@@ -21,7 +20,8 @@ CREATE TABLE IF NOT EXISTS coverage (
     contents TEXT NOT NULL,
     UNIQUE(tracker_id, revision)
 );
-
+`
+var schemaCoverageEntry = `
 CREATE TABLE IF NOT EXISTS coverage_entry (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     coverage_id INTEGER NOT NULL REFERENCES coverage(id) ON DELETE CASCADE,
@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS coverage_entry (
     lines INTEGER NOT NULL DEFAULT 0,
     UNIQUE(coverage_id, name)
 );
-
+`
+var schemaCoverageBlock = `
 CREATE TABLE IF NOT EXISTS coverage_block (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entry_id INTEGER NOT NULL REFERENCES coverage_entry(id) ON DELETE CASCADE,
@@ -40,7 +41,8 @@ CREATE TABLE IF NOT EXISTS coverage_block (
     blocks TEXT NOT NULL,
     UNIQUE(entry_id, filename)
 );
-
+`
+var schemaTrackerCoverageMain = `
 CREATE TABLE IF NOT EXISTS tracker_coverage (
     tracker_id INTEGER PRIMARY KEY,
     scm INTEGER NOT NULL,
@@ -124,9 +126,10 @@ func NewCoverageStore(db *sqlx.DB) CoverageStore {
 }
 
 func (s *coverageStoreImpl) Init() error {
-	_, err := s.db.Exec(schema)
-	if err != nil {
-		return fmt.Errorf("coverage Init schema: %w", err)
+	for _, stmt := range []string{schema, schemaCoverageEntry, schemaCoverageBlock, schemaTrackerCoverageMain} {
+		if _, err := s.db.Exec(stmt); err != nil {
+			return fmt.Errorf("coverage Init schema: %w", err)
+		}
 	}
 
 	if err := s.migrate(); err != nil {

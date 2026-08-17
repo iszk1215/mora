@@ -32,6 +32,8 @@ type MoraConfig struct {
 	Client             ClientConfig
 	Debug              bool
 	DatabaseFilename   string
+	TursoURL           string
+	TursoAuthToken     string
 	Demo               bool
 }
 

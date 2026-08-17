@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
 )
 
 func initTestStore(t *testing.T) *trackerStore {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	db.MustExec("PRAGMA foreign_keys = ON")
 
@@ -389,7 +390,11 @@ func TestStoreValue(t *testing.T) {
 	t.Run("list values by existing series id", func(t *testing.T) {
 		values, err := s.listValues(series.Id, 0)
 		require.NoError(t, err)
-		require.Equal(t, []ValueModel{*value}, values)
+		require.Len(t, values, 1)
+		require.Equal(t, value.Id, values[0].Id)
+		require.Equal(t, value.SeriesId, values[0].SeriesId)
+		require.True(t, values[0].Timestamp.Equal(value.Timestamp))
+		require.Equal(t, value.Value, values[0].Value)
 	})
 
 	t.Run("list values with limit", func(t *testing.T) {

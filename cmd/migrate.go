@@ -5,10 +5,9 @@ import (
 	"time"
 
 	"github.com/iszk1215/mora/config"
+	"github.com/iszk1215/mora/server"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/iszk1215/mora/udm"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -41,9 +40,9 @@ table. Requires the database path from the server config.`,
 
 			cmd.SilenceUsage = true
 
-			db, err := sqlx.Connect("sqlite3", cfg.DatabaseFilename)
+			db, err := server.OpenDB(cfg)
 			if err != nil {
-				return fmt.Errorf("open database %s: %w", cfg.DatabaseFilename, err)
+				return fmt.Errorf("open database: %w", err)
 			}
 			defer func() { _ = db.Close() }()
 
