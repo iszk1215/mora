@@ -16,7 +16,7 @@ import { Browser } from './browser'
 import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
@@ -237,24 +237,22 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
   })
 
   return (
-    <Card size="sm" className="my-2">
-      <CardContent className="flex justify-between text-base">
-        <div>
-          <Badge variant="outline" className="mr-2">#{cov.index}</Badge>
-          {elemsWithMargin}
-        </div>
-        <div>
-          <span className="mr-2">{formatTime(cov.time)}</span>
-          {hasScmAccess ? (
-            <ExternalLink href={cov.revision_url}>
-              {formatRevision(cov.revision)}
-            </ExternalLink>
-          ) : (
-            <span>{formatRevision(cov.revision)}</span>
-          )}
-        </div>
-      </CardContent>
-    </Card>)
+    <div className="flex justify-between text-base py-2 border-b last:border-b-0">
+      <div>
+        <Badge variant="outline" className="mr-2">#{cov.index}</Badge>
+        {elemsWithMargin}
+      </div>
+      <div>
+        <span className="mr-2">{formatTime(cov.time)}</span>
+        {hasScmAccess ? (
+          <ExternalLink href={cov.revision_url}>
+            {formatRevision(cov.revision)}
+          </ExternalLink>
+        ) : (
+          <span>{formatRevision(cov.revision)}</span>
+        )}
+      </div>
+    </div>)
 }
 
 export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSelector, chartConfig }: {
@@ -290,16 +288,20 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
       <div className="mb-4">
         Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
       </div>
-      {rangeSelector}
-      <TrackerChart
-        data={{ datasets }}
-        chartConfig={chartConfig ?? undefined}
-        min={min}
-        max={max}
-        animation={false}
-        onChartClick={onChartClick}
-      />
-      <div>{items}</div>
+      <div className="bg-card border rounded-lg py-4 pl-2 pr-3 sm:px-4 shadow-md">
+        {rangeSelector}
+        <TrackerChart
+          data={{ datasets }}
+          chartConfig={chartConfig ?? undefined}
+          min={min}
+          max={max}
+          animation={false}
+          onChartClick={onChartClick}
+        />
+      </div>
+      <div className="mt-4 bg-card border rounded-lg py-4 pl-2 pr-3 sm:px-4 shadow-md">
+        {items}
+      </div>
     </div>)
 }
 
