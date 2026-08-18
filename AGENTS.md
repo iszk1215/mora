@@ -21,7 +21,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 ## Structure
 
 - `main.go` → `cmd` (cobra CLI)
-- `server` - web server (chi router, sqlite3 via sqlx)
+- `server` - web server (chi router, libsql via sqlx)
 - `core` - client/interfaces
 - `udm` - user defined metrics (UDM)
 - `mockscm` - SCM mocks (build tag `//go:build !oss`)
@@ -63,7 +63,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - [docs/specs/tracker-search.md](docs/specs/tracker-search.md) - Tracker search spec (top page search feature)
 - [docs/specs/user-page.md](docs/specs/user-page.md) - User page spec (/users/:userName)
 - [docs/specs/coverage.md](docs/specs/coverage.md) - Coverage URL spec (URLs, middleware, upload)
-- [docs/decisions/0001-use-sqlite3.md](docs/decisions/0001-use-sqlite3.md) - ADR: SQLite3
+- [docs/decisions/0001-use-libsql.md](docs/decisions/0001-use-libsql.md) - ADR: libSQL/Turso
 - [docs/decisions/0002-use-go-chi.md](docs/decisions/0002-use-go-chi.md) - ADR: chi router
 
 ## UDM (User Defined Metrics)
