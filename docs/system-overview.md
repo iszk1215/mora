@@ -10,7 +10,7 @@ Mora is a code coverage tracker that integrates with GitHub and Gitea. It monito
 |-------|-----------|
 | Language | Go 1.25 |
 | HTTP Router | go-chi/chi v5 |
-| Database | SQLite3 (mattn/go-sqlite3) |
+| Database | libSQL (go-libsql) / Turso Cloud |
 | ORM/Query | sqlx |
 | CLI | Cobra |
 | Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS v4 |

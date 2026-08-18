@@ -190,7 +190,7 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 
 	// Inline pagination as literal integers: SQLite returns wrong row counts
 	// when LIMIT/OFFSET are bound parameters on a query with LEFT JOINs
-	// (observed with mattn/go-sqlite3). page/perPage are validated ints.
+	// (observed with both mattn/go-sqlite3 and tursodatabase/go-libsql). page/perPage are validated ints.
 	if perPage > 0 {
 		selectQuery += " LIMIT " + strconv.Itoa(perPage) + " OFFSET " + strconv.Itoa((page-1)*perPage)
 	}

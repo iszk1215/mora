@@ -58,7 +58,7 @@ func NewWebCommand() *cobra.Command {
 			config.Server.Port = port
 			config.Demo = demo
 			if demo {
-				config.DatabaseFilename = ":memory:?_loc=auto"
+				config.DatabaseFilename = ":memory:"
 			}
 
 			server, err := server.NewMoraServerFromConfig(config)

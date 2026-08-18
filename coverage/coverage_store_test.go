@@ -15,9 +15,9 @@ import (
 )
 
 func initCoverageStore(t *testing.T) CoverageStore {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
-	// db, err := sqlx.Connect("sqlite3", ":memory:")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	s := NewCoverageStore(db)
@@ -53,7 +53,7 @@ func TestCoverageStore_Find(t *testing.T) {
 
 	got, err := s.Find(id)
 	require.NoError(t, err)
-	require.Equal(t, want, got)
+	assertCoverageEqual(t, want, got)
 }
 
 func TestCoverageStore_Find_Nil(t *testing.T) {
@@ -81,8 +81,9 @@ func TestCoverageStore_List_Empty(t *testing.T) {
 }
 
 func TestCoverageStore_Init_CreatesUniqueConstraint(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	s := NewCoverageStore(db)
@@ -127,7 +128,7 @@ func TestCoverageStore_Put_Insert(t *testing.T) {
 
 	got, err := s.Find(id)
 	require.NoError(t, err)
-	require.Equal(t, want, got)
+	assertCoverageEqual(t, want, got)
 }
 
 func TestCoverageStore_Put_InsertWithEntry(t *testing.T) {
@@ -153,7 +154,7 @@ func TestCoverageStore_Put_InsertWithEntry(t *testing.T) {
 
 	got, err := s.Find(id)
 	require.NoError(t, err)
-	require.Equal(t, want, got)
+	assertCoverageEqual(t, want, got)
 }
 
 func TestCoverageStore_Put_Concurrent(t *testing.T) {
@@ -225,8 +226,9 @@ func TestCoverageStore_Put_Update(t *testing.T) {
 }
 
 func TestCoverageStore_Put_TouchesLinkedTracker(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	db.MustExec(`CREATE TABLE user (id INTEGER PRIMARY KEY, username TEXT NOT NULL)`)
@@ -374,8 +376,9 @@ func TestCoverageStore_ReplaceEntries_BeginTxError(t *testing.T) {
 		Entries:   []*CoverageEntry{{Name: "go", Hits: 10, Lines: 20}},
 	}
 
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	s := NewCoverageStore(db)
 	err = s.Init()
@@ -393,8 +396,9 @@ func TestCoverageStore_ReplaceEntries_BeginTxError(t *testing.T) {
 }
 
 func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	s := NewCoverageStore(db)
@@ -429,8 +433,10 @@ func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
 }
 
 // oldSchema recreates the tracker_coverage schema used before Issue #157 so
-// migration from an existing database can be exercised.
-const oldSchema = `
+// migration from an existing database can be exercised. Statements are kept
+// separate because the libSQL driver executes only the first statement of a
+// multi-statement string.
+const oldSchemaCoverage = `
 CREATE TABLE coverage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     repo_id INTEGER NOT NULL,
@@ -438,8 +444,8 @@ CREATE TABLE coverage (
     time DATETIME NOT NULL,
     contents TEXT NOT NULL,
     UNIQUE(repo_id, revision)
-);
-
+);`
+const oldSchemaTrackerCoverage = `
 CREATE TABLE tracker_coverage (
     tracker_id INTEGER PRIMARY KEY,
     repo_id    INTEGER NOT NULL,
@@ -448,8 +454,9 @@ CREATE TABLE tracker_coverage (
 );`
 
 func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	db.MustExec(`CREATE TABLE repository (
@@ -466,7 +473,8 @@ func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
 	db.MustExec(`CREATE TABLE tracker (id INTEGER PRIMARY KEY AUTOINCREMENT)`)
 	db.MustExec(`INSERT INTO tracker (id) VALUES (10)`)
 
-	db.MustExec(oldSchema)
+	db.MustExec(oldSchemaCoverage)
+	db.MustExec(oldSchemaTrackerCoverage)
 	db.MustExec(`INSERT INTO coverage (repo_id, revision, time, contents)
 		VALUES (1, 'abc', '2024-01-01', '[]')`)
 	db.MustExec(`INSERT INTO coverage (repo_id, revision, time, contents)
@@ -510,8 +518,9 @@ func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
 }
 
 func TestCoverageStore_DeleteTrackerCascadesCoverage(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 	db.MustExec("PRAGMA foreign_keys = ON")
 
@@ -548,8 +557,9 @@ func TestCoverageStore_DeleteTrackerCascadesCoverage(t *testing.T) {
 }
 
 func TestCoverageStore_Put_FailsForMissingTrackerWithForeignKeys(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 	db.MustExec("PRAGMA foreign_keys = ON")
 

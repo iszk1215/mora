@@ -6,7 +6,7 @@ import (
 
 	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,8 +39,9 @@ type migratedValueRow struct {
 }
 
 func initMigrateTestStore(t *testing.T) *sqlx.DB {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	db.MustExec("PRAGMA foreign_keys = ON")
 
@@ -271,8 +272,9 @@ func TestMigrateUDMToTrackerNoUdmTables(t *testing.T) {
 }
 
 func TestMigrateUDMToTrackerNoTrackerTables(t *testing.T) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	udmStore := newUdmStore(db)
 	require.NoError(t, udmStore.initialize())

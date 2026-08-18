@@ -26,6 +26,14 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// assertCoverageEqual normalizes the Timestamp Location before comparison to
+// avoid mismatches between libSQL's fixed-offset Location and the local timezone.
+func assertCoverageEqual(t *testing.T, want, got *Coverage) {
+	t.Helper()
+	got.Timestamp = got.Timestamp.In(want.Timestamp.Location())
+	assert.Equal(t, want, got)
+}
+
 type MockRepositoryClient struct {
 	url    *url.URL
 	client *scm.Client
@@ -48,8 +56,9 @@ func (m *MockRepositoryClient) RevisionURL(baseURL string, revision string) stri
 }
 
 func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	store := NewCoverageStore(db)
 	err = store.Init()
@@ -68,8 +77,9 @@ func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 // tracker injected into the request context, mirroring the production mount in
 // server/server.go.
 func trackerContextRouter(t *testing.T, s *CoverageHandler) http.Handler {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
@@ -119,7 +129,7 @@ func Test_injectCoverage(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Result().StatusCode)
-	assert.Equal(t, want, got)
+	assertCoverageEqual(t, want, got)
 }
 
 func Test_injectCoverage_malformed_id(t *testing.T) {
@@ -551,7 +561,7 @@ func TestCoverageHandler_AddCoverage(t *testing.T) {
 	cov.ID = got.ID
 	saved, err := store.Find(cov.ID)
 	require.NoError(t, err)
-	assert.Equal(t, cov, saved)
+	assertCoverageEqual(t, cov, saved)
 }
 
 func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
@@ -755,7 +765,7 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 	cov.ID = 1 // 1 will be assigned by the server
 	got, err := store.Find(cov.ID)
 	require.NoError(t, err)
-	assert.Equal(t, cov, got)
+	assertCoverageEqual(t, cov, got)
 }
 
 func TestValidateCoverageUploadRequest(t *testing.T) {

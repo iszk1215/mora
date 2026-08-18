@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 )
 
@@ -101,9 +100,7 @@ func TestIsUniqueConstraintError(t *testing.T) {
 	require.True(t, isUniqueConstraintError(err), "expected unique constraint error, got %v", err)
 
 	require.False(t, isUniqueConstraintError(errors.New("some other error")))
-
-	var sqliteErr sqlite3.Error
-	require.False(t, errors.As(errors.New("plain"), &sqliteErr))
+	require.False(t, isUniqueConstraintError(nil))
 }
 
 func TestUserStore_CreateUser_DuplicateUsername(t *testing.T) {

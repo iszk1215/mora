@@ -16,8 +16,9 @@ import (
 const testCSRFToken = "test-csrf-token-value"
 
 func newTestAPIKeyHandler(t *testing.T) (http.Handler, *MoraSessionManager, UserStore) {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())

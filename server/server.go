@@ -24,7 +24,6 @@ import (
 	"github.com/iszk1215/mora/tracker"
 	"github.com/iszk1215/mora/udm"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/rs/zerolog/log"
 	"github.com/swaggo/http-swagger/v2"
 )
@@ -650,20 +649,11 @@ func initRepositoryManagers(cfg config.MoraConfig, store RepositoryManagerStore)
 	return repositoryManagers, nil
 }
 
-func initStore(filename string) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, UserStore, error) {
-	log.Info().Msgf("Initialize store: filename=%s", filename)
-
-	if filename != "" && !strings.HasPrefix(filename, ":memory:") &&
-		!strings.HasPrefix(filename, "file::memory:") {
-		filename += "?_journal_mode=WAL&_busy_timeout=5000"
-	}
-	db, err := sqlx.Connect("sqlite3", filename)
+func initStore(cfg config.MoraConfig) (*sqlx.DB, RepositoryManagerStore, RepositoryStore, UserStore, error) {
+	db, err := OpenDB(cfg)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("sqlx.Connect: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("OpenDB: %w", err)
 	}
-	db.SetMaxOpenConns(1)
-
-	db.MustExec("PRAGMA foreign_keys = ON")
 
 	rmStore := NewRepositoryManagerStore(db)
 	if err := rmStore.Init(); err != nil {
@@ -696,7 +686,7 @@ func initFrontendFileServer() (http.Handler, error) {
 }
 
 func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
-	db, rmStore, repoStore, userStore, err := initStore(cfg.DatabaseFilename)
+	db, rmStore, repoStore, userStore, err := initStore(cfg)
 	if err != nil {
 		log.Err(err).Msg("initStore")
 		return nil, err

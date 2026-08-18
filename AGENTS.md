@@ -21,7 +21,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 ## Structure
 
 - `main.go` → `cmd` (cobra CLI)
-- `server` - web server (chi router, sqlite3 via sqlx)
+- `server` - web server (chi router, libsql via sqlx)
 - `core` - client/interfaces
 - `udm` - user defined metrics (UDM)
 - `mockscm` - SCM mocks (build tag `//go:build !oss`)
@@ -49,7 +49,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - Binary output: `bin/mora`
 - Default config: `mora.conf` (flag: `-c`)
 - Server default port: 4000 (flag: `-p`)
-- Tests use in-memory sqlite3 (`sqlite3`, `:memory:?_loc=auto`)
+- Tests use in-memory libsql (`libsql`, `:memory:`)
 - Static files embedded in `server/static`
 - Coverage: `make coverage.html` (requires `coverage.out` from `go test -coverprofile`); frontend coverage via `make frontend-coverage` (outputs `frontend/coverage/lcov.info`)
 - Frontend coverage: `make frontend-coverage` uses a file-based dependency on `frontend/coverage/lcov.info` for incremental builds
@@ -63,7 +63,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - [docs/specs/tracker-search.md](docs/specs/tracker-search.md) - Tracker search spec (top page search feature)
 - [docs/specs/user-page.md](docs/specs/user-page.md) - User page spec (/users/:userName)
 - [docs/specs/coverage.md](docs/specs/coverage.md) - Coverage URL spec (URLs, middleware, upload)
-- [docs/decisions/0001-use-sqlite3.md](docs/decisions/0001-use-sqlite3.md) - ADR: SQLite3
+- [docs/decisions/0001-use-libsql.md](docs/decisions/0001-use-libsql.md) - ADR: libSQL/Turso
 - [docs/decisions/0002-use-go-chi.md](docs/decisions/0002-use-go-chi.md) - ADR: chi router
 
 ## UDM (User Defined Metrics)

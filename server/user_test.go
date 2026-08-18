@@ -14,8 +14,9 @@ import (
 )
 
 func newTestUserStore(t *testing.T) UserStore {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	store := NewUserStore(db)
 	require.NoError(t, store.Init())
 	return store
@@ -697,8 +698,9 @@ func TestCreateUserForSession_FindByProviderError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 	store := NewUserStore(db)
 	require.NoError(t, store.Init())
 	_ = db.Close()

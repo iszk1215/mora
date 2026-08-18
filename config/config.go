@@ -31,7 +31,9 @@ type MoraConfig struct {
 	RepositoryManagers []RepositoryManagerConfig `toml:"scm"`
 	Client             ClientConfig
 	Debug              bool
-	DatabaseFilename   string
+	DatabaseFilename   string `toml:"database_filename"`
+	TursoURL           string `toml:"turso_url"`
+	TursoAuthToken     string `toml:"turso_token"`
 	Demo               bool
 }
 

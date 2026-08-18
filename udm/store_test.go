@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,8 +47,9 @@ func initMockStore(t *testing.T, s *udmStore, init *storeInitializer) {
 }
 
 func initTestStore(t *testing.T) *udmStore {
-	db, err := sqlx.Connect("sqlite3", ":memory:?_loc=auto")
+	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
+	 db.MustExec("PRAGMA foreign_keys = OFF")
 
 	s := newUdmStore(db)
 
@@ -331,7 +332,11 @@ func TestStoreValue(t *testing.T) {
 	// existing id
 	values, err = s.listValues(item.Id)
 	require.NoError(t, err)
-	require.Equal(t, []ValueModel{*value}, values)
+	require.Len(t, values, 1)
+	require.Equal(t, value.Id, values[0].Id)
+	require.Equal(t, value.ItemId, values[0].ItemId)
+	require.True(t, values[0].Timestamp.Equal(value.Timestamp))
+	require.Equal(t, value.Value, values[0].Value)
 }
 
 func TestDeleteValues(t *testing.T) {
