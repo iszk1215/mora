@@ -181,6 +181,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
         feature: {
           saveAsImage: { title: 'Save' },
           restore: { title: 'Reset' },
+          dataZoom: { title: { rect: 'Rectangle Zoom', back: 'Reset Zoom' } },
         },
       }
     }

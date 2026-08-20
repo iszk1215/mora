@@ -111,7 +111,7 @@ func (s *MoraServer) seedDemoData() error {
 			if rng.Intn(2) == 0 {
 				xAxisType = "datetime"
 			}
-			cc := map[string]any{"palette": palette, "x_axis_type": xAxisType}
+			cc := map[string]any{"palette": palette, "x_axis_type": xAxisType, "show_toolbox": true}
 
 			// ~25% of trackers get area fill disabled
 			if rng.Intn(4) == 0 {

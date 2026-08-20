@@ -582,7 +582,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [showLegend, setShowLegend] = useState(parsedChartConfig.show_legend ?? true)
   const [showSymbols, setShowSymbols] = useState(parsedChartConfig.show_symbols ?? true)
   const [showSlider, setShowSlider] = useState(parsedChartConfig.show_slider ?? true)
-  const [showToolbox, setShowToolbox] = useState(parsedChartConfig.show_toolbox ?? false)
+  const [showToolbox, setShowToolbox] = useState(parsedChartConfig.show_toolbox ?? true)
   const [palette, setPalette] = useState(parsedChartConfig.palette ?? 'default')
   const [yAxes, setYAxes] = useState<YAxisConfig[]>(() => {
     if (parsedChartConfig.y_axes && parsedChartConfig.y_axes.length > 0) {
