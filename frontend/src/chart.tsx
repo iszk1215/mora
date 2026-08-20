@@ -176,6 +176,14 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     if (showLegend) {
       opt.legend = { type: 'scroll' as const, top: 0 }
     }
+    if (cc?.show_toolbox) {
+      opt.toolbox = {
+        feature: {
+          saveAsImage: { title: 'Save' },
+          restore: { title: 'Reset' },
+        },
+      }
+    }
     if (cc?.x_axis_label) opt.xAxis.name = cc.x_axis_label
     opt.xAxis.min = params.min
     opt.xAxis.max = params.max
