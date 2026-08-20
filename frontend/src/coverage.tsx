@@ -205,57 +205,73 @@ interface CoverageSegmentProperty {
 }
 
 
-export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element => {
+export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Element[] => {
   const params = props.params
   const cov = props.cov
   const hasScmAccess = !!cov.revision_url
+  const rows: React.JSX.Element[] = []
 
-  const entryElems: React.JSX.Element[] = []
+  const entryCount = cov.entries.length
+  const showTotal = entryCount > 1
 
-  if (cov.entries.length > 1) {
-    entryElems.push(
-      <span key="total">
-        Total {formatRatio(cov.hits, cov.lines)}% ({cov.hits}/{cov.lines})
-      </span>)
+  const totalRows = showTotal ? entryCount + 1 : entryCount
+
+  // Total row
+  if (showTotal) {
+    rows.push(
+      <TableRow key={`${cov.index}-total`}>
+        <TableCell rowSpan={totalRows}>
+          <Badge variant="outline">#{cov.index}</Badge>
+        </TableCell>
+        <TableCell>Total</TableCell>
+        <TableCell>{cov.hits}/{cov.lines}</TableCell>
+        <TableCell rowSpan={totalRows}>{formatTime(cov.time)}</TableCell>
+        <TableCell rowSpan={totalRows}>
+          {hasScmAccess ? (
+            <ExternalLink href={cov.revision_url}>
+              {formatRevision(cov.revision)}
+            </ExternalLink>
+          ) : (
+            <span>{formatRevision(cov.revision)}</span>
+          )}
+        </TableCell>
+      </TableRow>)
   }
 
+  // Entry rows
   cov.entries.forEach((e: CoverageEntry) => {
-    if (hasScmAccess) {
-      const href = buildEntryUrl(params, cov, e.name)
-      entryElems.push(
-        <DefaultLink key={e.name} to={href}>
-          {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
-        </DefaultLink>)
-    } else {
-      entryElems.push(
-        <span key={e.name}>
-          {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
-        </span>)
-    }
-  })
-
-  const entrysWithMargin = entryElems.map((e: React.JSX.Element, i: number) => {
-    return <span className="mx-2" key={i}>{e} </span>
-  })
-
-  return (
-    <TableRow>
-      <TableCell>
-        <Badge variant="outline">#{cov.index}</Badge>
-      </TableCell>
-      <TableCell>{entrysWithMargin}</TableCell>
-      <TableCell>{formatRatio(cov.hits, cov.lines)}%</TableCell>
-      <TableCell>{formatTime(cov.time)}</TableCell>
-      <TableCell>
-        {hasScmAccess ? (
-          <ExternalLink href={cov.revision_url}>
-            {formatRevision(cov.revision)}
-          </ExternalLink>
-        ) : (
-          <span>{formatRevision(cov.revision)}</span>
+    const nameCell = hasScmAccess ? (
+      <DefaultLink to={buildEntryUrl(params, cov, e.name)}>
+        {e.name}
+      </DefaultLink>
+    ) : (
+      <span>{e.name}</span>
+    )
+    rows.push(
+      <TableRow key={`${cov.index}-${e.name}`}>
+        {!showTotal && (
+          <TableCell rowSpan={1}>
+            <Badge variant="outline">#{cov.index}</Badge>
+          </TableCell>
         )}
-      </TableCell>
-    </TableRow>)
+        <TableCell>{nameCell}</TableCell>
+        <TableCell>{e.hits}/{e.lines}</TableCell>
+        {!showTotal && <TableCell rowSpan={1}>{formatTime(cov.time)}</TableCell>}
+        {!showTotal && (
+          <TableCell rowSpan={1}>
+            {hasScmAccess ? (
+              <ExternalLink href={cov.revision_url}>
+                {formatRevision(cov.revision)}
+              </ExternalLink>
+            ) : (
+              <span>{formatRevision(cov.revision)}</span>
+            )}
+          </TableCell>
+        )}
+      </TableRow>)
+  })
+
+  return rows
 }
 
 const COVERAGE_PER_PAGE = 20
@@ -276,7 +292,7 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
 
   const items: React.JSX.Element[] = []
   pageCoverages.forEach((cov: Coverage, i: number) => {
-    items.push(<CoverageSegment key={i} cov={cov} params={params} />)
+    items.push(...CoverageSegment({ cov, params }))
   })
 
   const datasets = useMemo(() => coverageToDatasets(coverages), [coverages])
@@ -312,8 +328,8 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">Index</TableHead>
-              <TableHead>Entries</TableHead>
-              <TableHead className="w-24">Coverage</TableHead>
+              <TableHead>Entry</TableHead>
+              <TableHead className="w-24">Hits/Lines</TableHead>
               <TableHead className="w-48">Time</TableHead>
               <TableHead className="w-24">Revision</TableHead>
             </TableRow>
