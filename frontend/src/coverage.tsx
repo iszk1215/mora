@@ -219,7 +219,15 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
       <TableCell>
         <Badge variant="outline">#{cov.index}</Badge>
       </TableCell>
-      <TableCell>{formatRatio(cov.hits, cov.lines)}%</TableCell>
+      <TableCell>
+        {(() => {
+          const cell = <span>{formatRatio(cov.hits, cov.lines)}% ({cov.hits}/{cov.lines})</span>
+          if (!hasScmAccess) return cell
+          const totalEntry = entryMap.get('_default')
+          if (!totalEntry) return cell
+          return <DefaultLink to={buildEntryUrl(params, cov, '_default')}>{cell}</DefaultLink>
+        })()}
+      </TableCell>
       {props.entryNames.map((name) => {
         const e = entryMap.get(name)
         if (!e) return <TableCell key={name}>-</TableCell>
