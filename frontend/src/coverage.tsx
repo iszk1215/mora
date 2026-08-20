@@ -305,13 +305,13 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-16">Index</TableHead>
+              <TableHead className="w-16"></TableHead>
               <TableHead className="w-24">Total</TableHead>
               {entryNames.map((name) => (
                 <TableHead key={name}>{name}</TableHead>
               ))}
               <TableHead className="w-48">Time</TableHead>
-              <TableHead className="w-24">Revision</TableHead>
+              <TableHead className="w-24">Commit Hash</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
