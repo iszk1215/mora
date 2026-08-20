@@ -16,7 +16,9 @@ import { Browser } from './browser'
 import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
+
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
@@ -199,7 +201,8 @@ async function loadCoverageListByTracker({ params }: { params: Params }): Promis
 
 interface CoverageSegmentProperty {
   cov: Coverage,
-  params: Params
+  params: Params,
+  entryNames: string[]
 }
 
 
@@ -208,54 +211,50 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
   const cov = props.cov
   const hasScmAccess = !!cov.revision_url
 
-  const elems: React.JSX.Element[] = []
-
-  if (cov.entries.length > 1) { // Add "Total"
-    elems.push(
-      <span>
-        Total {formatRatio(cov.hits, cov.lines)}% ({cov.hits}/{cov.lines})
-      </span>)
-  }
-
-  cov.entries.forEach((e: CoverageEntry) => {
-    if (hasScmAccess) {
-      const href = buildEntryUrl(params, cov, e.name)
-      elems.push(
-        <DefaultLink to={href}>
-          {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
-        </DefaultLink>)
-    } else {
-      elems.push(
-        <span>
-          {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
-        </span>)
-    }
-  })
-
-  const elemsWithMargin = elems.map((e: React.JSX.Element, i: number) => {
-    return <span className="mx-2" key={i}>{e} </span>
-  })
+  const entryMap = new Map<string, CoverageEntry>()
+  cov.entries.forEach((e) => entryMap.set(e.name, e))
 
   return (
-    <Card size="sm" className="my-2">
-      <CardContent className="flex justify-between text-base">
-        <div>
-          <Badge variant="outline" className="mr-2">#{cov.index}</Badge>
-          {elemsWithMargin}
-        </div>
-        <div>
-          <span className="mr-2">{formatTime(cov.time)}</span>
-          {hasScmAccess ? (
-            <ExternalLink href={cov.revision_url}>
-              {formatRevision(cov.revision)}
-            </ExternalLink>
-          ) : (
-            <span>{formatRevision(cov.revision)}</span>
-          )}
-        </div>
-      </CardContent>
-    </Card>)
+    <TableRow>
+      <TableCell>
+        <Badge variant="outline">#{cov.index}</Badge>
+      </TableCell>
+      <TableCell>
+        {(() => {
+          const cell = <span>{formatRatio(cov.hits, cov.lines)}% ({cov.hits}/{cov.lines})</span>
+          if (!hasScmAccess) return cell
+          const totalEntry = entryMap.get('_default')
+          if (!totalEntry) return cell
+          return <DefaultLink to={buildEntryUrl(params, cov, '_default')}>{cell}</DefaultLink>
+        })()}
+      </TableCell>
+      {props.entryNames.map((name) => {
+        const e = entryMap.get(name)
+        if (!e) return <TableCell key={name}>-</TableCell>
+        const cell = <span>{formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})</span>
+        if (!hasScmAccess) return <TableCell key={name}>{cell}</TableCell>
+        return (
+          <TableCell key={name}>
+            <DefaultLink to={buildEntryUrl(params, cov, e.name)}>
+              {cell}
+            </DefaultLink>
+          </TableCell>
+        )
+      })}
+      <TableCell>{formatTime(cov.time)}</TableCell>
+      <TableCell>
+        {hasScmAccess ? (
+          <ExternalLink href={cov.revision_url}>
+            {formatRevision(cov.revision)}
+          </ExternalLink>
+        ) : (
+          <span>{formatRevision(cov.revision)}</span>
+        )}
+      </TableCell>
+    </TableRow>)
 }
+
+const COVERAGE_PER_PAGE = 20
 
 export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSelector, chartConfig }: {
   repo: Repo
@@ -266,11 +265,22 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
   rangeSelector?: React.ReactNode
   chartConfig?: ChartConfig | null
 }): React.JSX.Element => {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(coverages.length / COVERAGE_PER_PAGE))
+  const start = (page - 1) * COVERAGE_PER_PAGE
+  const pageCoverages = coverages.slice(start, start + COVERAGE_PER_PAGE)
+
+  const entryNames = useMemo(() => {
+    const nameSet = new Set<string>()
+    coverages.forEach((cov) => cov.entries.forEach((e) => nameSet.add(e.name)))
+    const names = Array.from(nameSet)
+    if (names.length === 1 && names[0] === '_default') return []
+    return names
+  }, [coverages])
+
   const items: React.JSX.Element[] = []
-  coverages.forEach((cov: Coverage, i: number) => {
-    items.push(<div key={i}>
-      <CoverageSegment cov={cov} params={params} />
-    </div>)
+  pageCoverages.forEach((cov: Coverage, i: number) => {
+    items.push(<CoverageSegment key={i} cov={cov} params={params} entryNames={entryNames} />)
   })
 
   const datasets = useMemo(() => coverageToDatasets(coverages), [coverages])
@@ -290,16 +300,48 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
       <div className="mb-4">
         Repository: <ExternalLink href={repo.url}>{repo.url}</ExternalLink>
       </div>
-      {rangeSelector}
-      <TrackerChart
-        data={{ datasets }}
-        chartConfig={chartConfig ?? undefined}
-        min={min}
-        max={max}
-        animation={false}
-        onChartClick={onChartClick}
-      />
-      <div>{items}</div>
+      <div className="bg-card border rounded-lg py-4 pl-2 pr-3 sm:px-4 shadow-md">
+        {rangeSelector}
+        <TrackerChart
+          data={{ datasets }}
+          chartConfig={chartConfig ?? undefined}
+          min={min}
+          max={max}
+          animation={false}
+          onChartClick={onChartClick}
+        />
+      </div>
+      <div className="mt-4 bg-card border rounded-lg py-4 pl-2 pr-3 sm:px-4 shadow-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16"></TableHead>
+              <TableHead className="w-24">Total</TableHead>
+              {entryNames.map((name) => (
+                <TableHead key={name}>{name}</TableHead>
+              ))}
+              <TableHead className="w-48">Time</TableHead>
+              <TableHead className="w-24">Commit Hash</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items}
+          </TableBody>
+        </Table>
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-4">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              Prev
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              Next
+            </Button>
+          </div>
+        )}
+      </div>
     </div>)
 }
 
