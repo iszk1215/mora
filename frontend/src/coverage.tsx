@@ -265,7 +265,9 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
   const entryNames = useMemo(() => {
     const nameSet = new Set<string>()
     coverages.forEach((cov) => cov.entries.forEach((e) => nameSet.add(e.name)))
-    return Array.from(nameSet)
+    const names = Array.from(nameSet)
+    if (names.length === 1 && names[0] === '_default') return []
+    return names
   }, [coverages])
 
   const items: React.JSX.Element[] = []
