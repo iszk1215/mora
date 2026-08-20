@@ -16,6 +16,8 @@ import { Browser } from './browser'
 import { CodeView } from './codeview'
 import { DefaultLink, ExternalLink } from './util'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table'
 
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
@@ -208,11 +210,11 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
   const cov = props.cov
   const hasScmAccess = !!cov.revision_url
 
-  const elems: React.JSX.Element[] = []
+  const entryElems: React.JSX.Element[] = []
 
-  if (cov.entries.length > 1) { // Add "Total"
-    elems.push(
-      <span>
+  if (cov.entries.length > 1) {
+    entryElems.push(
+      <span key="total">
         Total {formatRatio(cov.hits, cov.lines)}% ({cov.hits}/{cov.lines})
       </span>)
   }
@@ -220,30 +222,31 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
   cov.entries.forEach((e: CoverageEntry) => {
     if (hasScmAccess) {
       const href = buildEntryUrl(params, cov, e.name)
-      elems.push(
-        <DefaultLink to={href}>
+      entryElems.push(
+        <DefaultLink key={e.name} to={href}>
           {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
         </DefaultLink>)
     } else {
-      elems.push(
-        <span>
+      entryElems.push(
+        <span key={e.name}>
           {e.name} {formatRatio(e.hits, e.lines)}% ({e.hits}/{e.lines})
         </span>)
     }
   })
 
-  const elemsWithMargin = elems.map((e: React.JSX.Element, i: number) => {
+  const entrysWithMargin = entryElems.map((e: React.JSX.Element, i: number) => {
     return <span className="mx-2" key={i}>{e} </span>
   })
 
   return (
-    <div className="flex justify-between text-base py-2 border-b last:border-b-0">
-      <div>
-        <Badge variant="outline" className="mr-2">#{cov.index}</Badge>
-        {elemsWithMargin}
-      </div>
-      <div>
-        <span className="mr-2">{formatTime(cov.time)}</span>
+    <TableRow>
+      <TableCell>
+        <Badge variant="outline">#{cov.index}</Badge>
+      </TableCell>
+      <TableCell>{entrysWithMargin}</TableCell>
+      <TableCell>{formatRatio(cov.hits, cov.lines)}%</TableCell>
+      <TableCell>{formatTime(cov.time)}</TableCell>
+      <TableCell>
         {hasScmAccess ? (
           <ExternalLink href={cov.revision_url}>
             {formatRevision(cov.revision)}
@@ -251,9 +254,11 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
         ) : (
           <span>{formatRevision(cov.revision)}</span>
         )}
-      </div>
-    </div>)
+      </TableCell>
+    </TableRow>)
 }
+
+const COVERAGE_PER_PAGE = 20
 
 export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSelector, chartConfig }: {
   repo: Repo
@@ -264,11 +269,14 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
   rangeSelector?: React.ReactNode
   chartConfig?: ChartConfig | null
 }): React.JSX.Element => {
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(coverages.length / COVERAGE_PER_PAGE))
+  const start = (page - 1) * COVERAGE_PER_PAGE
+  const pageCoverages = coverages.slice(start, start + COVERAGE_PER_PAGE)
+
   const items: React.JSX.Element[] = []
-  coverages.forEach((cov: Coverage, i: number) => {
-    items.push(<div key={i}>
-      <CoverageSegment cov={cov} params={params} />
-    </div>)
+  pageCoverages.forEach((cov: Coverage, i: number) => {
+    items.push(<CoverageSegment key={i} cov={cov} params={params} />)
   })
 
   const datasets = useMemo(() => coverageToDatasets(coverages), [coverages])
@@ -300,7 +308,33 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
         />
       </div>
       <div className="mt-4 bg-card border rounded-lg py-4 pl-2 pr-3 sm:px-4 shadow-md">
-        {items}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-16">Index</TableHead>
+              <TableHead>Entries</TableHead>
+              <TableHead className="w-24">Coverage</TableHead>
+              <TableHead className="w-48">Time</TableHead>
+              <TableHead className="w-24">Revision</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items}
+          </TableBody>
+        </Table>
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-4">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+              Prev
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+              Next
+            </Button>
+          </div>
+        )}
       </div>
     </div>)
 }
