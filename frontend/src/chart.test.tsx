@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { formatValue, TrackerChart } from './chart'
+import { formatValue, formatDateTick, formatDateTimeTick, TrackerChart } from './chart'
 
 vi.mock('echarts-for-react', () => ({
   default: ({ option, onEvents }: any) => (
@@ -12,6 +12,19 @@ vi.mock('echarts-for-react', () => ({
     />
   ),
 }))
+
+function stubMatchMedia(matches: boolean): void {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: (query: string) => ({
+      matches,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }),
+  })
+}
 
 describe('formatValue', () => {
   it('returns default format when fmt is undefined', () => {
@@ -312,5 +325,67 @@ describe('TrackerChart', () => {
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.series[0].data[0].value[0]).toBe('2024-01-15T10:30:00Z')
+  })
+
+  it('sets hideOverlap on x-axis labels when x_axis_type is date', () => {
+    const chartConfig = { x_axis_type: 'date' as const }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.xAxis.axisLabel.hideOverlap).toBe(true)
+  })
+
+  it('sets hideOverlap on x-axis labels when x_axis_type is datetime', () => {
+    const chartConfig = { x_axis_type: 'datetime' as const }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.xAxis.axisLabel.hideOverlap).toBe(true)
+  })
+
+  it('sets hideOverlap on x-axis labels when x_axis_type is not set', () => {
+    render(<TrackerChart data={{ datasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.xAxis.axisLabel.hideOverlap).toBe(true)
+  })
+
+  it('reduces x-axis label font size on narrow viewports', () => {
+    stubMatchMedia(true)
+    render(<TrackerChart data={{ datasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.xAxis.axisLabel.fontSize).toBe(10)
+  })
+
+  it('keeps default x-axis label font size on wide viewports', () => {
+    stubMatchMedia(false)
+    render(<TrackerChart data={{ datasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.xAxis.axisLabel.fontSize).toBeUndefined()
+  })
+})
+
+describe('formatDateTick', () => {
+  it('formats current year dates without the year', () => {
+    const now = new Date()
+    const d = new Date(now.getFullYear(), 5, 15)
+    expect(formatDateTick(d.getTime())).toBe('6/15')
+  })
+
+  it('includes the year for dates in other years', () => {
+    expect(formatDateTick(new Date(2020, 0, 5).getTime())).toBe('2020/1/5')
+  })
+})
+
+describe('formatDateTimeTick', () => {
+  it('omits time for midnight ticks', () => {
+    expect(formatDateTimeTick(new Date(2024, 2, 9).getTime())).toBe('3/9')
+  })
+
+  it('appends zero-padded time for intraday ticks', () => {
+    expect(formatDateTimeTick(new Date(2024, 2, 9, 10, 30).getTime())).toBe('3/9 10:30')
+    expect(formatDateTimeTick(new Date(2024, 2, 9, 8, 5).getTime())).toBe('3/9 08:05')
   })
 })

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import * as echarts from 'echarts'
 import { ChartConfig, SeriesConfig, YAxisConfig } from './core'
@@ -37,6 +37,41 @@ export interface Dataset {
   data: Array<{ x: string; y: string; extra?: Record<string, any> }>
   label: string
   seriesConfig?: SeriesConfig
+}
+
+const NARROW_MEDIA_QUERY = '(max-width: 639px)'
+
+function useIsNarrowViewport(): boolean {
+  const [narrow, setNarrow] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia(NARROW_MEDIA_QUERY).matches
+      : false,
+  )
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const mq = window.matchMedia(NARROW_MEDIA_QUERY)
+    const onChange = (e: MediaQueryListEvent): void => setNarrow(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return narrow
+}
+
+export function formatDateTick(value: number): string {
+  const d = new Date(value)
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  if (d.getFullYear() === new Date().getFullYear()) {
+    return `${m}/${day}`
+  }
+  return `${d.getFullYear()}/${m}/${day}`
+}
+
+export function formatDateTimeTick(value: number): string {
+  const d = new Date(value)
+  const base = `${d.getMonth() + 1}/${d.getDate()}`
+  if (d.getHours() === 0 && d.getMinutes() === 0) return base
+  return `${base} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 const DEFAULT_Y_AXIS: YAxisConfig = { id: 0, position: 'left' }
@@ -89,6 +124,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   const datasets = params.data?.datasets ?? []
   const cc = params.chartConfig
   const dataZoomAdded = useRef(false)
+  const narrow = useIsNarrowViewport()
   const colors = useMemo(() => params.palette ?? resolvePalette(cc?.palette), [cc?.palette])
 
   const option = useMemo(() => {
@@ -104,21 +140,11 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     const xAxis: any = {
       type: 'time' as const,
       splitLine: { show: false },
-    }
-    if (isDateOnly) {
-      const currentYear = new Date().getFullYear()
-      xAxis.axisLabel = {
+      axisLabel: {
         hideOverlap: true,
-        formatter: (value: number) => {
-          const d = new Date(value)
-          const m = d.getMonth() + 1
-          const day = d.getDate()
-          if (d.getFullYear() === currentYear) {
-            return `${m}/${day}`
-          }
-          return `${d.getFullYear()}/${m}/${day}`
-        },
-      }
+        ...(narrow ? { fontSize: 10 } : {}),
+        formatter: isDateOnly ? formatDateTick : formatDateTimeTick,
+      },
     }
 
     const opt: any = {
@@ -188,7 +214,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     opt.xAxis.min = params.min
     opt.xAxis.max = params.max
     return opt
-  }, [datasets, cc, params.min, params.max, params.animation, colors])
+  }, [datasets, cc, params.min, params.max, params.animation, colors, narrow])
 
   useEffect(() => {
     dataZoomAdded.current = true
