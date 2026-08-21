@@ -276,6 +276,23 @@ describe('TrackerChart', () => {
     expect(option.yAxis[1].max).toBe(100)
   })
 
+  it('places right axis label vertically at middle so it does not overlap the toolbox', () => {
+    const chartConfig = {
+      y_axes: [
+        { id: 0, label: 'Count', position: 'left' as const },
+        { id: 1, label: 'Rate (%)', position: 'right' as const },
+      ],
+      show_toolbox: true,
+    }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis[1].nameLocation).toBe('middle')
+    expect(option.yAxis[1].nameRotate).toBe(90)
+    expect(option.yAxis[1].nameGap).toBe(40)
+    expect(option.yAxis[0].nameLocation).toBeUndefined()
+  })
+
   it('assigns series to correct Y-axis via y_axis_index', () => {
     const chartConfig = {
       y_axes: [

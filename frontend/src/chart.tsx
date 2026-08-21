@@ -98,7 +98,14 @@ function echartYAxis(cfg: YAxisConfig, hasRightAxis: boolean): any {
       show: cfg.position === 'left',
     },
   }
-  if (cfg.label) axis.name = cfg.label
+  if (cfg.label) {
+    axis.name = cfg.label
+    if (cfg.position === 'right') {
+      axis.nameLocation = 'middle'
+      axis.nameRotate = 90
+      axis.nameGap = 40
+    }
+  }
   axis.position = cfg.position
   if (cfg.min !== undefined) axis.min = cfg.min
   if (cfg.max !== undefined) axis.max = cfg.max
