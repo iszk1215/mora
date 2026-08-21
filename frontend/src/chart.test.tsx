@@ -276,7 +276,7 @@ describe('TrackerChart', () => {
     expect(option.yAxis[1].max).toBe(100)
   })
 
-  it('places right axis label vertically at middle so it does not overlap the toolbox', () => {
+  it('places axis labels vertically at middle so they do not overlap the toolbox', () => {
     const chartConfig = {
       y_axes: [
         { id: 0, label: 'Count', position: 'left' as const },
@@ -287,10 +287,30 @@ describe('TrackerChart', () => {
     render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis[0].nameLocation).toBe('middle')
+    expect(option.yAxis[0].nameRotate).toBe(-90)
+    expect(option.yAxis[0].nameGap).toBe(40)
     expect(option.yAxis[1].nameLocation).toBe('middle')
     expect(option.yAxis[1].nameRotate).toBe(90)
     expect(option.yAxis[1].nameGap).toBe(40)
-    expect(option.yAxis[0].nameLocation).toBeUndefined()
+    expect(option.grid.left).toBe(50)
+    expect(option.grid.right).toBe(50)
+  })
+
+  it('pins toolbox to the upper right corner away from axes', () => {
+    const chartConfig = { show_toolbox: true }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.toolbox.right).toBe(8)
+    expect(option.toolbox.top).toBe(4)
+  })
+
+  it('keeps default grid padding for unlabeled axes', () => {
+    render(<TrackerChart data={{ datasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.left).toBe(40)
   })
 
   it('assigns series to correct Y-axis via y_axis_index', () => {
