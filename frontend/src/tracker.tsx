@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig } from './core'
-import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, PALETTE_NAMES } from './chart'
+import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, PALETTE_NAMES, CHART_THEME_NAME } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
@@ -309,7 +309,7 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
           {loading ? (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
           ) : option.series.length > 0 ? (
-            <ReactECharts option={option} style={{ width: '100%', height: 120 }} opts={{ renderer: 'svg' }} />
+            <ReactECharts option={option} style={{ width: '100%', height: 120 }} opts={{ renderer: 'svg' }} theme={CHART_THEME_NAME} />
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
           )}
