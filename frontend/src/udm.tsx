@@ -16,6 +16,7 @@ import {
 } from 'react-router'
 
 import { Repo } from './core'
+import { CHART_THEME_NAME } from './chart'
 
 export interface UdmMetric {
   id: number,
@@ -168,7 +169,7 @@ export const UdmChart = (params: UdmChartProps): React.JSX.Element => {
   option.xAxis.max = params.max
 
   return (
-    <ReactECharts option={option} style={{ width: '100%', height: 300 }} id="udm-chart" opts={{ renderer: 'svg' }} />)
+    <ReactECharts option={option} style={{ width: '100%', height: 300 }} id="udm-chart" opts={{ renderer: 'svg' }} theme={CHART_THEME_NAME} />)
 }
 
 export const UdmMetricRoot = (): React.JSX.Element => {

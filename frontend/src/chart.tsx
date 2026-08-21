@@ -3,6 +3,15 @@ import ReactECharts from 'echarts-for-react'
 import * as echarts from 'echarts'
 import { ChartConfig, SeriesConfig, YAxisConfig } from './core'
 
+// Must match --font-sans in index.css so chart text uses the page font.
+export const CHART_FONT_FAMILY = "'Noto Sans JP Variable', 'Noto Sans JP', sans-serif"
+
+export const CHART_THEME_NAME = 'mora'
+
+echarts.registerTheme(CHART_THEME_NAME, {
+  textStyle: { fontFamily: CHART_FONT_FAMILY },
+})
+
 export const PALETTE_MAP: Record<string, string[]> = {
   default:  ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
   vintage:  ['#c23531', '#2f4554', '#61a0a8', '#d48265', '#91c7ae', '#749f83', '#ca8622', '#bda29a', '#6e7074', '#546570', '#c4ccd3'],
@@ -226,6 +235,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       style={{ width: '100%', height: 300 }}
       onEvents={params.onChartClick ? { click: params.onChartClick } : undefined}
       opts={{ renderer: 'svg' }}
+      theme={CHART_THEME_NAME}
     />
   )
 }

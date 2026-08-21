@@ -1,13 +1,14 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { formatValue, formatDateTick, formatDateTimeTick, TrackerChart } from './chart'
+import { formatValue, formatDateTick, formatDateTimeTick, TrackerChart, CHART_FONT_FAMILY, CHART_THEME_NAME } from './chart'
 
 vi.mock('echarts-for-react', () => ({
-  default: ({ option, onEvents }: any) => (
+  default: ({ option, onEvents, theme }: any) => (
     <div
       data-testid="echart"
       data-option={JSON.stringify(option)}
+      data-theme={theme}
       onClick={() => onEvents?.click?.({ seriesName: 'go', data: { value: ['2024-01-15', 90], index: 1 } })}
     />
   ),
@@ -76,6 +77,16 @@ describe('TrackerChart', () => {
   it('renders echart element', () => {
     render(<TrackerChart data={{ datasets }} />)
     expect(screen.getByTestId('echart')).toBeInTheDocument()
+  })
+
+  it('applies the mora theme so chart text uses the page font', () => {
+    render(<TrackerChart data={{ datasets }} />)
+    expect(screen.getByTestId('echart').getAttribute('data-theme')).toBe(CHART_THEME_NAME)
+    expect(CHART_THEME_NAME).toBe('mora')
+  })
+
+  it('defines the chart font family matching the page --font-sans', () => {
+    expect(CHART_FONT_FAMILY).toBe("'Noto Sans JP Variable', 'Noto Sans JP', sans-serif")
   })
 
   it('passes datasets to echart option', () => {
