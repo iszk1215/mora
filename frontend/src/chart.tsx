@@ -220,7 +220,8 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     if (cc?.show_toolbox) {
       opt.toolbox = {
         right: 8,
-        top: 4,
+        top: 0,
+        padding: [2, 8],
         feature: {
           saveAsImage: { title: 'Save' },
           restore: { title: 'Reset' },

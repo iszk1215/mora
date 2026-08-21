@@ -303,7 +303,8 @@ describe('TrackerChart', () => {
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.toolbox.right).toBe(8)
-    expect(option.toolbox.top).toBe(4)
+    expect(option.toolbox.top).toBe(0)
+    expect(option.toolbox.padding).toEqual([2, 8])
   })
 
   it('keeps default grid padding for unlabeled axes', () => {
