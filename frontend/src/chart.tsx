@@ -143,12 +143,14 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
 
   const option = useMemo(() => {
     const showLegend = cc?.show_legend !== false && datasets.length > 1
+    const showToolbox = !!cc?.show_toolbox
+    const stackHeader = narrow && showLegend && showToolbox
     const showSlider = cc?.show_slider !== false
     const yAxes = buildYAxes(cc?.y_axes)
     const hasRightAxis = yAxes.some((a) => a.position === 'right')
     const isDateOnly = cc?.x_axis_type === 'date'
 
-    const grid: any = { left: 40, right: 10, top: showLegend ? 40 : 20, bottom: showSlider ? 80 : 30 }
+    const grid: any = { left: 40, right: 10, top: showLegend ? (stackHeader ? 70 : 40) : 20, bottom: showSlider ? 80 : 30 }
     if (hasRightAxis) grid.right = 50
     if (yAxes.some((a) => a.position === 'left' && a.label)) grid.left = Math.max(grid.left, 50)
 
@@ -215,9 +217,9 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       }
     }
     if (showLegend) {
-      opt.legend = { type: 'scroll' as const, top: 0 }
+      opt.legend = { type: 'scroll' as const, top: stackHeader ? 30 : 0 }
     }
-    if (cc?.show_toolbox) {
+    if (showToolbox) {
       opt.toolbox = {
         right: 8,
         top: 0,
