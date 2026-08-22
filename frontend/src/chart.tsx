@@ -98,7 +98,12 @@ function echartYAxis(cfg: YAxisConfig, hasRightAxis: boolean): any {
       show: cfg.position === 'left',
     },
   }
-  if (cfg.label) axis.name = cfg.label
+  if (cfg.label) {
+    axis.name = cfg.label
+    axis.nameLocation = 'middle'
+    axis.nameRotate = cfg.position === 'right' ? 90 : -90
+    axis.nameGap = 40
+  }
   axis.position = cfg.position
   if (cfg.min !== undefined) axis.min = cfg.min
   if (cfg.max !== undefined) axis.max = cfg.max
@@ -145,6 +150,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
 
     const grid: any = { left: 40, right: 10, top: showLegend ? 40 : 20, bottom: showSlider ? 80 : 30 }
     if (hasRightAxis) grid.right = 50
+    if (yAxes.some((a) => a.position === 'left' && a.label)) grid.left = Math.max(grid.left, 50)
 
     const xAxis: any = {
       type: 'time' as const,
@@ -213,6 +219,9 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     }
     if (cc?.show_toolbox) {
       opt.toolbox = {
+        right: 8,
+        top: 0,
+        padding: [2, 8],
         feature: {
           saveAsImage: { title: 'Save' },
           restore: { title: 'Reset' },
