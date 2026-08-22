@@ -1198,12 +1198,6 @@ export const TrackerCreate = (): React.JSX.Element => {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <Link to="/trackers" className="text-blue-600 dark:text-blue-500 hover:underline">
-          &larr; Back to Trackers
-        </Link>
-      </div>
-
       <h1 className="text-3xl my-4">Create Tracker</h1>
 
       {error && <p className="text-red-500 mb-2">{error}</p>}

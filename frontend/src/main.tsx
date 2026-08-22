@@ -593,9 +593,6 @@ const router = createBrowserRouter([
       },
       {
         path: '/settings/api-keys',
-        handle: {
-          crumb: (_params: Params, _data: any) => ({ label: "API Keys", link: "/settings/api-keys" }),
-        },
         children: [apiKeyRoute],
       },
       {
