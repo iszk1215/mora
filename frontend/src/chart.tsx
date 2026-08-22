@@ -90,7 +90,7 @@ function buildYAxes(yAxes?: YAxisConfig[]): YAxisConfig[] {
   return [DEFAULT_Y_AXIS]
 }
 
-function echartYAxis(cfg: YAxisConfig, hasRightAxis: boolean): any {
+function echartYAxis(cfg: YAxisConfig, hasRightAxis: boolean, narrow: boolean): any {
   const axis: any = {
     type: 'value' as const,
     splitLine: {
@@ -100,9 +100,14 @@ function echartYAxis(cfg: YAxisConfig, hasRightAxis: boolean): any {
   }
   if (cfg.label) {
     axis.name = cfg.label
-    axis.nameLocation = 'middle'
-    axis.nameRotate = cfg.position === 'right' ? 90 : -90
-    axis.nameGap = 40
+    if (narrow) {
+      axis.nameLocation = 'end'
+      axis.nameTextStyle = { fontSize: 10 }
+    } else {
+      axis.nameLocation = 'middle'
+      axis.nameRotate = cfg.position === 'right' ? 90 : -90
+      axis.nameGap = 40
+    }
   }
   axis.position = cfg.position
   if (cfg.min !== undefined) axis.min = cfg.min
@@ -152,7 +157,8 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
 
     const grid: any = { left: 40, right: 10, top: showLegend ? (stackHeader ? 70 : 40) : 20, bottom: showSlider ? 80 : 30 }
     if (hasRightAxis) grid.right = 50
-    if (yAxes.some((a) => a.position === 'left' && a.label)) grid.left = Math.max(grid.left, 50)
+    if (!narrow && yAxes.some((a) => a.position === 'left' && a.label)) grid.left = Math.max(grid.left, 50)
+    if (narrow && yAxes.some((a) => a.label)) grid.top = Math.max(grid.top, 44)
 
     const xAxis: any = {
       type: 'time' as const,
@@ -168,7 +174,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       color: colors,
       grid,
       xAxis,
-      yAxis: yAxes.map((a) => echartYAxis(a, hasRightAxis)),
+      yAxis: yAxes.map((a) => echartYAxis(a, hasRightAxis, narrow)),
       series: datasets.map((ds, i) => {
         const seriesType = ds.seriesConfig?.type ?? 'line'
         const yAxisIndex = ds.seriesConfig?.y_axis_index ?? 0
