@@ -330,6 +330,7 @@ describe('TrackerChart', () => {
   })
 
   it('places axis labels vertically at middle so they do not overlap the toolbox', () => {
+    stubMatchMedia(false)
     const chartConfig = {
       y_axes: [
         { id: 0, label: 'Count', position: 'left' as const },
@@ -466,6 +467,111 @@ describe('TrackerChart', () => {
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.xAxis.axisLabel.fontSize).toBeUndefined()
+  })
+
+  it('shows y-axis names horizontally at the top on narrow viewports', () => {
+    stubMatchMedia(true)
+    const chartConfig = {
+      y_axes: [
+        { id: 0, label: 'Count', position: 'left' as const },
+        { id: 1, label: 'Rate (%)', position: 'right' as const },
+      ],
+    }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis[0].nameLocation).toBe('end')
+    expect(option.yAxis[0].nameRotate).toBeUndefined()
+    expect(option.yAxis[0].nameGap).toBe(8)
+    expect(option.yAxis[0].nameTextStyle.fontSize).toBe(10)
+    expect(option.yAxis[1].nameLocation).toBe('end')
+  })
+
+  it('keeps vertical y-axis names in the middle on wide viewports', () => {
+    stubMatchMedia(false)
+    const chartConfig = {
+      y_axes: [{ id: 0, label: 'Count', position: 'left' as const }],
+    }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.yAxis[0].nameLocation).toBe('middle')
+    expect(option.yAxis[0].nameRotate).toBe(-90)
+    expect(option.yAxis[0].nameGap).toBe(40)
+  })
+
+  it('does not widen grid.left for labeled axes on narrow viewports', () => {
+    stubMatchMedia(true)
+    const chartConfig = {
+      y_axes: [{ id: 0, label: 'Coverage %', position: 'left' as const }],
+    }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.left).toBe(40)
+  })
+
+  it('keeps vertical y-axis name margin on wide viewports with a left label', () => {
+    stubMatchMedia(false)
+    const chartConfig = {
+      y_axes: [{ id: 0, label: 'Coverage %', position: 'left' as const }],
+    }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.left).toBe(50)
+  })
+
+  it('reserves top margin for y-axis names below the toolbox on narrow viewports', () => {
+    stubMatchMedia(true)
+    const chartConfig = {
+      y_axes: [{ id: 0, label: 'Coverage %', position: 'left' as const }],
+      show_toolbox: true,
+    }
+    render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.top).toBe(52)
+  })
+
+  it('reserves top margin for y-axis names below the legend on narrow viewports', () => {
+    stubMatchMedia(true)
+    const multiDatasets = [
+      { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
+      { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
+    ]
+    const chartConfig = {
+      y_axes: [{ id: 0, label: 'Coverage %', position: 'left' as const }],
+    }
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.top).toBe(52)
+  })
+
+  it('keeps stacked header clear of y-axis names when both legend and toolbox are shown on narrow viewports', () => {
+    stubMatchMedia(true)
+    const multiDatasets = [
+      { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
+      { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
+      { label: 'js', data: [{ x: '2024-01-15', y: '70' }], seriesConfig: undefined },
+    ]
+    const chartConfig = {
+      y_axes: [{ id: 0, label: 'Coverage %', position: 'left' as const }],
+      show_toolbox: true,
+    }
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={chartConfig} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.top).toBe(80)
+  })
+
+  it('leaves grid.top unchanged on narrow viewports when axes have no labels', () => {
+    stubMatchMedia(true)
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_toolbox: true }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.grid.top).toBe(20)
   })
 })
 
