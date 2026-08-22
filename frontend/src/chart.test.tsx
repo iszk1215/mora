@@ -196,6 +196,59 @@ describe('TrackerChart', () => {
     expect(option.legend).toBeUndefined()
   })
 
+  it('stacks legend below toolbox on narrow viewports when both are shown', () => {
+    stubMatchMedia(true)
+    const multiDatasets = [
+      { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
+      { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
+      { label: 'js', data: [{ x: '2024-01-15', y: '70' }], seriesConfig: undefined },
+    ]
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={{ show_toolbox: true }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.toolbox.top).toBe(0)
+    expect(option.legend.top).toBe(30)
+    expect(option.grid.top).toBe(70)
+  })
+
+  it('keeps legend and toolbox on the same row on wide viewports', () => {
+    stubMatchMedia(false)
+    const multiDatasets = [
+      { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
+      { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
+    ]
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={{ show_toolbox: true }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.toolbox.top).toBe(0)
+    expect(option.legend.top).toBe(0)
+    expect(option.grid.top).toBe(40)
+  })
+
+  it('does not stack header when toolbox is hidden even on narrow viewports', () => {
+    stubMatchMedia(true)
+    const multiDatasets = [
+      { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
+      { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
+    ]
+    render(<TrackerChart data={{ datasets: multiDatasets }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.toolbox).toBeUndefined()
+    expect(option.legend.top).toBe(0)
+    expect(option.grid.top).toBe(40)
+  })
+
+  it('keeps grid top unchanged when toolbox is shown without legend on narrow viewports', () => {
+    stubMatchMedia(true)
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_toolbox: true }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.legend).toBeUndefined()
+    expect(option.toolbox.top).toBe(0)
+    expect(option.grid.top).toBe(20)
+  })
+
   it('sets xAxis.min/max to null when min and max are null', () => {
     render(<TrackerChart data={{ datasets }} min={null} max={null} />)
     const el = screen.getByTestId('echart')
