@@ -102,6 +102,7 @@ function echartYAxis(cfg: YAxisConfig, hasRightAxis: boolean, narrow: boolean): 
     axis.name = cfg.label
     if (narrow) {
       axis.nameLocation = 'end'
+      axis.nameGap = 8
       axis.nameTextStyle = { fontSize: 10 }
     } else {
       axis.nameLocation = 'middle'
@@ -158,7 +159,9 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     const grid: any = { left: 40, right: 10, top: showLegend ? (stackHeader ? 70 : 40) : 20, bottom: showSlider ? 80 : 30 }
     if (hasRightAxis) grid.right = 50
     if (!narrow && yAxes.some((a) => a.position === 'left' && a.label)) grid.left = Math.max(grid.left, 50)
-    if (narrow && yAxes.some((a) => a.label)) grid.top = Math.max(grid.top, 44)
+    if (narrow && yAxes.some((a) => a.label)) {
+      grid.top = Math.max(grid.top, stackHeader ? 80 : 52)
+    }
 
     const xAxis: any = {
       type: 'time' as const,

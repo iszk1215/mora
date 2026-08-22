@@ -482,7 +482,7 @@ describe('TrackerChart', () => {
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.yAxis[0].nameLocation).toBe('end')
     expect(option.yAxis[0].nameRotate).toBeUndefined()
-    expect(option.yAxis[0].nameGap).toBeUndefined()
+    expect(option.yAxis[0].nameGap).toBe(8)
     expect(option.yAxis[0].nameTextStyle.fontSize).toBe(10)
     expect(option.yAxis[1].nameLocation).toBe('end')
   })
@@ -531,7 +531,7 @@ describe('TrackerChart', () => {
     render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
-    expect(option.grid.top).toBe(44)
+    expect(option.grid.top).toBe(52)
   })
 
   it('reserves top margin for y-axis names below the legend on narrow viewports', () => {
@@ -546,10 +546,10 @@ describe('TrackerChart', () => {
     render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={chartConfig} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
-    expect(option.grid.top).toBe(44)
+    expect(option.grid.top).toBe(52)
   })
 
-  it('keeps stacked header margin when both legend and toolbox are shown on narrow viewports', () => {
+  it('keeps stacked header clear of y-axis names when both legend and toolbox are shown on narrow viewports', () => {
     stubMatchMedia(true)
     const multiDatasets = [
       { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
@@ -563,7 +563,7 @@ describe('TrackerChart', () => {
     render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={chartConfig} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
-    expect(option.grid.top).toBe(70)
+    expect(option.grid.top).toBe(80)
   })
 
   it('leaves grid.top unchanged on narrow viewports when axes have no labels', () => {
