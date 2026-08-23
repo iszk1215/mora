@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/drone/go-scm/scm"
+	"github.com/iszk1215/mora/render"
 	"github.com/rs/zerolog/log"
 )
 
@@ -229,7 +230,7 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 			sid, err = sessionID()
 			if err != nil {
 				log.Err(err).Msg("failed to generate session ID")
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				render.InternalError(w, err)
 				return
 			}
 		} else {

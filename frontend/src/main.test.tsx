@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { useLoaderData, useRouteError, useMatches, isRouteErrorResponse } from 'react-router'
-import { SCMList, Header, ErrorPage, Breadcrumbs, makeBredcrumbs, resetConfigCache, rootShouldRevalidate } from './main'
+import { useLoaderData, useMatches } from 'react-router'
+import { SCMList, Header, Breadcrumbs, makeBredcrumbs, resetConfigCache, rootShouldRevalidate } from './main'
 import { UserProvider } from './user-context'
 
 vi.mock('react-dom/client', () => ({
@@ -14,9 +14,7 @@ vi.mock('react-router', async () => {
   return {
     ...actual,
     useLoaderData: vi.fn(),
-    useRouteError: vi.fn(),
     useMatches: vi.fn(),
-    isRouteErrorResponse: vi.fn(),
     ScrollRestoration: () => null,
   }
 })
@@ -131,28 +129,6 @@ describe('Header z-index', () => {
     const header = container.querySelector('header')
     expect(header).not.toBeNull()
     expect(header!.className).toMatch(/\bz-\d+\b/)
-  })
-})
-
-describe('ErrorPage', () => {
-  beforeEach(() => {
-    vi.mocked(useRouteError).mockReset()
-    vi.mocked(isRouteErrorResponse).mockReset()
-  })
-
-  it('renders generic error message for non-route errors', () => {
-    vi.mocked(useRouteError).mockReturnValue(new Error('test error'))
-    vi.mocked(isRouteErrorResponse).mockReturnValue(false)
-    render(<MemoryRouter><ErrorPage /></MemoryRouter>)
-    expect(screen.getAllByText('Error')).toHaveLength(2)
-    expect(screen.getByText('Sorry, unexpected error has happend. Back to the top page.')).toBeInTheDocument()
-  })
-
-  it('renders route error status text', () => {
-    vi.mocked(useRouteError).mockReturnValue({ statusText: 'Not Found' })
-    vi.mocked(isRouteErrorResponse).mockReturnValue(true)
-    render(<MemoryRouter><ErrorPage /></MemoryRouter>)
-    expect(screen.getByText('Not Found')).toBeInTheDocument()
   })
 })
 

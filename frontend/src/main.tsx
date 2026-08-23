@@ -5,11 +5,9 @@ import {
   createBrowserRouter,
   Outlet,
   Params,
-  isRouteErrorResponse,
   ScrollRestoration,
   useLoaderData,
   useMatches,
-  useRouteError,
   useSearchParams,
   useLocation,
 } from 'react-router'
@@ -28,6 +26,7 @@ import { userPageRoute } from './user'
 import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
 import { PasswordLoginForm } from './auth'
+import { ErrorPage, NotFoundPage } from './error-page'
 import { DefaultLink, HeaderLink } from './util'
 import { Button } from '@/components/ui/button'
 import {
@@ -539,25 +538,6 @@ const Root = (): React.JSX.Element => {
   )
 }
 
-export const ErrorPage = (): React.JSX.Element => {
-  const error = useRouteError()
-  let message = <span>Error</span>
-  if (isRouteErrorResponse(error)) {
-    message = <i>{error.statusText}</i>
-  }
-  return (
-    <div>
-      <ScrollRestoration />
-      <Header />
-      <div className="w-full sm:w-8/12 m-auto px-4 sm:px-0">
-        <h1>Error</h1>
-        <p>Sorry, unexpected error has happend. Back to the top page.</p>
-        <p>{message}</p>
-      </div>
-    </div>
-  )
-}
-
 export function rootShouldRevalidate({ currentUrl, nextUrl, defaultShouldRevalidate }: {
   currentUrl: URL
   nextUrl: URL
@@ -629,6 +609,10 @@ const router = createBrowserRouter([
             children: udmRoute,
           },
         ],
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />,
       },
     ]
   }

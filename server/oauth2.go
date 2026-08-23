@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/drone/go-scm/scm"
+	"github.com/iszk1215/mora/render"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 )
 
@@ -71,7 +73,8 @@ func (h *OAuthHandler) Handler(next http.Handler) http.Handler {
 		if code == "" {
 			state, err := generateCSRFToken()
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Err(err).Msg("failed to generate CSRF token")
+				render.InternalError(w, err)
 				return
 			}
 			http.SetCookie(w, &http.Cookie{
