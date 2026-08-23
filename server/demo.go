@@ -78,6 +78,44 @@ func trackerNamesForUser(idx, count int) []string {
 	return trackerNames[start:end]
 }
 
+// demoValueTimes generates count distinct timestamps within the last 90 days.
+// Values are stored with a UNIQUE constraint on (series_id, time), so the
+// generated times must never repeat even though random draws may collide.
+func demoValueTimes(rng *rand.Rand, xAxisType string, count int, now time.Time) ([]time.Time, error) {
+	times := make([]time.Time, 0, count)
+	seen := make(map[int64]struct{}, count)
+
+	var daysList []int
+	if xAxisType == "date" {
+		daysList = rng.Perm(90)[:count]
+		sort.Ints(daysList)
+	}
+
+	for vi := 0; vi < count; vi++ {
+		var ts time.Time
+		for attempts := 0; ; attempts++ {
+			if attempts > 1000 {
+				return nil, fmt.Errorf("failed to generate a unique demo timestamp")
+			}
+			var daysAgo, hour, min int
+			if xAxisType == "date" {
+				daysAgo = daysList[vi]
+			} else {
+				daysAgo = rng.Intn(90)
+				hour = rng.Intn(24)
+				min = rng.Intn(60)
+			}
+			ts = time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()).AddDate(0, 0, -daysAgo)
+			if _, dup := seen[ts.Unix()]; !dup {
+				break
+			}
+		}
+		seen[ts.Unix()] = struct{}{}
+		times = append(times, ts)
+	}
+	return times, nil
+}
+
 func (s *MoraServer) seedDemoData() error {
 	log.Info().Msg("Seeding demo data")
 
@@ -204,25 +242,12 @@ func (s *MoraServer) seedDemoData() error {
 
 				seriesSeed := int(series.Id*7 + tracker.Id*13)
 				valueCount := 10 + rng.Intn(11) // 10-20 values per series
-				var daysList []int
-				if xAxisType == "date" {
-					daysList = rng.Perm(90)[:valueCount]
-					sort.Ints(daysList)
+				times, err := demoValueTimes(rng, xAxisType, valueCount, now)
+				if err != nil {
+					return fmt.Errorf("generate demo value times: %w", err)
 				}
 				for vi := 0; vi < valueCount; vi++ {
-					var daysAgo int
-					if xAxisType == "date" {
-						daysAgo = daysList[vi]
-					} else {
-						daysAgo = rng.Intn(90)
-					}
-					hour := 0
-					min := 0
-					if xAxisType == "datetime" {
-						hour = rng.Intn(24)
-						min = rng.Intn(60)
-					}
-					ts := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location()).AddDate(0, 0, -daysAgo)
+					ts := times[vi]
 
 					if ts.After(maxTs) {
 						maxTs = ts
