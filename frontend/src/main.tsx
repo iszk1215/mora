@@ -547,7 +547,7 @@ export function rootShouldRevalidate({ currentUrl, nextUrl, defaultShouldRevalid
   return defaultShouldRevalidate
 }
 
-const router = createBrowserRouter([
+export const routes = [
   {
     path: '/',
     element: <Root />,
@@ -617,7 +617,8 @@ const router = createBrowserRouter([
     ]
   }
 ]
-)
+
+const router = createBrowserRouter(routes)
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

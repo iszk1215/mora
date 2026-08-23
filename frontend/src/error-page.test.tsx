@@ -100,6 +100,12 @@ describe('ErrorPage', () => {
     expect(screen.getByText('test error')).toBeInTheDocument()
     expect(screen.getByText('Back to top page')).toBeInTheDocument()
   })
+
+  it('renders exactly one header when used standalone', () => {
+    vi.mocked(useRouteError).mockReturnValue(routeError(500, ''))
+    const { container } = render(<MemoryRouter><ErrorPage /></MemoryRouter>)
+    expect(container.querySelectorAll('header')).toHaveLength(1)
+  })
 })
 
 describe('NotFoundPage', () => {
@@ -116,5 +122,10 @@ describe('NotFoundPage', () => {
     const link = screen.getByText('Back to top page').closest('a')
     expect(link).not.toBeNull()
     expect(link).toHaveAttribute('href', '/')
+  })
+
+  it('does not render its own header because the root layout provides one', () => {
+    const { container } = render(<MemoryRouter><NotFoundPage /></MemoryRouter>)
+    expect(container.querySelectorAll('header')).toHaveLength(0)
   })
 })
