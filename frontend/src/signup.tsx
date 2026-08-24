@@ -16,10 +16,12 @@ export async function loadPendingSignup(): Promise<PendingSignupData | null> {
   return resp.json()
 }
 
-// sanitizeUsername mirrors the server-side rule: lowercase, keep only
-// [a-z0-9_-], replace runs of other characters with '-', trim leading/trailing
-// '-'/'_', cap length and fall back to "user" when empty.
-export function sanitizeUsername(input: string): string {
+// sanitizeUsernameInput mirrors the server-side sanitization rule: lowercase,
+// keep only [a-z0-9_-], replace runs of other characters with '-', trim
+// leading/trailing '-'/'_' and cap length. Unlike the server-side rule it
+// keeps the result empty when no valid character remains, so clearing the
+// input while typing does not auto-fill a fallback name.
+export function sanitizeUsernameInput(input: string): string {
   let result = ''
   for (const ch of input.toLowerCase()) {
     if (/[a-z0-9_-]/.test(ch)) {
@@ -30,18 +32,24 @@ export function sanitizeUsername(input: string): string {
   }
 
   let name = result.replace(/^[-_]+|[-_]+$/g, '')
-  if (name === '') return 'user'
   if (name.length > MAX_USERNAME_LENGTH) {
     name = name.slice(0, MAX_USERNAME_LENGTH).replace(/[-_]+$/, '')
-    if (name === '') return 'user'
   }
+  return name
+}
+
+// sanitizeUsername applies the server-side "user" fallback for cases where a
+// usable username must be derived from arbitrary provider data.
+export function sanitizeUsername(input: string): string {
+  const name = sanitizeUsernameInput(input)
+  if (name === '') return 'user'
   return name
 }
 
 export const SignupPage = (): React.JSX.Element => {
   const navigate = useNavigate()
   const pending = useLoaderData() as PendingSignupData | null
-  const [username, setUsername] = useState(sanitizeUsername(pending?.username ?? ''))
+  const [username, setUsername] = useState(() => sanitizeUsernameInput(pending?.username ?? ''))
   const [error, setError] = useState<string | null>(null)
   const [suggested, setSuggested] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -67,7 +75,7 @@ export const SignupPage = (): React.JSX.Element => {
   }
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUsername(sanitizeUsername(e.target.value))
+    setUsername(sanitizeUsernameInput(e.target.value))
     setError(null)
     setSuggested(null)
   }
@@ -84,6 +92,12 @@ export const SignupPage = (): React.JSX.Element => {
     setSubmitting(true)
     setError(null)
     setSuggested(null)
+
+    if (username === '') {
+      setError('Username is required')
+      setSubmitting(false)
+      return
+    }
 
     const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/)
     if (!match) {
