@@ -50,7 +50,7 @@ func RequireReadPermission(store *trackerStore, next http.Handler) http.Handler 
 			render.NotFound(w, errors.New("tracker not found"))
 			return
 		}
-		if uid == 1 {
+		if store.isSuperuser(uid) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -75,7 +75,7 @@ func RequireEditPermission(store *trackerStore, next http.Handler) http.Handler 
 			render.NotFound(w, errors.New("tracker not found"))
 			return
 		}
-		if uid == 1 {
+		if store.isSuperuser(uid) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -105,7 +105,7 @@ func RequireOwnerPermission(store *trackerStore, next http.Handler) http.Handler
 			render.NotFound(w, errors.New("tracker not found"))
 			return
 		}
-		if uid == 1 {
+		if store.isSuperuser(uid) {
 			next.ServeHTTP(w, r)
 			return
 		}

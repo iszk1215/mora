@@ -138,6 +138,27 @@ email's local part (sanitized), since Google accounts have no username.
   it; `user.id` remains the stable identifier (usernames are not yet used in
   URLs).
 
+## User Types
+
+Each user has a type stored in `user.user_type` (constants in
+`core/usertype.go`):
+
+| Type | Default | Tracker quota | Notes |
+|--------|---------|---------------|-------|
+| `free` | yes | 5 trackers | Applied to new signups via column default |
+| `pro` | no | unlimited | Intended for paid accounts |
+| `admin` | seeded id=1 | unlimited | Superuser: full access to all trackers |
+
+- The tracker quota is enforced centrally in `tracker.addTracker`
+  (`tracker/store.go`), so both `POST /api/trackers` and coverage tracker
+  creation are covered. Exceeding the quota returns
+  `tracker.ErrTrackerLimitReached`, mapped to `403` by the handlers.
+- The superuser check (`tracker.isSuperuser`) replaces the former hardcoded
+  `uid == 1` checks; the seeded admin user keeps id=1 with the `admin` type.
+- Admins change user types via `PATCH /api/users/{userName}/type`
+  (`server/usertype.go`). Only admins may call it, admins cannot change their
+  own type, and invalid types are rejected.
+
 ## Database Tables
 
 | Subsystem | Tables |

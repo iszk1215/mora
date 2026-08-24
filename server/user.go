@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/drone/go-scm/scm"
+	"github.com/iszk1215/mora/core"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
@@ -23,6 +24,7 @@ type User struct {
 	ID        int64     `db:"id" json:"id"`
 	Username  string    `db:"username" json:"username"`
 	AvatarURL string    `db:"avatar_url" json:"avatar_url"`
+	Type      string    `db:"user_type" json:"user_type"`
 	CreatedAt time.Time `db:"created_at" json:"-"`
 	UpdatedAt time.Time `db:"updated_at" json:"-"`
 }
@@ -57,6 +59,7 @@ type UserStore interface {
 	ListAPIKeys(userID int64) ([]UserAPIKey, error)
 	RevokeAPIKey(userID, keyID int64) error
 	FindUserByAPIKey(plaintext string) (*User, error)
+	UpdateUserType(userID int64, userType string) error
 }
 
 type userStore struct {
@@ -73,6 +76,7 @@ func (s *userStore) Init() error {
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			username   TEXT    NOT NULL UNIQUE COLLATE NOCASE,
 			avatar_url TEXT    NOT NULL DEFAULT '',
+			user_type  TEXT    NOT NULL DEFAULT 'free',
 			created_at TEXT    NOT NULL DEFAULT (datetime('now')),
 			updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 		)
@@ -126,8 +130,9 @@ func (s *userStore) Init() error {
 	}
 
 	_, err = s.db.Exec(
-		`INSERT OR IGNORE INTO user (id, username, avatar_url)
-		 VALUES (1, 'admin', '')`,
+		`INSERT OR IGNORE INTO user (id, username, avatar_url, user_type)
+		 VALUES (1, 'admin', '', ?)`,
+		core.UserTypeAdmin,
 	)
 	if err != nil {
 		return err
@@ -180,6 +185,7 @@ func (s *userStore) CreateUser(username, avatarURL string) (*User, error) {
 		ID:        id,
 		Username:  username,
 		AvatarURL: avatarURL,
+		Type:      core.UserTypeFree,
 	}, nil
 }
 
@@ -223,6 +229,7 @@ func (s *userStore) CreateUserWithPassword(username, password string) (*User, er
 		ID:        id,
 		Username:  username,
 		AvatarURL: "",
+		Type:      core.UserTypeFree,
 	}, nil
 }
 
@@ -266,6 +273,28 @@ func (s *userStore) FindByID(id int64) (*User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+// UpdateUserType sets the user type of `userID`. Callers are responsible
+// for authorization; userType must be one of the valid user types.
+func (s *userStore) UpdateUserType(userID int64, userType string) error {
+	if !core.IsValidUserType(userType) {
+		return fmt.Errorf("invalid user type: %s", userType)
+	}
+	res, err := s.db.Exec(
+		"UPDATE user SET user_type = ?, updated_at = datetime('now') WHERE id = ?",
+		userType, userID)
+	if err != nil {
+		return fmt.Errorf("update user type: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update user type rows affected: %w", err)
+	}
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func generateAPIKey() (string, string, error) {

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iszk1215/mora/core"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
@@ -25,13 +26,14 @@ func initTestStore(t *testing.T) *trackerStore {
 			provider_user_id TEXT NOT NULL,
 			username TEXT NOT NULL,
 			avatar_url TEXT NOT NULL DEFAULT '',
+			user_type TEXT NOT NULL DEFAULT 'free',
 			created_at TEXT NOT NULL DEFAULT (datetime('now')),
 			updated_at TEXT NOT NULL DEFAULT (datetime('now')),
 			UNIQUE(provider, provider_user_id)
 		)
 	`)
-	db.MustExec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url)
-		VALUES (1, 'system', 'superuser', 'admin', '')`)
+	db.MustExec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url, user_type)
+		VALUES (1, 'system', 'superuser', 'admin', '', 'admin')`)
 
 	// seed additional test users for FK constraints
 	for _, uid := range []int64{2, 3, 888, 999} {
@@ -96,6 +98,63 @@ func TestStoreTracker(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tracker.Body, resp.Body)
 	})
+}
+
+func TestStoreAddTracker_UserTypeLimit(t *testing.T) {
+	s := initTestStore(t)
+
+	// user 2 is seeded with the default 'free' type
+	t.Run("free user is limited", func(t *testing.T) {
+		for i := 0; i < core.FreeUserMaxTrackers; i++ {
+			tr := &TrackerModel{Name: fmt.Sprintf("free_tracker_%d", i)}
+			require.NoError(t, s.addTracker(tr, 2))
+		}
+		err := s.addTracker(&TrackerModel{Name: "over_limit"}, 2)
+		require.ErrorIs(t, err, ErrTrackerLimitReached)
+	})
+
+	t.Run("deleting a tracker frees capacity", func(t *testing.T) {
+		var id int64
+		require.NoError(t, s.db.Get(&id, "SELECT id FROM tracker WHERE owner_id = 2 LIMIT 1"))
+		_, err := s.db.Exec("DELETE FROM tracker WHERE id = ?", id)
+		require.NoError(t, err)
+
+		tr := &TrackerModel{Name: "after_delete"}
+		require.NoError(t, s.addTracker(tr, 2))
+	})
+
+	t.Run("pro user is unlimited", func(t *testing.T) {
+		s.db.MustExec(`UPDATE user SET user_type = 'pro' WHERE id = 3`)
+		for i := 0; i < core.FreeUserMaxTrackers+1; i++ {
+			tr := &TrackerModel{Name: fmt.Sprintf("pro_tracker_%d", i)}
+			require.NoError(t, s.addTracker(tr, 3))
+		}
+	})
+
+	t.Run("admin user is unlimited", func(t *testing.T) {
+		for i := 0; i < core.FreeUserMaxTrackers+1; i++ {
+			tr := &TrackerModel{Name: fmt.Sprintf("admin_tracker_%d", i)}
+			require.NoError(t, s.addTracker(tr, 1))
+		}
+	})
+
+	t.Run("unknown user type defaults to free limit", func(t *testing.T) {
+		s.db.MustExec(`UPDATE user SET user_type = 'unknown' WHERE id = 888`)
+		for i := 0; i < core.FreeUserMaxTrackers; i++ {
+			tr := &TrackerModel{Name: fmt.Sprintf("unknown_tracker_%d", i)}
+			require.NoError(t, s.addTracker(tr, 888))
+		}
+		err := s.addTracker(&TrackerModel{Name: "unknown_over_limit"}, 888)
+		require.ErrorIs(t, err, ErrTrackerLimitReached)
+	})
+}
+
+func TestStoreIsSuperuser(t *testing.T) {
+	s := initTestStore(t)
+
+	require.True(t, s.isSuperuser(1), "seeded admin must be superuser")
+	require.False(t, s.isSuperuser(2), "default users are not superuser")
+	require.False(t, s.isSuperuser(99999), "unknown users are not superuser")
 }
 
 func TestStoreFindTracker(t *testing.T) {

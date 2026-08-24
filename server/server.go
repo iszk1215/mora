@@ -491,6 +491,11 @@ func (s *MoraServer) handleCreateCoverageTracker(w http.ResponseWriter, r *http.
 			render.Conflict(w, errors.New("repository already has a coverage tracker"))
 			return
 		}
+		if errors.Is(err, tracker.ErrTrackerLimitReached) {
+			log.Warn().Int64("user_id", uid).Msg("handleCreateCoverageTracker: limit reached")
+			render.Forbidden(w, fmt.Errorf("tracker creation limit reached (free users can create up to %d trackers)", core.FreeUserMaxTrackers))
+			return
+		}
 		log.Err(err).Msg("handleCreateCoverageTracker")
 		render.InternalError(w, errors.New("internal error"))
 		return
@@ -534,6 +539,7 @@ func (s *MoraServer) Handler() http.Handler {
 		r.Route("/api/users", func(r chi.Router) {
 			r.With(s.requireTrackerAuth).Get("/{userName}", s.handleUserGet)
 			r.With(s.requireTrackerAuth).Get("/{userName}/trackers", s.handleUserTrackers)
+			r.With(s.requireTrackerAuth).Patch("/{userName}/type", s.handleUserSetType)
 		})
 	}
 

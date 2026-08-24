@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/render"
 	"github.com/rs/zerolog/log"
 )
@@ -241,6 +243,7 @@ func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
 // @Success      201   {object}  tracker.TrackerModel
 // @Failure      400   {object}  core.ErrorResponse
 // @Failure      401   {object}  core.ErrorResponse
+// @Failure      403   {object}  core.ErrorResponse
 // @Router       /api/trackers [post]
 func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -306,6 +309,11 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	}
 	err = h.store.addTracker(&tracker, uid)
 	if err != nil {
+		if errors.Is(err, ErrTrackerLimitReached) {
+			log.Warn().Int64("user_id", uid).Msg("createTracker: limit reached")
+			render.Forbidden(w, fmt.Errorf("tracker creation limit reached (free users can create up to %d trackers)", core.FreeUserMaxTrackers))
+			return
+		}
 		log.Warn().Err(err).Msg("addTracker")
 		render.BadRequest(w, errors.New("failed to create tracker"))
 		return
