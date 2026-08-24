@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iszk1215/mora/core"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
@@ -233,6 +234,38 @@ func TestHandlerCreateTracker(t *testing.T) {
 		r := newRequestWithJSON(t, http.MethodPost, "/", req)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("free user over limit returns 403", func(t *testing.T) {
+		h := newTestHandler(t)
+
+		// user 2 is seeded with the default 'free' type in initTestStore
+		var uid int64 = 2
+		ctx := ContextWithAuth(context.Background(), &uid)
+
+		for i := 0; i < core.FreeUserMaxTrackers; i++ {
+			req := CreateTrackerRequest{Name: fmt.Sprintf("limit_tracker_%d", i), Visibility: "private"}
+			r := newRequestWithJSON(t, http.MethodPost, "/", req).WithContext(ctx)
+			getResponse(t, http.StatusCreated, h, r)
+		}
+
+		req := CreateTrackerRequest{Name: "over_limit", Visibility: "private"}
+		r := newRequestWithJSON(t, http.MethodPost, "/", req).WithContext(ctx)
+		res := getResponse(t, http.StatusForbidden, h, r)
+
+		var got core.ErrorResponse
+		unmarshalResponse(t, res, &got)
+		require.Contains(t, got.Message, "limit reached")
+	})
+
+	t.Run("admin user is not limited", func(t *testing.T) {
+		h := newTestHandler(t)
+
+		for i := 0; i < core.FreeUserMaxTrackers+1; i++ {
+			req := CreateTrackerRequest{Name: fmt.Sprintf("admin_limit_tracker_%d", i), Visibility: "private"}
+			r := newRequestWithJSON(t, http.MethodPost, "/", req).WithContext(superuserCtx())
+			getResponse(t, http.StatusCreated, h, r)
+		}
 	})
 }
 

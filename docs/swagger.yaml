@@ -223,6 +223,8 @@ definitions:
         type: string
       id:
         type: integer
+      user_type:
+        type: string
       username:
         type: string
     type: object
@@ -244,6 +246,11 @@ definitions:
       repo_id:
         type: integer
       visibility:
+        type: string
+    type: object
+  server.setUserTypeRequest:
+    properties:
+      user_type:
         type: string
     type: object
   tracker.CreateSeriesRequest:
@@ -1197,6 +1204,10 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
       summary: Create a tracker
       tags:
       - tracker
@@ -1785,6 +1796,42 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrorResponse'
       summary: List trackers owned by a user
+      tags:
+      - server
+  /api/users/{userName}/type:
+    patch:
+      description: Update the user type of the given username. Only admins may call
+        this endpoint, and admins cannot change their own type.
+      parameters:
+      - description: Username
+        in: path
+        name: userName
+        required: true
+        type: string
+      - description: New user type
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/server.setUserTypeRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Set a user's type (admin only)
       tags:
       - server
 swagger: "2.0"

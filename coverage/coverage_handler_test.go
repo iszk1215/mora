@@ -81,6 +81,9 @@ func trackerContextRouter(t *testing.T, s *CoverageHandler) http.Handler {
 	require.NoError(t, err)
 	 db.MustExec("PRAGMA foreign_keys = OFF")
 
+	db.MustExec(`CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, user_type TEXT NOT NULL DEFAULT 'free')`)
+	db.MustExec(`INSERT INTO user (id, username, user_type) VALUES (1, 'admin', 'admin')`)
+
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 	_, err = trackerService.CreateTracker("test coverage", "", "", "public", 1, tracker.TypeCoverage, `{"area":false}`)

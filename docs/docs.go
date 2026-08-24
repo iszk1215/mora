@@ -1060,6 +1060,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/core.ErrorResponse"
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -1936,6 +1942,59 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/users/{userName}/type": {
+            "patch": {
+                "description": "Update the user type of the given username. Only admins may call this endpoint, and admins cannot change their own type.",
+                "tags": [
+                    "server"
+                ],
+                "summary": "Set a user's type (admin only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "userName",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New user type",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/server.setUserTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/server.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -2282,6 +2341,9 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "user_type": {
+                    "type": "string"
+                },
                 "username": {
                     "type": "string"
                 }
@@ -2314,6 +2376,14 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "visibility": {
+                    "type": "string"
+                }
+            }
+        },
+        "server.setUserTypeRequest": {
+            "type": "object",
+            "properties": {
+                "user_type": {
                     "type": "string"
                 }
             }

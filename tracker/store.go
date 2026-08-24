@@ -7,12 +7,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/iszk1215/mora/core"
 	"github.com/jmoiron/sqlx"
+	"github.com/rs/zerolog/log"
 )
 
 var (
 	errorTrackerNotFound = errors.New("no tracker found")
 	errorSeriesNotFound  = errors.New("no series found")
+
+	// ErrTrackerLimitReached is returned when the owner has reached the
+	// maximum number of trackers allowed for their user type.
+	ErrTrackerLimitReached = errors.New("tracker limit reached for this user type")
 )
 
 const (
@@ -101,6 +107,35 @@ func newTrackerStore(db *sqlx.DB) *trackerStore {
 // ----------------------------------------------------------------------
 // Tracker
 
+// findUserType returns the user type of `userID`.
+func (s *trackerStore) findUserType(userID int64) (string, error) {
+	var userType string
+	err := s.db.Get(&userType, "SELECT user_type FROM user WHERE id = ?", userID)
+	if err != nil {
+		return "", fmt.Errorf("find user type: %w", err)
+	}
+	return userType, nil
+}
+
+// countTrackersByOwner returns the number of trackers owned by `ownerID`.
+func (s *trackerStore) countTrackersByOwner(ownerID int64) (int, error) {
+	var n int
+	err := s.db.Get(&n, "SELECT COUNT(*) FROM tracker WHERE owner_id = ?", ownerID)
+	if err != nil {
+		return 0, fmt.Errorf("count trackers by owner: %w", err)
+	}
+	return n, nil
+}
+
+// isSuperuser reports whether the user has the admin user type.
+func (s *trackerStore) isSuperuser(userID int64) bool {
+	userType, err := s.findUserType(userID)
+	if err != nil {
+		return false
+	}
+	return userType == core.UserTypeAdmin
+}
+
 func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 	if tracker.Visibility == "" {
 		tracker.Visibility = "private"
@@ -111,6 +146,24 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 	if tracker.ChartConfig == "" {
 		tracker.ChartConfig = "{}"
 	}
+
+	userType, err := s.findUserType(userID)
+	if err != nil {
+		return fmt.Errorf("addTracker: %w", err)
+	}
+	max := core.MaxTrackersFor(userType)
+	if max >= 0 {
+		count, err := s.countTrackersByOwner(userID)
+		if err != nil {
+			return fmt.Errorf("addTracker: %w", err)
+		}
+		if count >= max {
+			log.Warn().Int64("user_id", userID).Str("user_type", userType).
+				Int("count", count).Int("max", max).Msg("tracker limit reached")
+			return ErrTrackerLimitReached
+		}
+	}
+
 	now := time.Now()
 	tracker.OwnerId = userID
 	tracker.CreatedAt = now

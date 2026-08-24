@@ -54,6 +54,20 @@ func requireEqualRepoList(t *testing.T, want []Repository, res *http.Response) {
 	require.Equal(t, want, got)
 }
 
+// seedTestUserTable creates a minimal user table with the admin user for
+// tests that exercise tracker creation without a full user store.
+func seedTestUserTable(db *sqlx.DB) {
+	db.MustExec(`CREATE TABLE IF NOT EXISTS user (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+		avatar_url TEXT NOT NULL DEFAULT '',
+		user_type TEXT NOT NULL DEFAULT 'free',
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)`)
+	db.MustExec(`INSERT OR IGNORE INTO user (id, username, user_type) VALUES (1, 'admin', 'admin')`)
+}
+
 func createMockRepoService(
 	controller *gomock.Controller,
 	repos ...Repository,
@@ -898,6 +912,7 @@ func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
 	 db.MustExec("PRAGMA foreign_keys = OFF")
+	seedTestUserTable(db)
 
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
@@ -931,6 +946,7 @@ func TestRequireTrackerAuth_APIKey(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
 	 db.MustExec("PRAGMA foreign_keys = OFF")
+	seedTestUserTable(db)
 
 	userStore := newTestUserStore(t)
 	_, err = userStore.CreateUser("apiuser", "")
@@ -1031,6 +1047,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
 	 db.MustExec("PRAGMA foreign_keys = OFF")
+	seedTestUserTable(db)
 
 	coverageService, err := coverage.NewCoverageService(db)
 	require.NoError(t, err)
@@ -1189,6 +1206,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
 	 db.MustExec("PRAGMA foreign_keys = OFF")
+	seedTestUserTable(db)
 
 	coverageService, err := coverage.NewCoverageService(db)
 	require.NoError(t, err)
@@ -1311,6 +1329,7 @@ func TestHandleCoveragePreview(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
 	 db.MustExec("PRAGMA foreign_keys = OFF")
+	seedTestUserTable(db)
 
 	coverageService, err := coverage.NewCoverageService(db)
 	require.NoError(t, err)

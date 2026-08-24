@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/drone/go-scm/scm"
+	"github.com/iszk1215/mora/core"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -135,12 +136,59 @@ func TestUserStore_SuperuserSeed(t *testing.T) {
 	admin, err := store.FindByID(1)
 	require.NoError(t, err)
 	require.Equal(t, "admin", admin.Username)
+	require.Equal(t, core.UserTypeAdmin, admin.Type)
 
 	passwordHash, err := store.GetPasswordHash(admin.ID)
 	require.NoError(t, err)
 	require.NotNil(t, passwordHash)
 	err = bcrypt.CompareHashAndPassword([]byte(*passwordHash), []byte("admin"))
 	require.NoError(t, err)
+}
+
+func TestUserStore_CreateUser_DefaultType(t *testing.T) {
+	store := newTestUserStore(t)
+
+	user, err := store.CreateUser("regularuser", "")
+	require.NoError(t, err)
+
+	found, err := store.FindByID(user.ID)
+	require.NoError(t, err)
+	require.Equal(t, core.UserTypeFree, found.Type)
+}
+
+func TestUserStore_UpdateUserType(t *testing.T) {
+	store := newTestUserStore(t)
+
+	user, err := store.CreateUser("upgradable", "")
+	require.NoError(t, err)
+
+	err = store.UpdateUserType(user.ID, core.UserTypePro)
+	require.NoError(t, err)
+
+	found, err := store.FindByID(user.ID)
+	require.NoError(t, err)
+	require.Equal(t, core.UserTypePro, found.Type)
+}
+
+func TestUserStore_UpdateUserType_Invalid(t *testing.T) {
+	store := newTestUserStore(t)
+
+	user, err := store.CreateUser("someone", "")
+	require.NoError(t, err)
+
+	err = store.UpdateUserType(user.ID, "enterprise")
+	require.Error(t, err)
+
+	found, err := store.FindByID(user.ID)
+	require.NoError(t, err)
+	require.Equal(t, core.UserTypeFree, found.Type)
+}
+
+func TestUserStore_UpdateUserType_NotFound(t *testing.T) {
+	store := newTestUserStore(t)
+
+	err := store.UpdateUserType(999, core.UserTypePro)
+	require.Error(t, err)
 }
 
 func TestUserStore_CreateUser_EmptyAvatar(t *testing.T) {

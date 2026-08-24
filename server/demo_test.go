@@ -6,8 +6,30 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iszk1215/mora/core"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSeedDemoData(t *testing.T) {
+	server, _ := setupUserPageServer(t)
+
+	// Demo users own 8-10 trackers each, which exceeds the free quota;
+	// seeding must upgrade them to 'pro' instead of failing.
+	require.NoError(t, server.seedDemoData())
+
+	for _, du := range demoUsers {
+		user, err := server.userStore.FindByUsername(du.Username)
+		require.NoError(t, err, "demo user %s should exist", du.Username)
+		require.Equal(t, core.UserTypePro, user.Type)
+
+		// Viewing as the owner includes private trackers
+		trackers, total, err := server.tracker.ListTrackersByOwner(user.ID, user.ID, "", 1, 100)
+		require.NoError(t, err)
+		require.Greater(t, total, core.FreeUserMaxTrackers,
+			"demo user %s should own more trackers than the free quota", du.Username)
+		require.NotEmpty(t, trackers)
+	}
+}
 
 func TestTrackerNamesForUser(t *testing.T) {
 	t.Run("returns first N names for index 0", func(t *testing.T) {

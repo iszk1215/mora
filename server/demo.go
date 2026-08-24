@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/iszk1215/mora/core"
 	"github.com/rs/zerolog/log"
 )
 
@@ -134,6 +135,12 @@ func (s *MoraServer) seedDemoData() error {
 		user, err := s.userStore.CreateUserWithPassword(du.Username, du.Password)
 		if err != nil {
 			return fmt.Errorf("create demo user %s: %w", du.Username, err)
+		}
+
+		// Demo users own more trackers than the free quota allows; give
+		// them the 'pro' type so seeding never hits the tracker limit.
+		if err := s.userStore.UpdateUserType(user.ID, core.UserTypePro); err != nil {
+			return fmt.Errorf("set demo user %s type to pro: %w", du.Username, err)
 		}
 		log.Debug().Int64("user_id", user.ID).Str("username", du.Username).Msg("Created demo user")
 

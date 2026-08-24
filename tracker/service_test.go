@@ -27,13 +27,14 @@ func initTestService(t *testing.T) *Service {
 			provider_user_id TEXT NOT NULL,
 			username TEXT NOT NULL,
 			avatar_url TEXT NOT NULL DEFAULT '',
+			user_type TEXT NOT NULL DEFAULT 'free',
 			created_at TEXT NOT NULL DEFAULT (datetime('now')),
 			updated_at TEXT NOT NULL DEFAULT (datetime('now')),
 			UNIQUE(provider, provider_user_id)
 		)
 	`)
-	db.MustExec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url)
-		VALUES (1, 'system', 'superuser', 'admin', '')`)
+	db.MustExec(`INSERT INTO user (id, provider, provider_user_id, username, avatar_url, user_type)
+		VALUES (1, 'system', 'superuser', 'admin', '', 'admin')`)
 
 	svc, err := NewService(db)
 	require.NoError(t, err)

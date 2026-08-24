@@ -55,7 +55,7 @@ requireAuth -> requireReadPermission -> requireEditPermission -> requireOwnerPer
 
 ### requireReadPermission
 
-| visibility | anonymous | logged-in (non-member) | member | superuser (id=1) |
+| visibility | anonymous | logged-in (non-member) | member | superuser (admin type) |
 |------------|-----------|----------------------|--------|-------------------|
 | public | yes | yes | yes | yes |
 | private | no | no | yes | yes |
@@ -63,7 +63,7 @@ requireAuth -> requireReadPermission -> requireEditPermission -> requireOwnerPer
 ### requireEditPermission
 
 - Anonymous users cannot edit
-- Superuser (id=1): full access
+- Superuser (admin type): full access
 - Members (owner/editor): can edit
 
 ### requireOwnerPermission
@@ -71,7 +71,7 @@ requireAuth -> requireReadPermission -> requireEditPermission -> requireOwnerPer
 Applied to DELETE and PATCH on `/api/trackers/{trackerId}`.
 
 - Anonymous users and non-members: 404
-- Superuser (id=1): full access
+- Superuser (admin type): full access
 - Owner (`tracker.owner_id == uid`): allowed
 - Editors and other members: 404
 
