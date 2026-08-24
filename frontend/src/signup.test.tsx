@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
-import { SignupPage, loadPendingSignup, sanitizeUsername } from './signup'
+import { SignupPage, loadPendingSignup, sanitizeUsername, sanitizeUsernameInput } from './signup'
 
 const mockNavigate = vi.fn()
 vi.mock('react-router', async () => {
@@ -47,6 +47,28 @@ describe('loadPendingSignup', () => {
     vi.mocked(globalThis.fetch).mockRejectedValue(new Error('network error'))
 
     await expect(loadPendingSignup()).rejects.toThrow('network error')
+  })
+})
+
+describe('sanitizeUsernameInput', () => {
+  it('lowercases the input', () => {
+    expect(sanitizeUsernameInput('Octocat')).toBe('octocat')
+  })
+
+  it('replaces invalid characters with a single hyphen', () => {
+    expect(sanitizeUsernameInput('John.Doe')).toBe('john-doe')
+    expect(sanitizeUsernameInput('a  b')).toBe('a-b')
+  })
+
+  it('keeps the input empty instead of falling back to user', () => {
+    expect(sanitizeUsernameInput('')).toBe('')
+    expect(sanitizeUsernameInput('!!!@@#')).toBe('')
+    expect(sanitizeUsernameInput('-')).toBe('')
+  })
+
+  it('truncates to 32 characters', () => {
+    const long = 'a'.repeat(40)
+    expect(sanitizeUsernameInput(long)).toBe('a'.repeat(32))
   })
 })
 
@@ -141,6 +163,39 @@ describe('SignupPage', () => {
     const input = screen.getByLabelText('Username') as HTMLInputElement
     fireEvent.change(input, { target: { value: 'New.User!' } })
     expect(input.value).toBe('new-user')
+  })
+
+  it('keeps the username input blank when cleared', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      provider: 'github',
+      username: 'octocat',
+      avatar_url: '',
+    })
+    render(<MemoryRouter><SignupPage /></MemoryRouter>)
+    const input = screen.getByLabelText('Username') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '' } })
+    expect(input.value).toBe('')
+  })
+
+  it('shows an error instead of submitting when the username is empty', async () => {
+    document.cookie = 'csrf_token=abc123; path=/'
+    vi.mocked(useLoaderData).mockReturnValue({
+      provider: 'github',
+      username: 'test',
+      avatar_url: '',
+    })
+    globalThis.fetch = vi.fn()
+
+    render(<MemoryRouter><SignupPage /></MemoryRouter>)
+
+    const input = screen.getByLabelText('Username') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '' } })
+    screen.getByRole('button', { name: 'Create Account' }).click()
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('Username is required')).toBeInTheDocument()
+    })
+    expect(globalThis.fetch).not.toHaveBeenCalledWith('/api/signup/confirm', expect.anything())
   })
 
   it('includes the username in the confirm request', async () => {
