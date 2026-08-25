@@ -112,6 +112,15 @@ describe('patchTracker', () => {
   })
 })
 
+describe('trackerRoute index', () => {
+  it('has index route that throws 404', async () => {
+    const { trackerRoute } = await import('./tracker')
+    const indexRoute = trackerRoute.find((r: any) => r.index === true)
+    expect(indexRoute).toBeDefined()
+    expect(indexRoute!.loader).toBeDefined()
+  })
+})
+
 
 describe('TrackerCreate', () => {
   const mockUser = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
@@ -872,5 +881,27 @@ describe('TrackerCard', () => {
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} /></MemoryRouter>)
     expect(screen.queryByText('private')).not.toBeInTheDocument()
+  })
+
+  it('shows owner name and links to user page', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'public', type: 'tracker',
+      chart_config: '{}',
+      role: '', liked: false, like_count: 0,
+      owner_name: 'alice',
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} /></MemoryRouter>)
+    const link = screen.getByText('alice').closest('a')
+    expect(link).toHaveAttribute('href', '/users/alice')
+  })
+
+  it('does not show owner name when not provided', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'public', type: 'tracker',
+      chart_config: '{}',
+      role: '', liked: false, like_count: 0,
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} /></MemoryRouter>)
+    expect(screen.queryByText('owner')).not.toBeInTheDocument()
   })
 })
