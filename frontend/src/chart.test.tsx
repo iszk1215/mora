@@ -239,14 +239,14 @@ describe('TrackerChart', () => {
     expect(option.grid.top).toBe(40)
   })
 
-  it('keeps grid top unchanged when toolbox is shown without legend on narrow viewports', () => {
+  it('increases grid top when toolbox is shown without legend', () => {
     stubMatchMedia(true)
     render(<TrackerChart data={{ datasets }} chartConfig={{ show_toolbox: true }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.legend).toBeUndefined()
     expect(option.toolbox.top).toBe(0)
-    expect(option.grid.top).toBe(20)
+    expect(option.grid.top).toBe(40)
   })
 
   it('sets xAxis.min/max to null when min and max are null', () => {
@@ -566,12 +566,12 @@ describe('TrackerChart', () => {
     expect(option.grid.top).toBe(80)
   })
 
-  it('leaves grid.top unchanged on narrow viewports when axes have no labels', () => {
+  it('increases grid.top on narrow viewports when toolbox is shown without axes labels', () => {
     stubMatchMedia(true)
     render(<TrackerChart data={{ datasets }} chartConfig={{ show_toolbox: true }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
-    expect(option.grid.top).toBe(20)
+    expect(option.grid.top).toBe(40)
   })
 })
 
