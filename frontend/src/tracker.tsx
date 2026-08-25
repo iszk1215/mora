@@ -158,10 +158,6 @@ export async function patchTracker(trackerId: number, opts: { visibility?: strin
   return resp.json()
 }
 
-export async function loadTrackerList(): Promise<PaginatedTrackers> {
-  return listTrackers(1, 12)
-}
-
 export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise<TrackerDetailData> {
   if (!params.trackerId) throw new Error('trackerId is required')
   return listSeries(parseInt(params.trackerId))
@@ -292,8 +288,8 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
       <Link to={linkTo} state={linkState} className="block">
         <div className="flex items-center gap-2 mb-2 pl-2">
           <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
-          {tracker.role && (
-            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tracker.role}</span>
+          {tracker.visibility === 'private' && (
+            <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">private</span>
           )}
           {tracker.type === 'coverage' && (
             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
@@ -315,90 +311,6 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
           )}
         </div>
       </Link>
-    </div>
-  )
-}
-
-export const TrackerView = (): React.JSX.Element => {
-  const initial = useLoaderData() as PaginatedTrackers
-  const [trackers, setTrackers] = useState<TrackerResponse[]>(initial.trackers)
-  const [page, setPage] = useState(initial.page)
-  const [total, setTotal] = useState(initial.total)
-  const perPage = initial.per_page
-  const totalPages = perPage > 0 ? Math.ceil(total / perPage) : 1
-
-  const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
-  const [loadingPreviews, setLoadingPreviews] = useState(false)
-  const [loadingPage, setLoadingPage] = useState(false)
-
-  const loadPreviews = useCallback(async () => {
-    if (trackers.length === 0) {
-      setPreviews(new Map())
-      return
-    }
-    setLoadingPreviews(true)
-    try {
-      const results = await Promise.all(
-        trackers.map((t) =>
-          fetchPreview(t.id, t.type).then((data) => ({ id: t.id, data } as const)),
-        ),
-      )
-      const map = new Map<number, PreviewData>()
-      results.forEach((r) => map.set(r.id, r.data))
-      setPreviews(map)
-    } catch {
-      // ignore individual preview failures
-    } finally {
-      setLoadingPreviews(false)
-    }
-  }, [trackers])
-
-  useEffect(() => {
-    void loadPreviews()
-  }, [loadPreviews])
-
-  const handlePageChange = async (newPage: number) => {
-    setLoadingPage(true)
-    try {
-      const data = await listTrackers(newPage, perPage)
-      setTrackers(data.trackers)
-      setPage(data.page)
-      setTotal(data.total)
-    } catch {
-      // ignore
-    } finally {
-      setLoadingPage(false)
-    }
-  }
-
-  return (
-    <div>
-      <div className="mb-4">
-        <Button asChild><Link to="/trackers/new">Create Tracker</Link></Button>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {trackers.map((t) => (
-          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} loading={loadingPreviews} />
-        ))}
-        {trackers.length === 0 && !loadingPage && (
-          <p className="col-span-full text-center text-muted-foreground py-8">No trackers yet.</p>
-        )}
-      </div>
-
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6">
-          <Button variant="outline" size="sm" disabled={page <= 1 || loadingPage} onClick={() => handlePageChange(page - 1)}>
-            Prev
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages || loadingPage} onClick={() => handlePageChange(page + 1)}>
-            Next
-          </Button>
-        </div>
-      )}
     </div>
   )
 }
@@ -1172,6 +1084,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
 
 export const TrackerCreate = (): React.JSX.Element => {
   const navigate = useNavigate()
+  const user = useUser()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [visibility, setVisibility] = useState('private')
@@ -1244,7 +1157,7 @@ export const TrackerCreate = (): React.JSX.Element => {
 
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link to="/trackers">Cancel</Link>
+            <Link to={user ? `/users/${user.username}` : '/'}>Cancel</Link>
           </Button>
           <Button onClick={handleCreate} disabled={!name.trim() || loading}>
             Create
@@ -1306,8 +1219,8 @@ export const TrackerDetailEditRouter = (): React.JSX.Element => {
 export const trackerRoute = [
   {
     index: true,
-    element: <TrackerView />,
-    loader: loadTrackerList,
+    element: null,
+    loader: () => { throw new Response('Not Found', { status: 404 }) },
   },
   {
     path: 'new',
