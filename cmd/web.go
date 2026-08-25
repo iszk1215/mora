@@ -44,6 +44,10 @@ func NewWebCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to get demo flag: %w", err)
 			}
+			insecureCookie, err := cmd.Flags().GetBool("insecure-cookie")
+			if err != nil {
+				return fmt.Errorf("failed to get insecure-cookie flag: %w", err)
+			}
 
 			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 			if debug {
@@ -57,6 +61,11 @@ func NewWebCommand() *cobra.Command {
 			config.Debug = debug
 			config.Server.Port = port
 			config.Demo = demo
+			// Only override the config file value when the flag is given
+			// explicitly; otherwise insecure_cookie from mora.conf stays intact.
+			if cmd.Flags().Changed("insecure-cookie") {
+				config.Server.InsecureCookie = insecureCookie
+			}
 			if demo {
 				config.DatabaseFilename = ":memory:"
 			}
@@ -112,6 +121,7 @@ func NewWebCommand() *cobra.Command {
 	webCmd.Flags().IntP("port", "p", 4000, "port")
 	webCmd.Flags().StringP("config", "c", "mora.conf", "Config filename")
 	webCmd.Flags().Bool("demo", false, "Start in demo mode with seed data")
+	webCmd.Flags().Bool("insecure-cookie", false, "Disable Secure cookie attribute (for development over HTTP)")
 
 	return webCmd
 }

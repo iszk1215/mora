@@ -37,7 +37,7 @@ func (m MockLoginMiddleware) Handler(next http.Handler) http.Handler {
 
 func createTestLoginHandler(rm RepositoryManager) http.Handler {
 	next := func(w http.ResponseWriter, r *http.Request) {}
-	return LoginHandler([]RepositoryManager{rm}, nil, http.HandlerFunc(next))
+	return LoginHandler([]RepositoryManager{rm}, nil, false, http.HandlerFunc(next))
 }
 
 func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request {
@@ -77,6 +77,51 @@ func TestLoginSuccess(t *testing.T) {
 	token, ok := sess.getToken(rm.ID())
 	require.True(t, ok)
 	assert.Equal(t, "MockAccessToken", token.Token)
+}
+
+func TestLoginSetsCSRFCookieSecure(t *testing.T) {
+	tests := []struct {
+		name           string
+		insecureCookie bool
+		wantSecure     bool
+	}{
+		{name: "default", wantSecure: true},
+		{name: "insecure cookie", insecureCookie: true, wantSecure: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rm := NewMockRepositoryManager(12)
+			path := "/" + strconv.FormatInt(rm.ID(), 10)
+			rm.loginHandler = MockLoginMiddleware{"/"}.Handler
+			handler := LoginHandler([]RepositoryManager{rm}, nil, tt.insecureCookie,
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+			sess := NewMoraSession()
+			req := NewGetRequestWithMoraSession(path, sess)
+			got := httptest.NewRecorder()
+			handler.ServeHTTP(got, req)
+			res := got.Result()
+
+			require.Equal(t, http.StatusFound, res.StatusCode)
+			loc, err := res.Location()
+			require.NoError(t, err)
+
+			req = NewGetRequestWithMoraSession(loc.String(), sess)
+			got = httptest.NewRecorder()
+			handler.ServeHTTP(got, req)
+			res = got.Result()
+
+			var found bool
+			for _, c := range res.Cookies() {
+				if c.Name == csrfCookieName {
+					found = true
+					require.Equal(t, tt.wantSecure, c.Secure)
+				}
+			}
+			require.True(t, found, "CSRF cookie should be set on OAuth login")
+		})
+	}
 }
 
 func TestLoginError(t *testing.T) {

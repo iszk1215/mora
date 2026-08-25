@@ -23,7 +23,7 @@ func newTestAPIKeyHandler(t *testing.T) (http.Handler, *MoraSessionManager, User
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
-	sm := NewMoraSessionManager()
+	sm := NewMoraSessionManager(false)
 	handler := APIKeyHandler(userStore)
 
 	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

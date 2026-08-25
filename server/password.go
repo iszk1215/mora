@@ -16,7 +16,7 @@ type PasswordLoginRequest struct {
 	Password string `json:"password"`
 }
 
-func PasswordAuthHandler(userStore UserStore) http.Handler {
+func PasswordAuthHandler(userStore UserStore, insecureCookie bool) http.Handler {
 	r := chi.NewRouter()
 
 	r.Get("/csrf", func(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +39,7 @@ func PasswordAuthHandler(userStore UserStore) http.Handler {
 			Path:     "/",
 			SameSite: http.SameSiteLaxMode,
 			HttpOnly: false,
+			Secure:   secureCookieAttr(insecureCookie, r),
 		})
 		render.JSON(w, map[string]string{"csrf_token": csrfToken}, http.StatusOK)
 	})

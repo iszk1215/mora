@@ -143,14 +143,18 @@ type MoraSessionManager struct {
 	lifetime   time.Duration
 	lock       sync.Mutex
 	stopCh     chan struct{}
+	// insecureCookie disables the Secure attribute on the session cookie
+	// (for development over plain HTTP).
+	insecureCookie bool
 }
 
-func NewMoraSessionManager() *MoraSessionManager {
+func NewMoraSessionManager(insecureCookie bool) *MoraSessionManager {
 	m := &MoraSessionManager{
-		cookiename: "morasessionid",
-		store:      map[string]*MoraSession{},
-		lifetime:   24 * time.Hour,
-		stopCh:     make(chan struct{}),
+		cookiename:     "morasessionid",
+		store:          map[string]*MoraSession{},
+		lifetime:       24 * time.Hour,
+		stopCh:         make(chan struct{}),
+		insecureCookie: insecureCookie,
 	}
 	go m.periodicGC()
 	return m
@@ -253,6 +257,7 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 			Path:     "/",
 			HttpOnly: true,
 			SameSite: http.SameSiteLaxMode,
+			Secure:   secureCookieAttr(m.insecureCookie, r),
 		}
 
 		http.SetCookie(w, cookie)

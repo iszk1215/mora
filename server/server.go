@@ -79,6 +79,7 @@ type (
 		apiKey             string
 		siteName           string
 		demo               bool
+		insecureCookie     bool
 
 		sessionManager     *MoraSessionManager
 		frontendFileServer http.Handler
@@ -564,12 +565,12 @@ func (s *MoraServer) Handler() http.Handler {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 		})
 
-	r.Mount("/login", LoginHandler(s.repositoryManagers, s.userStore, redirectHandler))
+	r.Mount("/login", LoginHandler(s.repositoryManagers, s.userStore, s.insecureCookie, redirectHandler))
 	r.Mount("/logout", LogoutHandler(s.repositoryManagers, redirectHandler))
 
 	if s.userStore != nil {
 		r.Mount("/api/signup", SignupHandler(s.userStore))
-		r.Mount("/api/auth", PasswordAuthHandler(s.userStore))
+		r.Mount("/api/auth", PasswordAuthHandler(s.userStore, s.insecureCookie))
 	}
 
 	// frontend
@@ -735,7 +736,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 
 	s := &MoraServer{
 		db:                 db,
-		sessionManager:     NewMoraSessionManager(),
+		sessionManager:     NewMoraSessionManager(cfg.Server.InsecureCookie),
 		repositoryManagers: repositoryManagers,
 		repos:              repoStore,
 		userStore:          userStore,
@@ -746,6 +747,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		apiKey:             os.Getenv("MORA_API_KEY"),
 		siteName:           cfg.Server.SiteName,
 		demo:               cfg.Demo,
+		insecureCookie:     cfg.Server.InsecureCookie,
 	}
 
 	if s.demo {
