@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -86,6 +87,60 @@ func TestSessionManager_SetsCookie(t *testing.T) {
 	require.Equal(t, "/", cookie.Path)
 	require.True(t, cookie.HttpOnly)
 	require.Equal(t, http.SameSiteLaxMode, cookie.SameSite)
+	// Secure is enabled by default even when the server runs behind plain HTTP.
+	require.True(t, cookie.Secure)
+}
+
+func TestSessionManager_InsecureCookie(t *testing.T) {
+	m := newTestSessionManager()
+	m.insecureCookie = true
+	next := func(w http.ResponseWriter, r *http.Request) {}
+	handler := m.SessionMiddleware(http.HandlerFunc(next))
+
+	req := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
+	got := httptest.NewRecorder()
+	handler.ServeHTTP(got, req)
+
+	cookies := got.Result().Cookies()
+	require.Len(t, cookies, 1)
+	require.False(t, cookies[0].Secure,
+		"Secure attribute should be omitted with insecure_cookie over HTTP")
+}
+
+func TestSessionManager_InsecureCookieStaysSecureOverHTTPS(t *testing.T) {
+	tests := []struct {
+		name string
+		tls  bool
+		xfp  string
+	}{
+		{name: "direct TLS connection", tls: true},
+		{name: "X-Forwarded-Proto https", xfp: "https"},
+		{name: "X-Forwarded-Proto HTTPS uppercase", xfp: "HTTPS"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := newTestSessionManager()
+			m.insecureCookie = true
+			handler := m.SessionMiddleware(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {}))
+
+			req := httptest.NewRequest(http.MethodGet, "/", strings.NewReader(""))
+			if tt.tls {
+				req.TLS = &tls.ConnectionState{}
+			}
+			if tt.xfp != "" {
+				req.Header.Set("X-Forwarded-Proto", tt.xfp)
+			}
+			got := httptest.NewRecorder()
+			handler.ServeHTTP(got, req)
+
+			cookies := got.Result().Cookies()
+			require.Len(t, cookies, 1)
+			require.True(t, cookies[0].Secure,
+				"Secure should stay enabled when the request itself is over HTTPS")
+		})
+	}
 }
 
 func TestSessionManager_ReusesExistingSession(t *testing.T) {

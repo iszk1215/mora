@@ -17,6 +17,9 @@ type ServerConfig struct {
 	URL  string
 	Port int
 	SiteName string
+	// InsecureCookie disables the Secure attribute on authentication cookies.
+	// Intended for development over plain HTTP (e.g. localhost).
+	InsecureCookie bool `toml:"insecure_cookie"`
 }
 
 type RepositoryManagerConfig struct {

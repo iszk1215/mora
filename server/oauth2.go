@@ -84,7 +84,7 @@ func (h *OAuthHandler) Handler(next http.Handler) http.Handler {
 				HttpOnly: true,
 				SameSite: http.SameSiteLaxMode,
 				MaxAge:   int((10 * time.Minute).Seconds()),
-				Secure:   r.TLS != nil,
+				Secure:   IsSecureRequest(r),
 			})
 			http.Redirect(w, r, h.config.AuthCodeURL(state), http.StatusFound)
 			return

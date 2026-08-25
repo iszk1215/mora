@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -54,6 +55,56 @@ func TestOAuthHandler_NoCode(t *testing.T) {
 	loc, err := res.Location()
 	require.NoError(t, err)
 	require.Contains(t, loc.String(), "https://example.com/auth")
+}
+
+func TestOAuthHandler_StateCookieSecure(t *testing.T) {
+	tests := []struct {
+		name       string
+		tls        bool
+		xfp        string
+		wantSecure bool
+	}{
+		{name: "plain HTTP request", wantSecure: false},
+		{name: "direct TLS connection", tls: true, wantSecure: true},
+		{name: "X-Forwarded-Proto https", xfp: "https", wantSecure: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Error("next should not be called when no code")
+			})
+
+			h := NewOAuthHandler(OAuthConfig{
+				ClientID: "id", ClientSecret: "secret",
+				AuthURL: "https://example.com/auth", TokenURL: "https://example.com/token",
+				RedirectURL: "https://example.com/callback",
+			})
+			handler := h.Handler(next)
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tt.tls {
+				r.TLS = &tls.ConnectionState{}
+			}
+			if tt.xfp != "" {
+				r.Header.Set("X-Forwarded-Proto", tt.xfp)
+			}
+			handler.ServeHTTP(w, r)
+			res := w.Result()
+			defer func() { _ = res.Body.Close() }()
+
+			require.Equal(t, http.StatusFound, res.StatusCode)
+			var found bool
+			for _, c := range res.Cookies() {
+				if c.Name == "oauth_state" {
+					found = true
+					require.Equal(t, tt.wantSecure, c.Secure)
+				}
+			}
+			require.True(t, found, "oauth_state cookie should be set")
+		})
+	}
 }
 
 func TestOAuthHandler_NoStateCookie(t *testing.T) {

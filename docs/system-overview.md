@@ -123,6 +123,36 @@ endpoints; a non-Google `url` (e.g. for E2E mocks) derives the endpoints from
 the configured URL. On signup the suggested username is derived from the
 email's local part (sanitized), since Google accounts have no username.
 
+### Cookies
+
+| Cookie | Issued by | Attributes |
+|--------|-----------|------------|
+| `morasessionid` | `SessionMiddleware` (every request) | `Path=/`, `HttpOnly`, `SameSite=Lax`, `Secure` (default) |
+| `csrf_token` | `GET /api/auth/csrf` and OAuth login | `Path=/`, `SameSite=Lax`, `Secure` (default); no `HttpOnly` (read by the frontend for double-submit CSRF) |
+| `oauth_state` | OAuth redirect (`server/oauth2.go`) | `Path=/`, `HttpOnly`, `SameSite=Lax`, `Max-Age=600`, `Secure` when the request is HTTPS |
+
+The `Secure` attribute is enabled by default on the session and CSRF cookies.
+It is disabled per request only when insecure cookie mode is active **and** the
+request itself is not over HTTPS:
+
+```
+secure = !insecureCookie || r.TLS != nil || X-Forwarded-Proto == "https"
+```
+
+`oauth_state` is always request-based: it gets `Secure` when the request
+arrives over HTTPS directly or through a TLS-terminating reverse proxy that
+sets `X-Forwarded-Proto`.
+
+**Insecure cookie mode (development over plain HTTP):**
+
+- Config file: `[server]` section, `insecure_cookie = true`
+- CLI: `mora web --insecure-cookie` (overrides the config file value)
+
+Without this mode, browsers drop the authentication cookies when mora runs on
+plain HTTP; login will not work. Production deployments behind a TLS-terminating
+reverse proxy should either set `X-Forwarded-Proto: https` or leave the default
+(Secure always on).
+
 ## Usernames
 
 - Usernames are unique (case-insensitive, enforced by the

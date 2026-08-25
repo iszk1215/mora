@@ -135,12 +135,12 @@ func (j *cookieJar) setOnRequest(req *http.Request) {
 
 func setupPasswordAuthHandler(t *testing.T) (*MoraSessionManager, UserStore, http.Handler) {
 	store := newTestUserStore(t)
-	sm := NewMoraSessionManager()
+	sm := NewMoraSessionManager(false)
 	t.Cleanup(func() { _ = sm.Close() })
 
 	r := chi.NewRouter()
 	r.Use(sm.SessionMiddleware)
-	r.Mount("/api/auth", PasswordAuthHandler(store))
+	r.Mount("/api/auth", PasswordAuthHandler(store, false))
 
 	return sm, store, r
 }
@@ -364,10 +364,41 @@ func TestPasswordAuth_CSRFEndpointSetsCookie(t *testing.T) {
 			require.Equal(t, csrf, c.Value)
 			require.Equal(t, "/", c.Path)
 			require.False(t, c.HttpOnly)
+			require.True(t, c.Secure,
+				"Secure should be enabled by default on the CSRF cookie")
 			break
 		}
 	}
 	require.True(t, found, "CSRF cookie should be set by /api/auth/csrf endpoint")
+}
+
+func TestPasswordAuth_CSRFEndpointInsecureCookie(t *testing.T) {
+	store := newTestUserStore(t)
+	sm := NewMoraSessionManager(true)
+	t.Cleanup(func() { _ = sm.Close() })
+
+	r := chi.NewRouter()
+	r.Use(sm.SessionMiddleware)
+	r.Mount("/api/auth", PasswordAuthHandler(store, true))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/csrf", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer func() { _ = resp.Body.Close() }()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var found bool
+	for _, c := range resp.Cookies() {
+		if c.Name == csrfCookieName {
+			found = true
+			require.False(t, c.Secure,
+				"Secure attribute should be omitted with insecure_cookie over HTTP")
+			break
+		}
+	}
+	require.True(t, found)
 }
 
 func TestPasswordLogin_CorrectCSRF(t *testing.T) {
