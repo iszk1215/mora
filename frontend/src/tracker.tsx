@@ -288,11 +288,9 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
       <Link to={linkTo} state={linkState} className="block">
         <div className="flex items-center gap-2 mb-2 pl-2">
           <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
-          {tracker.visibility === 'private' ? (
+          {tracker.visibility === 'private' && (
             <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">private</span>
-          ) : tracker.role ? (
-            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{tracker.role}</span>
-          ) : null}
+          )}
           {tracker.type === 'coverage' && (
             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
           )}
