@@ -4,12 +4,10 @@ import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
 import {
   TrackerCreate,
-  TrackerView,
   TrackerDetailView,
   TrackerDetailEdit,
   TrackerDetailEditRouter,
   TrackerCard,
-  loadTrackerList,
   loadTrackerDetail,
   patchTracker,
 } from './tracker'
@@ -29,44 +27,6 @@ vi.mock('react-datepicker', () => ({
   default: (props: any) => <input data-testid="datepicker" {...props} />,
 }))
 
-describe('loadTrackerList', () => {
-  beforeEach(() => {
-    globalThis.fetch = vi.fn()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('returns paginated trackers from successful API response', async () => {
-    const mockResponse = {
-      trackers: [
-        { id: 1, name: 'tracker-a', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-        { id: 2, name: 'tracker-b', visibility: 'public', type: 'tracker', chart_config: '{}', role: '', liked: true },
-      ],
-      total: 2,
-      page: 1,
-      per_page: 12,
-    }
-    vi.mocked(globalThis.fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockResponse),
-    } as Response)
-
-    const result = await loadTrackerList()
-    expect(result).toEqual(mockResponse)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers?page=1&per_page=12')
-  })
-
-  it('throws on non-ok response', async () => {
-    vi.mocked(globalThis.fetch).mockResolvedValue({
-      ok: false,
-      status: 500,
-    } as Response)
-
-    await expect(loadTrackerList()).rejects.toBeDefined()
-  })
-})
 
 describe('loadTrackerDetail', () => {
   beforeEach(() => {
@@ -152,130 +112,10 @@ describe('patchTracker', () => {
   })
 })
 
-describe('TrackerView', () => {
-  beforeEach(() => {
-    vi.mocked(useLoaderData).mockReset()
-    globalThis.fetch = vi.fn()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('shows Create Tracker link', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
-    render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    const link = screen.getByText('Create Tracker').closest('a')
-    expect(link).toHaveAttribute('href', '/trackers/new')
-  })
-
-  it('renders tracker cards', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      trackers: [
-        { id: 1, name: 'tracker-a', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-        { id: 2, name: 'tracker-b', visibility: 'public', type: 'tracker', chart_config: '{}', role: '', liked: true },
-      ],
-      total: 2,
-      page: 1,
-      per_page: 12,
-    })
-    render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('tracker-a')).toBeInTheDocument()
-    expect(screen.getByText('tracker-b')).toBeInTheDocument()
-  })
-
-  it('shows role badge for owned trackers', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      trackers: [
-        { id: 1, name: 'my-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      ],
-      total: 1,
-      page: 1,
-      per_page: 12,
-    })
-    render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('owner')).toBeInTheDocument()
-  })
-
-  it('shows owner name and last updated date on cards', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      trackers: [
-        {
-          id: 1,
-          name: 'my-tracker',
-          visibility: 'private',
-          type: 'tracker',
-          chart_config: '{}',
-          role: 'owner',
-          liked: false,
-          owner_id: 2,
-          owner_name: 'alice',
-          created_at: '2026-01-01T00:00:00Z',
-          last_updated_at: '2026-02-03T00:00:00Z',
-        },
-      ],
-      total: 1,
-      page: 1,
-      per_page: 12,
-    })
-    render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('alice')).toBeInTheDocument()
-  })
-
-  it('links owner name to user page', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      trackers: [
-        {
-          id: 1,
-          name: 'my-tracker',
-          visibility: 'private',
-          type: 'tracker',
-          chart_config: '{}',
-          role: 'owner',
-          liked: false,
-          owner_id: 2,
-          owner_name: 'alice',
-          last_updated_at: '2026-02-03T00:00:00Z',
-        },
-      ],
-      total: 1,
-      page: 1,
-      per_page: 12,
-    })
-    render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    const link = screen.getByText('alice').closest('a')
-    expect(link).toHaveAttribute('href', '/users/alice')
-  })
-
-  it('shows empty state when no trackers', () => {
-    vi.mocked(useLoaderData).mockReturnValue({ trackers: [], total: 0, page: 1, per_page: 12 })
-    render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('No trackers yet.')).toBeInTheDocument()
-  })
-
-  it('renders pagination controls when multiple pages', () => {
-    const trackers = Array.from({ length: 12 }, (_, i) => ({
-      id: i + 1,
-      name: `tracker-${i}`,
-      visibility: 'private' as const,
-      type: 'tracker' as const,
-      role: 'owner' as const,
-      chart_config: '{}' as const,
-      liked: false,
-    }))
-    vi.mocked(useLoaderData).mockReturnValue({
-      trackers,
-      total: 24,
-      page: 1,
-      per_page: 12,
-    })
-    render(<MemoryRouter><TrackerView /></MemoryRouter>)
-    expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
-    expect(screen.getByText('Next')).toBeInTheDocument()
-  })
-})
 
 describe('TrackerCreate', () => {
+  const mockUser = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
+
   beforeEach(() => {
     mockNavigate.mockReset()
     globalThis.fetch = vi.fn()
@@ -286,13 +126,13 @@ describe('TrackerCreate', () => {
   })
 
   it('renders form with name input, visibility select, and buttons', () => {
-    render(<MemoryRouter><TrackerCreate /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerCreate /></UserProvider></MemoryRouter>)
     expect(screen.getByPlaceholderText('Tracker name')).toBeInTheDocument()
     expect(screen.getByText('Create Tracker')).toBeInTheDocument()
     expect(screen.getByText('Cancel')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Private')).toBeInTheDocument()
     const cancelLink = screen.getByText('Cancel').closest('a')
-    expect(cancelLink).toHaveAttribute('href', '/trackers')
+    expect(cancelLink).toHaveAttribute('href', '/users/testuser')
   })
 
   it('creates tracker and navigates on submit', async () => {
@@ -302,7 +142,7 @@ describe('TrackerCreate', () => {
       json: () => Promise.resolve(created),
     } as Response)
 
-    render(<MemoryRouter><TrackerCreate /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerCreate /></UserProvider></MemoryRouter>)
     const input = screen.getByPlaceholderText('Tracker name')
     const createBtn = screen.getByText('Create')
 
@@ -328,7 +168,7 @@ describe('TrackerCreate', () => {
       status: 400,
     } as Response)
 
-    render(<MemoryRouter><TrackerCreate /></MemoryRouter>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerCreate /></UserProvider></MemoryRouter>)
     const input = screen.getByPlaceholderText('Tracker name')
     const createBtn = screen.getByText('Create')
 
@@ -1012,5 +852,25 @@ describe('TrackerCard', () => {
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.series[0].data[0][0]).toBe('2024-01-15')
+  })
+
+  it('shows private badge for private trackers', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} /></MemoryRouter>)
+    expect(screen.getByText('private')).toBeInTheDocument()
+  })
+
+  it('does not show private badge for public trackers', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'public', type: 'tracker',
+      chart_config: '{}',
+      role: '', liked: false, like_count: 0,
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} /></MemoryRouter>)
+    expect(screen.queryByText('private')).not.toBeInTheDocument()
   })
 })

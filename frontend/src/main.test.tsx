@@ -97,7 +97,7 @@ describe('Header', () => {
     await img.click()
     const link = screen.getByText('My Trackers')
     expect(link).toBeInTheDocument()
-    expect(link.closest('a')).toHaveAttribute('href', '/trackers')
+    expect(link.closest('a')).toHaveAttribute('href', '/users/testuser')
   })
 
   it('closes menu when clicking My Trackers', async () => {
