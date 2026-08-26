@@ -110,6 +110,22 @@ describe('patchTracker', () => {
 
     await expect(patchTracker(1, { visibility: 'public' })).rejects.toBeDefined()
   })
+
+  it('sends PATCH request with name', async () => {
+    const updated = { id: 1, name: 'renamed', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(updated),
+    } as Response)
+
+    const result = await patchTracker(1, { name: 'renamed' })
+    expect(result).toEqual(updated)
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'renamed' }),
+    })
+  })
 })
 
 describe('trackerRoute index', () => {
@@ -286,13 +302,22 @@ describe('TrackerDetailView', () => {
     expect(screen.getByText('one')).toBeInTheDocument()
   })
 
-  it('does not render body when empty', () => {
+  it('does not render body when empty and user is not owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '' },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
     expect(screen.queryByRole('heading', { name: 'Overview' })).not.toBeInTheDocument()
+  })
+
+  it('shows empty body placeholder for owner when body is empty', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '' },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByText('No body content')).toBeInTheDocument()
   })
 
   it('renders description in the same foreground color as the title', () => {
@@ -327,6 +352,115 @@ describe('TrackerDetailView', () => {
     const body = container.querySelector('.md-body')
     expect(body).toBeInTheDocument()
     expect(body!.className).toContain('bg-card')
+  })
+
+  it('shows pencil icon for title when owner', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByRole('button', { name: /edit title/i })).toBeInTheDocument()
+  })
+
+  it('hides pencil icon for title when not owner', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.queryByRole('button', { name: /edit title/i })).not.toBeInTheDocument()
+  })
+
+  it('enters title edit mode on pencil click and saves', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'old-name', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, name: 'new-name', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByText('old-name')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /edit title/i }))
+    const input = screen.getByRole('textbox')
+    expect(input).toHaveValue('old-name')
+
+    fireEvent.change(input, { target: { value: 'new-name' } })
+    fireEvent.click(screen.getByText('Save'))
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('new-name')).toBeInTheDocument()
+    })
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({ method: 'PATCH' }))
+  })
+
+  it('cancels title edit and restores original value', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'original', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /edit title/i }))
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'changed' } })
+    fireEvent.click(screen.getByText('Cancel'))
+
+    expect(screen.getByText('original')).toBeInTheDocument()
+  })
+
+  it('shows pencil icon for description when owner', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'desc' },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByRole('button', { name: /edit description/i })).toBeInTheDocument()
+  })
+
+  it('enters description edit mode and saves', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'old desc' },
+      series: [],
+    })
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'new desc' }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /edit description/i }))
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'new desc' } })
+    fireEvent.click(screen.getByText('Save'))
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('new desc')).toBeInTheDocument()
+    })
+  })
+
+  it('shows pencil icon for body when owner', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '## Hello' },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByRole('button', { name: /edit body/i })).toBeInTheDocument()
+  })
+
+  it('enters body edit mode and shows markdown editor', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '## Hello' },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /edit body/i }))
+    expect(screen.getByText('Save Body')).toBeInTheDocument()
+    expect(screen.getByText('Cancel')).toBeInTheDocument()
   })
 
 })

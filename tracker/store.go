@@ -361,13 +361,17 @@ func (s *trackerStore) deleteTracker(id int64) error {
 	return nil
 }
 
-func (s *trackerStore) updateTracker(id int64, visibility, chartConfig, description, body *string) error {
-	if visibility == nil && chartConfig == nil && description == nil && body == nil {
+func (s *trackerStore) updateTracker(id int64, name, visibility, chartConfig, description, body *string) error {
+	if name == nil && visibility == nil && chartConfig == nil && description == nil && body == nil {
 		return nil
 	}
 	query := "UPDATE tracker SET "
 	args := []any{}
 	parts := []string{}
+	if name != nil {
+		parts = append(parts, "name = ?")
+		args = append(args, *name)
+	}
 	if visibility != nil {
 		parts = append(parts, "visibility = ?")
 		args = append(args, *visibility)

@@ -688,6 +688,49 @@ func TestHandlerPatchTracker(t *testing.T) {
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
+
+	t.Run("patch name", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := PatchTrackerRequest{Name: strPtr("renamed")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got TrackerResponse
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, "renamed", got.Name)
+	})
+
+	t.Run("patch name with empty string rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := PatchTrackerRequest{Name: strPtr("  ")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("patch name over 200 characters rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d", tr.Id)
+		body := PatchTrackerRequest{Name: strPtr(strings.Repeat("a", 201))}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
 }
 
 func TestHandlerRequireReadPermission(t *testing.T) {
