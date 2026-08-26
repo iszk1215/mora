@@ -156,7 +156,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     const hasRightAxis = yAxes.some((a) => a.position === 'right')
     const isDateOnly = cc?.x_axis_type === 'date'
 
-    const grid: any = { left: 40, right: 10, top: showLegend ? (stackHeader ? 70 : 40) : 20, bottom: showSlider ? 80 : 30 }
+    const grid: any = { left: 40, right: 10, top: showLegend ? (stackHeader ? 70 : 40) : showToolbox ? 40 : 20, bottom: showSlider ? 80 : 30 }
     if (hasRightAxis) grid.right = 50
     if (!narrow && yAxes.some((a) => a.position === 'left' && a.label)) grid.left = Math.max(grid.left, 50)
     if (narrow && yAxes.some((a) => a.label)) {
