@@ -244,7 +244,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("update to public", func(t *testing.T) {
 		v := "public"
-		err := s.updateTracker(tracker.Id, &v, nil, nil, nil)
+		err := s.updateTracker(tracker.Id, nil, &v, nil, nil, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -254,7 +254,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("update description", func(t *testing.T) {
 		desc := "test description"
-		err := s.updateTracker(tracker.Id, nil, nil, &desc, nil)
+		err := s.updateTracker(tracker.Id, nil, nil, nil, &desc, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -264,7 +264,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("update to private", func(t *testing.T) {
 		v := "private"
-		err := s.updateTracker(tracker.Id, &v, nil, nil, nil)
+		err := s.updateTracker(tracker.Id, nil, &v, nil, nil, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -274,13 +274,13 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("non-existing tracker returns error", func(t *testing.T) {
 		v := "public"
-		err := s.updateTracker(99999, &v, nil, nil, nil)
+		err := s.updateTracker(99999, nil, &v, nil, nil, nil)
 		require.ErrorIs(t, err, errorTrackerNotFound)
 	})
 
 	t.Run("update chart_config", func(t *testing.T) {
 		cc := `{"x_axis_label":"Time"}`
-		err := s.updateTracker(tracker.Id, nil, &cc, nil, nil)
+		err := s.updateTracker(tracker.Id, nil, nil, &cc, nil, nil)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -290,7 +290,7 @@ func TestStoreUpdateTracker(t *testing.T) {
 
 	t.Run("update body", func(t *testing.T) {
 		body := "## Overview\n\nSome markdown content"
-		err := s.updateTracker(tracker.Id, nil, nil, nil, &body)
+		err := s.updateTracker(tracker.Id, nil, nil, nil, nil, &body)
 		require.NoError(t, err)
 
 		got, err := s.findTrackerById(tracker.Id)
@@ -299,8 +299,18 @@ func TestStoreUpdateTracker(t *testing.T) {
 	})
 
 	t.Run("nil fields is no-op", func(t *testing.T) {
-		err := s.updateTracker(tracker.Id, nil, nil, nil, nil)
+		err := s.updateTracker(tracker.Id, nil, nil, nil, nil, nil)
 		require.NoError(t, err)
+	})
+
+	t.Run("update name", func(t *testing.T) {
+		n := "renamed_tracker"
+		err := s.updateTracker(tracker.Id, &n, nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		got, err := s.findTrackerById(tracker.Id)
+		require.NoError(t, err)
+		require.Equal(t, n, got.Name)
 	})
 }
 

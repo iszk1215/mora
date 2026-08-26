@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { Star } from 'lucide-react'
+import { Pencil, Star } from 'lucide-react'
 
 import {
   Link,
@@ -148,7 +148,7 @@ export async function unlikeTracker(trackerId: number): Promise<void> {
   if (!resp.ok) throw resp
 }
 
-export async function patchTracker(trackerId: number, opts: { visibility?: string; chart_config?: string; description?: string; body?: string }): Promise<TrackerResponse> {
+export async function patchTracker(trackerId: number, opts: { name?: string; visibility?: string; chart_config?: string; description?: string; body?: string }): Promise<TrackerResponse> {
   const resp = await fetch(`/api/trackers/${trackerId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -325,6 +325,24 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [likeCount, setLikeCount] = useState(tracker.like_count ?? 0)
   const [likeLoading, setLikeLoading] = useState(false)
 
+  const isOwner = tracker.role !== ''
+
+  const [trackerName, setTrackerName] = useState(tracker.name)
+  const [trackerDescription, setTrackerDescription] = useState(tracker.description ?? '')
+  const [trackerBody, setTrackerBody] = useState(tracker.body ?? '')
+
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [editingBody, setEditingBody] = useState(false)
+
+  const [draftName, setDraftName] = useState(tracker.name)
+  const [draftDescription, setDraftDescription] = useState(tracker.description ?? '')
+  const [draftBody, setDraftBody] = useState(tracker.body ?? '')
+
+  const [savingTitle, setSavingTitle] = useState(false)
+  const [savingDescription, setSavingDescription] = useState(false)
+  const [savingBody, setSavingBody] = useState(false)
+
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
@@ -352,6 +370,74 @@ export const TrackerDetailView = (): React.JSX.Element => {
     } finally {
       setLikeLoading(false)
     }
+  }
+
+  const handleSaveTitle = async () => {
+    const trimmed = draftName.trim()
+    if (!trimmed || trimmed === trackerName) {
+      setEditingTitle(false)
+      return
+    }
+    setSavingTitle(true)
+    try {
+      await patchTracker(tracker.id, { name: trimmed })
+      setTrackerName(trimmed)
+      setEditingTitle(false)
+    } catch {
+      setDraftName(trackerName)
+    } finally {
+      setSavingTitle(false)
+    }
+  }
+
+  const handleCancelTitle = () => {
+    setDraftName(trackerName)
+    setEditingTitle(false)
+  }
+
+  const handleSaveDescription = async () => {
+    const trimmed = draftDescription.trim()
+    if (trimmed === trackerDescription) {
+      setEditingDescription(false)
+      return
+    }
+    setSavingDescription(true)
+    try {
+      await patchTracker(tracker.id, { description: trimmed })
+      setTrackerDescription(trimmed)
+      setEditingDescription(false)
+    } catch {
+      setDraftDescription(trackerDescription)
+    } finally {
+      setSavingDescription(false)
+    }
+  }
+
+  const handleCancelDescription = () => {
+    setDraftDescription(trackerDescription)
+    setEditingDescription(false)
+  }
+
+  const handleSaveBody = async () => {
+    if (draftBody === trackerBody) {
+      setEditingBody(false)
+      return
+    }
+    setSavingBody(true)
+    try {
+      await patchTracker(tracker.id, { body: draftBody })
+      setTrackerBody(draftBody)
+      setEditingBody(false)
+    } catch {
+      setDraftBody(trackerBody)
+    } finally {
+      setSavingBody(false)
+    }
+  }
+
+  const handleCancelBody = () => {
+    setDraftBody(trackerBody)
+    setEditingBody(false)
   }
 
   const valuesToDataset = (sv: SeriesValues): Dataset => {
@@ -383,7 +469,38 @@ export const TrackerDetailView = (): React.JSX.Element => {
     <div>
       <div className="my-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl">{tracker.name}</h1>
+          {editingTitle ? (
+            <div className="flex items-center gap-2 flex-1">
+              <input
+                type="text"
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                maxLength={200}
+                className="text-3xl border rounded px-2 py-1 flex-1"
+                autoFocus
+              />
+              <Button size="sm" onClick={handleSaveTitle} disabled={savingTitle || !draftName.trim()}>
+                Save
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleCancelTitle} disabled={savingTitle}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-3xl">{trackerName}</h1>
+              {isOwner && (
+                <button
+                  type="button"
+                  aria-label="Edit title"
+                  onClick={() => { setDraftName(trackerName); setEditingTitle(true) }}
+                  className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+            </>
+          )}
           <button
             type="button"
             aria-label={liked ? 'Unlike' : 'Like'}
@@ -400,14 +517,49 @@ export const TrackerDetailView = (): React.JSX.Element => {
               </span>
             )}
           </button>
-          {tracker.role !== '' && (
+          {isOwner && (
             <Button variant="outline" size="sm" asChild>
               <Link to={`/trackers/${tracker.id}/edit`}>Edit</Link>
             </Button>
           )}
         </div>
-        {tracker.description && (
-          <p className="mt-1">{tracker.description}</p>
+
+        {editingDescription ? (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="text"
+              value={draftDescription}
+              onChange={(e) => setDraftDescription(e.target.value)}
+              maxLength={200}
+              placeholder="One-line description (max 200 characters)"
+              className="border rounded px-2 py-1 flex-1 max-w-md"
+              autoFocus
+            />
+            <Button size="sm" onClick={handleSaveDescription} disabled={savingDescription}>
+              Save
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleCancelDescription} disabled={savingDescription}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-1 flex items-center gap-2">
+            {trackerDescription ? (
+              <p>{trackerDescription}</p>
+            ) : (
+              isOwner && <p className="text-muted-foreground italic">No description</p>
+            )}
+            {isOwner && (
+              <button
+                type="button"
+                aria-label="Edit description"
+                onClick={() => { setDraftDescription(trackerDescription); setEditingDescription(true) }}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -422,10 +574,46 @@ export const TrackerDetailView = (): React.JSX.Element => {
         )}
       </div>
 
-      {tracker.body?.trim() && (
-        <div className="mt-6 bg-card border rounded-lg p-4 shadow-md md-body">
-          <MDEditor.Markdown source={tracker.body} />
+      {editingBody ? (
+        <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
+          <div data-color-mode="light">
+            <MDEditor
+              value={draftBody}
+              onChange={(v) => setDraftBody(v ?? '')}
+              preview="live"
+              height={300}
+              textareaProps={{ placeholder: 'Write the body in Markdown...' }}
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <Button size="sm" onClick={handleSaveBody} disabled={savingBody}>
+              Save Body
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleCancelBody} disabled={savingBody}>
+              Cancel
+            </Button>
+          </div>
         </div>
+      ) : (
+        (trackerBody?.trim() || isOwner) && (
+          <div className="mt-6 bg-card border rounded-lg p-4 shadow-md md-body relative">
+            {isOwner && (
+              <button
+                type="button"
+                aria-label="Edit body"
+                onClick={() => { setDraftBody(trackerBody); setEditingBody(true) }}
+                className="absolute top-2 right-2 p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            )}
+            {trackerBody?.trim() ? (
+              <MDEditor.Markdown source={trackerBody} />
+            ) : (
+              <p className="text-muted-foreground italic">No body content</p>
+            )}
+          </div>
+        )
       )}
     </div>
   )

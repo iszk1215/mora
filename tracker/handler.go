@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -75,6 +76,7 @@ type (
 	}
 
 	PatchTrackerRequest struct {
+		Name        *string `json:"name"`
 		Visibility  *string `json:"visibility"`
 		ChartConfig *string `json:"chart_config"`
 		Description *string `json:"description"`
@@ -418,6 +420,19 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Name != nil {
+		n := strings.TrimSpace(*req.Name)
+		if n == "" {
+			render.BadRequest(w, errors.New("name must not be empty"))
+			return
+		}
+		if len(n) > 200 {
+			render.BadRequest(w, errors.New("name must be at most 200 characters"))
+			return
+		}
+		*req.Name = n
+	}
+
 	if req.Visibility != nil {
 		v := *req.Visibility
 		if v != "public" && v != "private" {
@@ -448,7 +463,7 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tracker, _ := trackerFrom(r.Context())
-	err = h.store.updateTracker(tracker.Id, req.Visibility, req.ChartConfig, req.Description, req.Body)
+	err = h.store.updateTracker(tracker.Id, req.Name, req.Visibility, req.ChartConfig, req.Description, req.Body)
 	if err != nil {
 		log.Error().Err(err).Msg("patchTracker updateTracker")
 		render.InternalError(w, err)
@@ -456,6 +471,9 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uid, _ := UserIDFromContext(r.Context())
+	if req.Name != nil {
+		tracker.Name = *req.Name
+	}
 	if req.Visibility != nil {
 		tracker.Visibility = *req.Visibility
 	}
