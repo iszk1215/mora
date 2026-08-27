@@ -3,8 +3,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { MoreVertical, Pencil, Star } from 'lucide-react'
-import { DropdownMenu } from 'radix-ui'
+import { MoreVertical, Pencil, Star, Trash } from 'lucide-react'
+import { AlertDialog, DropdownMenu } from 'radix-ui'
 
 import {
   Link,
@@ -158,6 +158,11 @@ export async function patchTracker(trackerId: number, opts: { name?: string; vis
   })
   if (!resp.ok) throw resp
   return resp.json()
+}
+
+export async function deleteTracker(trackerId: number): Promise<void> {
+  const resp = await fetch(`/api/trackers/${trackerId}`, { method: 'DELETE' })
+  if (!resp.ok) throw resp
 }
 
 export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise<TrackerDetailData> {
@@ -321,11 +326,15 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const data = useLoaderData() as TrackerDetailData
   const { tracker } = data
   const user = useUser()
+  const navigate = useNavigate()
   const [seriesList] = useState<SeriesModel[]>(data.series)
   const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
   const [liked, setLiked] = useState(tracker.liked)
   const [likeCount, setLikeCount] = useState(tracker.like_count ?? 0)
   const [likeLoading, setLikeLoading] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const isOwner = tracker.role !== ''
   const isRoleOwner = tracker.role === 'owner'
@@ -373,6 +382,24 @@ export const TrackerDetailView = (): React.JSX.Element => {
       // ignore
     } finally {
       setLikeLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteTracker(tracker.id)
+      if (user) {
+        navigate(`/users/${encodeURIComponent(user.username)}`)
+      } else {
+        navigate('/trackers')
+      }
+    } catch {
+      setDeleteError('Failed to delete tracker. Please try again.')
+      setDeleteConfirmOpen(true)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -545,6 +572,14 @@ export const TrackerDetailView = (): React.JSX.Element => {
                   >
                     Chart Options
                   </DropdownMenu.Item>
+                  <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer text-red-600 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700 outline-none"
+                    onSelect={() => { setDeleteError(null); setDeleteConfirmOpen(true) }}
+                  >
+                    <Trash className="w-4 h-4" />
+                    Delete
+                  </DropdownMenu.Item>
                 </DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
@@ -667,6 +702,29 @@ export const TrackerDetailView = (): React.JSX.Element => {
           </div>
         )
       )}
+
+      <AlertDialog.Root open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+          <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-popover text-popover-foreground border shadow-lg p-6">
+            <AlertDialog.Title className="text-lg font-semibold">Delete Tracker?</AlertDialog.Title>
+            <AlertDialog.Description className="mt-2 text-sm text-muted-foreground">
+              This will permanently delete the tracker and all of its associated series and values. This action cannot be undone.
+            </AlertDialog.Description>
+            {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <AlertDialog.Cancel asChild>
+                <Button variant="outline" size="sm" disabled={deleting}>Cancel</Button>
+              </AlertDialog.Cancel>
+              <AlertDialog.Action asChild>
+                <Button variant="destructive" size="sm" disabled={deleting} onClick={handleDelete}>
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </Button>
+              </AlertDialog.Action>
+            </div>
+          </AlertDialog.Content>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
     </div>
   )
 }

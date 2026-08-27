@@ -352,6 +352,105 @@ describe('TrackerDetailView', () => {
     })
   })
 
+  it('shows Delete item in tracker menu when owner', async () => {
+    const user = userEvent.setup()
+    mockNavigate.mockClear()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    expect(await screen.findByText('Delete')).toBeInTheDocument()
+  })
+
+  it('hides Delete item in tracker menu when editor', () => {
+    mockNavigate.mockClear()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.queryByRole('button', { name: /tracker menu/i })).not.toBeInTheDocument()
+  })
+
+  it('shows confirmation dialog when Delete is selected', async () => {
+    const user = userEvent.setup()
+    mockNavigate.mockClear()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Delete'))
+
+    expect(await screen.findByText('Delete Tracker?')).toBeInTheDocument()
+    expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument()
+  })
+
+  it('does not delete when confirming is cancelled', async () => {
+    const user = userEvent.setup()
+    mockNavigate.mockClear()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Delete'))
+    await user.click(await screen.findByText('Cancel'))
+
+    expect(screen.queryByText('Delete Tracker?')).not.toBeInTheDocument()
+    const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(
+      ([url, init]) => url === '/api/trackers/1' && (init as RequestInit)?.method === 'DELETE'
+    )
+    expect(deleteCall).toBeUndefined()
+  })
+
+  it('deletes tracker and navigates to user page on confirm', async () => {
+    const user = userEvent.setup()
+    mockNavigate.mockClear()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true } as Response)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Delete'))
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({ method: 'DELETE' }))
+    })
+    expect(mockNavigate).toHaveBeenCalledWith('/users/testuser')
+  })
+
+  it('shows error and stays on page when delete fails', async () => {
+    const user = userEvent.setup()
+    mockNavigate.mockClear()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false } as Response)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Delete'))
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByText(/failed to delete tracker/i)).toBeInTheDocument()
+    })
+    expect(mockNavigate).not.toHaveBeenCalled()
+  })
+
   it('renders markdown body below the chart', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '## Overview\n\nSome **notes** here' },
