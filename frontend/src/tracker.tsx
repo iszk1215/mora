@@ -472,7 +472,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   return (
     <div>
       <div className="my-4">
-        <div className="flex items-center gap-3 pr-3 sm:px-4">
+        <div className="flex items-center gap-3 pr-3 sm:pr-4">
           {editingTitle ? (
             <div className="flex items-center gap-2 flex-1">
               <input
@@ -532,7 +532,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                 <button
                   type="button"
                   aria-label="Tracker menu"
-                  className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  className="ml-auto p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <MoreVertical className="w-5 h-5" />
                 </button>
