@@ -472,7 +472,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   return (
     <div>
       <div className="my-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pr-3 sm:px-4">
           {editingTitle ? (
             <div className="flex items-center gap-2 flex-1">
               <input
