@@ -473,29 +473,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
     <div>
       <div className="my-4">
         <div className="flex items-center gap-3">
-          {isRoleOwner && (
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger asChild>
-                <button
-                  type="button"
-                  aria-label="Tracker menu"
-                  className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <MoreVertical className="w-5 h-5" />
-                </button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Portal>
-                <DropdownMenu.Content align="start" className="bg-popover text-popover-foreground rounded-md border shadow-md p-1 min-w-[12rem] z-50">
-                  <DropdownMenu.Item
-                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
-                    onSelect={() => setShowChartOptions((v) => !v)}
-                  >
-                    Chart Options
-                  </DropdownMenu.Item>
-                </DropdownMenu.Content>
-              </DropdownMenu.Portal>
-            </DropdownMenu.Root>
-          )}
           {editingTitle ? (
             <div className="flex items-center gap-2 flex-1">
               <input
@@ -548,6 +525,29 @@ export const TrackerDetailView = (): React.JSX.Element => {
             <Button variant="outline" size="sm" asChild>
               <Link to={`/trackers/${tracker.id}/edit`}>Edit</Link>
             </Button>
+          )}
+          {isRoleOwner && (
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button
+                  type="button"
+                  aria-label="Tracker menu"
+                  className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content align="end" className="bg-popover text-popover-foreground rounded-md border shadow-md p-1 min-w-[12rem] z-50">
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
+                    onSelect={() => setShowChartOptions((v) => !v)}
+                  >
+                    Chart Options
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           )}
         </div>
 
