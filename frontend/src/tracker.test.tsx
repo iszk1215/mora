@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
 import {
@@ -276,6 +277,79 @@ describe('TrackerDetailView', () => {
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
     expect(screen.queryByText('Edit')).not.toBeInTheDocument()
+  })
+
+  it('shows tracker menu when user is owner', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByRole('button', { name: /tracker menu/i })).toBeInTheDocument()
+  })
+
+  it('hides tracker menu when user is editor', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.queryByRole('button', { name: /tracker menu/i })).not.toBeInTheDocument()
+  })
+
+  it('hides tracker menu when user has no role', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.queryByRole('button', { name: /tracker menu/i })).not.toBeInTheDocument()
+  })
+
+  it('opens and closes chart options panel from tracker menu', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    const menuItem = await screen.findByText('Chart Options')
+    await user.click(menuItem)
+
+    expect(screen.getByText('Close')).toBeInTheDocument()
+    await user.click(screen.getByText('Close'))
+    expect(screen.queryByText('Close')).not.toBeInTheDocument()
+  })
+
+  it('saves chart options via PATCH from panel', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"palette":"default"}', role: 'owner', liked: false }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    const menuItem = await screen.findByText('Chart Options')
+    await user.click(menuItem)
+
+    await user.click(screen.getByText('Save Chart Options'))
+
+    await vi.waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) => url === '/api/trackers/1' && (init as RequestInit)?.method === 'PATCH'
+      )
+      expect(patchCall).toBeDefined()
+      const body = JSON.parse((patchCall![1] as RequestInit).body as string)
+      expect(body.chart_config).toContain('"palette":"default"')
+    })
   })
 
   it('renders markdown body below the chart', () => {

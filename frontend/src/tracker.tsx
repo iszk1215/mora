@@ -3,7 +3,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { Pencil, Star } from 'lucide-react'
+import { MoreVertical, Pencil, Star } from 'lucide-react'
+import { DropdownMenu } from 'radix-ui'
 
 import {
   Link,
@@ -23,7 +24,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig } from './core'
-import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, PALETTE_NAMES, CHART_THEME_NAME } from './chart'
+import { ChartOptionsForm } from './chart-options-form'
+import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, CHART_THEME_NAME } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
@@ -326,6 +328,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [likeLoading, setLikeLoading] = useState(false)
 
   const isOwner = tracker.role !== ''
+  const isRoleOwner = tracker.role === 'owner'
 
   const [trackerName, setTrackerName] = useState(tracker.name)
   const [trackerDescription, setTrackerDescription] = useState(tracker.description ?? '')
@@ -334,6 +337,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [editingTitle, setEditingTitle] = useState(false)
   const [editingDescription, setEditingDescription] = useState(false)
   const [editingBody, setEditingBody] = useState(false)
+  const [showChartOptions, setShowChartOptions] = useState(false)
 
   const [draftName, setDraftName] = useState(tracker.name)
   const [draftDescription, setDraftDescription] = useState(tracker.description ?? '')
@@ -454,13 +458,13 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
   const datasets: Dataset[] = useMemo(() => seriesValues.map(valuesToDataset), [seriesValues])
 
-  const viewChartConfig = useMemo<ChartConfig | null>(() => {
+  const [chartConfig, setChartConfig] = useState<ChartConfig | null>(() => {
     try {
       return JSON.parse(tracker.chart_config) as ChartConfig
     } catch {
       return null
     }
-  }, [tracker.chart_config])
+  })
 
   const [range, setRange] = useState<TimeRangeKey>('all')
   const { min, max } = computeDateRange(range)
@@ -468,7 +472,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   return (
     <div>
       <div className="my-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pr-3 sm:pr-4">
           {editingTitle ? (
             <div className="flex items-center gap-2 flex-1">
               <input
@@ -522,6 +526,29 @@ export const TrackerDetailView = (): React.JSX.Element => {
               <Link to={`/trackers/${tracker.id}/edit`}>Edit</Link>
             </Button>
           )}
+          {isRoleOwner && (
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button
+                  type="button"
+                  aria-label="Tracker menu"
+                  className="ml-auto p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content align="end" className="bg-popover text-popover-foreground rounded-md border shadow-md p-1 min-w-[12rem] z-50">
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
+                    onSelect={() => setShowChartOptions((v) => !v)}
+                  >
+                    Chart Options
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          )}
         </div>
 
         {editingDescription ? (
@@ -567,12 +594,37 @@ export const TrackerDetailView = (): React.JSX.Element => {
         {datasets.length > 0 ? (
           <>
             <TimeRangeSelector value={range} onChange={setRange} />
-            <TrackerChart data={{ datasets }} chartConfig={viewChartConfig} min={min} max={max} />
+            <TrackerChart data={{ datasets }} chartConfig={chartConfig} min={min} max={max} />
           </>
         ) : (
           <p className="text-muted-foreground">No data to display</p>
         )}
       </div>
+
+      {isRoleOwner && showChartOptions && (
+        <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xl">Chart Options</h2>
+            <Button variant="outline" size="sm" onClick={() => setShowChartOptions(false)}>
+              Close
+            </Button>
+          </div>
+          <ChartOptionsForm
+            initialConfig={chartConfig ?? {}}
+            onChange={setChartConfig}
+            onSave={async (config) => {
+              const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config) })
+              setChartConfig(() => {
+                try {
+                  return JSON.parse(updated.chart_config) as ChartConfig
+                } catch {
+                  return config
+                }
+              })
+            }}
+          />
+        </div>
+      )}
 
       {editingBody ? (
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
@@ -676,20 +728,13 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [body, setBody] = useState(tracker.body ?? '')
   const [bodySaved, setBodySaved] = useState(false)
   const [visibility, setVisibility] = useState(tracker.visibility)
-  const [xLabel, setXLabel] = useState(parsedChartConfig.x_axis_label ?? '')
-  const [xAxisType, setXAxisType] = useState<'date' | 'datetime'>(parsedChartConfig.x_axis_type ?? 'date')
-  const [area, setArea] = useState(parsedChartConfig.area ?? true)
-  const [showLegend, setShowLegend] = useState(parsedChartConfig.show_legend ?? true)
-  const [showSymbols, setShowSymbols] = useState(parsedChartConfig.show_symbols ?? true)
-  const [showSlider, setShowSlider] = useState(parsedChartConfig.show_slider ?? true)
-  const [showToolbox, setShowToolbox] = useState(parsedChartConfig.show_toolbox ?? true)
-  const [palette, setPalette] = useState(parsedChartConfig.palette ?? 'default')
-  const [yAxes, setYAxes] = useState<YAxisConfig[]>(() => {
+  const xAxisType = parsedChartConfig.x_axis_type ?? 'date'
+  const yAxes: YAxisConfig[] = useMemo(() => {
     if (parsedChartConfig.y_axes && parsedChartConfig.y_axes.length > 0) {
       return parsedChartConfig.y_axes
     }
     return [{ id: 0, position: 'left' }]
-  })
+  }, [parsedChartConfig])
 
   const isCoverage = tracker.type === 'coverage'
 
@@ -722,33 +767,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       // ignore
     }
   }
-
-  const saveChartConfig = async (newYAxes: YAxisConfig[]) => {
-    const cc: ChartConfig = {}
-    if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
-    if (xAxisType === 'date') cc.x_axis_type = 'date'
-    if (!area) cc.area = false
-    if (!showLegend) cc.show_legend = false
-    if (!showSymbols) cc.show_symbols = false
-    if (!showSlider) cc.show_slider = false
-    if (showToolbox) cc.show_toolbox = true
-    cc.palette = palette
-    cc.y_axes = newYAxes.map((a) => {
-      const axis: YAxisConfig = { id: a.id, position: a.position }
-      if (a.label?.trim()) axis.label = a.label.trim()
-      if (a.min !== undefined) axis.min = a.min
-      if (a.max !== undefined) axis.max = a.max
-      return axis
-    })
-    try {
-      const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(cc) })
-      setSavedChartConfig(updated.chart_config)
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleChartConfigSave = () => saveChartConfig(yAxes)
 
   useEffect(() => {
     Promise.all(
@@ -1048,146 +1066,36 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
 
       {/* Chart Options */}
       <h2 className="text-xl my-2">Chart Options</h2>
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <select
-          value={xAxisType}
-          onChange={(e) => setXAxisType(e.target.value as 'date' | 'datetime')}
-          className="border rounded px-2 py-1"
-        >
-          <option value="date">Date</option>
-          <option value="datetime">Datetime</option>
-        </select>
-        <input
-          type="text"
-          value={xLabel}
-          onChange={(e) => setXLabel(e.target.value)}
-          placeholder="X-axis label"
-          className="border rounded px-2 py-1 w-40"
-        />
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={area} onChange={(e) => setArea(e.target.checked)} />
-          Area
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
-          Legend
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showSymbols} onChange={(e) => setShowSymbols(e.target.checked)} />
-          Symbols
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showSlider} onChange={(e) => setShowSlider(e.target.checked)} />
-          Slider
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showToolbox} onChange={(e) => setShowToolbox(e.target.checked)} />
-          Toolbox
-        </label>
-        <select
-          value={palette}
-          onChange={(e) => setPalette(e.target.value)}
-          className="border rounded px-2 py-1"
-        >
-          {PALETTE_NAMES.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Y-Axes */}
-      <h3 className="text-lg my-2">Y-Axes</h3>
-      <div className="flex flex-col gap-2 mb-4">
-        {(['left', 'right'] as const).map((pos) => {
-          const axis = yAxes.find((a) => a.position === pos)
-          const active = !!axis
-          const canRemove = yAxes.length > 1
-
-          return (
-            <div key={pos} className="flex items-center gap-2">
-              <span className="text-sm font-medium w-12">{pos === 'left' ? 'Left' : 'Right'}</span>
-              {active ? (
-                <>
-                  <input
-                    type="text"
-                    value={axis.label ?? ''}
-                    onChange={(e) => {
-                      const next = yAxes.map((a) =>
-                        a.position === pos ? { ...a, label: e.target.value || undefined } : a
-                      )
-                      setYAxes(next)
-                    }}
-                    placeholder="Label"
-                    className="border rounded px-2 py-1 w-32 text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={axis.min ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value ? parseFloat(e.target.value) : undefined
-                      const next = yAxes.map((a) =>
-                        a.position === pos ? { ...a, min: v } : a
-                      )
-                      setYAxes(next)
-                    }}
-                    placeholder="Min"
-                    className="border rounded px-2 py-1 w-20 text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={axis.max ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value ? parseFloat(e.target.value) : undefined
-                      const next = yAxes.map((a) =>
-                        a.position === pos ? { ...a, max: v } : a
-                      )
-                      setYAxes(next)
-                    }}
-                    placeholder="Max"
-                    className="border rounded px-2 py-1 w-20 text-sm"
-                  />
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={!canRemove}
-                    onClick={async () => {
-                      const removedIndex = yAxes.findIndex((a) => a.position === pos)
-                      for (const [sidStr, yi] of Object.entries(seriesYAxisIndices)) {
-                        const sid = Number(sidStr)
-                        if (yi === removedIndex) {
-                          await handleSeriesYAxisChange(sid, 0)
-                        } else if (yi > removedIndex) {
-                          await handleSeriesYAxisChange(sid, yi - 1)
-                        }
-                      }
-                      const newYAxes = yAxes.filter((a) => a.position !== pos)
-                      setYAxes(newYAxes)
-                      await saveChartConfig(newYAxes)
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    const id = yAxes.length > 0 ? Math.max(...yAxes.map((a) => a.id)) + 1 : 0
-                    const newYAxes = [...yAxes, { id, position: pos }]
-                    setYAxes(newYAxes)
-                    await saveChartConfig(newYAxes)
-                  }}
-                >
-                  Add
-                </Button>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      <Button onClick={handleChartConfigSave}>Save Chart Options</Button>
+      <ChartOptionsForm
+        initialConfig={parsedChartConfig}
+        onSave={async (config) => {
+          try {
+            const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config) })
+            setSavedChartConfig(updated.chart_config)
+          } catch {
+            // ignore
+          }
+        }}
+        onYAxesChange={async (config) => {
+          try {
+            const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config) })
+            setSavedChartConfig(updated.chart_config)
+          } catch {
+            // ignore
+          }
+        }}
+        onRemoveYAxis={async (removed) => {
+          const removedIndex = yAxes.findIndex((a) => a.position === removed.position)
+          for (const [sidStr, yi] of Object.entries(seriesYAxisIndices)) {
+            const sid = Number(sidStr)
+            if (yi === removedIndex) {
+              await handleSeriesYAxisChange(sid, 0)
+            } else if (yi > removedIndex) {
+              await handleSeriesYAxisChange(sid, yi - 1)
+            }
+          }
+        }}
+      />
 
       {/* Add value form */}
       <h2 className="text-xl my-2">Add Value</h2>
