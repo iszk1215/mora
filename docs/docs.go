@@ -2246,6 +2246,9 @@ const docTemplate = `{
         "server.ConfigResponse": {
             "type": "object",
             "properties": {
+                "demo": {
+                    "type": "boolean"
+                },
                 "site_name": {
                     "type": "string"
                 }
@@ -2510,6 +2513,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "description": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "visibility": {

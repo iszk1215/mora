@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 
@@ -9,12 +9,19 @@ async function fetchCSRFToken(): Promise<string | null> {
   return data.csrf_token
 }
 
-export const PasswordLoginForm = (): React.JSX.Element => {
+export const PasswordLoginForm = ({ demo = false }: { demo?: boolean }): React.JSX.Element => {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (demo && !username && !password) {
+      setUsername('demo')
+      setPassword('demo')
+    }
+  }, [demo, username, password])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

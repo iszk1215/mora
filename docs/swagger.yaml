@@ -162,6 +162,8 @@ definitions:
     type: object
   server.ConfigResponse:
     properties:
+      demo:
+        type: boolean
       site_name:
         type: string
     type: object
@@ -333,6 +335,8 @@ definitions:
       chart_config:
         type: string
       description:
+        type: string
+      name:
         type: string
       visibility:
         type: string
