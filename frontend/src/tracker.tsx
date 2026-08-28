@@ -492,6 +492,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
       return null
     }
   })
+  const [chartDraft, setChartDraft] = useState<ChartConfig | null>(chartConfig)
 
   const [range, setRange] = useState<TimeRangeKey>('all')
   const { min, max } = computeDateRange(range)
@@ -629,7 +630,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
         {datasets.length > 0 ? (
           <>
             <TimeRangeSelector value={range} onChange={setRange} />
-            <TrackerChart data={{ datasets }} chartConfig={chartConfig} min={min} max={max} />
+            <TrackerChart data={{ datasets }} chartConfig={chartDraft} min={min} max={max} />
           </>
         ) : (
           <p className="text-muted-foreground">No data to display</p>
@@ -645,8 +646,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
             </Button>
           </div>
           <ChartOptionsForm
-            initialConfig={chartConfig ?? {}}
-            onChange={setChartConfig}
+            initialConfig={chartDraft ?? chartConfig ?? {}}
+            baselineConfig={chartConfig ?? {}}
+            onChange={setChartDraft}
             onSave={async (config) => {
               const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config) })
               setChartConfig(() => {
@@ -656,7 +658,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
                   return config
                 }
               })
+              setChartDraft(config)
             }}
+            onCancel={setChartDraft}
           />
         </div>
       )}

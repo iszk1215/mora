@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ChartConfig, YAxisConfig } from './core'
@@ -6,13 +6,15 @@ import { PALETTE_NAMES } from './chart'
 
 export interface ChartOptionsFormProps {
   initialConfig: ChartConfig
+  baselineConfig?: ChartConfig
   onChange?: (config: ChartConfig) => void
   onSave?: (config: ChartConfig) => Promise<void> | void
+  onCancel?: (config: ChartConfig) => void
   onYAxesChange?: (config: ChartConfig) => void
   onRemoveYAxis?: (removed: YAxisConfig) => void
 }
 
-export const ChartOptionsForm = ({ initialConfig, onChange, onSave, onYAxesChange, onRemoveYAxis }: ChartOptionsFormProps): React.JSX.Element => {
+export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSave, onCancel, onYAxesChange, onRemoveYAxis }: ChartOptionsFormProps): React.JSX.Element => {
   const [xLabel, setXLabel] = useState(initialConfig.x_axis_label ?? '')
   const [xAxisType, setXAxisType] = useState<'date' | 'datetime'>(initialConfig.x_axis_type ?? 'date')
   const [area, setArea] = useState(initialConfig.area ?? true)
@@ -25,6 +27,20 @@ export const ChartOptionsForm = ({ initialConfig, onChange, onSave, onYAxesChang
 
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const baselineRef = useRef<ChartConfig>(baselineConfig ?? initialConfig)
+
+  const resetFrom = (cc: ChartConfig) => {
+    setXLabel(cc.x_axis_label ?? '')
+    setXAxisType(cc.x_axis_type ?? 'date')
+    setArea(cc.area ?? true)
+    setShowLegend(cc.show_legend ?? true)
+    setShowSymbols(cc.show_symbols ?? true)
+    setShowSlider(cc.show_slider ?? true)
+    setShowToolbox(cc.show_toolbox ?? true)
+    setPalette(cc.palette ?? 'default')
+    setYAxes(cc.y_axes?.length ? cc.y_axes : [{ id: 0, position: 'left' }])
+    setSaved(false)
+  }
 
   const buildConfig = (yAxesOverride?: YAxisConfig[]): ChartConfig => {
     const cc: ChartConfig = {}
@@ -47,27 +63,73 @@ export const ChartOptionsForm = ({ initialConfig, onChange, onSave, onYAxesChang
     return cc
   }
 
-  const notify = () => {
-    setSaved(false)
+  useEffect(() => {
     onChange?.(buildConfig())
-  }
+    setSaved(false)
+  }, [xLabel, xAxisType, area, showLegend, showSymbols, showSlider, showToolbox, palette, yAxes])
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await onSave?.(buildConfig())
+      const config = buildConfig()
+      await onSave?.(config)
+      baselineRef.current = config
       setSaved(true)
     } finally {
       setSaving(false)
     }
   }
 
+  const handleCancel = () => {
+    const baseline = baselineRef.current
+    resetFrom(baseline)
+    onChange?.(baseline)
+    onCancel?.(baseline)
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3 mb-4">
+        <label className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={area} onChange={(e) => setArea(e.target.checked)} />
+          Area
+        </label>
+        <label className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
+          Legend
+        </label>
+        <label className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={showSymbols} onChange={(e) => setShowSymbols(e.target.checked)} />
+          Symbols
+        </label>
+        <label className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={showSlider} onChange={(e) => setShowSlider(e.target.checked)} />
+          Slider
+        </label>
+        <label className="flex items-center gap-1 text-sm">
+          <input type="checkbox" checked={showToolbox} onChange={(e) => setShowToolbox(e.target.checked)} />
+          Toolbox
+        </label>
+      </div>
+
+      <h3 className="text-lg my-2">Color</h3>
+      <div className="flex flex-col gap-2 mb-4">
+        <select
+          value={palette}
+          onChange={(e) => setPalette(e.target.value)}
+          className="border rounded px-2 py-1"
+        >
+          {PALETTE_NAMES.map((name) => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
+      </div>
+
+      <h3 className="text-lg my-2">X-Axis</h3>
+      <div className="flex flex-col gap-2 mb-4">
         <select
           value={xAxisType}
-          onChange={(e) => { setXAxisType(e.target.value as 'date' | 'datetime'); notify() }}
+          onChange={(e) => setXAxisType(e.target.value as 'date' | 'datetime')}
           className="border rounded px-2 py-1"
         >
           <option value="date">Date</option>
@@ -76,39 +138,10 @@ export const ChartOptionsForm = ({ initialConfig, onChange, onSave, onYAxesChang
         <input
           type="text"
           value={xLabel}
-          onChange={(e) => { setXLabel(e.target.value); notify() }}
+          onChange={(e) => setXLabel(e.target.value)}
           placeholder="X-axis label"
           className="border rounded px-2 py-1 w-40"
         />
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={area} onChange={(e) => { setArea(e.target.checked); notify() }} />
-          Area
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showLegend} onChange={(e) => { setShowLegend(e.target.checked); notify() }} />
-          Legend
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showSymbols} onChange={(e) => { setShowSymbols(e.target.checked); notify() }} />
-          Symbols
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showSlider} onChange={(e) => { setShowSlider(e.target.checked); notify() }} />
-          Slider
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showToolbox} onChange={(e) => { setShowToolbox(e.target.checked); notify() }} />
-          Toolbox
-        </label>
-        <select
-          value={palette}
-          onChange={(e) => { setPalette(e.target.value); notify() }}
-          className="border rounded px-2 py-1"
-        >
-          {PALETTE_NAMES.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
       </div>
 
       <h3 className="text-lg my-2">Y-Axes</h3>
@@ -119,16 +152,13 @@ export const ChartOptionsForm = ({ initialConfig, onChange, onSave, onYAxesChang
           const canRemove = yAxes.length > 1
 
           const updateAxis = (patch: Partial<YAxisConfig>) => {
-            const next = yAxes.map((a) => a.position === pos ? { ...a, ...patch } : a)
-            setYAxes(next)
-            notify()
+            setYAxes((prev) => prev.map((a) => a.position === pos ? { ...a, ...patch } : a))
           }
 
           const commitYAxes = (next: YAxisConfig[]) => {
+            const config = buildConfig(next)
             setYAxes(next)
             setSaved(false)
-            const config = buildConfig(next)
-            onChange?.(config)
             onYAxesChange?.(config)
           }
 
@@ -188,9 +218,16 @@ export const ChartOptionsForm = ({ initialConfig, onChange, onSave, onYAxesChang
         })}
       </div>
 
-      <Button onClick={handleSave} disabled={saving}>
-        {saving ? 'Saving...' : saved ? 'Saved' : 'Save Chart Options'}
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : saved ? 'Saved' : 'Save'}
+        </Button>
+        {onCancel && (
+          <Button variant="outline" onClick={handleCancel} disabled={saving}>
+            Cancel
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
