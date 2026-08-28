@@ -243,3 +243,6 @@ Current migrations:
 - ~40-50 trackers across all users with random visibility (public/private)
 - 1-3 series per tracker, 10-20 values per series
 - Random likes between users on public trackers
+
+In demo mode the login page (`/auth`) pre-fills the username and password
+fields with the demo account credentials (`demo`/`demo`).

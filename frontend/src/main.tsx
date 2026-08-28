@@ -233,11 +233,23 @@ function scmBrandStyle(name: string): React.CSSProperties {
 }
 
 export const AuthPage = (): React.JSX.Element => {
+  const [demo, setDemo] = useState(false)
+
+  useEffect(() => {
+    if (!configPromise) {
+      configPromise = fetch('/api/config')
+        .then(r => r.json())
+        .then(cfg => { configCache = cfg; return cfg })
+        .catch(() => ({ site_name: 'Mora', demo: false }))
+    }
+    configPromise.then(cfg => setDemo(cfg.demo)).catch(() => {})
+  }, [])
+
   return (
     <div>
       <SCMList />
       <div className="max-w-md mx-auto">
-        <PasswordLoginForm />
+        <PasswordLoginForm demo={demo} />
       </div>
     </div>
   )
@@ -295,8 +307,8 @@ export const SCMList = (): React.JSX.Element => {
   )
 }
 
-let configCache: { site_name: string } | null = null
-let configPromise: Promise<{ site_name: string }> | null = null
+let configCache: { site_name: string; demo: boolean } | null = null
+let configPromise: Promise<{ site_name: string; demo: boolean }> | null = null
 
 export function resetConfigCache() {
   configCache = null
@@ -314,7 +326,7 @@ export const Header = (): React.JSX.Element => {
       configPromise = fetch('/api/config')
         .then(r => r.json())
         .then(cfg => { configCache = cfg; return cfg })
-        .catch(() => ({ site_name: 'Mora' }))
+        .catch(() => ({ site_name: 'Mora', demo: false }))
     }
     configPromise.then(cfg => setSiteName(cfg.site_name))
   }, [])

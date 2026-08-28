@@ -36,6 +36,16 @@ describe('PasswordLoginForm', () => {
     expect(screen.getByRole('button', { name: 'Sign In' })).toBeInTheDocument()
   })
 
+  it('prefills demo credentials when demo mode is enabled', () => {
+    render(<MemoryRouter><PasswordLoginForm demo /></MemoryRouter>)
+
+    const username = screen.getByLabelText('Username') as HTMLInputElement
+    const password = screen.getByLabelText('Password') as HTMLInputElement
+
+    expect(username.value).toBe('demo')
+    expect(password.value).toBe('demo')
+  })
+
   it('shows error when CSRF token fetch fails', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValueOnce({
       ok: false,

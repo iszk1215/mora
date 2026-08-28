@@ -204,6 +204,7 @@ func (s *MoraServer) handleMe(w http.ResponseWriter, r *http.Request) {
 
 type ConfigResponse struct {
 	SiteName string `json:"site_name"`
+	Demo     bool   `json:"demo"`
 }
 
 // handleConfig godoc
@@ -219,6 +220,7 @@ func (s *MoraServer) handleConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	render.JSON(w, ConfigResponse{
 		SiteName: name,
+		Demo:     s.demo,
 	}, http.StatusOK)
 }
 

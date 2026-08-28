@@ -11,8 +11,9 @@ test.describe('Login flow', () => {
 
     await page.getByText('Login').click()
 
-    await page.getByLabel('Username').fill('demo')
-    await page.getByLabel('Password').fill('demo')
+    await expect(page.getByLabel('Username')).toHaveValue('demo')
+    await expect(page.getByLabel('Password')).toHaveValue('demo')
+
     await page.getByRole('button', { name: 'Sign In' }).click()
 
     await expect(page.locator('header .bg-blue-500')).toBeVisible({ timeout: 10_000 })

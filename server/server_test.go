@@ -429,6 +429,30 @@ func TestServerAPIConfig(t *testing.T) {
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
 	require.Equal(t, "My Mora", got.SiteName)
+	require.False(t, got.Demo)
+}
+
+func TestServerAPIConfig_Demo(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithSessionManager().Finish()
+	server.demo = true
+	handler := server.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	var got ConfigResponse
+	err = json.Unmarshal(body, &got)
+	require.NoError(t, err)
+	require.Equal(t, "Mora", got.SiteName)
+	require.True(t, got.Demo)
 }
 
 func TestServerAPIConfig_Default(t *testing.T) {
