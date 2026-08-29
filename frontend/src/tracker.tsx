@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { MoreVertical, Pencil, Star, Trash } from 'lucide-react'
+import { MoreVertical, Pencil, SlidersHorizontal, Star, Trash } from 'lucide-react'
 import { AlertDialog, DropdownMenu } from 'radix-ui'
 
 import {
@@ -571,6 +571,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
                     onSelect={() => setShowChartOptions((v) => !v)}
                   >
+                    <SlidersHorizontal className="w-4 h-4" />
                     Chart Options
                   </DropdownMenu.Item>
                   <DropdownMenu.Separator className="my-1 h-px bg-border" />
