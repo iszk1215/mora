@@ -113,7 +113,7 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
       </div>
 
       <h3 className="text-lg my-2">Color</h3>
-      <div className="flex flex-col gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <select
           value={palette}
           onChange={(e) => setPalette(e.target.value)}
@@ -126,7 +126,7 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
       </div>
 
       <h3 className="text-lg my-2">X-Axis</h3>
-      <div className="flex flex-col gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <select
           value={xAxisType}
           onChange={(e) => setXAxisType(e.target.value as 'date' | 'datetime')}
