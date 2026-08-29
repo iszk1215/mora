@@ -352,6 +352,97 @@ describe('TrackerDetailView', () => {
     })
   })
 
+  it('adds a series with default line type from tracker menu', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 'new-series', data_type: 'float', config: '{"type":"line"}' }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Add Series'))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Series name'), 'new-series')
+
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await vi.waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) => url === '/api/trackers/1/series' && (init as RequestInit)?.method === 'POST'
+      )
+      expect(postCall).toBeDefined()
+      const body = JSON.parse((postCall![1] as RequestInit).body as string)
+      expect(body.name).toBe('new-series')
+      expect(body.data_type).toBe('float')
+      expect(body.config).toBe('{"type":"line"}')
+    })
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('adds a series with bar type and int data type', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 'bar-series', data_type: 'int', config: '{"type":"bar"}' }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Add Series'))
+
+    await user.type(screen.getByPlaceholderText('Series name'), 'bar-series')
+    await user.selectOptions(screen.getByLabelText('Data Type'), 'int')
+    await user.selectOptions(screen.getByLabelText('Chart Type'), 'bar')
+
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await vi.waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) => url === '/api/trackers/1/series' && (init as RequestInit)?.method === 'POST'
+      )
+      expect(postCall).toBeDefined()
+      const body = JSON.parse((postCall![1] as RequestInit).body as string)
+      expect(body.name).toBe('bar-series')
+      expect(body.data_type).toBe('int')
+      expect(body.config).toBe('{"type":"bar"}')
+    })
+  })
+
+  it('shows error when adding a series fails', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({ ok: false, status: 500 } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Add Series'))
+
+    await user.type(screen.getByPlaceholderText('Series name'), 'fail-series')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('Failed to add series. Please try again.')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
   it('cancels chart options changes without saving', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({

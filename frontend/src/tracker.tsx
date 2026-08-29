@@ -3,8 +3,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { MoreVertical, Pencil, SlidersHorizontal, Star, Trash } from 'lucide-react'
-import { AlertDialog, DropdownMenu } from 'radix-ui'
+import { MoreVertical, Pencil, Plus, SlidersHorizontal, Star, Trash } from 'lucide-react'
+import { AlertDialog, Dialog, DropdownMenu } from 'radix-ui'
 
 import {
   Link,
@@ -327,7 +327,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const { tracker } = data
   const user = useUser()
   const navigate = useNavigate()
-  const [seriesList] = useState<SeriesModel[]>(data.series)
+  const [seriesList, setSeriesList] = useState<SeriesModel[]>(data.series)
   const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
   const [liked, setLiked] = useState(tracker.liked)
   const [likeCount, setLikeCount] = useState(tracker.like_count ?? 0)
@@ -347,6 +347,12 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [editingDescription, setEditingDescription] = useState(false)
   const [editingBody, setEditingBody] = useState(false)
   const [showChartOptions, setShowChartOptions] = useState(false)
+  const [addSeriesOpen, setAddSeriesOpen] = useState(false)
+  const [newSeriesName, setNewSeriesName] = useState('')
+  const [newSeriesDataType, setNewSeriesDataType] = useState('float')
+  const [newSeriesChartType, setNewSeriesChartType] = useState<'line' | 'bar'>('line')
+  const [addingSeries, setAddingSeries] = useState(false)
+  const [addSeriesError, setAddSeriesError] = useState<string | null>(null)
 
   const [draftName, setDraftName] = useState(tracker.name)
   const [draftDescription, setDraftDescription] = useState(tracker.description ?? '')
@@ -400,6 +406,26 @@ export const TrackerDetailView = (): React.JSX.Element => {
       setDeleteConfirmOpen(true)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  const handleAddSeries = async () => {
+    const name = newSeriesName.trim()
+    if (!name) return
+    setAddingSeries(true)
+    setAddSeriesError(null)
+    try {
+      const config = JSON.stringify({ type: newSeriesChartType })
+      const created = await createSeries(tracker.id, name, newSeriesDataType, config)
+      setSeriesList((prev) => [...prev, created])
+      setAddSeriesOpen(false)
+      setNewSeriesName('')
+      setNewSeriesDataType('float')
+      setNewSeriesChartType('line')
+    } catch {
+      setAddSeriesError('Failed to add series. Please try again.')
+    } finally {
+      setAddingSeries(false)
     }
   }
 
@@ -574,6 +600,13 @@ export const TrackerDetailView = (): React.JSX.Element => {
                     <SlidersHorizontal className="w-4 h-4" />
                     Chart Options
                   </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
+                    onSelect={() => { setAddSeriesError(null); setAddSeriesOpen(true) }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Series
+                  </DropdownMenu.Item>
                   <DropdownMenu.Separator className="my-1 h-px bg-border" />
                   <DropdownMenu.Item
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer text-red-600 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700 outline-none"
@@ -730,6 +763,70 @@ export const TrackerDetailView = (): React.JSX.Element => {
           </AlertDialog.Content>
         </AlertDialog.Portal>
       </AlertDialog.Root>
+
+      <Dialog.Root open={addSeriesOpen} onOpenChange={setAddSeriesOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-popover text-popover-foreground border shadow-lg p-6">
+            <Dialog.Title className="text-lg font-semibold">Add Series</Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-muted-foreground">
+              Add a new series to this tracker.
+            </Dialog.Description>
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <label htmlFor="add-series-name" className="text-sm w-20 shrink-0">Name</label>
+                <input
+                  id="add-series-name"
+                  type="text"
+                  value={newSeriesName}
+                  onChange={(e) => setNewSeriesName(e.target.value)}
+                  placeholder="Series name"
+                  className="border rounded px-2 py-1 flex-1"
+                  autoFocus
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="add-series-datatype" className="text-sm w-20 shrink-0">Data Type</label>
+                <select
+                  id="add-series-datatype"
+                  value={newSeriesDataType}
+                  onChange={(e) => setNewSeriesDataType(e.target.value)}
+                  className="border rounded px-2 py-1 flex-1"
+                >
+                  <option value="float">float</option>
+                  <option value="int">int</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="add-series-charttype" className="text-sm w-20 shrink-0">Chart Type</label>
+                <select
+                  id="add-series-charttype"
+                  value={newSeriesChartType}
+                  onChange={(e) => setNewSeriesChartType(e.target.value as 'line' | 'bar')}
+                  className="border rounded px-2 py-1 flex-1"
+                >
+                  <option value="line">Line</option>
+                  <option value="bar">Bar</option>
+                </select>
+              </div>
+            </div>
+            {addSeriesError && <p className="mt-3 text-sm text-red-600">{addSeriesError}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAddSeriesOpen(false)}
+                disabled={addingSeries}
+                className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium bg-background text-foreground hover:bg-accent disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <Button size="sm" disabled={!newSeriesName.trim() || addingSeries} onClick={handleAddSeries}>
+                {addingSeries ? 'Adding...' : 'Add'}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   )
 }
