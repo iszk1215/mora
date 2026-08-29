@@ -812,14 +812,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
             </div>
             {addSeriesError && <p className="mt-3 text-sm text-red-600">{addSeriesError}</p>}
             <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setAddSeriesOpen(false)}
-                disabled={addingSeries}
-                className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium bg-background text-foreground hover:bg-accent disabled:opacity-50"
-              >
+              <Button variant="outline" size="sm" onClick={() => setAddSeriesOpen(false)} disabled={addingSeries}>
                 Cancel
-              </button>
+              </Button>
               <Button size="sm" disabled={!newSeriesName.trim() || addingSeries} onClick={handleAddSeries}>
                 {addingSeries ? 'Adding...' : 'Add'}
               </Button>
