@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
@@ -340,7 +340,7 @@ describe('TrackerDetailView', () => {
     const menuItem = await screen.findByText('Chart Options')
     await user.click(menuItem)
 
-    await user.click(screen.getByText('Save Chart Options'))
+    await user.click(screen.getByText('Save'))
 
     await vi.waitFor(() => {
       const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
@@ -350,6 +350,58 @@ describe('TrackerDetailView', () => {
       const body = JSON.parse((patchCall![1] as RequestInit).body as string)
       expect(body.chart_config).toContain('"palette":"default"')
     })
+  })
+
+  it('cancels chart options changes without saving', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve({}) } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Chart Options'))
+
+    const areaCheckbox = screen.getByLabelText('Area')
+    await user.click(areaCheckbox)
+    expect(areaCheckbox).not.toBeChecked()
+
+    await user.click(screen.getByText('Cancel'))
+
+    expect(areaCheckbox).toBeChecked()
+    const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
+      ([url, init]) => url === '/api/trackers/1' && (init as RequestInit)?.method === 'PATCH'
+    )
+    expect(patchCall).toBeUndefined()
+  })
+
+  it('keeps chart options edits when panel is closed and reopened', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve({}) } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Chart Options'))
+
+    const legendCheckbox = screen.getByLabelText('Legend')
+    await user.click(legendCheckbox)
+    expect(legendCheckbox).not.toBeChecked()
+
+    await user.click(screen.getByText('Close'))
+    expect(screen.queryByText('Close')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Chart Options'))
+
+    expect(screen.getByLabelText('Legend')).not.toBeChecked()
   })
 
   it('shows Delete item in tracker menu when owner', async () => {
@@ -759,7 +811,9 @@ describe('TrackerDetailEdit', () => {
     expect(screen.getByText('Area')).toBeInTheDocument()
     expect(screen.getByText('Legend')).toBeInTheDocument()
     expect(screen.getByText('Slider')).toBeInTheDocument()
-    expect(screen.getByText('Save Chart Options')).toBeInTheDocument()
+    expect(screen.getByText('Color')).toBeInTheDocument()
+    expect(screen.getByText('X-Axis')).toBeInTheDocument()
+    expect(screen.getByText('Save')).toBeInTheDocument()
   })
 
   it('pre-fills chart option labels from tracker.chart_config', () => {
@@ -830,8 +884,8 @@ describe('TrackerDetailEdit', () => {
     const input = screen.getByPlaceholderText('e.g. %.1f') as HTMLInputElement
     fireEvent.change(input, { target: { value: '%.1f' } })
 
-    const saveBtn = screen.getByText('Save')
-    saveBtn.click()
+    const row = input.closest('tr') as HTMLElement
+    within(row).getByText('Save').click()
 
     await vi.waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/10', {
@@ -861,8 +915,8 @@ describe('TrackerDetailEdit', () => {
     const input = screen.getByPlaceholderText('e.g. %.1f') as HTMLInputElement
     fireEvent.change(input, { target: { value: '' } })
 
-    const saveBtn = screen.getByText('Save')
-    saveBtn.click()
+    const row = input.closest('tr') as HTMLElement
+    within(row).getByText('Save').click()
 
     await vi.waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/10', {
