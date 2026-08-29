@@ -366,7 +366,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    await user.click(await screen.findByText('Add Series'))
+    await user.click(await screen.findByRole('menuitem', { name: /add series/i }))
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     await user.type(screen.getByPlaceholderText('Series name'), 'new-series')
@@ -401,7 +401,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    await user.click(await screen.findByText('Add Series'))
+    await user.click(await screen.findByRole('menuitem', { name: /add series/i }))
 
     await user.type(screen.getByPlaceholderText('Series name'), 'bar-series')
     await user.selectOptions(screen.getByLabelText('Data Type'), 'int')
@@ -432,7 +432,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    await user.click(await screen.findByText('Add Series'))
+    await user.click(await screen.findByRole('menuitem', { name: /add series/i }))
 
     await user.type(screen.getByPlaceholderText('Series name'), 'fail-series')
     await user.click(screen.getByRole('button', { name: 'Add' }))
@@ -657,6 +657,32 @@ describe('TrackerDetailView', () => {
     const chartCard = noData.closest('.bg-card')
     expect(chartCard).toBeInTheDocument()
     expect(chartCard!.className).toContain('border rounded-lg')
+  })
+
+  it('hides empty state Add Series button when user is not owner', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByText('No data to display')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add series/i })).not.toBeInTheDocument()
+  })
+
+  it('opens Add Series dialog from empty state button', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    const addBtn = screen.getByRole('button', { name: /add series/i })
+    expect(addBtn).toBeInTheDocument()
+    await user.click(addBtn)
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Series name')).toBeInTheDocument()
   })
 
   it('renders markdown body inside a card', () => {

@@ -667,7 +667,15 @@ export const TrackerDetailView = (): React.JSX.Element => {
             <TrackerChart data={{ datasets }} chartConfig={chartDraft} min={min} max={max} />
           </>
         ) : (
-          <p className="text-muted-foreground">No data to display</p>
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <p className="text-muted-foreground">No data to display</p>
+            {isRoleOwner && (
+              <Button variant="outline" size="sm" onClick={() => { setAddSeriesError(null); setAddSeriesOpen(true) }}>
+                <Plus className="w-4 h-4" />
+                Add Series
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
