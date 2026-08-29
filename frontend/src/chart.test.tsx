@@ -138,6 +138,18 @@ describe('TrackerChart', () => {
     expect(option.dataZoom[0].type).toBe('inside')
   })
 
+  it('updates slider visibility on re-render when show_slider changes', () => {
+    const view = render(<TrackerChart data={{ datasets }} chartConfig={{}} />)
+    const readOption = () => JSON.parse(screen.getByTestId('echart').getAttribute('data-option')!)
+
+    expect(readOption().dataZoom).toHaveLength(2)
+
+    view.rerender(<TrackerChart data={{ datasets }} chartConfig={{ show_slider: false }} />)
+    const option = readOption()
+    expect(option.dataZoom).toHaveLength(1)
+    expect(option.dataZoom[0].type).toBe('inside')
+  })
+
   it('reduces bottom margin when slider is hidden', () => {
     render(<TrackerChart data={{ datasets }} chartConfig={{ show_slider: false }} />)
     const el = screen.getByTestId('echart')

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import * as echarts from 'echarts'
 import { ChartConfig, SeriesConfig, YAxisConfig } from './core'
@@ -143,7 +143,6 @@ export interface TrackerChartProps {
 export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   const datasets = params.data?.datasets ?? []
   const cc = params.chartConfig
-  const dataZoomAdded = useRef(false)
   const narrow = useIsNarrowViewport()
   const colors = useMemo(() => params.palette ?? resolvePalette(cc?.palette), [cc?.palette])
 
@@ -219,11 +218,9 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     if (params.animation === false) {
       opt.animation = false
     }
-    if (!dataZoomAdded.current) {
-      opt.dataZoom = [{ type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const }]
-      if (cc?.show_slider !== false) {
-        opt.dataZoom.push({ type: 'slider' as const, xAxisIndex: 0, bottom: 10, filterMode: 'none' as const })
-      }
+    opt.dataZoom = [{ type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const }]
+    if (cc?.show_slider !== false) {
+      opt.dataZoom.push({ type: 'slider' as const, xAxisIndex: 0, bottom: 10, filterMode: 'none' as const })
     }
     if (showLegend) {
       opt.legend = { type: 'scroll' as const, top: stackHeader ? 30 : 0 }
@@ -245,13 +242,10 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
     return opt
   }, [datasets, cc, params.min, params.max, params.animation, colors, narrow])
 
-  useEffect(() => {
-    dataZoomAdded.current = true
-  }, [])
-
   return (
     <ReactECharts
       option={option}
+      notMerge
       style={{ width: '100%', height: 300 }}
       onEvents={params.onChartClick ? { click: params.onChartClick } : undefined}
       opts={{ renderer: 'svg' }}
