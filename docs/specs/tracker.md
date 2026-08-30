@@ -165,7 +165,7 @@ All fields are optional. Only provided fields are updated.
 |-------|------|---------|-------------|
 | `x_axis_label` | string | — | X-axis label |
 | `area` | boolean | true | Show area fill under line series |
-| `show_legend` | boolean | true | Show legend (when >1 series) |
+| `show_legend` | boolean | true | Show legend (auto-hidden when only 1 series unless explicitly enabled) |
 | `palette` | string | "random" | Named color palette |
 | `y_axes` | YAxisConfig[] | `[{id:0,position:"left"}]` | Y-axis definitions |
 

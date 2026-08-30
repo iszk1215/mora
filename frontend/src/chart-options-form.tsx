@@ -47,6 +47,7 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
     if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
     if (xAxisType === 'date') cc.x_axis_type = 'date'
     if (!area) cc.area = false
+    if (showLegend) cc.show_legend = true
     if (!showLegend) cc.show_legend = false
     if (!showSymbols) cc.show_symbols = false
     if (!showSlider) cc.show_slider = false

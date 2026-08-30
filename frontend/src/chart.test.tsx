@@ -208,6 +208,20 @@ describe('TrackerChart', () => {
     expect(option.legend).toBeUndefined()
   })
 
+  it('shows legend for single dataset when explicitly enabled', () => {
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_legend: true }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.legend).toEqual({ type: 'scroll', top: 0 })
+  })
+
+  it('hides legend for single dataset when explicitly disabled', () => {
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_legend: false }} />)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.legend).toBeUndefined()
+  })
+
   it('stacks legend below toolbox on narrow viewports when both are shown', () => {
     stubMatchMedia(true)
     const multiDatasets = [
