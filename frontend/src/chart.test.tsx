@@ -201,21 +201,21 @@ describe('TrackerChart', () => {
     expect(option.legend).toEqual({ type: 'scroll', top: 0 })
   })
 
-  it('hides legend when single dataset', () => {
+  it('shows legend for a single dataset by default', () => {
     render(<TrackerChart data={{ datasets }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
-    expect(option.legend).toBeUndefined()
+    expect(option.legend).toEqual({ type: 'scroll', top: 0 })
   })
 
-  it('shows legend for single dataset when explicitly enabled', () => {
+  it('shows legend for a single dataset when explicitly enabled', () => {
     render(<TrackerChart data={{ datasets }} chartConfig={{ show_legend: true }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.legend).toEqual({ type: 'scroll', top: 0 })
   })
 
-  it('hides legend for single dataset when explicitly disabled', () => {
+  it('hides legend when explicitly disabled', () => {
     render(<TrackerChart data={{ datasets }} chartConfig={{ show_legend: false }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
@@ -267,7 +267,7 @@ describe('TrackerChart', () => {
 
   it('increases grid top when toolbox is shown without legend', () => {
     stubMatchMedia(true)
-    render(<TrackerChart data={{ datasets }} chartConfig={{ show_toolbox: true }} />)
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_toolbox: true, show_legend: false }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.legend).toBeUndefined()
@@ -553,6 +553,7 @@ describe('TrackerChart', () => {
     const chartConfig = {
       y_axes: [{ id: 0, label: 'Coverage %', position: 'left' as const }],
       show_toolbox: true,
+      show_legend: false,
     }
     render(<TrackerChart data={{ datasets }} chartConfig={chartConfig} />)
     const el = screen.getByTestId('echart')
@@ -594,7 +595,7 @@ describe('TrackerChart', () => {
 
   it('increases grid.top on narrow viewports when toolbox is shown without axes labels', () => {
     stubMatchMedia(true)
-    render(<TrackerChart data={{ datasets }} chartConfig={{ show_toolbox: true }} />)
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_toolbox: true, show_legend: false }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.grid.top).toBe(40)
