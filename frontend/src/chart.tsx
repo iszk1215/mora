@@ -147,7 +147,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   const colors = useMemo(() => params.palette ?? resolvePalette(cc?.palette), [cc?.palette])
 
   const option = useMemo(() => {
-    const showLegend = cc?.show_legend !== false && datasets.length > 1
+    const showLegend = cc?.show_legend !== false && datasets.length >= 1
     const showToolbox = !!cc?.show_toolbox
     const stackHeader = narrow && showLegend && showToolbox
     const showSlider = cc?.show_slider !== false
