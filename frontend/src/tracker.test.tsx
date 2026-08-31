@@ -369,7 +369,10 @@ describe('TrackerDetailView', () => {
     await user.click(await screen.findByRole('menuitem', { name: /add series/i }))
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-    await user.type(screen.getByPlaceholderText('Series name'), 'new-series')
+    const nameInput = screen.getByPlaceholderText('Series name')
+    expect(nameInput).toHaveValue('test')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'new-series')
 
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
@@ -403,7 +406,10 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: /add series/i }))
 
-    await user.type(screen.getByPlaceholderText('Series name'), 'bar-series')
+    const nameInput = screen.getByPlaceholderText('Series name')
+    expect(nameInput).toHaveValue('test')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'bar-series')
     await user.selectOptions(screen.getByLabelText('Data Type'), 'int')
     await user.selectOptions(screen.getByLabelText('Chart Type'), 'bar')
 

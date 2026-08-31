@@ -602,7 +602,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
-                    onSelect={() => { setAddSeriesError(null); setAddSeriesOpen(true) }}
+                    onSelect={() => { setAddSeriesError(null); setNewSeriesName(seriesList.length === 0 ? tracker.name : ''); setAddSeriesOpen(true) }}
                   >
                     <Plus className="w-4 h-4" />
                     Add Series
@@ -670,7 +670,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
           <div className="flex flex-col items-center gap-3 py-4 text-center">
             <p className="text-muted-foreground">No data to display</p>
             {isRoleOwner && (
-              <Button variant="outline" size="sm" onClick={() => { setAddSeriesError(null); setAddSeriesOpen(true) }}>
+              <Button variant="outline" size="sm" onClick={() => { setAddSeriesError(null); setNewSeriesName(seriesList.length === 0 ? tracker.name : ''); setAddSeriesOpen(true) }}>
                 <Plus className="w-4 h-4" />
                 Add Series
               </Button>
