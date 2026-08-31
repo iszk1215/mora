@@ -113,17 +113,16 @@ describe('TrackerChart', () => {
     expect(option.animation).toBeUndefined()
   })
 
-  it('includes dataZoom options by default', () => {
+  it('includes only inside dataZoom by default', () => {
     render(<TrackerChart data={{ datasets }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
-    expect(option.dataZoom).toHaveLength(2)
+    expect(option.dataZoom).toHaveLength(1)
     expect(option.dataZoom[0].type).toBe('inside')
-    expect(option.dataZoom[1].type).toBe('slider')
   })
 
   it('reserves larger bottom margin when slider is shown', () => {
-    render(<TrackerChart data={{ datasets }} />)
+    render(<TrackerChart data={{ datasets }} chartConfig={{ show_slider: true }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.grid.bottom).toBe(80)
@@ -139,7 +138,7 @@ describe('TrackerChart', () => {
   })
 
   it('updates slider visibility on re-render when show_slider changes', () => {
-    const view = render(<TrackerChart data={{ datasets }} chartConfig={{}} />)
+    const view = render(<TrackerChart data={{ datasets }} chartConfig={{ show_slider: true }} />)
     const readOption = () => JSON.parse(screen.getByTestId('echart').getAttribute('data-option')!)
 
     expect(readOption().dataZoom).toHaveLength(2)
@@ -190,22 +189,22 @@ describe('TrackerChart', () => {
     )
   })
 
-  it('shows legend when multiple datasets', () => {
+  it('shows legend when multiple datasets and show_legend is true', () => {
     const multiDatasets = [
       { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
       { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
     ]
-    render(<TrackerChart data={{ datasets: multiDatasets }} />)
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={{ show_legend: true }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.legend).toEqual({ type: 'scroll', top: 0 })
   })
 
-  it('shows legend for a single dataset by default', () => {
+  it('hides legend by default', () => {
     render(<TrackerChart data={{ datasets }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
-    expect(option.legend).toEqual({ type: 'scroll', top: 0 })
+    expect(option.legend).toBeUndefined()
   })
 
   it('shows legend for a single dataset when explicitly enabled', () => {
@@ -229,7 +228,7 @@ describe('TrackerChart', () => {
       { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
       { label: 'js', data: [{ x: '2024-01-15', y: '70' }], seriesConfig: undefined },
     ]
-    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={{ show_toolbox: true }} />)
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={{ show_toolbox: true, show_legend: true }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.toolbox.top).toBe(0)
@@ -243,7 +242,7 @@ describe('TrackerChart', () => {
       { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
       { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
     ]
-    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={{ show_toolbox: true }} />)
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={{ show_toolbox: true, show_legend: true }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.toolbox.top).toBe(0)
@@ -257,7 +256,7 @@ describe('TrackerChart', () => {
       { label: 'go', data: [{ x: '2024-01-15', y: '90' }], seriesConfig: undefined },
       { label: 'py', data: [{ x: '2024-01-15', y: '80' }], seriesConfig: undefined },
     ]
-    render(<TrackerChart data={{ datasets: multiDatasets }} />)
+    render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={{ show_legend: true }} />)
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.toolbox).toBeUndefined()
@@ -586,6 +585,7 @@ describe('TrackerChart', () => {
     const chartConfig = {
       y_axes: [{ id: 0, label: 'Coverage %', position: 'left' as const }],
       show_toolbox: true,
+      show_legend: true,
     }
     render(<TrackerChart data={{ datasets: multiDatasets }} chartConfig={chartConfig} />)
     const el = screen.getByTestId('echart')
