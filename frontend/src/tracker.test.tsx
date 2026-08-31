@@ -489,8 +489,9 @@ describe('TrackerDetailView', () => {
     await user.click(await screen.findByText('Chart Options'))
 
     const legendCheckbox = screen.getByLabelText('Legend')
-    await user.click(legendCheckbox)
     expect(legendCheckbox).not.toBeChecked()
+    await user.click(legendCheckbox)
+    expect(legendCheckbox).toBeChecked()
 
     await user.click(screen.getByText('Close'))
     expect(screen.queryByText('Close')).not.toBeInTheDocument()
@@ -498,7 +499,7 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByText('Chart Options'))
 
-    expect(screen.getByLabelText('Legend')).not.toBeChecked()
+    expect(screen.getByLabelText('Legend')).toBeChecked()
   })
 
   it('shows Delete item in tracker menu when owner', async () => {
@@ -1096,7 +1097,7 @@ describe('TrackerDetailEdit', () => {
     await vi.waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ chart_config: '{"x_axis_type":"date","show_legend":true,"show_toolbox":true,"palette":"default","y_axes":[{"id":0,"position":"left","label":"Count"}]}' }),
+        body: JSON.stringify({ chart_config: '{"x_axis_type":"date","show_legend":false,"show_slider":false,"show_toolbox":true,"palette":"default","y_axes":[{"id":0,"position":"left","label":"Count"}]}' }),
       }))
     })
   })

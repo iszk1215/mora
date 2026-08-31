@@ -147,10 +147,10 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   const colors = useMemo(() => params.palette ?? resolvePalette(cc?.palette), [cc?.palette])
 
   const option = useMemo(() => {
-    const showLegend = cc?.show_legend !== false && datasets.length >= 1
+    const showLegend = cc?.show_legend === true && datasets.length >= 1
     const showToolbox = !!cc?.show_toolbox
     const stackHeader = narrow && showLegend && showToolbox
-    const showSlider = cc?.show_slider !== false
+    const showSlider = cc?.show_slider === true
     const yAxes = buildYAxes(cc?.y_axes)
     const hasRightAxis = yAxes.some((a) => a.position === 'right')
     const isDateOnly = cc?.x_axis_type === 'date'
@@ -219,7 +219,7 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
       opt.animation = false
     }
     opt.dataZoom = [{ type: 'inside' as const, xAxisIndex: 0, filterMode: 'none' as const }]
-    if (cc?.show_slider !== false) {
+    if (showSlider) {
       opt.dataZoom.push({ type: 'slider' as const, xAxisIndex: 0, bottom: 10, filterMode: 'none' as const })
     }
     if (showLegend) {
