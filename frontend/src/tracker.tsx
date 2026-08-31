@@ -887,6 +887,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       return {}
     }
   }, [savedChartConfig])
+  const [chartDraft, setChartDraft] = useState<ChartConfig | null>(null)
   const [description, setDescription] = useState(tracker.description ?? '')
   const [body, setBody] = useState(tracker.body ?? '')
   const [bodySaved, setBodySaved] = useState(false)
@@ -1075,12 +1076,13 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const datasets: Dataset[] = useMemo(() => seriesValues.map(valuesToDataset), [seriesValues])
 
   const chartConfigForChart = useMemo<ChartConfig | null>(() => {
+    if (chartDraft) return chartDraft
     try {
       return JSON.parse(savedChartConfig) as ChartConfig
     } catch {
       return null
     }
-  }, [savedChartConfig])
+  }, [chartDraft, savedChartConfig])
 
   if (isCoverage) {
     return (
@@ -1231,10 +1233,13 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
       <h2 className="text-xl my-2">Chart Options</h2>
       <ChartOptionsForm
         initialConfig={parsedChartConfig}
+        baselineConfig={parsedChartConfig}
+        onChange={setChartDraft}
         onSave={async (config) => {
           try {
             const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config) })
             setSavedChartConfig(updated.chart_config)
+            setChartDraft(null)
           } catch {
             // ignore
           }
