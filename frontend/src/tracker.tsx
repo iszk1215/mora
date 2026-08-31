@@ -643,10 +643,16 @@ export const TrackerDetailView = (): React.JSX.Element => {
           <div className="mt-1 flex items-center gap-2">
             {trackerDescription ? (
               <p>{trackerDescription}</p>
-            ) : (
-              isOwner && <p className="text-muted-foreground italic">No description</p>
-            )}
-            {isOwner && (
+            ) : isOwner ? (
+              <button
+                type="button"
+                onClick={() => { setDraftDescription(trackerDescription); setEditingDescription(true) }}
+                className="text-muted-foreground text-sm italic hover:text-foreground transition-colors"
+              >
+                Add description...
+              </button>
+            ) : null}
+            {trackerDescription && isOwner && (
               <button
                 type="button"
                 aria-label="Edit description"
@@ -729,23 +735,31 @@ export const TrackerDetailView = (): React.JSX.Element => {
         </div>
       ) : (
         (trackerBody?.trim() || isOwner) && (
-          <div className="mt-6 bg-card border rounded-lg p-4 shadow-md md-body relative">
-            {isOwner && (
+          trackerBody?.trim() ? (
+            <div className="mt-6 bg-card border rounded-lg p-4 shadow-md md-body relative">
+              {isOwner && (
+                <button
+                  type="button"
+                  aria-label="Edit body"
+                  onClick={() => { setDraftBody(trackerBody); setEditingBody(true) }}
+                  className="absolute top-2 right-2 p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+              <MDEditor.Markdown source={trackerBody} />
+            </div>
+          ) : (
+            <div className="mt-6">
               <button
                 type="button"
-                aria-label="Edit body"
                 onClick={() => { setDraftBody(trackerBody); setEditingBody(true) }}
-                className="absolute top-2 right-2 p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground text-sm italic hover:text-foreground transition-colors"
               >
-                <Pencil className="w-4 h-4" />
+                Add content...
               </button>
-            )}
-            {trackerBody?.trim() ? (
-              <MDEditor.Markdown source={trackerBody} />
-            ) : (
-              <p className="text-muted-foreground italic">No body content</p>
-            )}
-          </div>
+            </div>
+          )
         )
       )}
 

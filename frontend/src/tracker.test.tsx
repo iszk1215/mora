@@ -640,7 +640,7 @@ describe('TrackerDetailView', () => {
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
-    expect(screen.getByText('No body content')).toBeInTheDocument()
+    expect(screen.getByText('Add content...')).toBeInTheDocument()
   })
 
   it('renders description in the same foreground color as the title', () => {
