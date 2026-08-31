@@ -50,6 +50,7 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
     if (showLegend) cc.show_legend = true
     if (!showLegend) cc.show_legend = false
     if (!showSymbols) cc.show_symbols = false
+    if (showSlider) cc.show_slider = true
     if (!showSlider) cc.show_slider = false
     if (showToolbox) cc.show_toolbox = true
     cc.palette = palette
