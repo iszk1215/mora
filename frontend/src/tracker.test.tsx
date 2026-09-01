@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
@@ -810,6 +810,77 @@ describe('TrackerDetailView', () => {
     fireEvent.click(screen.getByRole('button', { name: /edit body/i }))
     expect(screen.getByText('Save Body')).toBeInTheDocument()
     expect(screen.getByText('Cancel')).toBeInTheDocument()
+  })
+
+  it('opens Add Data Points card from tracker menu and closes it', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    const menuItem = await screen.findByText('Add Data Points')
+    await user.click(menuItem)
+
+    expect(screen.getByText('Data Points')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^close$/i }))
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^close$/i })).not.toBeInTheDocument()
+    })
+  })
+
+  it('renders a row per series with a date defaulting to today', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: 1, tracker_id: 1, name: 's1', data_type: 'float' },
+        { id: 2, tracker_id: 1, name: 's2', data_type: 'float' },
+      ],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Add Data Points'))
+
+    expect(screen.getByText('s1')).toBeInTheDocument()
+    expect(screen.getByText('s2')).toBeInTheDocument()
+    const dateInputs = screen.getAllByLabelText(/date for/i)
+    expect(dateInputs).toHaveLength(2)
+    const today = new Date().toISOString().slice(0, 10)
+    dateInputs.forEach((d) => expect(d).toHaveValue(today))
+  })
+
+  it('adds a value via POST and refreshes series values', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    const postBody = vi.fn()
+    globalThis.fetch = vi.fn((url: RequestInfo | URL, opts?: RequestInit) => {
+      if (opts?.method === 'POST') {
+        postBody(JSON.parse(opts?.body as string))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ values: [{ time: '2024-01-01T00:00:00Z', value: 5 }] }) } as Response)
+    })
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Add Data Points'))
+
+    const valueInput = screen.getByRole('spinbutton', { name: /value for/i })
+    await user.type(valueInput, '42')
+    await user.click(screen.getAllByRole('button', { name: /^add$/i })[0])
+
+    await waitFor(() => {
+      expect(postBody).toHaveBeenCalled()
+    })
+    expect(postBody.mock.calls[0][0]).toMatchObject({ value: 42 })
   })
 
 })

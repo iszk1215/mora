@@ -354,6 +354,11 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [addingSeries, setAddingSeries] = useState(false)
   const [addSeriesError, setAddSeriesError] = useState<string | null>(null)
 
+  const [showAddValue, setShowAddValue] = useState(false)
+  const [addingValues, setAddingValues] = useState<Record<number, boolean>>({})
+  const [addValueError, setAddValueError] = useState<string | null>(null)
+  const [valueInputs, setValueInputs] = useState<Record<number, { time: string; value: string }>>({})
+
   const [draftName, setDraftName] = useState(tracker.name)
   const [draftDescription, setDraftDescription] = useState(tracker.description ?? '')
   const [draftBody, setDraftBody] = useState(tracker.body ?? '')
@@ -523,6 +528,57 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [range, setRange] = useState<TimeRangeKey>('all')
   const { min, max } = computeDateRange(range)
 
+  const xAxisType = chartConfig?.x_axis_type ?? 'date'
+  const todayValue = useMemo(() => {
+    const now = new Date()
+    if (xAxisType === 'date') {
+      return now.toISOString().slice(0, 10)
+    }
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
+  }, [xAxisType])
+
+  const openAddValue = () => {
+    setValueInputs(Object.fromEntries(seriesList.map((s) => [s.id, { time: todayValue, value: '' }])))
+    setAddValueError(null)
+    setShowAddValue(true)
+  }
+
+  const closeAddValue = () => {
+    setValueInputs({})
+    setAddValueError(null)
+    setShowAddValue(false)
+  }
+
+  const setValueInput = (seriesId: number, field: 'time' | 'value', val: string) => {
+    setValueInputs((prev) => {
+      const current = prev[seriesId] ?? { time: todayValue, value: '' }
+      return { ...prev, [seriesId]: { ...current, [field]: val } }
+    })
+  }
+
+  const handleAddValue = async (seriesId: number) => {
+    const input = valueInputs[seriesId]
+    if (!input?.time || !input?.value) return
+    setAddingValues((prev) => ({ ...prev, [seriesId]: true }))
+    setAddValueError(null)
+    try {
+      await createValue(tracker.id, seriesId, new Date(input.time).toISOString(), parseFloat(input.value))
+      const resp = await fetch(`/api/trackers/${tracker.id}/series/${seriesId}/values`)
+      const data = await resp.json()
+      setSeriesValues((prev) =>
+        prev.map((sv) =>
+          sv.series.id === seriesId ? { ...sv, values: data.values ?? [] } : sv
+        )
+      )
+      setValueInput(seriesId, 'value', '')
+    } catch {
+      setAddValueError('Failed to add value. Please try again.')
+    } finally {
+      setAddingValues((prev) => ({ ...prev, [seriesId]: false }))
+    }
+  }
+
   return (
     <div>
       <div className="my-4">
@@ -607,6 +663,13 @@ export const TrackerDetailView = (): React.JSX.Element => {
                     <Plus className="w-4 h-4" />
                     Add Series
                   </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
+                    onSelect={openAddValue}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Data Points
+                  </DropdownMenu.Item>
                   <DropdownMenu.Separator className="my-1 h-px bg-border" />
                   <DropdownMenu.Item
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer text-red-600 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700 outline-none"
@@ -684,6 +747,55 @@ export const TrackerDetailView = (): React.JSX.Element => {
           </div>
         )}
       </div>
+
+      {isOwner && tracker.type !== 'coverage' && showAddValue && (
+        <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl">Data Points</h2>
+            <Button variant="outline" size="sm" onClick={closeAddValue}>
+              Close
+            </Button>
+          </div>
+          {seriesList.length === 0 ? (
+            <p className="text-muted-foreground">No series yet. Add a series first.</p>
+          ) : (
+            <div className="space-y-3">
+              {seriesList.map((s) => {
+                const input = valueInputs[s.id]
+                const adding = addingValues[s.id]
+                return (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <span className="w-32 truncate text-sm font-medium">{s.name}</span>
+                    <input
+                      type={xAxisType === 'date' ? 'date' : 'datetime-local'}
+                      value={input?.time ?? todayValue}
+                      onChange={(e) => setValueInput(s.id, 'time', e.target.value)}
+                      aria-label={`Date for ${s.name}`}
+                      className="border rounded px-2 py-1"
+                    />
+                    <input
+                      type="number"
+                      value={input?.value ?? ''}
+                      onChange={(e) => setValueInput(s.id, 'value', e.target.value)}
+                      placeholder="Value"
+                      aria-label={`Value for ${s.name}`}
+                      className="border rounded px-2 py-1 w-32"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => handleAddValue(s.id)}
+                      disabled={adding || !input?.time || !input?.value}
+                    >
+                      {adding ? 'Adding...' : 'Add'}
+                    </Button>
+                  </div>
+                )
+              })}
+              {addValueError && <p className="text-sm text-red-600">{addValueError}</p>}
+            </div>
+          )}
+        </div>
+      )}
 
       {isRoleOwner && showChartOptions && (
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
