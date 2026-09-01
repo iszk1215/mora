@@ -668,7 +668,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                     onSelect={openAddValue}
                   >
                     <Plus className="w-4 h-4" />
-                    Add Value
+                    Add Data Points
                   </DropdownMenu.Item>
                   <DropdownMenu.Separator className="my-1 h-px bg-border" />
                   <DropdownMenu.Item
@@ -751,7 +751,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
       {isOwner && tracker.type !== 'coverage' && showAddValue && (
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl">Add Value</h2>
+            <h2 className="text-xl">Data Points</h2>
             <Button variant="outline" size="sm" onClick={closeAddValue}>
               Close
             </Button>

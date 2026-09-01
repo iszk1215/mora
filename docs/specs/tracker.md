@@ -222,7 +222,7 @@ Coverage-type trackers (`type="coverage"`) are created exclusively through the c
 |------|-----------|-------------|
 | `/trackers` | TrackerView | Card grid with preview charts |
 | `/trackers/new` | TrackerCreate | Create form |
-| `/trackers/:trackerId` | TrackerDetailView | Detail (tracker type). Offers an "Add Value" card (opened from the owner's tracker menu) with a date picker (defaults to today), a value input, and an Add button per series; values are added live to the chart without a page reload |
+| `/trackers/:trackerId` | TrackerDetailView | Detail (tracker type). Offers a "Data Points" card (opened via "Add Data Points" from the owner's tracker menu) with a date picker (defaults to today), a value input, and an Add button per series; values are added live to the chart without a page reload |
 | `/trackers/:trackerId/edit` | TrackerDetailEdit | Edit visibility/chart/description. Guarded by edit permission: users with `role == ""` get a 403 |
 
 ## Key Files

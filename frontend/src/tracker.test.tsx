@@ -812,7 +812,7 @@ describe('TrackerDetailView', () => {
     expect(screen.getByText('Cancel')).toBeInTheDocument()
   })
 
-  it('opens Add Value card from tracker menu and closes it', async () => {
+  it('opens Add Data Points card from tracker menu and closes it', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
@@ -821,10 +821,10 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    const menuItem = await screen.findByText('Add Value')
+    const menuItem = await screen.findByText('Add Data Points')
     await user.click(menuItem)
 
-    expect(screen.getByText('Add Value')).toBeInTheDocument()
+    expect(screen.getByText('Data Points')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^close$/i }))
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /^close$/i })).not.toBeInTheDocument()
@@ -843,7 +843,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    await user.click(await screen.findByText('Add Value'))
+    await user.click(await screen.findByText('Add Data Points'))
 
     expect(screen.getByText('s1')).toBeInTheDocument()
     expect(screen.getByText('s2')).toBeInTheDocument()
@@ -871,7 +871,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    await user.click(await screen.findByText('Add Value'))
+    await user.click(await screen.findByText('Add Data Points'))
 
     const valueInput = screen.getByRole('spinbutton', { name: /value for/i })
     await user.type(valueInput, '42')
