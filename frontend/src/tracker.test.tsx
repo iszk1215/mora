@@ -825,9 +825,9 @@ describe('TrackerDetailView', () => {
     await user.click(menuItem)
 
     expect(screen.getByText('Add Value')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /close add value/i }))
+    await user.click(screen.getByRole('button', { name: /^close$/i }))
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /close add value/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^close$/i })).not.toBeInTheDocument()
     })
   })
 

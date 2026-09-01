@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { MoreVertical, Pencil, Plus, SlidersHorizontal, Star, Trash, X } from 'lucide-react'
+import { MoreVertical, Pencil, Plus, SlidersHorizontal, Star, Trash } from 'lucide-react'
 import { AlertDialog, Dialog, DropdownMenu } from 'radix-ui'
 
 import {
@@ -752,14 +752,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl">Add Value</h2>
-            <button
-              type="button"
-              aria-label="Close add value"
-              onClick={closeAddValue}
-              className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <Button variant="outline" size="sm" onClick={closeAddValue}>
+              Close
+            </Button>
           </div>
           {seriesList.length === 0 ? (
             <p className="text-muted-foreground">No series yet. Add a series first.</p>
