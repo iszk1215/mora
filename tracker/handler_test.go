@@ -891,6 +891,29 @@ func TestHandlerCreateSeries(t *testing.T) {
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
 	})
+
+	t.Run("series limit exceeded returns 403", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series", tr.Id)
+
+		for i := 0; i < MaxSeriesPerTracker; i++ {
+			r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: fmt.Sprintf("limit_s_%d", i)})
+			r = r.WithContext(superuserCtx())
+			getResponse(t, http.StatusCreated, h, r)
+		}
+
+		r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "over_limit_s"})
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusForbidden, h, r)
+
+		var got core.ErrorResponse
+		unmarshalResponse(t, res, &got)
+		require.Contains(t, got.Message, "series limit reached")
+	})
 }
 
 func TestHandlerListSeries(t *testing.T) {
@@ -1156,6 +1179,31 @@ func TestHandlerCreateValue(t *testing.T) {
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
 		// anonymous
 		getResponse(t, http.StatusNotFound, h, r)
+	})
+
+	t.Run("value limit exceeded returns 403", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < MaxValuesPerSeries; i++ {
+			_, err := store.db.Exec("INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
+				s.Id, base.Add(time.Duration(i)*time.Second), float64(i))
+			require.NoError(t, err)
+		}
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
+		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: base.Add(time.Hour * 8760), Value: 1})
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusForbidden, h, r)
+
+		var got core.ErrorResponse
+		unmarshalResponse(t, res, &got)
+		require.Contains(t, got.Message, "value limit reached")
 	})
 }
 

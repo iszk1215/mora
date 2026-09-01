@@ -689,6 +689,11 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.addSeries(&series)
 	if err != nil {
+		if errors.Is(err, ErrSeriesLimitReached) {
+			log.Warn().Int64("tracker_id", tracker.Id).Msg("createSeries: limit reached")
+			render.Forbidden(w, fmt.Errorf("series limit reached (max %d series per tracker)", MaxSeriesPerTracker))
+			return
+		}
 		log.Warn().Err(err).Msg("createSeries")
 		render.BadRequest(w, errors.New("failed to create series"))
 		return
@@ -893,6 +898,11 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 
 	err = h.store.addValue(&value)
 	if err != nil {
+		if errors.Is(err, ErrValueLimitReached) {
+			log.Warn().Int64("series_id", series.Id).Msg("createValue: limit reached")
+			render.Forbidden(w, fmt.Errorf("value limit reached (max %d values per series)", MaxValuesPerSeries))
+			return
+		}
 		log.Error().Err(err).Msg("addValue")
 		render.InternalError(w, err)
 		return

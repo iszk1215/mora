@@ -157,6 +157,112 @@ func TestStoreIsSuperuser(t *testing.T) {
 	require.False(t, s.isSuperuser(99999), "unknown users are not superuser")
 }
 
+func TestStoreAddSeriesLimit(t *testing.T) {
+	s := initTestStore(t)
+
+	t.Run("max series allowed then rejected", func(t *testing.T) {
+		tr := &TrackerModel{Name: "series_limit_tracker"}
+		require.NoError(t, s.addTracker(tr, 1))
+
+		for i := 0; i < MaxSeriesPerTracker; i++ {
+			se := &SeriesModel{TrackerId: tr.Id, Name: fmt.Sprintf("series_%d", i), DataType: "float"}
+			require.NoError(t, s.addSeries(se))
+		}
+		err := s.addSeries(&SeriesModel{TrackerId: tr.Id, Name: "over_limit", DataType: "float"})
+		require.ErrorIs(t, err, ErrSeriesLimitReached)
+	})
+
+	t.Run("deleting a series frees capacity", func(t *testing.T) {
+		tr := &TrackerModel{Name: "series_delete_tracker"}
+		require.NoError(t, s.addTracker(tr, 1))
+
+		var victimID int64
+		for i := 0; i < MaxSeriesPerTracker; i++ {
+			se := &SeriesModel{TrackerId: tr.Id, Name: fmt.Sprintf("delete_series_%d", i), DataType: "float"}
+			require.NoError(t, s.addSeries(se))
+			victimID = se.Id
+		}
+		require.NoError(t, s.deleteSeries(victimID))
+		se := &SeriesModel{TrackerId: tr.Id, Name: "after_delete", DataType: "float"}
+		require.NoError(t, s.addSeries(se))
+	})
+
+	t.Run("limit applies per tracker", func(t *testing.T) {
+		tr := &TrackerModel{Name: "series_per_tracker_1"}
+		require.NoError(t, s.addTracker(tr, 1))
+		tr2 := &TrackerModel{Name: "series_per_tracker_2"}
+		require.NoError(t, s.addTracker(tr2, 1))
+
+		for i := 0; i < MaxSeriesPerTracker; i++ {
+			se := &SeriesModel{TrackerId: tr2.Id, Name: fmt.Sprintf("other_series_%d", i), DataType: "float"}
+			require.NoError(t, s.addSeries(se))
+		}
+		err := s.addSeries(&SeriesModel{TrackerId: tr2.Id, Name: "other_over_limit", DataType: "float"})
+		require.ErrorIs(t, err, ErrSeriesLimitReached)
+
+		// first tracker is unaffected
+		err = s.addSeries(&SeriesModel{TrackerId: tr.Id, Name: "first_tracker_series", DataType: "float"})
+		require.NoError(t, err)
+	})
+}
+
+func TestStoreAddValueLimit(t *testing.T) {
+	s := initTestStore(t)
+
+	t.Run("max values allowed then rejected", func(t *testing.T) {
+		tr := &TrackerModel{Name: "value_limit_tracker"}
+		require.NoError(t, s.addTracker(tr, 1))
+		se := &SeriesModel{TrackerId: tr.Id, Name: "value_series", DataType: "float"}
+		require.NoError(t, s.addSeries(se))
+
+		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < MaxValuesPerSeries; i++ {
+			_, err := s.db.Exec("INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
+				se.Id, base.Add(time.Duration(i)*time.Second), float64(i))
+			require.NoError(t, err)
+		}
+		err := s.addValue(&ValueModel{SeriesId: se.Id, Timestamp: base.Add(time.Hour * 8760), Value: 42})
+		require.ErrorIs(t, err, ErrValueLimitReached)
+	})
+
+	t.Run("deleting values frees capacity", func(t *testing.T) {
+		tr := &TrackerModel{Name: "value_delete_tracker"}
+		require.NoError(t, s.addTracker(tr, 1))
+		se := &SeriesModel{TrackerId: tr.Id, Name: "value_delete_series", DataType: "float"}
+		require.NoError(t, s.addSeries(se))
+
+		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < MaxValuesPerSeries; i++ {
+			_, err := s.db.Exec("INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
+				se.Id, base.Add(time.Duration(i)*time.Second), float64(i))
+			require.NoError(t, err)
+		}
+		require.NoError(t, s.deleteValues(se.Id))
+		require.NoError(t, s.addValue(&ValueModel{SeriesId: se.Id, Timestamp: time.Now().Round(0), Value: 10}))
+	})
+
+	t.Run("limit applies per series", func(t *testing.T) {
+		tr := &TrackerModel{Name: "value_per_series_tracker"}
+		require.NoError(t, s.addTracker(tr, 1))
+		se := &SeriesModel{TrackerId: tr.Id, Name: "value_series_1", DataType: "float"}
+		require.NoError(t, s.addSeries(se))
+		se2 := &SeriesModel{TrackerId: tr.Id, Name: "value_series_2", DataType: "float"}
+		require.NoError(t, s.addSeries(se2))
+
+		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		for i := 0; i < MaxValuesPerSeries; i++ {
+			_, err := s.db.Exec("INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
+				se.Id, base.Add(time.Duration(i)*time.Second), float64(i))
+			require.NoError(t, err)
+		}
+		err := s.addValue(&ValueModel{SeriesId: se.Id, Timestamp: base.Add(time.Hour * 8760), Value: 42})
+		require.ErrorIs(t, err, ErrValueLimitReached)
+
+		// second series is unaffected
+		require.NoError(t, s.addValue(&ValueModel{SeriesId: se2.Id, Timestamp: time.Now().Round(0), Value: 7}))
+	})
+}
+
 func TestStoreFindTracker(t *testing.T) {
 	tracker := &TrackerModel{
 		Name: "test_tracker",

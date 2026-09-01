@@ -24,6 +24,21 @@ tracker
 - **type=`tracker`**: Normal time-series data (tracker -> series -> values)
 - **type=`coverage`**: Links to a repository via the `tracker_coverage` table, owned and managed by the coverage package. No series/values of its own. Created via the coverage API, not `POST /api/trackers`.
 
+## Limits
+
+Hard limits on the number of series and values, applied regardless of user type (free/pro/admin, issue #195). Exceeded creation requests return 403.
+
+| Resource | Limit | Enforced by | 403 message |
+|----------|-------|-------------|-------------|
+| Series per tracker | `10` (`tracker.MaxSeriesPerTracker`) | `store.addSeries` | `series limit reached (max 10 series per tracker)` |
+| Values per series | `5000` (`tracker.MaxValuesPerSeries`) | `store.addValue` | `value limit reached (max 5000 values per series)` |
+
+- Limits are checked before insert; the 10th series and the 5000th value are allowed, and subsequent inserts are rejected.
+- Deleting a series (or all values of a series) frees capacity.
+- Coverage-type trackers have no series/values and are unaffected.
+- The limits only guard new inserts through the tracker store. Existing data and the one-time UDM->tracker data migration (which writes via raw SQL) are not retroactively capped.
+- The tracker-count limit (`core.FreeUserMaxTrackers`, free users only) is a separate, user-type-based limit.
+
 ## API Endpoints
 
 | Method | Path | Description | Auth |
