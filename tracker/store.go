@@ -19,6 +19,14 @@ var (
 	// ErrTrackerLimitReached is returned when the owner has reached the
 	// maximum number of trackers allowed for their user type.
 	ErrTrackerLimitReached = errors.New("tracker limit reached for this user type")
+
+	// ErrSeriesLimitReached is returned when a tracker has reached the
+	// maximum number of series.
+	ErrSeriesLimitReached = errors.New("series limit reached for this tracker")
+
+	// ErrValueLimitReached is returned when a series has reached the
+	// maximum number of values.
+	ErrValueLimitReached = errors.New("value limit reached for this series")
 )
 
 const (
@@ -26,6 +34,14 @@ const (
 	TypeTracker = "tracker"
 	// TypeCoverage is the coverage-type tracker, managed by the coverage package.
 	TypeCoverage = "coverage"
+
+	// MaxSeriesPerTracker is the hard limit on the number of series a single
+	// tracker may have, regardless of user type (issue #195).
+	MaxSeriesPerTracker = 10
+
+	// MaxValuesPerSeries is the hard limit on the number of values a single
+	// series may have, regardless of user type (issue #195).
+	MaxValuesPerSeries = 5000
 )
 
 var schemaTracker = `
@@ -123,6 +139,26 @@ func (s *trackerStore) countTrackersByOwner(ownerID int64) (int, error) {
 	err := s.db.Get(&n, "SELECT COUNT(*) FROM tracker WHERE owner_id = ?", ownerID)
 	if err != nil {
 		return 0, fmt.Errorf("count trackers by owner: %w", err)
+	}
+	return n, nil
+}
+
+// countSeriesByTracker returns the number of series belonging to `trackerID`.
+func (s *trackerStore) countSeriesByTracker(trackerID int64) (int, error) {
+	var n int
+	err := s.db.Get(&n, "SELECT COUNT(*) FROM tracker_series WHERE tracker_id = ?", trackerID)
+	if err != nil {
+		return 0, fmt.Errorf("count series by tracker: %w", err)
+	}
+	return n, nil
+}
+
+// countValuesBySeries returns the number of values belonging to `seriesID`.
+func (s *trackerStore) countValuesBySeries(seriesID int64) (int, error) {
+	var n int
+	err := s.db.Get(&n, "SELECT COUNT(*) FROM tracker_value WHERE series_id = ?", seriesID)
+	if err != nil {
+		return 0, fmt.Errorf("count values by series: %w", err)
 	}
 	return n, nil
 }
@@ -420,6 +456,16 @@ func (s *trackerStore) addSeries(series *SeriesModel) error {
 		return fmt.Errorf("addSeries findTrackerById: %w", err)
 	}
 
+	count, err := s.countSeriesByTracker(series.TrackerId)
+	if err != nil {
+		return fmt.Errorf("addSeries countSeriesByTracker: %w", err)
+	}
+	if count >= MaxSeriesPerTracker {
+		log.Warn().Int64("tracker_id", series.TrackerId).
+			Int("count", count).Int("max", MaxSeriesPerTracker).Msg("series limit reached")
+		return ErrSeriesLimitReached
+	}
+
 	if series.Config == "" {
 		series.Config = "{}"
 	}
@@ -526,6 +572,16 @@ func (s *trackerStore) addValue(value *ValueModel) error {
 	series, err := s.findSeriesById(value.SeriesId)
 	if err != nil {
 		return fmt.Errorf("addValue findSeriesById: %w", err)
+	}
+
+	count, err := s.countValuesBySeries(value.SeriesId)
+	if err != nil {
+		return fmt.Errorf("addValue countValuesBySeries: %w", err)
+	}
+	if count >= MaxValuesPerSeries {
+		log.Warn().Int64("series_id", value.SeriesId).
+			Int("count", count).Int("max", MaxValuesPerSeries).Msg("value limit reached")
+		return ErrValueLimitReached
 	}
 
 	query := "INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)"
