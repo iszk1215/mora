@@ -323,6 +323,71 @@ describe('TrackerDetailView', () => {
     expect(screen.queryByText('Close')).not.toBeInTheDocument()
   })
 
+  it('opens and closes series settings panel from tracker menu', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    const menuItem = await screen.findByRole('menuitem', { name: 'Series' })
+    await user.click(menuItem)
+
+    expect(screen.getByText('No series yet')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByText('No series yet')).not.toBeInTheDocument()
+  })
+
+  it('shows series rows in the series settings panel', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: 1, tracker_id: 1, name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
+        { id: 2, tracker_id: 1, name: 'series-b', data_type: 'int', config: '{"type":"bar"}' },
+      ],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    expect(screen.getByText('series-a')).toBeInTheDocument()
+    expect(screen.getByText('series-b')).toBeInTheDocument()
+    expect(screen.getAllByText('Delete')).toHaveLength(2)
+  })
+
+  it('adds a series via menu while series settings panel is open and reflects it', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 'added-series', data_type: 'float', config: '{"type":"line"}' }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: /add series/i }))
+
+    const nameInput = screen.getByPlaceholderText('Series name')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'added-series')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('added-series')).toBeInTheDocument()
+    })
+  })
+
   it('saves chart options via PATCH from panel', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
