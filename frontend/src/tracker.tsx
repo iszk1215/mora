@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { MoreVertical, Pencil, Plus, SlidersHorizontal, Star, Trash } from 'lucide-react'
+import { MoreVertical, Pencil, Plus, Settings2, SlidersHorizontal, Star, Trash } from 'lucide-react'
 import { AlertDialog, Dialog, DropdownMenu } from 'radix-ui'
 
 import {
@@ -15,16 +15,9 @@ import {
 } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig } from './core'
 import { ChartOptionsForm } from './chart-options-form'
+import { SeriesTable, SeriesTableHandle } from './series-form'
 import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, CHART_THEME_NAME } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
@@ -111,7 +104,7 @@ async function createSeries(trackerId: number, name: string, dataType: string, c
   return resp.json()
 }
 
-async function patchSeries(trackerId: number, seriesId: number, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
+export async function patchSeries(trackerId: number, seriesId: number, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -121,7 +114,7 @@ async function patchSeries(trackerId: number, seriesId: number, opts: { name?: s
   return resp.json()
 }
 
-async function deleteSeries(trackerId: number, seriesId: number): Promise<void> {
+export async function deleteSeries(trackerId: number, seriesId: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
@@ -135,7 +128,7 @@ async function createValue(trackerId: number, seriesId: number, time: string, va
   if (!resp.ok) throw resp
 }
 
-async function deleteValues(trackerId: number, seriesId: number): Promise<void> {
+export async function deleteValues(trackerId: number, seriesId: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
@@ -347,6 +340,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [editingDescription, setEditingDescription] = useState(false)
   const [editingBody, setEditingBody] = useState(false)
   const [showChartOptions, setShowChartOptions] = useState(false)
+  const [showSeriesSettings, setShowSeriesSettings] = useState(false)
   const [addSeriesOpen, setAddSeriesOpen] = useState(false)
   const [newSeriesName, setNewSeriesName] = useState('')
   const [newSeriesDataType, setNewSeriesDataType] = useState('float')
@@ -529,6 +523,12 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const { min, max } = computeDateRange(range)
 
   const xAxisType = chartConfig?.x_axis_type ?? 'date'
+  const yAxes: YAxisConfig[] = useMemo(() => {
+    if (chartConfig?.y_axes && chartConfig.y_axes.length > 0) {
+      return chartConfig.y_axes
+    }
+    return [{ id: 0, position: 'left' }]
+  }, [chartConfig])
   const todayValue = useMemo(() => {
     const now = new Date()
     if (xAxisType === 'date') {
@@ -577,6 +577,19 @@ export const TrackerDetailView = (): React.JSX.Element => {
     } finally {
       setAddingValues((prev) => ({ ...prev, [seriesId]: false }))
     }
+  }
+
+  const handleSeriesDeleted = (seriesId: number) => {
+    setSeriesList((prev) => prev.filter((s) => s.id !== seriesId))
+    setSeriesValues((prev) => prev.filter((sv) => sv.series.id !== seriesId))
+  }
+
+  const handleValuesCleared = (seriesId: number) => {
+    setSeriesValues((prev) =>
+      prev.map((sv) =>
+        sv.series.id === seriesId ? { ...sv, values: [] } : sv
+      )
+    )
   }
 
   return (
@@ -655,6 +668,13 @@ export const TrackerDetailView = (): React.JSX.Element => {
                   >
                     <SlidersHorizontal className="w-4 h-4" />
                     Chart Options
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
+                    onSelect={() => setShowSeriesSettings((v) => !v)}
+                  >
+                    <Settings2 className="w-4 h-4" />
+                    Series
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
@@ -747,6 +767,24 @@ export const TrackerDetailView = (): React.JSX.Element => {
           </div>
         )}
       </div>
+
+      {isRoleOwner && showSeriesSettings && (
+        <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl">Series</h2>
+            <Button variant="outline" size="sm" onClick={() => setShowSeriesSettings(false)}>
+              Close
+            </Button>
+          </div>
+          <SeriesTable
+            trackerId={tracker.id}
+            seriesList={seriesList}
+            yAxes={yAxes}
+            onDeleteSeries={handleSeriesDeleted}
+            onValuesCleared={handleValuesCleared}
+          />
+        </div>
+      )}
 
       {isOwner && tracker.type !== 'coverage' && showAddValue && (
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
@@ -971,39 +1009,7 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
   const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(null)
   const [newValueTime, setNewValueTime] = useState('')
   const [newValueNumber, setNewValueNumber] = useState('')
-
-  const [seriesValueFormats, setSeriesValueFormats] = useState<Record<number, string>>(() => {
-    const map: Record<number, string> = {}
-    for (const s of data.series) {
-      try {
-        const cfg = JSON.parse(s.config) as SeriesConfig
-        if (cfg.value_format) map[s.id] = cfg.value_format
-      } catch { /* ignore */ }
-    }
-    return map
-  })
-
-  const [seriesTypes, setSeriesTypes] = useState<Record<number, 'line' | 'bar'>>(() => {
-    const map: Record<number, 'line' | 'bar'> = {}
-    for (const s of data.series) {
-      try {
-        const cfg = JSON.parse(s.config) as SeriesConfig
-        if (cfg.type) map[s.id] = cfg.type
-      } catch { /* ignore */ }
-    }
-    return map
-  })
-
-  const [seriesYAxisIndices, setSeriesYAxisIndices] = useState<Record<number, number>>(() => {
-    const map: Record<number, number> = {}
-    for (const s of data.series) {
-      try {
-        const cfg = JSON.parse(s.config) as SeriesConfig
-        if (cfg.y_axis_index !== undefined) map[s.id] = cfg.y_axis_index
-      } catch { /* ignore */ }
-    }
-    return map
-  })
+  const seriesTableRef = useRef<SeriesTableHandle>(null)
 
   const [savedChartConfig, setSavedChartConfig] = useState(tracker.chart_config)
   const parsedChartConfig = useMemo<ChartConfig>(() => {
@@ -1079,16 +1085,6 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     }
   }
 
-  const handleDeleteSeries = async (seriesId: number) => {
-    try {
-      await deleteSeries(tracker.id, seriesId)
-      setSeriesList((prev) => prev.filter((s) => s.id !== seriesId))
-      setSeriesValues((prev) => prev.filter((sv) => sv.series.id !== seriesId))
-    } catch {
-      // ignore
-    }
-  }
-
   const handleAddValue = async () => {
     if (selectedSeriesId === null || !newValueTime || !newValueNumber) return
     try {
@@ -1107,84 +1103,17 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
     }
   }
 
-  const buildSeriesConfig = (seriesId: number): SeriesConfig => {
-    const config: SeriesConfig = {}
-    const fmt = seriesValueFormats[seriesId]
-    if (fmt) config.value_format = fmt
-    const t = seriesTypes[seriesId]
-    if (t) config.type = t
-    const yi = seriesYAxisIndices[seriesId]
-    if (yi !== undefined) config.y_axis_index = yi
-    return config
+  const handleSeriesDeleted = (seriesId: number) => {
+    setSeriesList((prev) => prev.filter((s) => s.id !== seriesId))
+    setSeriesValues((prev) => prev.filter((sv) => sv.series.id !== seriesId))
   }
 
-  const handleSaveSeriesConfig = async (seriesId: number) => {
-    const config = buildSeriesConfig(seriesId)
-    try {
-      const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
-      setSeriesList((prev) => prev.map((s) => s.id === seriesId ? updated : s))
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleSaveValueFormat = async (seriesId: number, fmt: string) => {
-    if (fmt) {
-      setSeriesValueFormats((prev) => ({ ...prev, [seriesId]: fmt }))
-    } else {
-      setSeriesValueFormats((prev) => {
-        const next = { ...prev }
-        delete next[seriesId]
-        return next
-      })
-    }
-    const config: SeriesConfig = {}
-    if (fmt) config.value_format = fmt
-    const t = seriesTypes[seriesId]
-    if (t) config.type = t
-    const yi = seriesYAxisIndices[seriesId]
-    if (yi !== undefined) config.y_axis_index = yi
-    try {
-      const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
-      setSeriesList((s) => s.map((s) => s.id === seriesId ? updated : s))
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleSeriesTypeChange = async (seriesId: number, type: 'line' | 'bar') => {
-    setSeriesTypes((prev) => ({ ...prev, [seriesId]: type }))
-    const config: SeriesConfig = { ...buildSeriesConfig(seriesId), type }
-    try {
-      const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
-      setSeriesList((prev) => prev.map((s) => s.id === seriesId ? updated : s))
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleSeriesYAxisChange = async (seriesId: number, yAxisIndex: number) => {
-    setSeriesYAxisIndices((prev) => ({ ...prev, [seriesId]: yAxisIndex }))
-    const config: SeriesConfig = { ...buildSeriesConfig(seriesId), y_axis_index: yAxisIndex }
-    try {
-      const updated = await patchSeries(tracker.id, seriesId, { config: JSON.stringify(config) })
-      setSeriesList((prev) => prev.map((s) => s.id === seriesId ? updated : s))
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleDeleteValues = async (seriesId: number) => {
-    try {
-      await deleteValues(tracker.id, seriesId)
-      setSeriesValues((prev) =>
-        prev.map((sv) =>
-          sv.series.id === seriesId ? { ...sv, values: [] } : sv
-        )
+  const handleValuesCleared = (seriesId: number) => {
+    setSeriesValues((prev) =>
+      prev.map((sv) =>
+        sv.series.id === seriesId ? { ...sv, values: [] } : sv
       )
-    } catch {
-      // ignore
-    }
+    )
   }
 
   const valuesToDataset = (sv: SeriesValues): Dataset => {
@@ -1262,87 +1191,15 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
         <Button onClick={handleCreateSeries} disabled={!newSeriesName.trim()}>Add Series</Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Data Type</TableHead>
-            <TableHead>Chart Type</TableHead>
-            <TableHead>Y-Axis</TableHead>
-            <TableHead>Value Format</TableHead>
-            <TableHead className="w-48">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {seriesList.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
-                No series yet
-              </TableCell>
-            </TableRow>
-          ) : (
-            seriesList.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell>
-                  <button
-                    className="text-blue-600 dark:text-blue-500 hover:underline"
-                    onClick={() => setSelectedSeriesId(s.id)}
-                  >
-                    {s.name}
-                  </button>
-                </TableCell>
-                <TableCell>{s.data_type}</TableCell>
-                <TableCell>
-                  <select
-                    value={seriesTypes[s.id] ?? 'line'}
-                    onChange={(e) => handleSeriesTypeChange(s.id, e.target.value as 'line' | 'bar')}
-                    className="border rounded px-1 py-0.5 text-sm"
-                  >
-                    <option value="line">Line</option>
-                    <option value="bar">Bar</option>
-                  </select>
-                </TableCell>
-                <TableCell>
-                  {(() => {
-                    const sorted = yAxes.map((a, i) => ({ ...a, origIdx: i }))
-                      .sort((a, b) => (a.position === 'left' ? -1 : 1))
-                    const currentIdx = seriesYAxisIndices[s.id] ?? 0
-                    const dispIdx = sorted.findIndex((a) => a.origIdx === currentIdx)
-                    return (
-                      <select
-                        value={dispIdx >= 0 ? dispIdx : 0}
-                        onChange={(e) => handleSeriesYAxisChange(s.id, sorted[parseInt(e.target.value)].origIdx)}
-                        className="border rounded px-1 py-0.5 text-sm"
-                      >
-                        {sorted.map((a, i) => (
-                          <option key={i} value={i}>
-                            {a.position === 'left' ? 'Left' : 'Right'}{a.label ? ` (${a.label})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    )
-                  })()}
-                </TableCell>
-                <TableCell>
-                  <ValueFormatCell
-                    seriesId={s.id}
-                    initialFormat={seriesValueFormats[s.id] ?? ''}
-                    onSave={handleSaveValueFormat}
-                  />
-                </TableCell>
-                <TableCell className="flex gap-2">
-                  <Button variant="destructive" size="sm" onClick={() => handleDeleteSeries(s.id)}>
-                    Delete
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => handleDeleteValues(s.id)}>
-                    Clear Values
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+      <SeriesTable
+        ref={seriesTableRef}
+        trackerId={tracker.id}
+        seriesList={seriesList}
+        yAxes={yAxes}
+        onSelectSeries={setSelectedSeriesId}
+        onDeleteSeries={handleSeriesDeleted}
+        onValuesCleared={handleValuesCleared}
+      />
 
       {/* Chart */}
       <h2 className="text-xl my-2">Chart</h2>
@@ -1380,13 +1237,8 @@ export const TrackerDetailEdit = (): React.JSX.Element => {
         }}
         onRemoveYAxis={async (removed) => {
           const removedIndex = yAxes.findIndex((a) => a.position === removed.position)
-          for (const [sidStr, yi] of Object.entries(seriesYAxisIndices)) {
-            const sid = Number(sidStr)
-            if (yi === removedIndex) {
-              await handleSeriesYAxisChange(sid, 0)
-            } else if (yi > removedIndex) {
-              await handleSeriesYAxisChange(sid, yi - 1)
-            }
+          if (removedIndex >= 0) {
+            await seriesTableRef.current?.reassignYAxes(removedIndex)
           }
         }}
       />
@@ -1554,38 +1406,6 @@ export const TrackerCreate = (): React.JSX.Element => {
           </Button>
         </div>
       </div>
-    </div>
-  )
-}
-
-function ValueFormatCell({ seriesId, initialFormat, onSave }: { seriesId: number; initialFormat: string; onSave: (seriesId: number, fmt: string) => void }): React.JSX.Element {
-  const [value, setValue] = useState(initialFormat)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => { setValue(initialFormat); setSaved(false) }, [initialFormat])
-
-  const handleSave = async () => {
-    setSaving(true)
-    setSaved(false)
-    onSave(seriesId, value)
-    setSaving(false)
-    setSaved(true)
-  }
-
-  return (
-    <div className="flex items-center gap-1">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => { setValue(e.target.value); setSaved(false) }}
-        placeholder="e.g. %.1f"
-        className="border rounded px-1 py-0.5 w-20 text-sm"
-        onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
-      />
-      <Button size="sm" variant="outline" onClick={handleSave} disabled={saving}>
-        {saving ? '...' : saved ? 'Saved' : 'Save'}
-      </Button>
     </div>
   )
 }
