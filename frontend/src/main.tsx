@@ -446,11 +446,9 @@ export const Breadcrumbs = (): React.JSX.Element => {
 
   const crumbs: Crumb[] = []
 
-  // Detect if we are on a tracker detail or edit page using params (not route IDs)
+  // Detect if we are on a tracker detail page using params (not route IDs)
   const hasTrackerId = matches.some(m => Boolean((m.params as any)?.trackerId))
-  const isOnEditPage = last.pathname.endsWith('/edit')
-  const isTrackerDetail = hasTrackerId && !isOnEditPage
-  const isTrackerEdit = hasTrackerId && isOnEditPage
+  const isTrackerDetail = hasTrackerId
 
   // For tracker detail page: add "Search Results" parent if navigated from a search
   // (top page or user page), otherwise add the owner username (linking to the user page)
@@ -470,35 +468,6 @@ export const Breadcrumbs = (): React.JSX.Element => {
       if (ownerName) {
         crumbs.push({ label: ownerName, link: `/users/${encodeURIComponent(ownerName)}` })
       }
-    }
-  }
-
-  // For tracker edit page: always add tracker name, plus "Search Results" or owner username
-  if (isTrackerEdit) {
-    if (searchQuery) {
-      if (fromUser) {
-        crumbs.push({ label: fromUser, link: `/users/${encodeURIComponent(fromUser)}` })
-      }
-      crumbs.push({
-        label: 'Search Results',
-        link: fromUser
-          ? `/users/${encodeURIComponent(fromUser)}?q=${encodeURIComponent(searchQuery)}`
-          : `/?q=${encodeURIComponent(searchQuery)}`,
-      })
-    } else {
-      const ownerName = (last.data as any)?.tracker?.owner_name as string | undefined
-      if (ownerName) {
-        crumbs.push({ label: ownerName, link: `/users/${encodeURIComponent(ownerName)}` })
-      }
-    }
-    // Find the tracker detail match to get tracker name
-    const trackerMatch = matches.find((m: any) => Boolean(m.params?.trackerId))
-    if (trackerMatch) {
-      const trackerData = trackerMatch.data as any
-      crumbs.push({
-        label: trackerData?.tracker?.name ?? 'Tracker',
-        link: `/trackers/${trackerMatch.params?.trackerId}`,
-      })
     }
   }
 

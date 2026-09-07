@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { MoreVertical, Pencil, Plus, Settings2, SlidersHorizontal, Star, Trash } from 'lucide-react'
+import { MoreVertical, Pencil, Plus, Settings, Settings2, Star, Trash } from 'lucide-react'
 import { AlertDialog, Dialog, DropdownMenu } from 'radix-ui'
 
 import {
@@ -16,8 +16,8 @@ import {
 
 import { Button } from '@/components/ui/button'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig } from './core'
-import { ChartOptionsForm } from './chart-options-form'
-import { SeriesTable, SeriesTableHandle } from './series-form'
+import { SettingsForm } from './settings-form'
+import { SeriesTable } from './series-form'
 import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, CHART_THEME_NAME } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
@@ -335,6 +335,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [trackerName, setTrackerName] = useState(tracker.name)
   const [trackerDescription, setTrackerDescription] = useState(tracker.description ?? '')
   const [trackerBody, setTrackerBody] = useState(tracker.body ?? '')
+  const [trackerVisibility, setTrackerVisibility] = useState(tracker.visibility)
 
   const [editingTitle, setEditingTitle] = useState(false)
   const [editingDescription, setEditingDescription] = useState(false)
@@ -644,11 +645,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
               </span>
             )}
           </button>
-          {isOwner && (
-            <Button variant="outline" size="sm" asChild>
-              <Link to={`/trackers/${tracker.id}/edit`}>Edit</Link>
-            </Button>
-          )}
           {isRoleOwner && (
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
@@ -666,8 +662,8 @@ export const TrackerDetailView = (): React.JSX.Element => {
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
                     onSelect={() => setShowChartOptions((v) => !v)}
                   >
-                    <SlidersHorizontal className="w-4 h-4" />
-                    Chart Options
+                    <Settings className="w-4 h-4" />
+                    Settings
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
@@ -838,17 +834,18 @@ export const TrackerDetailView = (): React.JSX.Element => {
       {isRoleOwner && showChartOptions && (
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xl">Chart Options</h2>
+            <h2 className="text-xl">Settings</h2>
             <Button variant="outline" size="sm" onClick={() => setShowChartOptions(false)}>
               Close
             </Button>
           </div>
-          <ChartOptionsForm
+          <SettingsForm
             initialConfig={chartDraft ?? chartConfig ?? {}}
             baselineConfig={chartConfig ?? {}}
+            initialVisibility={trackerVisibility}
             onChange={setChartDraft}
-            onSave={async (config) => {
-              const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config) })
+            onSave={async (config, visibility) => {
+              const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config), visibility })
               setChartConfig(() => {
                 try {
                   return JSON.parse(updated.chart_config) as ChartConfig
@@ -857,6 +854,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                 }
               })
               setChartDraft(config)
+              setTrackerVisibility(visibility ?? trackerVisibility)
             }}
             onCancel={setChartDraft}
           />
@@ -999,332 +997,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
   )
 }
 
-export const TrackerDetailEdit = (): React.JSX.Element => {
-  const data = useLoaderData() as TrackerDetailData
-  const { tracker } = data
-  const [seriesList, setSeriesList] = useState<SeriesModel[]>(data.series)
-  const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
-  const [newSeriesName, setNewSeriesName] = useState('')
-  const [newSeriesDataType, setNewSeriesDataType] = useState('float')
-
-  const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(null)
-  const [newValueTime, setNewValueTime] = useState('')
-  const [newValueNumber, setNewValueNumber] = useState('')
-  const seriesTableRef = useRef<SeriesTableHandle>(null)
-
-  const [savedChartConfig, setSavedChartConfig] = useState(tracker.chart_config)
-  const parsedChartConfig = useMemo<ChartConfig>(() => {
-    try {
-      return JSON.parse(savedChartConfig) as ChartConfig
-    } catch {
-      return {}
-    }
-  }, [savedChartConfig])
-  const [chartDraft, setChartDraft] = useState<ChartConfig | null>(null)
-  const [description, setDescription] = useState(tracker.description ?? '')
-  const [body, setBody] = useState(tracker.body ?? '')
-  const [bodySaved, setBodySaved] = useState(false)
-  const [visibility, setVisibility] = useState(tracker.visibility)
-  const xAxisType = parsedChartConfig.x_axis_type ?? 'date'
-  const yAxes: YAxisConfig[] = useMemo(() => {
-    if (parsedChartConfig.y_axes && parsedChartConfig.y_axes.length > 0) {
-      return parsedChartConfig.y_axes
-    }
-    return [{ id: 0, position: 'left' }]
-  }, [parsedChartConfig])
-
-  const isCoverage = tracker.type === 'coverage'
-
-  const handleDescriptionBlur = async () => {
-    const trimmed = description.trim()
-    if (trimmed === (tracker.description ?? '')) return
-    try {
-      await patchTracker(tracker.id, { description: trimmed })
-    } catch {
-      setDescription(tracker.description ?? '')
-    }
-  }
-
-  const handleBodySave = async () => {
-    setBodySaved(false)
-    try {
-      const updated = await patchTracker(tracker.id, { body })
-      setBody(updated.body ?? '')
-      setBodySaved(true)
-    } catch {
-      setBody(tracker.body ?? '')
-    }
-  }
-
-  const handleVisibilityChange = async (newVisibility: string) => {
-    try {
-      await patchTracker(tracker.id, { visibility: newVisibility })
-      setVisibility(newVisibility)
-    } catch {
-      // ignore
-    }
-  }
-
-  useEffect(() => {
-    Promise.all(
-      seriesList.map((s) =>
-        fetch(`/api/trackers/${tracker.id}/series/${s.id}/values`)
-          .then((r) => r.json() as Promise<{ values: ValueModel[] }>)
-          .then((d) => ({ series: s, values: d.values ?? [] }))
-      )
-    ).then(setSeriesValues).catch(() => {})
-  }, [seriesList, tracker.id])
-
-  const handleCreateSeries = async () => {
-    if (!newSeriesName.trim()) return
-    try {
-      const created = await createSeries(tracker.id, newSeriesName.trim(), newSeriesDataType)
-      setSeriesList((prev) => [...prev, created])
-      setNewSeriesName('')
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleAddValue = async () => {
-    if (selectedSeriesId === null || !newValueTime || !newValueNumber) return
-    try {
-      await createValue(tracker.id, selectedSeriesId, new Date(newValueTime).toISOString(), parseFloat(newValueNumber))
-      setNewValueTime('')
-      setNewValueNumber('')
-      const resp = await fetch(`/api/trackers/${tracker.id}/series/${selectedSeriesId}/values`)
-      const data = await resp.json()
-      setSeriesValues((prev) =>
-        prev.map((sv) =>
-          sv.series.id === selectedSeriesId ? { ...sv, values: data.values ?? [] } : sv
-        )
-      )
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleSeriesDeleted = (seriesId: number) => {
-    setSeriesList((prev) => prev.filter((s) => s.id !== seriesId))
-    setSeriesValues((prev) => prev.filter((sv) => sv.series.id !== seriesId))
-  }
-
-  const handleValuesCleared = (seriesId: number) => {
-    setSeriesValues((prev) =>
-      prev.map((sv) =>
-        sv.series.id === seriesId ? { ...sv, values: [] } : sv
-      )
-    )
-  }
-
-  const valuesToDataset = (sv: SeriesValues): Dataset => {
-    let seriesConfig: SeriesConfig | undefined
-    try {
-      seriesConfig = JSON.parse(sv.series.config) as SeriesConfig
-    } catch { /* ignore */ }
-    return {
-      data: sv.values.map((v: ValueModel) => ({ x: v.time, y: String(v.value) })),
-      label: sv.series.name,
-      seriesConfig,
-    }
-  }
-
-  const datasets: Dataset[] = useMemo(() => seriesValues.map(valuesToDataset), [seriesValues])
-
-  const chartConfigForChart = useMemo<ChartConfig | null>(() => {
-    if (chartDraft) return chartDraft
-    try {
-      return JSON.parse(savedChartConfig) as ChartConfig
-    } catch {
-      return null
-    }
-  }, [chartDraft, savedChartConfig])
-
-  if (isCoverage) {
-    return (
-      <div>
-        <h1 className="text-3xl my-4">{tracker.name} (Edit)</h1>
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-6">
-          <p className="text-yellow-800">
-            This tracker is linked to coverage data and cannot be edited directly.
-          </p>
-        </div>
-
-        {/* Visibility */}
-        <h2 className="text-xl my-2">Visibility</h2>
-        <select
-          value={visibility}
-          onChange={(e) => handleVisibilityChange(e.target.value)}
-          className="border rounded px-2 py-1 mb-4"
-        >
-          <option value="private">Private</option>
-          <option value="public">Public</option>
-        </select>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <h1 className="text-3xl my-4">{tracker.name} (Edit)</h1>
-
-      {/* Series list */}
-      <h2 className="text-xl my-2">Series</h2>
-
-      <div className="flex items-center gap-2 mb-4">
-        <input
-          type="text"
-          value={newSeriesName}
-          onChange={(e) => setNewSeriesName(e.target.value)}
-          placeholder="Series name"
-          className="border rounded px-2 py-1"
-          onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSeries() }}
-        />
-        <select
-          value={newSeriesDataType}
-          onChange={(e) => setNewSeriesDataType(e.target.value)}
-          className="border rounded px-2 py-1"
-        >
-          <option value="float">float</option>
-          <option value="int">int</option>
-        </select>
-        <Button onClick={handleCreateSeries} disabled={!newSeriesName.trim()}>Add Series</Button>
-      </div>
-
-      <SeriesTable
-        ref={seriesTableRef}
-        trackerId={tracker.id}
-        seriesList={seriesList}
-        yAxes={yAxes}
-        onSelectSeries={setSelectedSeriesId}
-        onDeleteSeries={handleSeriesDeleted}
-        onValuesCleared={handleValuesCleared}
-      />
-
-      {/* Chart */}
-      <h2 className="text-xl my-2">Chart</h2>
-
-      <div className="bg-card border rounded-lg py-4 pl-2 pr-3 sm:px-4 mb-4 shadow-md">
-        {datasets.length > 0 ? (
-          <TrackerChart data={{ datasets }} chartConfig={chartConfigForChart} />
-        ) : (
-          <p className="text-muted-foreground">No data to display</p>
-        )}
-      </div>
-
-      {/* Chart Options */}
-      <h2 className="text-xl my-2">Chart Options</h2>
-      <ChartOptionsForm
-        initialConfig={parsedChartConfig}
-        baselineConfig={parsedChartConfig}
-        onChange={setChartDraft}
-        onSave={async (config) => {
-          try {
-            const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config) })
-            setSavedChartConfig(updated.chart_config)
-            setChartDraft(null)
-          } catch {
-            // ignore
-          }
-        }}
-        onYAxesChange={async (config) => {
-          try {
-            const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config) })
-            setSavedChartConfig(updated.chart_config)
-          } catch {
-            // ignore
-          }
-        }}
-        onRemoveYAxis={async (removed) => {
-          const removedIndex = yAxes.findIndex((a) => a.position === removed.position)
-          if (removedIndex >= 0) {
-            await seriesTableRef.current?.reassignYAxes(removedIndex)
-          }
-        }}
-      />
-
-      {/* Add value form */}
-      <h2 className="text-xl my-2">Add Value</h2>
-
-      <div className="flex items-center gap-2 mb-4">
-        <select
-          value={selectedSeriesId ?? ''}
-          onChange={(e) => setSelectedSeriesId(e.target.value ? parseInt(e.target.value) : null)}
-          className="border rounded px-2 py-1"
-        >
-          <option value="">Select series</option>
-          {seriesList.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        <input
-          type={xAxisType === 'date' ? 'date' : 'datetime-local'}
-          value={newValueTime}
-          onChange={(e) => setNewValueTime(e.target.value)}
-          className="border rounded px-2 py-1"
-        />
-        <input
-          type="number"
-          value={newValueNumber}
-          onChange={(e) => setNewValueNumber(e.target.value)}
-          placeholder="Value"
-          className="border rounded px-2 py-1 w-32"
-        />
-        <Button
-          onClick={handleAddValue}
-          disabled={selectedSeriesId === null || !newValueTime || !newValueNumber}
-        >
-          Add
-        </Button>
-      </div>
-
-      {/* Description */}
-      <h2 className="text-xl my-2">Description</h2>
-      <input
-        type="text"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        onBlur={handleDescriptionBlur}
-        placeholder="One-line description (max 200 characters)"
-        maxLength={200}
-        className="border rounded px-2 py-1 mb-4 w-full max-w-md"
-      />
-
-      {/* Body */}
-      <h2 className="text-xl my-2">Body</h2>
-      <p className="text-sm text-muted-foreground mb-2">
-        Markdown is supported. This content is shown below the chart on the detail page.
-      </p>
-      <div data-color-mode="light" className="mb-2 bg-card border rounded-lg p-4 shadow-md">
-        <MDEditor
-          value={body}
-          onChange={(v) => { setBody(v ?? ''); setBodySaved(false) }}
-          preview="live"
-          height={300}
-          textareaProps={{ placeholder: 'Write the body in Markdown...' }}
-        />
-      </div>
-      <div className="flex items-center gap-2 mb-4">
-        <Button size="sm" onClick={handleBodySave}>
-          {bodySaved ? 'Saved' : 'Save Body'}
-        </Button>
-      </div>
-
-      {/* Visibility */}
-      <h2 className="text-xl my-2">Visibility</h2>
-      <select
-        value={visibility}
-        onChange={(e) => handleVisibilityChange(e.target.value)}
-        className="border rounded px-2 py-1 mb-4"
-      >
-        <option value="private">Private</option>
-        <option value="public">Public</option>
-      </select>
-    </div>
-  )
-}
-
 export const TrackerCreate = (): React.JSX.Element => {
   const navigate = useNavigate()
   const user = useUser()
@@ -1419,14 +1091,6 @@ const TrackerDetailRouter = (): React.JSX.Element => {
   return <TrackerDetailView />
 }
 
-export const TrackerDetailEditRouter = (): React.JSX.Element => {
-  const data = useLoaderData() as TrackerDetailData
-  if (data.tracker.role === '') {
-    throw new Response('Forbidden', { status: 403 })
-  }
-  return <TrackerDetailEdit />
-}
-
 export const trackerRoute = [
   {
     index: true,
@@ -1445,14 +1109,6 @@ export const trackerRoute = [
       crumb: (params: Params, data: any) => ({
         label: data?.tracker?.name ?? `Tracker #${params.trackerId}`,
       }),
-    },
-  },
-  {
-    path: ':trackerId/edit',
-    loader: loadTrackerDetail,
-    element: <TrackerDetailEditRouter />,
-    handle: {
-      crumb: () => ({ label: 'Edit' }),
     },
   },
 ]

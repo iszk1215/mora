@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
 import {
   TrackerCreate,
   TrackerDetailView,
-  TrackerDetailEdit,
-  TrackerDetailEditRouter,
   TrackerCard,
   loadTrackerDetail,
   patchTracker,
@@ -261,24 +259,6 @@ describe('TrackerDetailView', () => {
     expect(likeButton).toBeDisabled()
   })
 
-  it('shows Edit button when user has role', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
-    expect(screen.getByText('Edit')).toBeInTheDocument()
-  })
-
-  it('hides Edit button when user has no role', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
-    expect(screen.queryByText('Edit')).not.toBeInTheDocument()
-  })
-
   it('shows tracker menu when user is owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
@@ -315,7 +295,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    const menuItem = await screen.findByText('Chart Options')
+    const menuItem = await screen.findByText('Settings')
     await user.click(menuItem)
 
     expect(screen.getByText('Close')).toBeInTheDocument()
@@ -402,7 +382,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    const menuItem = await screen.findByText('Chart Options')
+    const menuItem = await screen.findByText('Settings')
     await user.click(menuItem)
 
     await user.click(screen.getByText('Save'))
@@ -414,6 +394,37 @@ describe('TrackerDetailView', () => {
       expect(patchCall).toBeDefined()
       const body = JSON.parse((patchCall![1] as RequestInit).body as string)
       expect(body.chart_config).toContain('"palette":"default"')
+    })
+  })
+
+  it('saves visibility via PATCH from settings panel', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'public', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    const menuItem = await screen.findByText('Settings')
+    await user.click(menuItem)
+
+    const select = screen.getByDisplayValue('Private')
+    await user.selectOptions(select, 'public')
+    await user.click(screen.getByText('Save'))
+
+    await vi.waitFor(() => {
+      const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) => url === '/api/trackers/1' && (init as RequestInit)?.method === 'PATCH'
+      )
+      expect(patchCall).toBeDefined()
+      const body = JSON.parse((patchCall![1] as RequestInit).body as string)
+      expect(body.visibility).toBe('public')
     })
   })
 
@@ -525,7 +536,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    await user.click(await screen.findByText('Chart Options'))
+    await user.click(await screen.findByText('Settings'))
 
     const areaCheckbox = screen.getByLabelText('Area')
     await user.click(areaCheckbox)
@@ -551,7 +562,7 @@ describe('TrackerDetailView', () => {
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    await user.click(await screen.findByText('Chart Options'))
+    await user.click(await screen.findByText('Settings'))
 
     const legendCheckbox = screen.getByLabelText('Legend')
     expect(legendCheckbox).not.toBeChecked()
@@ -562,7 +573,7 @@ describe('TrackerDetailView', () => {
     expect(screen.queryByText('Close')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
-    await user.click(await screen.findByText('Chart Options'))
+    await user.click(await screen.findByText('Settings'))
 
     expect(screen.getByLabelText('Legend')).toBeChecked()
   })
@@ -948,423 +959,6 @@ describe('TrackerDetailView', () => {
     expect(postBody.mock.calls[0][0]).toMatchObject({ value: 42 })
   })
 
-})
-
-
-describe('TrackerDetailEditRouter', () => {
-  beforeEach(() => {
-    vi.mocked(useLoaderData).mockReset()
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ values: [] }),
-    } as Response)
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('throws 403 Forbidden when user has no role', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'public', type: 'tracker', chart_config: '{}', role: '', liked: false },
-      series: [],
-    })
-    let thrown: unknown
-    try {
-      render(<MemoryRouter><TrackerDetailEditRouter /></MemoryRouter>)
-    } catch (e) {
-      thrown = e
-    }
-    expect(thrown).toBeInstanceOf(Response)
-    expect((thrown as Response).status).toBe(403)
-  })
-
-  it('renders edit page for owner', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEditRouter /></MemoryRouter>)
-    expect(screen.getByPlaceholderText('Series name')).toBeInTheDocument()
-  })
-
-  it('renders edit page for editor', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEditRouter /></MemoryRouter>)
-    expect(screen.getByPlaceholderText('Series name')).toBeInTheDocument()
-  })
-})
-
-describe('TrackerDetailEdit', () => {
-  beforeEach(() => {
-    vi.mocked(useLoaderData).mockReset()
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ values: [] }),
-    } as Response)
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('renders edit heading with tracker name', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'edit-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText(/edit-tracker \(Edit\)/)).toBeInTheDocument()
-  })
-
-  it('renders Add Series form', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByPlaceholderText('Series name')).toBeInTheDocument()
-    expect(screen.getByText('Add Series')).toBeInTheDocument()
-  })
-
-  it('renders Add Value form', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText('Add Value')).toBeInTheDocument()
-  })
-
-  it('renders tracker name in title', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText('test (Edit)')).toBeInTheDocument()
-  })
-
-  it('renders visibility selector', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText('Visibility')).toBeInTheDocument()
-    const select = screen.getByDisplayValue('Private')
-    expect(select).toBeInTheDocument()
-  })
-
-  it('renders Chart Options section with all inputs', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText('Chart Options')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('X-axis label')).toBeInTheDocument()
-    expect(screen.getByText('Y-Axes')).toBeInTheDocument()
-    expect(screen.getByText('Area')).toBeInTheDocument()
-    expect(screen.getByText('Legend')).toBeInTheDocument()
-    expect(screen.getByText('Slider')).toBeInTheDocument()
-    expect(screen.getByText('Color')).toBeInTheDocument()
-    expect(screen.getByText('X-Axis')).toBeInTheDocument()
-    expect(screen.getByText('Save')).toBeInTheDocument()
-  })
-
-  it('pre-fills chart option labels from tracker.chart_config', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"x_axis_label":"Time","y_axes":[{"id":0,"label":"Value","position":"left"}]}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByDisplayValue('Time')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Value')).toBeInTheDocument()
-  })
-
-  it('renders Value Format column in series table', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText('Value Format')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('e.g. %.1f')).toBeInTheDocument()
-  })
-
-  it('renders Chart Type and Y-Axis columns in series table', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"y_axes":[{"id":1,"position":"right"},{"id":0,"position":"left"}]}', role: 'owner', liked: false },
-      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"type":"bar","y_axis_index":1}' }],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    expect(screen.getByText('Chart Type')).toBeInTheDocument()
-    expect(screen.getByText('Y-Axis')).toBeInTheDocument()
-    const typeSelect = screen.getByDisplayValue('Bar') as HTMLSelectElement
-    expect(typeSelect).toBeInTheDocument()
-    // y_axis_index:1 is the left axis (reversed order in config), dropdown should show Left
-    const yAxisSelect = screen.getByDisplayValue('Left') as HTMLSelectElement
-    expect(yAxisSelect).toBeInTheDocument()
-    const options = Array.from(yAxisSelect.options)
-    expect(options).toHaveLength(2)
-    expect(options[0].text).toBe('Left')
-    expect(options[1].text).toBe('Right')
-  })
-
-  it('pre-fills value format input from series config', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"value_format":"%.2f"}' }],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const input = screen.getByPlaceholderText('e.g. %.1f') as HTMLInputElement
-    expect(input.value).toBe('%.2f')
-  })
-
-  it('sends PATCH request when saving value format', async () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }],
-    })
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
-      if (opts?.method === 'PATCH') {
-        return {
-          ok: true,
-          json: () => Promise.resolve({ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"value_format":"%.1f"}' }),
-        } as Response
-      }
-      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
-    })
-
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const input = screen.getByPlaceholderText('e.g. %.1f') as HTMLInputElement
-    fireEvent.change(input, { target: { value: '%.1f' } })
-
-    const row = input.closest('tr') as HTMLElement
-    within(row).getByText('Save').click()
-
-    await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/10', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: '{"value_format":"%.1f"}' }),
-      })
-    })
-  })
-
-  it('clears value format when input is empty and saved', async () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{"value_format":"%.2f"}' }],
-    })
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
-      if (opts?.method === 'PATCH') {
-        return {
-          ok: true,
-          json: () => Promise.resolve({ id: 10, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }),
-        } as Response
-      }
-      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
-    })
-
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const input = screen.getByPlaceholderText('e.g. %.1f') as HTMLInputElement
-    fireEvent.change(input, { target: { value: '' } })
-
-    const row = input.closest('tr') as HTMLElement
-    within(row).getByText('Save').click()
-
-    await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/10', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config: '{}' }),
-      })
-    })
-  })
-
-  it('reassigns series to Y0 when removed axis was used', async () => {
-    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"},{"id":1,"position":"right","label":"Rate"}]}'
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: {
-        id: 1, name: 'test', visibility: 'private', type: 'tracker',
-        chart_config: chartConfig,
-        role: 'owner', liked: false,
-      },
-      series: [
-        { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' },
-        { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '{"y_axis_index":1}' },
-      ],
-    })
-
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
-      if (opts?.method === 'PATCH') {
-        if (url === '/api/trackers/1') {
-          const body = JSON.parse(opts.body as string)
-          return {
-            ok: true,
-            json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: body.chart_config, role: 'owner', liked: false }),
-          } as Response
-        }
-        return {
-          ok: true,
-          json: () => Promise.resolve({ id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: opts.body }),
-        } as Response
-      }
-      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
-    })
-
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-
-    const removeButtons = screen.getAllByText('Remove')
-    fireEvent.click(removeButtons[1])
-
-    await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series/2', expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ config: '{"y_axis_index":0}' }),
-      }))
-    })
-
-    await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ chart_config: '{"x_axis_type":"date","show_legend":false,"show_slider":false,"show_toolbox":true,"palette":"default","y_axes":[{"id":0,"position":"left","label":"Count"}]}' }),
-      }))
-    })
-  })
-
-  it('disables Remove button when only one axis is active', () => {
-    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"}]}'
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: {
-        id: 1, name: 'test', visibility: 'private', type: 'tracker',
-        chart_config: chartConfig,
-        role: 'owner', liked: false,
-      },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const removeButtons = screen.getAllByText('Remove')
-    expect(removeButtons).toHaveLength(1)
-    expect(removeButtons[0]).toBeDisabled()
-  })
-
-  it('shows Add button for removed axis and clicking it adds axis back', async () => {
-    const chartConfig = '{"y_axes":[{"id":0,"position":"left","label":"Count"},{"id":1,"position":"right","label":"Rate"}]}'
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: {
-        id: 1, name: 'test', visibility: 'private', type: 'tracker',
-        chart_config: chartConfig,
-        role: 'owner', liked: false,
-      },
-      series: [],
-    })
-
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
-      if (opts?.method === 'PATCH' && url === '/api/trackers/1') {
-        const body = JSON.parse(opts.body as string)
-        return {
-          ok: true,
-          json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: body.chart_config, role: 'owner', liked: false }),
-        } as Response
-      }
-      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
-    })
-
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-
-    // Both axes active: two Remove buttons, one Add button (in Add Value form)
-    expect(screen.getAllByText('Remove')).toHaveLength(2)
-    const addButtonsBefore = screen.getAllByText('Add')
-    expect(addButtonsBefore).toHaveLength(1) // Only the "Add Value" button
-
-    // Click Remove on Right axis (second Remove button)
-    const removeButtons = screen.getAllByText('Remove')
-    fireEvent.click(removeButtons[1])
-
-    // Now: Left active (Remove), Right inactive (Add for axis + Add Value)
-    await vi.waitFor(() => {
-      expect(screen.getAllByText('Remove')).toHaveLength(1)
-      expect(screen.getAllByText('Add')).toHaveLength(2) // Y-axis Add + Add Value
-    })
-
-    // Click the first Add button (Y-axis Add)
-    const addButtonsAfter = screen.getAllByText('Add')
-    fireEvent.click(addButtonsAfter[0])
-
-    await vi.waitFor(() => {
-      expect(screen.getAllByText('Remove')).toHaveLength(2)
-    })
-  })
-
-  it('renders Body editor with current body value', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: 'existing body' },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const editor = screen.getByPlaceholderText('Write the body in Markdown...') as HTMLTextAreaElement
-    expect(editor).toBeInTheDocument()
-    expect(editor.value).toBe('existing body')
-    expect(screen.getByText('Save Body')).toBeInTheDocument()
-  })
-
-  it('renders chart section inside a card', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const noData = screen.getByText('No data to display')
-    const chartCard = noData.closest('.bg-card')
-    expect(chartCard).toBeInTheDocument()
-    expect(chartCard!.className).toContain('border rounded-lg')
-  })
-
-  it('renders body editor inside a card', () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: 'Some body' },
-      series: [],
-    })
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const editor = screen.getByPlaceholderText('Write the body in Markdown...')
-    expect(editor.closest('.bg-card')).toBeInTheDocument()
-  })
-
-  it('saves body via PATCH request', async () => {
-    vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: 'old body' },
-      series: [],
-    })
-    globalThis.fetch = vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
-      if (opts?.method === 'PATCH') {
-        const reqBody = JSON.parse(opts.body as string)
-        return {
-          ok: true,
-          json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: reqBody.body }),
-        } as Response
-      }
-      return { ok: true, json: () => Promise.resolve({ values: [] }) } as Response
-    })
-
-    render(<MemoryRouter><TrackerDetailEdit /></MemoryRouter>)
-    const editor = screen.getByPlaceholderText('Write the body in Markdown...') as HTMLTextAreaElement
-    fireEvent.change(editor, { target: { value: 'new body' } })
-    fireEvent.click(screen.getByText('Save Body'))
-
-    await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ body: 'new body' }),
-      })
-    })
-  })
 })
 
 describe('TrackerCard', () => {
