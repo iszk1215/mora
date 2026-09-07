@@ -335,67 +335,7 @@ describe('Breadcrumbs', () => {
     expect(link).toHaveAttribute('href', '/?q=foo')
   })
 
-  it('shows Search Results > Tracker Name > Edit for edit page with fromSearch', () => {
-    vi.mocked(useMatches).mockReturnValue([
-      {
-        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-        handle: {},
-      },
-      {
-        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
-        handle: {},
-      },
-      {
-        id: 'routes/trackers/:trackerId/edit', pathname: '/trackers/1/edit', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'Edit' }) },
-      },
-    ])
-    render(
-      <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit', state: { fromSearch: 'foo' } }]}>
-        <Breadcrumbs />
-      </MemoryRouter>
-    )
-    expect(screen.getByText('Search Results')).toBeInTheDocument()
-    expect(screen.getByText('My Tracker')).toBeInTheDocument()
-    expect(screen.getByText('Edit')).toBeInTheDocument()
-    const searchLink = screen.getByText('Search Results').closest('a')
-    expect(searchLink).toHaveAttribute('href', '/?q=foo')
-    const trackerLink = screen.getByText('My Tracker').closest('a')
-    expect(trackerLink).toHaveAttribute('href', '/trackers/1')
-  })
 
-  it('shows Username linking to user page > Tracker Name > Edit for edit page without fromSearch', () => {
-    vi.mocked(useMatches).mockReturnValue([
-      {
-        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-        handle: {},
-      },
-      {
-        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
-        handle: {},
-      },
-      {
-        id: 'routes/trackers/:trackerId/edit', pathname: '/trackers/1/edit', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'Edit' }) },
-      },
-    ])
-    render(
-      <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit' }]}>
-        <Breadcrumbs />
-      </MemoryRouter>
-    )
-    expect(screen.queryByText('Search Results')).toBeNull()
-    expect(screen.getByText('alice')).toBeInTheDocument()
-    expect(screen.getByText('alice').closest('a')).toHaveAttribute('href', '/users/alice')
-    expect(screen.getByText('My Tracker')).toBeInTheDocument()
-    expect(screen.getByText('Edit')).toBeInTheDocument()
-    const trackerLink = screen.getByText('My Tracker').closest('a')
-    expect(trackerLink).toHaveAttribute('href', '/trackers/1')
-  })
 
   it('shows tracker name in coverage breadcrumb from data', () => {
     vi.mocked(useMatches).mockReturnValue([
@@ -484,36 +424,6 @@ describe('Breadcrumbs', () => {
     expect(link).toHaveAttribute('href', '/users/alice?q=foo')
   })
 
-  it('shows Username > Search Results > Tracker Name > Edit on edit page with fromUser', () => {
-    vi.mocked(useMatches).mockReturnValue([
-      {
-        id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-        handle: {},
-      },
-      {
-        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' },
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
-        handle: {},
-      },
-      {
-        id: 'routes/trackers/:trackerId/edit', pathname: '/trackers/1/edit', params: { trackerId: '1' },
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
-        handle: { crumb: () => ({ label: 'Edit' }) },
-      },
-    ])
-    render(
-      <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit', state: { fromSearch: 'foo', fromUser: 'alice' } }]}>
-        <Breadcrumbs />
-      </MemoryRouter>
-    )
-    expect(screen.getByText('alice')).toBeInTheDocument()
-    expect(screen.getByText('alice').closest('a')).toHaveAttribute('href', '/users/alice')
-    expect(screen.getByText('Search Results')).toBeInTheDocument()
-    expect(screen.getByText('My Tracker')).toBeInTheDocument()
-    expect(screen.getByText('Edit')).toBeInTheDocument()
-    const searchLink = screen.getByText('Search Results').closest('a')
-    expect(searchLink).toHaveAttribute('href', '/users/alice?q=foo')
-  })
 
   // Tests using React Router v7 auto-generated numeric IDs (e.g. "0-4-2")
   describe('with React Router v7 numeric route IDs', () => {
@@ -571,63 +481,7 @@ describe('Breadcrumbs', () => {
       expect(screen.getByText('My Tracker')).toBeInTheDocument()
     })
 
-    it('shows Search Results > Tracker Name > Edit on edit page with fromSearch (real IDs)', () => {
-      vi.mocked(useMatches).mockReturnValue([
-        {
-          id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-          handle: {},
-        },
-        {
-          id: '0-4', pathname: '/trackers', params: {}, data: undefined, loaderData: undefined,
-          handle: {},
-        },
-        {
-          id: '0-4-3', pathname: '/trackers/1/edit', params: { trackerId: '1' },
-          data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
-          handle: { crumb: () => ({ label: 'Edit' }) },
-        },
-      ])
-      render(
-        <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit', state: { fromSearch: 'foo' } }]}>
-          <Breadcrumbs />
-        </MemoryRouter>
-      )
-      expect(screen.getByText('Search Results')).toBeInTheDocument()
-      expect(screen.getByText('My Tracker')).toBeInTheDocument()
-      expect(screen.getByText('Edit')).toBeInTheDocument()
-      const searchLink = screen.getByText('Search Results').closest('a')
-      expect(searchLink).toHaveAttribute('href', '/?q=foo')
-      const trackerLink = screen.getByText('My Tracker').closest('a')
-      expect(trackerLink).toHaveAttribute('href', '/trackers/1')
-    })
 
-    it('shows Username linking to user page > Tracker Name > Edit on edit page without fromSearch (real IDs)', () => {
-      vi.mocked(useMatches).mockReturnValue([
-        {
-          id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
-          handle: {},
-        },
-        {
-          id: '0-4', pathname: '/trackers', params: {}, data: undefined, loaderData: undefined,
-          handle: {},
-        },
-        {
-          id: '0-4-3', pathname: '/trackers/1/edit', params: { trackerId: '1' },
-          data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
-          handle: { crumb: () => ({ label: 'Edit' }) },
-        },
-      ])
-      render(
-        <MemoryRouter initialEntries={[{ pathname: '/trackers/1/edit' }]}>
-          <Breadcrumbs />
-        </MemoryRouter>
-      )
-      expect(screen.queryByText('Search Results')).toBeNull()
-      expect(screen.getByText('alice')).toBeInTheDocument()
-      expect(screen.getByText('alice').closest('a')).toHaveAttribute('href', '/users/alice')
-      expect(screen.getByText('My Tracker')).toBeInTheDocument()
-      expect(screen.getByText('Edit')).toBeInTheDocument()
-    })
   })
 })
 

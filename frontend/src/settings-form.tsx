@@ -4,17 +4,18 @@ import { Button } from '@/components/ui/button'
 import { ChartConfig, YAxisConfig } from './core'
 import { PALETTE_NAMES } from './chart'
 
-export interface ChartOptionsFormProps {
+export interface SettingsFormProps {
   initialConfig: ChartConfig
   baselineConfig?: ChartConfig
+  initialVisibility?: string
   onChange?: (config: ChartConfig) => void
-  onSave?: (config: ChartConfig) => Promise<void> | void
+  onSave?: (config: ChartConfig, visibility?: string) => Promise<void> | void
   onCancel?: (config: ChartConfig) => void
   onYAxesChange?: (config: ChartConfig) => void
   onRemoveYAxis?: (removed: YAxisConfig) => void
 }
 
-export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSave, onCancel, onYAxesChange, onRemoveYAxis }: ChartOptionsFormProps): React.JSX.Element => {
+export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility, onChange, onSave, onCancel, onYAxesChange, onRemoveYAxis }: SettingsFormProps): React.JSX.Element => {
   const [xLabel, setXLabel] = useState(initialConfig.x_axis_label ?? '')
   const [xAxisType, setXAxisType] = useState<'date' | 'datetime'>(initialConfig.x_axis_type ?? 'date')
   const [area, setArea] = useState(initialConfig.area ?? true)
@@ -24,10 +25,12 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
   const [showToolbox, setShowToolbox] = useState(initialConfig.show_toolbox ?? true)
   const [palette, setPalette] = useState(initialConfig.palette ?? 'default')
   const [yAxes, setYAxes] = useState<YAxisConfig[]>(() => initialConfig.y_axes?.length ? initialConfig.y_axes : [{ id: 0, position: 'left' }])
+  const [visibility, setVisibility] = useState(initialVisibility ?? 'private')
 
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const baselineRef = useRef<ChartConfig>(baselineConfig ?? initialConfig)
+  const baselineVisibilityRef = useRef<string>(initialVisibility ?? 'private')
 
   const resetFrom = (cc: ChartConfig) => {
     setXLabel(cc.x_axis_label ?? '')
@@ -39,6 +42,7 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
     setShowToolbox(cc.show_toolbox ?? true)
     setPalette(cc.palette ?? 'default')
     setYAxes(cc.y_axes?.length ? cc.y_axes : [{ id: 0, position: 'left' }])
+    setVisibility(baselineVisibilityRef.current)
     setSaved(false)
   }
 
@@ -74,8 +78,9 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
     setSaving(true)
     try {
       const config = buildConfig()
-      await onSave?.(config)
+      await onSave?.(config, visibility)
       baselineRef.current = config
+      baselineVisibilityRef.current = visibility
       setSaved(true)
     } finally {
       setSaving(false)
@@ -92,6 +97,7 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3 mb-4">
+        <span className="text-lg">Chart Options</span>
         <label className="flex items-center gap-1 text-sm">
           <input type="checkbox" checked={area} onChange={(e) => setArea(e.target.checked)} />
           Area
@@ -218,6 +224,18 @@ export const ChartOptionsForm = ({ initialConfig, baselineConfig, onChange, onSa
             </div>
           )
         })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <span className="text-lg">Visibility</span>
+        <select
+          value={visibility}
+          onChange={(e) => setVisibility(e.target.value)}
+          className="border rounded px-2 py-1"
+        >
+          <option value="private">Private</option>
+          <option value="public">Public</option>
+        </select>
       </div>
 
       <div className="flex items-center gap-2">

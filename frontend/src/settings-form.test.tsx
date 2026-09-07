@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { ChartOptionsForm } from './chart-options-form'
+import { SettingsForm } from './settings-form'
 
-describe('ChartOptionsForm', () => {
+describe('SettingsForm', () => {
   describe('onChange', () => {
     it('calls onChange with show_slider true when slider checkbox is checked', async () => {
       const onChange = vi.fn()
       render(
-        <ChartOptionsForm
+        <SettingsForm
           initialConfig={{ show_slider: false }}
           onChange={onChange}
         />,
@@ -23,7 +23,7 @@ describe('ChartOptionsForm', () => {
     it('calls onChange with show_slider false when slider checkbox is unchecked', async () => {
       const onChange = vi.fn()
       render(
-        <ChartOptionsForm
+        <SettingsForm
           initialConfig={{ show_slider: true }}
           onChange={onChange}
         />,
@@ -39,7 +39,7 @@ describe('ChartOptionsForm', () => {
     it('calls onChange with show_legend true when legend checkbox is checked', async () => {
       const onChange = vi.fn()
       render(
-        <ChartOptionsForm
+        <SettingsForm
           initialConfig={{ show_legend: false }}
           onChange={onChange}
         />,
@@ -55,7 +55,7 @@ describe('ChartOptionsForm', () => {
     it('calls onChange with area false when area checkbox is unchecked', async () => {
       const onChange = vi.fn()
       render(
-        <ChartOptionsForm
+        <SettingsForm
           initialConfig={{ area: true }}
           onChange={onChange}
         />,
@@ -71,7 +71,7 @@ describe('ChartOptionsForm', () => {
     it('calls onChange with show_toolbox true when toolbox checkbox is checked', async () => {
       const onChange = vi.fn()
       render(
-        <ChartOptionsForm
+        <SettingsForm
           initialConfig={{ show_toolbox: false }}
           onChange={onChange}
         />,
@@ -89,7 +89,7 @@ describe('ChartOptionsForm', () => {
     it('emits show_symbols false when symbols checkbox is unchecked', async () => {
       const onChange = vi.fn()
       render(
-        <ChartOptionsForm
+        <SettingsForm
           initialConfig={{ show_symbols: true }}
           onChange={onChange}
         />,
@@ -105,7 +105,7 @@ describe('ChartOptionsForm', () => {
     it('includes all checkbox options in built config', async () => {
       const onChange = vi.fn()
       render(
-        <ChartOptionsForm
+        <SettingsForm
           initialConfig={{
             area: false,
             show_legend: true,
@@ -132,7 +132,7 @@ describe('ChartOptionsForm', () => {
     it('calls onSave with current config when save button is clicked', async () => {
       const onSave = vi.fn()
       render(
-        <ChartOptionsForm
+        <SettingsForm
           initialConfig={{ show_slider: false }}
           onSave={onSave}
         />,
@@ -147,6 +147,43 @@ describe('ChartOptionsForm', () => {
       })
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({ show_slider: true }),
+        expect.any(String),
+      )
+    })
+  })
+
+  describe('visibility', () => {
+    it('renders visibility select with initial value', () => {
+      render(
+        <SettingsForm
+          initialConfig={{}}
+          initialVisibility="public"
+        />,
+      )
+      expect(screen.getByText('Visibility')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('Public')).toBeInTheDocument()
+    })
+
+    it('passes visibility to onSave when changed', async () => {
+      const onSave = vi.fn()
+      render(
+        <SettingsForm
+          initialConfig={{}}
+          initialVisibility="private"
+          onSave={onSave}
+        />,
+      )
+      const select = screen.getByDisplayValue('Private')
+      await act(() => {
+        fireEvent.change(select, { target: { value: 'public' } })
+      })
+      const saveButton = screen.getByRole('button', { name: /save/i })
+      await act(() => {
+        fireEvent.click(saveButton)
+      })
+      expect(onSave).toHaveBeenCalledWith(
+        expect.any(Object),
+        'public',
       )
     })
   })
