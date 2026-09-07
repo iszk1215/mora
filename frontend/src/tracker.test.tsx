@@ -705,7 +705,7 @@ describe('TrackerDetailView', () => {
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
-    expect(screen.getByText('Add content...')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /edit body/i })).toBeInTheDocument()
   })
 
   it('renders description in the same foreground color as the title', () => {
