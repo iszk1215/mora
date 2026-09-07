@@ -903,10 +903,11 @@ export const TrackerDetailView = (): React.JSX.Element => {
             <div className="mt-6">
               <button
                 type="button"
+                aria-label="Edit body"
                 onClick={() => { setDraftBody(trackerBody); setEditingBody(true) }}
-                className="text-muted-foreground text-sm italic hover:text-foreground transition-colors"
+                className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               >
-                Add content...
+                <Pencil className="w-4 h-4" />
               </button>
             </div>
           )
