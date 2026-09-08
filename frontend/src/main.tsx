@@ -27,6 +27,7 @@ import { signupRoute } from './signup'
 import { apiKeyRoute } from './apikey'
 import { PasswordLoginForm } from './auth'
 import { ErrorPage, NotFoundPage } from './error-page'
+import { PrivacyPage } from './privacy'
 import { DefaultLink, HeaderLink } from './util'
 import { Button } from '@/components/ui/button'
 import {
@@ -495,6 +496,16 @@ async function loadRootData(): Promise<{ user: UserData | null }> {
   }
 }
 
+export const Footer = (): React.JSX.Element => {
+  return (
+    <footer className="border-t mt-6">
+      <div className="px-4 sm:px-8 py-4">
+        <DefaultLink to="/privacy">Privacy Policy</DefaultLink>
+      </div>
+    </footer>
+  )
+}
+
 const Root = (): React.JSX.Element => {
   const { user } = useLoaderData() as { user: UserData | null }
   const [searchState, setSearchState] = useState<SearchState>({
@@ -506,13 +517,14 @@ const Root = (): React.JSX.Element => {
   return (
     <UserProvider value={user}>
       <SearchContext.Provider value={{ ...searchState, setSearch: setSearchState }}>
-        <div>
+        <div className="flex flex-col min-h-screen">
           <ScrollRestoration />
           <Header />
-          <div className="w-full sm:w-8/12 m-auto px-4 sm:px-0">
+          <div className="w-full sm:w-8/12 m-auto px-4 sm:px-0 flex-1">
             <Breadcrumbs />
             <Outlet />
           </div>
+          <Footer />
         </div>
       </SearchContext.Provider>
     </UserProvider>
@@ -551,6 +563,18 @@ export const routes = [
           crumb: (_params: Params, _data: any) => ({ label: "Sign Up", link: "/signup" }),
         },
         children: [signupRoute],
+      },
+      {
+        path: '/privacy',
+        handle: {
+          crumb: () => ({ label: "Privacy Policy", link: "/privacy" }),
+        },
+        children: [
+          {
+            index: true,
+            element: <PrivacyPage />,
+          },
+        ],
       },
       {
         path: '/settings/api-keys',
