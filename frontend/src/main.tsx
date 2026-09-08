@@ -3,6 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import ReactDOM from 'react-dom/client'
 import {
   createBrowserRouter,
+  Link,
   Outlet,
   Params,
   ScrollRestoration,
@@ -498,9 +499,11 @@ async function loadRootData(): Promise<{ user: UserData | null }> {
 
 export const Footer = (): React.JSX.Element => {
   return (
-    <footer className="border-t mt-6">
-      <div className="px-4 sm:px-8 py-4">
-        <DefaultLink to="/privacy">Privacy Policy</DefaultLink>
+    <footer className="mt-6 py-3">
+      <div className="px-4 sm:px-8 text-xs">
+        <Link to="/privacy" className="text-muted-foreground no-underline hover:text-foreground hover:underline">
+          Privacy Policy
+        </Link>
       </div>
     </footer>
   )
