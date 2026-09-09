@@ -153,6 +153,12 @@ plain HTTP; login will not work. Production deployments behind a TLS-terminating
 reverse proxy should either set `X-Forwarded-Proto: https` or leave the default
 (Secure always on).
 
+All cookies are necessary/functional cookies (session management, CSRF
+protection, OAuth login state). There are no non-essential (tracking,
+analytics, advertising) cookies, so no consent banner is required; the
+`/privacy` page (linked from the site footer) discloses the cookies used and
+how to control them from the browser.
+
 ## Usernames
 
 - Usernames are unique (case-insensitive, enforced by the

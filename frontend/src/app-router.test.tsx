@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 // Import the router pieces from the same module instance so React contexts
 // match; importing RouterProvider from 'react-router/dom' would resolve to a
 // separate build and break context identity in tests.
@@ -59,5 +59,15 @@ describe('app router integration', () => {
     expect(await screen.findByRole('heading', { name: 'Not Found' })).toBeInTheDocument()
     expect(await screen.findByText('404')).toBeInTheDocument()
     expect(document.querySelectorAll('header')).toHaveLength(1)
+  })
+
+  it('renders Privacy Policy page with footer link and exactly one header', async () => {
+    renderRoutesAt('/privacy')
+    expect(await screen.findByRole('heading', { name: 'Privacy Policy' })).toBeInTheDocument()
+    expect(await screen.findByText('morasessionid')).toBeInTheDocument()
+    expect(document.querySelectorAll('header')).toHaveLength(1)
+    const footer = document.querySelector('footer')
+    expect(footer).not.toBeNull()
+    expect(within(footer as HTMLElement).getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy')
   })
 })
