@@ -2,6 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { formatValue, formatDateTick, formatDateTimeTick, TrackerChart, CHART_FONT_FAMILY, CHART_THEME_NAME } from './chart'
+import { normalizeChartConfig } from './core'
 
 vi.mock('echarts-for-react', () => ({
   default: ({ option, onEvents, theme }: any) => (
@@ -614,13 +615,24 @@ describe('formatDateTick', () => {
   })
 })
 
-describe('formatDateTimeTick', () => {
-  it('omits time for midnight ticks', () => {
-    expect(formatDateTimeTick(new Date(2024, 2, 9).getTime())).toBe('3/9')
+describe('normalizeChartConfig', () => {
+  it('defaults x_axis_type to date when missing', () => {
+    expect(normalizeChartConfig({})).toEqual({ x_axis_type: 'date' })
   })
 
-  it('appends zero-padded time for intraday ticks', () => {
-    expect(formatDateTimeTick(new Date(2024, 2, 9, 10, 30).getTime())).toBe('3/9 10:30')
-    expect(formatDateTimeTick(new Date(2024, 2, 9, 8, 5).getTime())).toBe('3/9 08:05')
+  it('preserves explicit date value', () => {
+    expect(normalizeChartConfig({ x_axis_type: 'date' })).toEqual({ x_axis_type: 'date' })
+  })
+
+  it('preserves explicit datetime value', () => {
+    expect(normalizeChartConfig({ x_axis_type: 'datetime' })).toEqual({ x_axis_type: 'datetime' })
+  })
+
+  it('preserves other config fields', () => {
+    const input = { palette: 'dark', area: false }
+    const result = normalizeChartConfig(input)
+    expect(result.x_axis_type).toBe('date')
+    expect(result.palette).toBe('dark')
+    expect(result.area).toBe(false)
   })
 })

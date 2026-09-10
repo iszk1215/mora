@@ -15,7 +15,7 @@ import {
 } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig } from './core'
+import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig, normalizeChartConfig } from './core'
 import { SettingsForm } from './settings-form'
 import { SeriesTable } from './series-form'
 import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, CHART_THEME_NAME } from './chart'
@@ -165,7 +165,7 @@ export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise
 
 export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean; searchQuery?: string; fromUser?: string }): React.JSX.Element => {
   const chartConfig = useMemo(() => {
-    try { return JSON.parse(preview?.tracker?.chart_config ?? '{}') as ChartConfig }
+    try { return normalizeChartConfig(JSON.parse(preview?.tracker?.chart_config ?? '{}') as ChartConfig) }
     catch { return {} as ChartConfig }
   }, [preview])
   const colors = useMemo(() => resolvePalette(chartConfig.palette), [chartConfig.palette])
@@ -513,7 +513,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
   const [chartConfig, setChartConfig] = useState<ChartConfig | null>(() => {
     try {
-      return JSON.parse(tracker.chart_config) as ChartConfig
+      return normalizeChartConfig(JSON.parse(tracker.chart_config) as ChartConfig)
     } catch {
       return null
     }
@@ -848,7 +848,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
               const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config), visibility })
               setChartConfig(() => {
                 try {
-                  return JSON.parse(updated.chart_config) as ChartConfig
+                  return normalizeChartConfig(JSON.parse(updated.chart_config) as ChartConfig)
                 } catch {
                   return config
                 }

@@ -1078,6 +1078,24 @@ describe('TrackerCard', () => {
     expect(option.series[0].data[0][0]).toBe('2024-01-15')
   })
 
+  it('defaults to date-only x values when x_axis_type is not set', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      chart_config: '{}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-15T10:30:00Z', value: 90 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].data[0][0]).toBe('2024-01-15')
+  })
+
   it('shows private badge for private trackers', () => {
     const tracker = {
       id: 1, name: 'test', visibility: 'private', type: 'tracker',
