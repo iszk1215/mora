@@ -57,6 +57,10 @@ export interface ChartConfig {
   y_axes?: YAxisConfig[]
 }
 
+export function normalizeChartConfig(cc: ChartConfig): ChartConfig {
+  return cc.x_axis_type ? cc : { ...cc, x_axis_type: 'date' }
+}
+
 export interface SeriesConfig {
   value_format?: string
   type?: 'line' | 'bar'

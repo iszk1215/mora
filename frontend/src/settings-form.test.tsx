@@ -86,6 +86,50 @@ describe('SettingsForm', () => {
   })
 
   describe('buildConfig', () => {
+    it('emits x_axis_type date by default', async () => {
+      const onChange = vi.fn()
+      render(
+        <SettingsForm
+          initialConfig={{}}
+          onChange={onChange}
+        />,
+      )
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0]
+      expect(lastCall.x_axis_type).toBe('date')
+    })
+
+    it('emits x_axis_type datetime when datetime is selected', async () => {
+      const onChange = vi.fn()
+      render(
+        <SettingsForm
+          initialConfig={{}}
+          onChange={onChange}
+        />,
+      )
+      const select = screen.getByDisplayValue('Date')
+      await act(() => {
+        fireEvent.change(select, { target: { value: 'datetime' } })
+      })
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0]
+      expect(lastCall.x_axis_type).toBe('datetime')
+    })
+
+    it('emits explicit x_axis_type date when date is selected', async () => {
+      const onChange = vi.fn()
+      render(
+        <SettingsForm
+          initialConfig={{ x_axis_type: 'datetime' }}
+          onChange={onChange}
+        />,
+      )
+      const select = screen.getByDisplayValue('Datetime')
+      await act(() => {
+        fireEvent.change(select, { target: { value: 'date' } })
+      })
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0]
+      expect(lastCall.x_axis_type).toBe('date')
+    })
+
     it('emits show_symbols false when symbols checkbox is unchecked', async () => {
       const onChange = vi.fn()
       render(

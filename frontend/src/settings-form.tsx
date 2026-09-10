@@ -49,7 +49,7 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
   const buildConfig = (yAxesOverride?: YAxisConfig[]): ChartConfig => {
     const cc: ChartConfig = {}
     if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
-    if (xAxisType === 'date') cc.x_axis_type = 'date'
+    cc.x_axis_type = xAxisType
     if (!area) cc.area = false
     if (showLegend) cc.show_legend = true
     if (!showLegend) cc.show_legend = false
