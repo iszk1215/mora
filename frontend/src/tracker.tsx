@@ -781,9 +781,15 @@ export const TrackerDetailView = (): React.JSX.Element => {
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl">Series</h2>
-            <Button variant="outline" size="sm" onClick={() => setShowSeriesSettings(false)}>
-              Close
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setAddSeriesError(null); setNewSeriesName(seriesList.length === 0 ? tracker.name : ''); setAddSeriesOpen(true) }}>
+                <Plus className="w-4 h-4" />
+                Add Series
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowSeriesSettings(false)}>
+                Close
+              </Button>
+            </div>
           </div>
           <SeriesTable
             trackerId={tracker.id}
