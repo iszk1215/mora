@@ -1061,7 +1061,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.Equal(t, "renamed", got.Name)
 	})
 
-	t.Run("invalid JSON config rejected", func(t *testing.T) {
+	t.Run("patch series name empty rejected", func(t *testing.T) {
 		store := initTestStore(t)
 		tr := &TrackerModel{Name: "test"}
 		require.NoError(t, store.addTracker(tr, 1))
@@ -1070,10 +1070,46 @@ func TestHandlerPatchSeries(t *testing.T) {
 
 		h := newHandler(store)
 		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
-		body := PatchSeriesRequest{Config: strPtr("not-json")}
+		body := PatchSeriesRequest{Name: strPtr("   ")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("patch series name trimmed", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d", tr.Id, s.Id)
+		body := PatchSeriesRequest{Name: strPtr("  renamed  ")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got SeriesModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, "renamed", got.Name)
+	})
+
+	t.Run("patch series name duplicate rejected", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		s1 := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s1))
+		s2 := &SeriesModel{TrackerId: tr.Id, Name: "s2", DataType: "float"}
+		require.NoError(t, store.addSeries(s2))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d", tr.Id, s2.Id)
+		body := PatchSeriesRequest{Name: strPtr("s1")}
+		r := newRequestWithJSON(t, http.MethodPatch, path, body)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusConflict, h, r)
 	})
 
 	t.Run("forbidden without edit permission", func(t *testing.T) {

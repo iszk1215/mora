@@ -50,7 +50,7 @@ Hard limits on the number of series and values, applied regardless of user type 
 | GET | `/api/trackers/{trackerId}/preview` | Preview data (latest 20 values per series) | read perm |
 | GET | `/api/trackers/{trackerId}/series` | List series | read perm |
 | POST | `/api/trackers/{trackerId}/series` | Create series | edit perm |
-| PATCH | `/api/trackers/{trackerId}/series/{seriesId}` | Update series | edit perm |
+| PATCH | `/api/trackers/{trackerId}/series/{seriesId}` | Update series (rename via `name`, data_type, config) | edit perm |
 | DELETE | `/api/trackers/{trackerId}/series/{seriesId}` | Delete series | edit perm |
 | GET | `/api/trackers/{trackerId}/series/{seriesId}/values` | List values (`?limit=N`) | read perm |
 | POST | `/api/trackers/{trackerId}/series/{seriesId}/values` | Add value | edit perm |
@@ -59,6 +59,8 @@ Hard limits on the number of series and values, applied regardless of user type 
 | DELETE | `/api/trackers/{trackerId}/like` | Unlike | authenticated |
 
 POST returns 201, DELETE returns 204.
+
+PATCH `/api/trackers/{trackerId}/series/{seriesId}` accepts optional `name`, `data_type`, and `config` fields; only provided fields are updated. A series `name` must be non-empty (after trim), at most 200 characters, and unique within the tracker. A rename to an already-used name returns `409 Conflict`.
 
 ## Authentication & Authorization
 

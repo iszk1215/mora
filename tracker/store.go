@@ -39,6 +39,9 @@ const (
 	// tracker may have, regardless of user type (issue #195).
 	MaxSeriesPerTracker = 10
 
+	// MaxSeriesNameLength is the maximum length of a series name.
+	MaxSeriesNameLength = 200
+
 	// MaxValuesPerSeries is the hard limit on the number of values a single
 	// series may have, regardless of user type (issue #195).
 	MaxValuesPerSeries = 5000
@@ -511,6 +514,17 @@ func (s *trackerStore) listSeries(trackerId int64) ([]SeriesModel, error) {
 	}
 
 	return rows, nil
+}
+
+// seriesNameExists reports whether another series in the same tracker already
+// uses the given name. The series with excludeId (if any) is not counted.
+func (s *trackerStore) seriesNameExists(trackerId int64, name string, excludeId int64) (bool, error) {
+	query := "SELECT COUNT(*) FROM tracker_series WHERE tracker_id = ? AND name = ? AND id != ?"
+	var n int
+	if err := s.db.Get(&n, query, trackerId, name, excludeId); err != nil {
+		return false, fmt.Errorf("seriesNameExists select: %w", err)
+	}
+	return n > 0, nil
 }
 
 func (s *trackerStore) deleteSeries(id int64) error {

@@ -770,6 +770,32 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	series, _ := seriesFrom(r.Context())
+
+	if req.Name != nil {
+		n := strings.TrimSpace(*req.Name)
+		if n == "" {
+			render.BadRequest(w, errors.New("name must not be empty"))
+			return
+		}
+		if len(n) > MaxSeriesNameLength {
+			render.BadRequest(w, errors.New("name must be at most 200 characters"))
+			return
+		}
+		*req.Name = n
+
+		exists, err := h.store.seriesNameExists(tracker.Id, n, series.Id)
+		if err != nil {
+			log.Error().Err(err).Msg("patchSeries seriesNameExists")
+			render.InternalError(w, err)
+			return
+		}
+		if exists {
+			render.Conflict(w, errors.New("series name already exists in this tracker"))
+			return
+		}
+	}
+
 	if req.DataType != nil {
 		dt := *req.DataType
 		if dt != "int" && dt != "float" {
@@ -789,7 +815,6 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	series, _ := seriesFrom(r.Context())
 	err = h.store.updateSeries(series.Id, req.Name, req.DataType, req.Config)
 	if err != nil {
 		log.Error().Err(err).Msg("patchSeries updateSeries")

@@ -585,6 +585,19 @@ export const TrackerDetailView = (): React.JSX.Element => {
     setSeriesValues((prev) => prev.filter((sv) => sv.series.id !== seriesId))
   }
 
+  const handleSeriesRename = async (seriesId: number, name: string): Promise<boolean> => {
+    try {
+      const updated = await patchSeries(tracker.id, seriesId, { name })
+      setSeriesList((prev) => prev.map((s) => (s.id === seriesId ? updated : s)))
+      setSeriesValues((prev) =>
+        prev.map((sv) => (sv.series.id === seriesId ? { ...sv, series: updated } : sv))
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const handleValuesCleared = (seriesId: number) => {
     setSeriesValues((prev) =>
       prev.map((sv) =>
@@ -778,6 +791,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
             yAxes={yAxes}
             onDeleteSeries={handleSeriesDeleted}
             onValuesCleared={handleValuesCleared}
+            onRenameSeries={handleSeriesRename}
           />
         </div>
       )}
