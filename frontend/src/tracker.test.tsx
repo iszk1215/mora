@@ -334,8 +334,8 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
 
-    expect(screen.getByDisplayValue('series-a')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('series-b')).toBeInTheDocument()
+    expect(screen.getByText('series-a')).toBeInTheDocument()
+    expect(screen.getByText('series-b')).toBeInTheDocument()
     expect(screen.getAllByText('Delete')).toHaveLength(2)
   })
 
@@ -357,6 +357,9 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
 
+    const pencil = screen.getByRole('button', { name: /rename series series-a/i })
+    await user.click(pencil)
+
     const nameInput = screen.getByRole('textbox', { name: /rename series series-a/i })
     await user.clear(nameInput)
     await user.type(nameInput, 'series-a-renamed')
@@ -373,7 +376,7 @@ describe('TrackerDetailView', () => {
     })
 
     await vi.waitFor(() => {
-      expect(screen.getByDisplayValue('series-a-renamed')).toBeInTheDocument()
+      expect(screen.getByText('series-a-renamed')).toBeInTheDocument()
     })
   })
 
@@ -402,7 +405,7 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
     await vi.waitFor(() => {
-      expect(screen.getByDisplayValue('added-series')).toBeInTheDocument()
+      expect(screen.getByText('added-series')).toBeInTheDocument()
     })
   })
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react'
 
+import { Pencil } from 'lucide-react'
 import { patchSeries, deleteSeries, deleteValues } from './tracker'
 import { Button } from '@/components/ui/button'
 import {
@@ -310,6 +311,7 @@ function ValueFormatCell({ seriesId, initialFormat, onSave }: { seriesId: number
 }
 
 function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId: number; initialName: string; existingNames: string[]; onRename?: (seriesId: number, name: string) => Promise<boolean> }): React.JSX.Element {
+  const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(initialName)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -324,6 +326,7 @@ function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId
       return
     }
     if (trimmed === initialName) {
+      setEditing(false)
       setValue(initialName)
       setError(null)
       return
@@ -339,10 +342,28 @@ function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId
     setSaving(false)
     if (ok) {
       setSaved(true)
+      setEditing(false)
     } else {
       setValue(initialName)
       setError('Failed to rename. Please try again.')
     }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-sm">{initialName}</span>
+        {onRename && (
+          <button
+            onClick={() => { setValue(initialName); setEditing(true) }}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label={`Rename series ${initialName}`}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -352,6 +373,7 @@ function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId
         value={value}
         onChange={(e) => { setValue(e.target.value); setSaved(false); setError(null) }}
         maxLength={200}
+        autoFocus
         className="border rounded px-1 py-0.5 w-40 text-sm"
         onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
         aria-label={`Rename series ${initialName}`}
