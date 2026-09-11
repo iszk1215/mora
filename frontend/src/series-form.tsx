@@ -1,5 +1,6 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react'
 
+import { Pencil } from 'lucide-react'
 import { patchSeries, deleteSeries, deleteValues } from './tracker'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,10 +24,11 @@ interface SeriesTableProps {
   onSelectSeries?: (seriesId: number) => void
   onDeleteSeries?: (seriesId: number) => void
   onValuesCleared?: (seriesId: number) => void
+  onRenameSeries?: (seriesId: number, name: string) => Promise<boolean>
   ref?: React.Ref<SeriesTableHandle>
 }
 
-export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDeleteSeries, onValuesCleared, ref }: SeriesTableProps): React.JSX.Element => {
+export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDeleteSeries, onValuesCleared, onRenameSeries, ref }: SeriesTableProps): React.JSX.Element => {
   const [seriesValueFormats, setSeriesValueFormats] = useState<Record<number, string>>(() => {
     const map: Record<number, string> = {}
     for (const s of seriesList) {
@@ -213,7 +215,12 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
                     {s.name}
                   </button>
                 ) : (
-                  s.name
+                  <NameCell
+                    seriesId={s.id}
+                    initialName={s.name}
+                    existingNames={seriesList.map((x) => x.name)}
+                    onRename={onRenameSeries}
+                  />
                 )}
               </TableCell>
               <TableCell>{s.data_type}</TableCell>
@@ -299,6 +306,82 @@ function ValueFormatCell({ seriesId, initialFormat, onSave }: { seriesId: number
       <Button size="sm" variant="outline" onClick={handleSave} disabled={saving}>
         {saving ? '...' : saved ? 'Saved' : 'Save'}
       </Button>
+    </div>
+  )
+}
+
+function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId: number; initialName: string; existingNames: string[]; onRename?: (seriesId: number, name: string) => Promise<boolean> }): React.JSX.Element {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(initialName)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { setValue(initialName); setSaved(false); setError(null) }, [initialName])
+
+  const handleSave = async () => {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      setError('Name must not be empty')
+      return
+    }
+    if (trimmed === initialName) {
+      setEditing(false)
+      setValue(initialName)
+      setError(null)
+      return
+    }
+    if (existingNames.some((n) => n === trimmed)) {
+      setError('Name already exists')
+      return
+    }
+    if (!onRename) return
+    setSaving(true)
+    setError(null)
+    const ok = await onRename(seriesId, trimmed)
+    setSaving(false)
+    if (ok) {
+      setSaved(true)
+      setEditing(false)
+    } else {
+      setValue(initialName)
+      setError('Failed to rename. Please try again.')
+    }
+  }
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-sm">{initialName}</span>
+        {onRename && (
+          <button
+            onClick={() => { setValue(initialName); setEditing(true) }}
+            className="text-muted-foreground hover:text-foreground"
+            aria-label={`Rename series ${initialName}`}
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => { setValue(e.target.value); setSaved(false); setError(null) }}
+        maxLength={200}
+        autoFocus
+        className="border rounded px-1 py-0.5 w-40 text-sm"
+        onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+        aria-label={`Rename series ${initialName}`}
+      />
+      <Button size="sm" variant="outline" onClick={handleSave} disabled={saving}>
+        {saving ? '...' : saved ? 'Saved' : 'Save'}
+      </Button>
+      {error && <span className="text-xs text-red-600">{error}</span>}
     </div>
   )
 }
