@@ -341,6 +341,26 @@ definitions:
       visibility:
         type: string
     type: object
+  tracker.PatchValueItem:
+    properties:
+      id:
+        type: integer
+      time:
+        type: string
+      value:
+        type: number
+    type: object
+  tracker.PatchValuesRequest:
+    properties:
+      deletes:
+        items:
+          type: integer
+        type: array
+      updates:
+        items:
+          $ref: '#/definitions/tracker.PatchValueItem'
+        type: array
+    type: object
   tracker.PreviewResponse:
     properties:
       series:
@@ -1624,6 +1644,59 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrorResponse'
       summary: List all values
+      tags:
+      - tracker
+    patch:
+      consumes:
+      - application/json
+      description: Apply a set of value updates and deletions to a series atomically.
+        Updating a value to a timestamp that already exists in the same series is
+        rejected with a conflict.
+      parameters:
+      - description: Tracker ID
+        in: path
+        name: trackerId
+        required: true
+        type: integer
+      - description: Series ID
+        in: path
+        name: seriesId
+        required: true
+        type: integer
+      - description: Batch of value updates and deletions
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/tracker.PatchValuesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/tracker.ListValuesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/core.ErrorResponse'
+      summary: Update and delete values in a batch
       tags:
       - tracker
     post:

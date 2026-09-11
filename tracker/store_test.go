@@ -995,3 +995,71 @@ func TestStoreTrackerOwner(t *testing.T) {
 		require.True(t, trackers[0].LastUpdatedAt.Equal(tr.LastUpdatedAt))
 	})
 }
+
+func TestStoreApplyValueChanges(t *testing.T) {
+	s := initTestStore(t)
+
+	tr := &TrackerModel{Name: "test_tracker"}
+	require.NoError(t, s.addTracker(tr, 1))
+	ser := &SeriesModel{TrackerId: tr.Id, Name: "test_series", DataType: "float"}
+	require.NoError(t, s.addSeries(ser))
+
+	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Hour)
+	t3 := t1.Add(2 * time.Hour)
+
+	v1 := &ValueModel{SeriesId: ser.Id, Timestamp: t1, Value: 10.0}
+	v2 := &ValueModel{SeriesId: ser.Id, Timestamp: t2, Value: 20.0}
+	v3 := &ValueModel{SeriesId: ser.Id, Timestamp: t3, Value: 30.0}
+	require.NoError(t, s.addValue(v1))
+	require.NoError(t, s.addValue(v2))
+	require.NoError(t, s.addValue(v3))
+
+	t.Run("empty batch returns current values", func(t *testing.T) {
+		values, err := s.applyValueChanges(ser.Id, nil, nil)
+		require.NoError(t, err)
+		require.Len(t, values, 3)
+	})
+
+	t.Run("update and delete", func(t *testing.T) {
+		values, err := s.applyValueChanges(ser.Id,
+			[]ValuePatch{{Id: v1.Id, Time: t1.Add(time.Hour * 24), Value: 99.0}},
+			[]int64{v2.Id})
+		require.NoError(t, err)
+		require.Len(t, values, 2)
+		require.Equal(t, v3.Id, values[0].Id)
+		require.Equal(t, v1.Id, values[1].Id)
+		require.Equal(t, 99.0, values[1].Value)
+
+		got, err := s.findTrackerById(tr.Id)
+		require.NoError(t, err)
+		require.True(t, got.LastUpdatedAt.After(tr.LastUpdatedAt))
+	})
+
+	t.Run("delete unknown id is ignored", func(t *testing.T) {
+		values, err := s.applyValueChanges(ser.Id, nil, []int64{99999})
+		require.NoError(t, err)
+		require.Len(t, values, 2)
+	})
+
+	t.Run("update unknown id returns errorValueNotFound", func(t *testing.T) {
+		_, err := s.applyValueChanges(ser.Id, []ValuePatch{{Id: 99999, Time: t1, Value: 1}}, nil)
+		require.ErrorIs(t, err, errorValueNotFound)
+	})
+
+	t.Run("duplicate time returns ErrValueExists", func(t *testing.T) {
+		v4 := &ValueModel{SeriesId: ser.Id, Timestamp: t1.Add(3 * time.Hour), Value: 40.0}
+		require.NoError(t, s.addValue(v4))
+
+		_, err := s.applyValueChanges(ser.Id, []ValuePatch{{Id: v4.Id, Time: t1.Add(time.Hour * 24), Value: 41.0}}, nil)
+		require.ErrorIs(t, err, ErrValueExists)
+
+		// ensure the failed batch rolled back
+		values, err := s.listValues(ser.Id, 0)
+		require.NoError(t, err)
+		require.Len(t, values, 3)
+		for _, v := range values {
+			require.NotEqual(t, 41.0, v.Value)
+		}
+	})
+}

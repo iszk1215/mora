@@ -1029,6 +1029,144 @@ describe('TrackerDetailView', () => {
     expect(postBody.mock.calls[0][0]).toMatchObject({ value: 42 })
   })
 
+  const openEditCard = async (user: ReturnType<typeof userEvent.setup>, values: { id: number; time: string; value: number }[]) => {
+    globalThis.fetch = vi.fn((_url: RequestInfo | URL, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ values }) } as Response)
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ values }) } as Response)
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Add Data Points'))
+    await user.click(screen.getByRole('button', { name: 's1' }))
+  }
+
+  it('opens the data point edit card and lists values newest-first', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    await openEditCard(user, [
+      { id: 1, time: '2024-01-01T00:00:00Z', value: 10 },
+      { id: 2, time: '2024-01-03T00:00:00Z', value: 20 },
+      { id: 3, time: '2024-01-02T00:00:00Z', value: 30 },
+    ])
+
+    expect(screen.getByText('Save')).toBeInTheDocument()
+    const timeInputs = screen.getAllByLabelText(/Data point time for s1/)
+    expect(timeInputs.map((el) => (el as HTMLInputElement).value.slice(0, 10))).toEqual([
+      '2024-01-03', '2024-01-02', '2024-01-01',
+    ])
+  })
+
+  it('paginates edit card values and supports changing per page', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    const values = Array.from({ length: 25 }, (_, i) => ({
+      id: i + 1,
+      time: `2024-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`,
+      value: i + 1,
+    }))
+    await openEditCard(user, values)
+
+    expect(screen.getAllByLabelText(/Data point time for s1/)).toHaveLength(20)
+    expect(screen.getByText('1 of 2')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText('2 of 2')).toBeInTheDocument()
+    expect(screen.getAllByLabelText(/Data point time for s1/)).toHaveLength(5)
+
+    await user.selectOptions(screen.getByLabelText('Data points per page'), '50')
+    expect(screen.getAllByLabelText(/Data point time for s1/)).toHaveLength(25)
+    expect(screen.getByText('1 of 1')).toBeInTheDocument()
+  })
+
+  it('reflects edit card value changes in the chart immediately without saving', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    const patchSpy = vi.fn()
+    await openEditCard(user, [{ id: 1, time: '2024-01-01T00:00:00Z', value: 10 }])
+    globalThis.fetch = vi.fn((_url: RequestInfo | URL, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        patchSpy()
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ values: [{ id: 1, time: '2024-01-01T00:00:00Z', value: 10 }] }) } as Response)
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ values: [{ id: 1, time: '2024-01-01T00:00:00Z', value: 10 }] }) } as Response)
+    })
+
+    const valueInput = screen.getByLabelText(/Data point value for s1/)
+    await user.clear(valueInput)
+    await user.type(valueInput, '42')
+
+    const option = JSON.parse(screen.getByTestId('echart').getAttribute('data-option') as string)
+    expect(JSON.stringify(option)).toContain('42')
+    expect(patchSpy).not.toHaveBeenCalled()
+  })
+
+  it('saves all edits and deletes in a single batch request', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    const patchBody = vi.fn()
+    const values = [
+      { id: 1, time: '2024-01-01T00:00:00Z', value: 10 },
+      { id: 2, time: '2024-01-02T00:00:00Z', value: 20 },
+      { id: 3, time: '2024-01-03T00:00:00Z', value: 30 },
+    ]
+    await openEditCard(user, values)
+    globalThis.fetch = vi.fn((_url: RequestInfo | URL, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        patchBody(JSON.parse(opts?.body as string))
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ values }) } as Response)
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ values }) } as Response)
+    })
+
+    const valueInputs = screen.getAllByLabelText(/Data point value for s1/)
+    await user.clear(valueInputs[0])
+    await user.type(valueInputs[0], '42')
+    await user.click(screen.getByRole('button', { name: 'Delete data point 1' }))
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(patchBody).toHaveBeenCalled())
+    expect(patchBody.mock.calls[0][0]).toEqual({
+      updates: [{ id: 3, time: '2024-01-03T00:00:00.000Z', value: 42 }],
+      deletes: [1],
+    })
+  })
+
+  it('discards pending edits and refetches values when closed', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    await openEditCard(user, [{ id: 1, time: '2024-01-01T00:00:00Z', value: 10 }])
+
+    const valueInput = screen.getByLabelText(/Data point value for s1/)
+    await user.clear(valueInput)
+    await user.type(valueInput, '42')
+
+    const closeButtons = screen.getAllByRole('button', { name: 'Close' })
+    await user.click(closeButtons[closeButtons.length - 1])
+
+    expect(screen.queryByText('Save')).not.toBeInTheDocument()
+    await waitFor(() => {
+      const option = JSON.parse(screen.getByTestId('echart').getAttribute('data-option') as string)
+      expect(JSON.stringify(option)).not.toContain('42')
+    })
+  })
+
 })
 
 describe('TrackerCard', () => {
@@ -1041,8 +1179,8 @@ describe('TrackerCard', () => {
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"y_axis_index":0}' }, values: [{ time: '2024-01-01', value: 10 }] },
-        { series: { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '{"y_axis_index":1}' }, values: [{ time: '2024-01-01', value: 80 }] },
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"y_axis_index":0}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
+        { series: { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '{"y_axis_index":1}' }, values: [{ id: 1, time: '2024-01-01', value: 80 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1065,7 +1203,7 @@ describe('TrackerCard', () => {
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-01', value: 10 }] },
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1085,7 +1223,7 @@ describe('TrackerCard', () => {
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-01', value: 10 }] },
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1103,7 +1241,7 @@ describe('TrackerCard', () => {
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-01', value: 10 }] },
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1121,7 +1259,7 @@ describe('TrackerCard', () => {
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"type":"bar"}' }, values: [{ time: '2024-01-01', value: 10 }] },
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"type":"bar"}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1139,7 +1277,7 @@ describe('TrackerCard', () => {
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-15T10:30:00Z', value: 90 }] },
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-15T10:30:00Z', value: 90 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1157,7 +1295,7 @@ describe('TrackerCard', () => {
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ time: '2024-01-15T10:30:00Z', value: 90 }] },
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-15T10:30:00Z', value: 90 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)

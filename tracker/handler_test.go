@@ -1346,6 +1346,111 @@ func TestHandlerDeleteValues(t *testing.T) {
 	getResponse(t, http.StatusNoContent, h, r)
 }
 
+func TestHandlerPatchValues(t *testing.T) {
+	setup := func(t *testing.T) (*trackerStore, int64, int64, ValueModel, ValueModel) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test", Type: TypeTracker}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		t1 := time.Now().Round(0)
+		v1 := &ValueModel{SeriesId: s.Id, Timestamp: t1, Value: 10.0}
+		v2 := &ValueModel{SeriesId: s.Id, Timestamp: t1.Add(time.Hour), Value: 20.0}
+		require.NoError(t, store.addValue(v1))
+		require.NoError(t, store.addValue(v2))
+		return store, tr.Id, s.Id, *v1, *v2
+	}
+
+	t.Run("update and delete returns updated list", func(t *testing.T) {
+		store, trId, sId, v1, v2 := setup(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		req := PatchValuesRequest{
+			Updates: []PatchValueItem{{Id: v1.Id, Time: v2.Timestamp.Add(time.Hour), Value: 99.0}},
+			Deletes: []int64{v2.Id},
+		}
+		r := newRequestWithJSON(t, http.MethodPatch, path, req)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListValuesResponse
+		unmarshalResponse(t, res, &got)
+		require.Len(t, got.Values, 1)
+		require.Equal(t, v1.Id, got.Values[0].Id)
+		require.Equal(t, 99.0, got.Values[0].Value)
+	})
+
+	t.Run("empty batch returns current values", func(t *testing.T) {
+		store, trId, sId, _, _ := setup(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		r := newRequestWithJSON(t, http.MethodPatch, path, PatchValuesRequest{})
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListValuesResponse
+		unmarshalResponse(t, res, &got)
+		require.Len(t, got.Values, 2)
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		store, trId, sId, _, _ := setup(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		r := httptest.NewRequest(http.MethodPatch, path, bytes.NewBufferString("{invalid"))
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("duplicate time returns 409", func(t *testing.T) {
+		store, trId, sId, v1, v2 := setup(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		// v1 time collides with v2's time
+		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: v1.Id, Time: v2.Timestamp, Value: 99.0}}}
+		r := newRequestWithJSON(t, http.MethodPatch, path, req)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusConflict, h, r)
+
+		var got core.ErrorResponse
+		unmarshalResponse(t, res, &got)
+		require.Contains(t, got.Message, "timestamp already exists")
+	})
+
+	t.Run("update unknown id returns 404", func(t *testing.T) {
+		store, trId, sId, _, _ := setup(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: 99999, Time: time.Now(), Value: 1}}}
+		r := newRequestWithJSON(t, http.MethodPatch, path, req)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusNotFound, h, r)
+	})
+
+	t.Run("forbidden without auth", func(t *testing.T) {
+		store, trId, sId, _, _ := setup(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		r := newRequestWithJSON(t, http.MethodPatch, path, PatchValuesRequest{})
+		getResponse(t, http.StatusNotFound, h, r)
+	})
+
+	t.Run("coverage tracker returns 400", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "cov", Type: TypeCoverage}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", tr.Id, s.Id)
+		r := newRequestWithJSON(t, http.MethodPatch, path, PatchValuesRequest{})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+}
+
 // ----------------------------------------------------------------------
 // Like
 

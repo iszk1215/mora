@@ -15,6 +15,7 @@ import (
 var (
 	errorTrackerNotFound = errors.New("no tracker found")
 	errorSeriesNotFound  = errors.New("no series found")
+	errorValueNotFound   = errors.New("no value found")
 
 	// ErrTrackerLimitReached is returned when the owner has reached the
 	// maximum number of trackers allowed for their user type.
@@ -27,6 +28,10 @@ var (
 	// ErrValueLimitReached is returned when a series has reached the
 	// maximum number of values.
 	ErrValueLimitReached = errors.New("value limit reached for this series")
+
+	// ErrValueExists is returned when an update would collide with an
+	// existing value sharing the same (series_id, time) pair.
+	ErrValueExists = errors.New("a value with this timestamp already exists")
 )
 
 const (
@@ -686,6 +691,87 @@ func (s *trackerStore) deleteValues(seriesId int64) error {
 		return fmt.Errorf("deleteValues delete: %w", err)
 	}
 	return nil
+}
+
+// ValuePatch describes an update to a single value row.
+type ValuePatch struct {
+	Id    int64
+	Time  time.Time
+	Value float64
+}
+
+// applyValueChanges applies updates and deletions to a series' values within a
+// single transaction and returns the resulting value list (ordered by time).
+// Updates are rejected (ErrValueExists) when the new timestamp collides with
+// another value of the same series. Deletions of unknown ids are ignored.
+func (s *trackerStore) applyValueChanges(seriesID int64, updates []ValuePatch, deletes []int64) ([]ValueModel, error) {
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return nil, fmt.Errorf("applyValueChanges begin: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	for _, u := range updates {
+		var count int
+		err := tx.Get(&count,
+			"SELECT COUNT(*) FROM tracker_value WHERE series_id = ? AND time = ? AND id != ?",
+			seriesID, u.Time, u.Id)
+		if err != nil {
+			return nil, fmt.Errorf("applyValueChanges conflict check: %w", err)
+		}
+		if count > 0 {
+			return nil, fmt.Errorf("applyValueChanges update %d: %w", u.Id, ErrValueExists)
+		}
+
+		res, err := tx.Exec("UPDATE tracker_value SET time = ?, value = ? WHERE id = ? AND series_id = ?",
+			u.Time, u.Value, u.Id, seriesID)
+		if err != nil {
+			return nil, fmt.Errorf("applyValueChanges update: %w", err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return nil, fmt.Errorf("applyValueChanges rows affected: %w", err)
+		}
+		if n == 0 {
+			return nil, fmt.Errorf("applyValueChanges update %d: %w", u.Id, errorValueNotFound)
+		}
+	}
+
+	if len(deletes) > 0 {
+		query, args, err := sqlx.In("DELETE FROM tracker_value WHERE series_id = ? AND id IN (?)", seriesID, deletes)
+		if err != nil {
+			return nil, fmt.Errorf("applyValueChanges delete: %w", err)
+		}
+		query = tx.Rebind(query)
+		if _, err := tx.Exec(query, args...); err != nil {
+			return nil, fmt.Errorf("applyValueChanges delete: %w", err)
+		}
+	}
+
+	var trackerID int64
+	if len(updates) > 0 || len(deletes) > 0 {
+		err := tx.Get(&trackerID, "SELECT tracker_id FROM tracker_series WHERE id = ?", seriesID)
+		if err != nil {
+			return nil, fmt.Errorf("applyValueChanges find series: %w", err)
+		}
+		if _, err := tx.Exec("UPDATE tracker SET last_updated_at = ? WHERE id = ?", time.Now(), trackerID); err != nil {
+			return nil, fmt.Errorf("applyValueChanges touchTracker: %w", err)
+		}
+	}
+
+	var values []ValueModel
+	err = tx.Select(&values, "SELECT id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time", seriesID)
+	if err != nil {
+		return nil, fmt.Errorf("applyValueChanges select: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("applyValueChanges commit: %w", err)
+	}
+
+	return values, nil
 }
 
 // ----------------------------------------------------------------------
