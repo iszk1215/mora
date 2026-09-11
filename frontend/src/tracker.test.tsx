@@ -409,6 +409,35 @@ describe('TrackerDetailView', () => {
     })
   })
 
+  it('adds a series from the series settings panel button', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 'added-from-panel', data_type: 'float', config: '{"type":"line"}' }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    const addButtons = await screen.findAllByRole('button', { name: /add series/i })
+    await user.click(addButtons[addButtons.length - 1])
+
+    const nameInput = screen.getByPlaceholderText('Series name')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'added-from-panel')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('added-from-panel')).toBeInTheDocument()
+    })
+  })
+
   it('saves chart options via PATCH from panel', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
