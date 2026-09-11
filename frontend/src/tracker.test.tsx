@@ -1145,6 +1145,28 @@ describe('TrackerDetailView', () => {
     })
   })
 
+  it('reverts pending edits without closing when cancel is clicked', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    await openEditCard(user, [{ id: 1, time: '2024-01-01T00:00:00Z', value: 10 }])
+
+    const valueInput = screen.getByLabelText(/Data point value for s1/)
+    await user.clear(valueInput)
+    await user.type(valueInput, '42')
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByText('Save')).toBeInTheDocument()
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Data point value for s1/) as HTMLInputElement).value).toBe('10')
+      const option = JSON.parse(screen.getByTestId('echart').getAttribute('data-option') as string)
+      expect(JSON.stringify(option)).not.toContain('42')
+    })
+  })
+
   it('discards pending edits and refetches values when closed', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({

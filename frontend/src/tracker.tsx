@@ -741,6 +741,26 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
+  const refetchSeriesValues = async (seriesId: number) => {
+    try {
+      const resp = await fetch(`/api/trackers/${tracker.id}/series/${seriesId}/values`)
+      const data = await resp.json()
+      setSeriesValues((prev) =>
+        prev.map((sv) => (sv.series.id === seriesId ? { ...sv, values: data.values ?? [] } : sv))
+      )
+    } catch { /* ignore */ }
+  }
+
+  const cancelEditChanges = async () => {
+    const sid = editSeriesId
+    setPendingEdits({})
+    setPendingDeletes(new Set())
+    setEditError(null)
+    if (sid != null) {
+      await refetchSeriesValues(sid)
+    }
+  }
+
   const closeEditSeries = async () => {
     const sid = editSeriesId
     setEditSeriesId(null)
@@ -749,13 +769,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     setEditError(null)
     setEditPage(1)
     if (sid != null) {
-      try {
-        const resp = await fetch(`/api/trackers/${tracker.id}/series/${sid}/values`)
-        const data = await resp.json()
-        setSeriesValues((prev) =>
-          prev.map((sv) => (sv.series.id === sid ? { ...sv, values: data.values ?? [] } : sv))
-        )
-      } catch { /* ignore */ }
+      await refetchSeriesValues(sid)
     }
   }
 
@@ -1058,6 +1072,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
           onPerPageChange={(n) => { setEditPerPage(n); setEditPage(1) }}
           onPageChange={setEditPage}
           onSave={handleSaveValues}
+          onCancel={cancelEditChanges}
           onClose={closeEditSeries}
         />
       )}

@@ -33,6 +33,7 @@ export interface DataPointEditCardProps {
   onPerPageChange: (n: number) => void
   onPageChange: (n: number) => void
   onSave: () => void
+  onCancel: () => void
   onClose: () => void
 }
 
@@ -70,6 +71,7 @@ export const DataPointEditCard = ({
   onPerPageChange,
   onPageChange,
   onSave,
+  onCancel,
   onClose,
 }: DataPointEditCardProps): React.JSX.Element => {
   const totalPages = Math.max(1, Math.ceil(total / perPage))
@@ -80,6 +82,9 @@ export const DataPointEditCard = ({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl">{seriesName}</h2>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onCancel} disabled={!dirty || saving}>
+            Cancel
+          </Button>
           <Button variant="outline" size="sm" onClick={onSave} disabled={!dirty || saving}>
             {saving ? 'Saving...' : 'Save'}
           </Button>
