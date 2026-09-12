@@ -159,6 +159,15 @@ describe('TrackerCreate', () => {
     expect(cancelLink).toHaveAttribute('href', '/users/testuser')
   })
 
+  it('renders login prompt when not logged in', () => {
+    render(<MemoryRouter><UserProvider value={null}><TrackerCreate /></UserProvider></MemoryRouter>)
+    expect(screen.getByText('Create Tracker')).toBeInTheDocument()
+    expect(screen.getByText('Please log in to create a tracker.')).toBeInTheDocument()
+    const loginLink = screen.getByText('Login').closest('a')
+    expect(loginLink).toHaveAttribute('href', '/auth')
+    expect(screen.queryByPlaceholderText('Tracker name')).not.toBeInTheDocument()
+  })
+
   it('creates tracker and navigates on submit', async () => {
     const created = { id: 42, name: 'new-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
     vi.mocked(globalThis.fetch).mockResolvedValue({

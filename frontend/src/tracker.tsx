@@ -1252,6 +1252,18 @@ export const TrackerCreate = (): React.JSX.Element => {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  if (!user) {
+    return (
+      <div>
+        <h1 className="text-3xl my-4">Create Tracker</h1>
+        <p className="mb-4">Please log in to create a tracker.</p>
+        <Button variant="outline" asChild>
+          <Link to="/auth">Login</Link>
+        </Button>
+      </div>
+    )
+  }
+
   const handleCreate = async () => {
     if (!name.trim()) return
     setLoading(true)
@@ -1318,7 +1330,7 @@ export const TrackerCreate = (): React.JSX.Element => {
 
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link to={user ? `/users/${user.username}` : '/'}>Cancel</Link>
+            <Link to={`/users/${user.username}`}>Cancel</Link>
           </Button>
           <Button onClick={handleCreate} disabled={!name.trim() || loading}>
             Create
