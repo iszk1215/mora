@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
@@ -18,12 +18,14 @@ import { Button } from '@/components/ui/button'
 import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig, normalizeChartConfig } from './core'
 import { SettingsForm } from './settings-form'
 import { SeriesTable } from './series-form'
+import { DataPointEditCard, isoToInputValue } from './data-points-form'
 import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, CHART_THEME_NAME } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
 
-interface ValueModel {
+export interface ValueModel {
+  id: number
   time: string
   value: number
 }
@@ -131,6 +133,23 @@ async function createValue(trackerId: number, seriesId: number, time: string, va
 export async function deleteValues(trackerId: number, seriesId: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, { method: 'DELETE' })
   if (!resp.ok) throw resp
+}
+
+interface ValueUpdate {
+  id: number
+  time: string
+  value: number
+}
+
+export async function patchValuesBatch(trackerId: number, seriesId: number, updates: ValueUpdate[], deletes: number[]): Promise<ValueModel[]> {
+  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ updates, deletes }),
+  })
+  if (!resp.ok) throw resp
+  const data = await resp.json()
+  return data.values ?? []
 }
 
 export async function likeTracker(trackerId: number): Promise<void> {
@@ -354,6 +373,14 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [addValueError, setAddValueError] = useState<string | null>(null)
   const [valueInputs, setValueInputs] = useState<Record<number, { time: string; value: string }>>({})
 
+  const [editSeriesId, setEditSeriesId] = useState<number | null>(null)
+  const [editPage, setEditPage] = useState(1)
+  const [editPerPage, setEditPerPage] = useState(20)
+  const [pendingEdits, setPendingEdits] = useState<Record<number, { time: string; value: string }>>({})
+  const [pendingDeletes, setPendingDeletes] = useState<Set<number>>(new Set())
+  const [savingValues, setSavingValues] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
   const [draftName, setDraftName] = useState(tracker.name)
   const [draftDescription, setDraftDescription] = useState(tracker.description ?? '')
   const [draftBody, setDraftBody] = useState(tracker.body ?? '')
@@ -362,15 +389,39 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [savingDescription, setSavingDescription] = useState(false)
   const [savingBody, setSavingBody] = useState(false)
 
+  const seriesValuesRef = useRef(seriesValues)
+  useEffect(() => { seriesValuesRef.current = seriesValues }, [seriesValues])
+  const pendingEditsRef = useRef<Record<number, { time: string; value: string }>>({})
+  useEffect(() => { pendingEditsRef.current = pendingEdits }, [pendingEdits])
+  const pendingDeletesRef = useRef<Set<number>>(new Set())
+  useEffect(() => { pendingDeletesRef.current = pendingDeletes }, [pendingDeletes])
+
   useEffect(() => {
     Promise.all(
       seriesList.map((s) =>
         fetch(`/api/trackers/${tracker.id}/series/${s.id}/values`)
           .then((r) => r.json() as Promise<{ values: ValueModel[] }>)
-          .then((d) => ({ series: s, values: d.values ?? [] }))
+          .then((d) => ({ series: s, values: mergePendingValues(s.id, d.values ?? []) }))
       )
     ).then(setSeriesValues).catch(() => {})
   }, [seriesList, tracker.id])
+
+  const mergePendingValues = (seriesId: number, fetched: ValueModel[]): ValueModel[] => {
+    const deletes = pendingDeletesRef.current
+    const edits = pendingEditsRef.current
+    const existing = seriesValuesRef.current.find((x) => x.series.id === seriesId)?.values ?? []
+    const byId = new Map(existing.map((v) => [v.id, v]))
+    const result: ValueModel[] = []
+    for (const v of fetched) {
+      if (deletes.has(v.id)) continue
+      if (edits[v.id]) {
+        const cur = byId.get(v.id)
+        if (cur) { result.push(cur); continue }
+      }
+      result.push(v)
+    }
+    return result
+  }
 
   const handleLikeToggle = async () => {
     setLikeLoading(true)
@@ -539,6 +590,16 @@ export const TrackerDetailView = (): React.JSX.Element => {
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
   }, [xAxisType])
 
+  const editSorted = useMemo(() => {
+    const sv = seriesValues.find((x) => x.series.id === editSeriesId)
+    return sv ? [...sv.values].sort((a, b) => b.time.localeCompare(a.time)) : []
+  }, [seriesValues, editSeriesId])
+  const editTotalPages = Math.max(1, Math.ceil(editSorted.length / editPerPage))
+  const editClampedPage = Math.min(editPage, editTotalPages)
+  const editPageValues = editSorted.slice((editClampedPage - 1) * editPerPage, editClampedPage * editPerPage)
+  const editDirty = Object.keys(pendingEdits).length > 0 || pendingDeletes.size > 0
+  const editSeries = editSeriesId != null ? seriesList.find((s) => s.id === editSeriesId) : undefined
+
   const openAddValue = () => {
     setValueInputs(Object.fromEntries(seriesList.map((s) => [s.id, { time: todayValue, value: '' }])))
     setAddValueError(null)
@@ -580,9 +641,146 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
+  const openEditSeries = (seriesId: number) => {
+    setEditSeriesId(seriesId)
+    setEditPage(1)
+    setPendingEdits({})
+    setPendingDeletes(new Set())
+    setEditError(null)
+  }
+
+  const currentValue = (seriesId: number, valueId: number): ValueModel | undefined =>
+    seriesValues.find((x) => x.series.id === seriesId)?.values.find((v) => v.id === valueId)
+
+  const handleEditDataPoint = (seriesId: number, valueId: number, which: 'time' | 'value', raw: string) => {
+    const cur = currentValue(seriesId, valueId)
+    if (!cur) return
+    const isDate = xAxisType === 'date'
+    if (which === 'time') {
+      if (raw) {
+        const iso = new Date(raw).toISOString()
+        setSeriesValues((prev) =>
+          prev.map((sv) => (sv.series.id !== seriesId ? sv : {
+            ...sv,
+            values: sv.values
+              .map((v) => (v.id === valueId ? { ...v, time: iso } : v))
+              .sort((a, b) => a.time.localeCompare(b.time)),
+          }))
+        )
+      }
+      setPendingEdits((prev) => ({
+        ...prev,
+        [valueId]: { time: raw, value: prev[valueId]?.value ?? String(cur.value) },
+      }))
+    } else {
+      setPendingEdits((prev) => ({
+        ...prev,
+        [valueId]: {
+          time: prev[valueId]?.time ?? isoToInputValue(cur.time, isDate),
+          value: raw,
+        },
+      }))
+      const num = Number(raw)
+      if (raw !== '' && !Number.isNaN(num)) {
+        setSeriesValues((prev) =>
+          prev.map((sv) => (sv.series.id !== seriesId ? sv : {
+            ...sv,
+            values: sv.values
+              .map((v) => (v.id === valueId ? { ...v, value: num } : v))
+              .sort((a, b) => a.time.localeCompare(b.time)),
+          }))
+        )
+      }
+    }
+  }
+
+  const handleDeleteDataPoint = (seriesId: number, valueId: number) => {
+    setSeriesValues((prev) =>
+      prev.map((sv) => (sv.series.id !== seriesId ? sv : {
+        ...sv,
+        values: sv.values.filter((v) => v.id !== valueId),
+      }))
+    )
+    setPendingDeletes((prev) => {
+      const next = new Set(prev)
+      next.add(valueId)
+      return next
+    })
+    setPendingEdits((prev) => {
+      const next = { ...prev }
+      delete next[valueId]
+      return next
+    })
+  }
+
+  const handleSaveValues = async () => {
+    if (editSeriesId == null) return
+    setSavingValues(true)
+    setEditError(null)
+    try {
+      const updates: ValueUpdate[] = []
+      for (const [idStr, draft] of Object.entries(pendingEdits)) {
+        const id = Number(idStr)
+        if (pendingDeletes.has(id) || !currentValue(editSeriesId, id)) continue
+        const time = new Date(draft.time).toISOString()
+        const value = Number(draft.value)
+        if (Number.isNaN(value)) continue
+        updates.push({ id, time, value })
+      }
+      const deletes = [...pendingDeletes]
+      const values = await patchValuesBatch(tracker.id, editSeriesId, updates, deletes)
+      setSeriesValues((prev) =>
+        prev.map((sv) => (sv.series.id === editSeriesId ? { ...sv, values } : sv))
+      )
+      setPendingEdits({})
+      setPendingDeletes(new Set())
+    } catch {
+      setEditError('Failed to save changes. Please try again.')
+    } finally {
+      setSavingValues(false)
+    }
+  }
+
+  const refetchSeriesValues = async (seriesId: number) => {
+    try {
+      const resp = await fetch(`/api/trackers/${tracker.id}/series/${seriesId}/values`)
+      const data = await resp.json()
+      setSeriesValues((prev) =>
+        prev.map((sv) => (sv.series.id === seriesId ? { ...sv, values: data.values ?? [] } : sv))
+      )
+    } catch { /* ignore */ }
+  }
+
+  const cancelEditChanges = async () => {
+    const sid = editSeriesId
+    setPendingEdits({})
+    setPendingDeletes(new Set())
+    setEditError(null)
+    if (sid != null) {
+      await refetchSeriesValues(sid)
+    }
+  }
+
+  const closeEditSeries = async () => {
+    const sid = editSeriesId
+    setEditSeriesId(null)
+    setPendingEdits({})
+    setPendingDeletes(new Set())
+    setEditError(null)
+    setEditPage(1)
+    if (sid != null) {
+      await refetchSeriesValues(sid)
+    }
+  }
+
   const handleSeriesDeleted = (seriesId: number) => {
     setSeriesList((prev) => prev.filter((s) => s.id !== seriesId))
     setSeriesValues((prev) => prev.filter((sv) => sv.series.id !== seriesId))
+    if (editSeriesId === seriesId) {
+      setEditSeriesId(null)
+      setPendingEdits({})
+      setPendingDeletes(new Set())
+    }
   }
 
   const handleSeriesRename = async (seriesId: number, name: string): Promise<boolean> => {
@@ -819,7 +1017,13 @@ export const TrackerDetailView = (): React.JSX.Element => {
                 const adding = addingValues[s.id]
                 return (
                   <div key={s.id} className="flex items-center gap-2">
-                    <span className="w-32 truncate text-sm font-medium">{s.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => openEditSeries(s.id)}
+                      className="w-32 truncate text-left text-sm font-medium text-blue-600 hover:underline dark:text-blue-500"
+                    >
+                      {s.name}
+                    </button>
                     <input
                       type={xAxisType === 'date' ? 'date' : 'datetime-local'}
                       value={input?.time ?? todayValue}
@@ -849,6 +1053,28 @@ export const TrackerDetailView = (): React.JSX.Element => {
             </div>
           )}
         </div>
+      )}
+
+      {isOwner && editSeries && tracker.type !== 'coverage' && (
+        <DataPointEditCard
+          seriesName={editSeries.name}
+          values={editPageValues}
+          total={editSorted.length}
+          page={editClampedPage}
+          perPage={editPerPage}
+          isDate={xAxisType === 'date'}
+          dirty={editDirty}
+          saving={savingValues}
+          error={editError}
+          pendingEdits={pendingEdits}
+          onEdit={(valueId, which, raw) => handleEditDataPoint(editSeries.id, valueId, which, raw)}
+          onDelete={(valueId) => handleDeleteDataPoint(editSeries.id, valueId)}
+          onPerPageChange={(n) => { setEditPerPage(n); setEditPage(1) }}
+          onPageChange={setEditPage}
+          onSave={handleSaveValues}
+          onCancel={cancelEditChanges}
+          onClose={closeEditSeries}
+        />
       )}
 
       {isRoleOwner && showChartOptions && (

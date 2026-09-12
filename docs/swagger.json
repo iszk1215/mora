@@ -1741,6 +1741,82 @@
                         }
                     }
                 }
+            },
+            "patch": {
+                "description": "Apply a set of value updates and deletions to a series atomically. Updating a value to a timestamp that already exists in the same series is rejected with a conflict.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tracker"
+                ],
+                "summary": "Update and delete values in a batch",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Tracker ID",
+                        "name": "trackerId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Series ID",
+                        "name": "seriesId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Batch of value updates and deletions",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tracker.PatchValuesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/tracker.ListValuesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/api/user/me/api-keys": {
@@ -2513,6 +2589,37 @@
                 },
                 "visibility": {
                     "type": "string"
+                }
+            }
+        },
+        "tracker.PatchValueItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "time": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "tracker.PatchValuesRequest": {
+            "type": "object",
+            "properties": {
+                "deletes": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "updates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tracker.PatchValueItem"
+                    }
                 }
             }
         },

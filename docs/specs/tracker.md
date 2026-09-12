@@ -19,7 +19,7 @@ tracker
 ```
 
 - `tracker.owner_id`: FK to `user.id`, `NOT NULL`, `ON DELETE CASCADE`. The owner is the sole authority for DELETE and PATCH on the tracker; `tracker_member` rows grant editor (edit-only) access.
-- `tracker.created_at` / `tracker.last_updated_at`: RFC3339 timestamps. `last_updated_at` is set at creation and bumped whenever a value is added (`POST values`) or coverage data is uploaded for a linked repository.
+- `tracker.created_at` / `tracker.last_updated_at`: RFC3339 timestamps. `last_updated_at` is set at creation and bumped whenever a value is added, updated, or deleted (`POST`/`PATCH`/`DELETE values`) or coverage data is uploaded for a linked repository.
 
 - **type=`tracker`**: Normal time-series data (tracker -> series -> values)
 - **type=`coverage`**: Links to a repository via the `tracker_coverage` table, owned and managed by the coverage package. No series/values of its own. Created via the coverage API, not `POST /api/trackers`.
@@ -54,6 +54,7 @@ Hard limits on the number of series and values, applied regardless of user type 
 | DELETE | `/api/trackers/{trackerId}/series/{seriesId}` | Delete series | edit perm |
 | GET | `/api/trackers/{trackerId}/series/{seriesId}/values` | List values (`?limit=N`) | read perm |
 | POST | `/api/trackers/{trackerId}/series/{seriesId}/values` | Add value | edit perm |
+| PATCH | `/api/trackers/{trackerId}/series/{seriesId}/values` | Batch update/delete values | edit perm |
 | DELETE | `/api/trackers/{trackerId}/series/{seriesId}/values` | Delete all values | edit perm |
 | POST | `/api/trackers/{trackerId}/like` | Like | authenticated |
 | DELETE | `/api/trackers/{trackerId}/like` | Unlike | authenticated |
@@ -61,6 +62,48 @@ Hard limits on the number of series and values, applied regardless of user type 
 POST returns 201, DELETE returns 204.
 
 PATCH `/api/trackers/{trackerId}/series/{seriesId}` accepts optional `name`, `data_type`, and `config` fields; only provided fields are updated. A series `name` must be non-empty (after trim), at most 200 characters, and unique within the tracker. A rename to an already-used name returns `409 Conflict`.
+
+PATCH `/api/trackers/{trackerId}/series/{seriesId}/values` performs an atomic batch update: all value updates are applied and all requested deletions are executed in a single transaction (`applyValueChanges` in `tracker/store.go`), so the batch either succeeds completely or not at all. The whole batch is subject to the values-per-series limit (5000).
+
+### PatchValuesRequest
+
+```json
+{
+  "updates": [
+    { "id": 3, "time": "2024-01-02T00:00:00Z", "value": 45.0 },
+    { "id": 5, "time": "2024-01-04T00:00:00Z", "value": 12 }
+  ],
+  "deletes": [7, 9]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `updates` | Array of `{id, time, value}` | Values to update. Each `id` must reference an existing value of the series, otherwise the batch fails with `404` |
+| `deletes` | Array of number | Value IDs to delete. Unknown IDs are silently ignored |
+
+Error behavior: on a `409` conflict the batch fails with a message like `value already exists at time 2024-01-02T00:00:00Z` naming the first conflicting time, and no changes are applied (transaction rolled back). Coverage-type trackers have no value endpoints and return `400`; values with a time already present within the updates themselves (two updates for the same new time) also conflict.
+
+On success the response body is the updated values list:
+
+```json
+{
+  "values": [
+    { "id": 3, "time": "2024-01-02T00:00:00Z", "value": 45.0 },
+    { "id": 5, "time": "2024-01-04T00:00:00Z", "value": 12 }
+  ]
+}
+```
+
+### ValueModel
+
+Values carry an `id` in list (`GET values`, `PATCH values`) and preview responses:
+
+```json
+{ "id": 3, "time": "2024-01-02T00:00:00Z", "value": 45.0 }
+```
+
+The `id` is needed by the batch PATCH endpoint and by the frontend edit card to track per-value edits and deletions.
 
 ## Authentication & Authorization
 
@@ -239,7 +282,7 @@ Coverage-type trackers (`type="coverage"`) are created exclusively through the c
 |------|-----------|-------------|
 | `/trackers` | TrackerView | Card grid with preview charts |
 | `/trackers/new` | TrackerCreate | Create form |
-| `/trackers/:trackerId` | TrackerDetailView | Detail (tracker type). Offers a "Data Points" card (opened via "Add Data Points" from the owner's tracker menu) with a date picker (defaults to today), a value input, and an Add button per series; values are added live to the chart without a page reload. Owner menu also opens a "Settings" card with chart options and visibility |
+| `/trackers/:trackerId` | TrackerDetailView | Detail (tracker type). Owner menu offers a "Data Points" card (Add Data Points) with a date picker (defaults to today), a value input, and an Add button per series; values are added live to the chart without a page reload. Clicking a series name in that card opens an inline data-point edit card (owner only): it lists that series' values newest-first (paginable, 10/20/50/100 per page, default 20) with editable date/time and value inputs and a delete button per row; edits and deletes reflect instantly in the chart. "Save" commits all pending edits/deletes to the backend in a single `PATCH values` batch. Owner menu also opens a "Settings" card with chart options and visibility |
 
 ## Key Files
 

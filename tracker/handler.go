@@ -43,7 +43,7 @@ type (
 	}
 
 	ValueModel struct {
-		Id        int64     `db:"id"`
+		Id        int64     `json:"id"    db:"id"`
 		SeriesId  int64     `db:"series_id"`
 		Timestamp time.Time `json:"time"  db:"time"`
 		Value     float64   `json:"value" db:"value"`
@@ -108,6 +108,18 @@ type (
 	ListValuesResponse struct {
 		Series SeriesModel  `json:"series"`
 		Values []ValueModel `json:"values"`
+	}
+
+	// PatchValueItem is a single value update in a batch patch request.
+	PatchValueItem struct {
+		Id    int64     `json:"id"`
+		Time  time.Time `json:"time"`
+		Value float64   `json:"value"`
+	}
+
+	PatchValuesRequest struct {
+		Updates []PatchValueItem `json:"updates"`
+		Deletes []int64          `json:"deletes"`
 	}
 )
 
@@ -966,6 +978,73 @@ func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 	renderNoContent(w)
 }
 
+// PatchValues godoc
+// @Summary      Update and delete values in a batch
+// @Description  Apply a set of value updates and deletions to a series atomically. Updating a value to a timestamp that already exists in the same series is rejected with a conflict.
+// @Tags         tracker
+// @Accept       json
+// @Produce      json
+// @Param        trackerId  path  int                       true  "Tracker ID"
+// @Param        seriesId   path  int                       true  "Series ID"
+// @Param        body       body  tracker.PatchValuesRequest  true  "Batch of value updates and deletions"
+// @Success      200  {object}  tracker.ListValuesResponse
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Failure      409  {object}  core.ErrorResponse
+// @Router       /api/trackers/{trackerId}/series/{seriesId}/values [patch]
+func (h *trackerHandler) patchValues(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			log.Error().Err(err).Msg("Body.Close")
+		}
+	}()
+
+	tracker, _ := trackerFrom(r.Context())
+	if tracker.Type != TypeTracker {
+		render.BadRequest(w, errors.New("cannot modify values for this tracker type"))
+		return
+	}
+
+	var req PatchValuesRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		log.Warn().Err(err).Msg("invalid value request body")
+		render.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	series, _ := seriesFrom(r.Context())
+
+	updates := make([]ValuePatch, 0, len(req.Updates))
+	for _, u := range req.Updates {
+		updates = append(updates, ValuePatch(u))
+	}
+
+	values, err := h.store.applyValueChanges(series.Id, updates, req.Deletes)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrValueExists):
+			render.Conflict(w, errors.New("a value with this timestamp already exists"))
+		case errors.Is(err, errorValueNotFound):
+			render.NotFound(w, errors.New("value not found"))
+		default:
+			log.Error().Err(err).Msg("tracker.handler.patchValues")
+			render.InternalError(w, err)
+		}
+		return
+	}
+
+	resp := ListValuesResponse{
+		Series: series,
+		Values: values,
+	}
+
+	render.JSON(w, resp, http.StatusOK)
+}
+
 // ----------------------------------------------------------------------
 // Like
 
@@ -1053,6 +1132,7 @@ func newHandler(store *trackerStore) http.Handler {
 					r.Route("/values", func(r chi.Router) {
 						r.Get("/", h.listValues)
 						r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Post("/", h.createValue)
+						r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Patch("/", h.patchValues)
 						r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Delete("/", h.deleteValues)
 					})
 				})
