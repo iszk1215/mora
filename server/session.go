@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -48,6 +49,82 @@ func NewMoraSession() *MoraSession {
 		timestamp:   time.Now(),
 		loggingInto: -1,
 	}
+}
+
+type moraSessionJSON struct {
+	ReposMap      map[int64]map[int64]bool `json:"reposMap,omitempty"`
+	TokenMap      map[int64]scm.Token      `json:"tokenMap,omitempty"`
+	Timestamp     time.Time                `json:"timestamp"`
+	LoggingInto   int64                    `json:"loggingInto"`
+	UserID        *int64                   `json:"userID,omitempty"`
+	PendingSignup *pendingSignupJSON       `json:"pendingSignup,omitempty"`
+}
+
+type pendingSignupJSON struct {
+	RMID           int64  `json:"rmID"`
+	Provider       string `json:"provider"`
+	ProviderUserID string `json:"providerUserID"`
+	Username       string `json:"username"`
+	AvatarURL      string `json:"avatarURL"`
+}
+
+// MarshalJSON serializes the session so it can be persisted in a shared
+// database. The lock is held while the snapshot is taken.
+func (s *MoraSession) MarshalJSON() ([]byte, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	dto := moraSessionJSON{
+		ReposMap:    s.reposMap,
+		TokenMap:    s.tokenMap,
+		Timestamp:   s.timestamp,
+		LoggingInto: s.loggingInto,
+		UserID:      s.userID,
+	}
+	if s.pendingSignup != nil {
+		dto.PendingSignup = &pendingSignupJSON{
+			RMID:           s.pendingSignup.rmID,
+			Provider:       s.pendingSignup.provider,
+			ProviderUserID: s.pendingSignup.providerUserID,
+			Username:       s.pendingSignup.username,
+			AvatarURL:      s.pendingSignup.avatarURL,
+		}
+	}
+	return json.Marshal(dto)
+}
+
+// UnmarshalJSON restores a session persisted by MarshalJSON. Maps are
+// normalized back to non-nil so subsequent writes do not panic.
+func (s *MoraSession) UnmarshalJSON(b []byte) error {
+	var dto moraSessionJSON
+	if err := json.Unmarshal(b, &dto); err != nil {
+		return err
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.reposMap = dto.ReposMap
+	if s.reposMap == nil {
+		s.reposMap = map[int64]map[int64]bool{}
+	}
+	s.tokenMap = dto.TokenMap
+	if s.tokenMap == nil {
+		s.tokenMap = map[int64]scm.Token{}
+	}
+	s.timestamp = dto.Timestamp
+	s.loggingInto = dto.LoggingInto
+	s.userID = dto.UserID
+	if dto.PendingSignup != nil {
+		s.pendingSignup = &pendingSignup{
+			rmID:           dto.PendingSignup.RMID,
+			provider:       dto.PendingSignup.Provider,
+			providerUserID: dto.PendingSignup.ProviderUserID,
+			username:       dto.PendingSignup.Username,
+			avatarURL:      dto.PendingSignup.AvatarURL,
+		}
+	}
+	return nil
 }
 
 func (s *MoraSession) getReposCache(rmID int64) map[int64]bool {
@@ -139,24 +216,34 @@ func (s *MoraSession) ClearPendingSignup() {
 
 type MoraSessionManager struct {
 	cookiename string
-	store      map[string]*MoraSession
+	store      sessionStore
 	lifetime   time.Duration
-	lock       sync.Mutex
 	stopCh     chan struct{}
 	// insecureCookie disables the Secure attribute on the session cookie
 	// (for development over plain HTTP).
 	insecureCookie bool
+	// sessionLocks serializes read-modify-write on a single session within
+	// this instance so concurrent requests cannot lose each other's updates.
+	sessionLocks sync.Map // sid -> *sync.Mutex
 }
 
 func NewMoraSessionManager(insecureCookie bool) *MoraSessionManager {
 	m := &MoraSessionManager{
 		cookiename:     "morasessionid",
-		store:          map[string]*MoraSession{},
+		store:          newMemSessionStore(),
 		lifetime:       24 * time.Hour,
 		stopCh:         make(chan struct{}),
 		insecureCookie: insecureCookie,
 	}
 	go m.periodicGC()
+	return m
+}
+
+// NewMoraSessionManagerWithStore creates a session manager backed by the
+// given session store (e.g. a database store shared across instances).
+func NewMoraSessionManagerWithStore(insecureCookie bool, store sessionStore) *MoraSessionManager {
+	m := NewMoraSessionManager(insecureCookie)
+	m.store = store
 	return m
 }
 
@@ -196,33 +283,32 @@ func sessionID() (string, error) {
 }
 
 func (m *MoraSessionManager) GC() {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	now := time.Now()
-	for sid, sess := range m.store {
-		sess.lock.Lock()
-		expired := now.Sub(sess.timestamp) > m.lifetime
-		sess.lock.Unlock()
-		if expired {
-			delete(m.store, sid)
-		}
+	cutoff := time.Now().Add(-m.lifetime)
+	if err := m.store.DeleteExpired(cutoff); err != nil {
+		log.Err(err).Msg("session GC failed")
+		return
 	}
+
+	// Prune per-session locks whose sessions no longer exist. Holding the
+	// mutex while deleting the entry guarantees no in-flight request still
+	// references it (requests hold their lock through the write-back).
+	m.sessionLocks.Range(func(key, value any) bool {
+		sid := key.(string)
+		mu := value.(*sync.Mutex)
+		mu.Lock()
+		if !m.store.Has(sid) {
+			m.sessionLocks.Delete(sid)
+		}
+		mu.Unlock()
+		return true
+	})
 }
 
-func (m *MoraSessionManager) get(sid string) (*MoraSession, bool) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	sess, ok := m.store[sid]
-	return sess, ok
-}
-
-func (m *MoraSessionManager) put(sid string, session *MoraSession) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	m.store[sid] = session
+func (m *MoraSessionManager) lockSession(sid string) func() {
+	l, _ := m.sessionLocks.LoadOrStore(sid, &sync.Mutex{})
+	mu := l.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
 }
 
 func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
@@ -241,15 +327,28 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 			sid = cookie.Value
 		}
 
-		sess, ok := m.get(sid)
+		// Serialize concurrent requests on the same session within this
+		// instance so the read-modify-write below is atomic.
+		unlock := m.lockSession(sid)
+
+		sess, ok := m.store.Get(sid)
 		if !ok {
 			log.Info().Msgf("SessionMiddleware: create new MoraSession")
 			sess = NewMoraSession()
-			m.put(sid, sess)
 		}
 		sess.lock.Lock()
 		sess.timestamp = time.Now()
 		sess.lock.Unlock()
+
+		// Write the session back once the handler chain has run, so every
+		// mutation made by handlers is persisted. The deferred order (LIFO)
+		// keeps the per-session lock held until after the write-back.
+		defer func() {
+			defer unlock()
+			if err := m.store.Put(sid, sess); err != nil {
+				log.Err(err).Str("sid", sid).Msg("SessionMiddleware: failed to persist session")
+			}
+		}()
 
 		cookie = &http.Cookie{
 			Name:     m.cookiename,

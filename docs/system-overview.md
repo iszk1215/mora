@@ -117,6 +117,14 @@ Coverage-type trackers are created via `POST /api/coverages` (the tracker packag
 | API Key | Bearer token | Programmatic access (`user_api_key` table) |
 | Session | Cookie-based | Browser sessions (`MoraSession`) |
 
+Sessions are stored in the shared database (`session` table, JSON-serialized
+`MoraSession` snapshots keyed by the `morasessionid` value) so that all
+instances of a horizontally scaled deployment (e.g. Cloud Run) see the same
+sessions. On every request the session is reloaded from the database and
+written back after the handler runs; a background GC deletes sessions that
+have been idle for the session lifetime (24 hours). A process-local map-based
+store is used in tests and demo mode.
+
 Google is configured as an `[[scm]]` entry with `scm = "google"` (login-only
 provider, no SCM client). The default endpoints point at Google's OAuth2
 endpoints; a non-Google `url` (e.g. for E2E mocks) derives the endpoints from

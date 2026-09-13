@@ -93,7 +93,7 @@ func TestHandleUserTrackers(t *testing.T) {
 		sid := fmt.Sprintf("session-%d", userID)
 		sess := NewMoraSession()
 		sess.SetUserID(userID)
-		server.sessionManager.store[sid] = sess
+		require.NoError(t, server.sessionManager.store.Put(sid, sess))
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
 		return r
 	}
