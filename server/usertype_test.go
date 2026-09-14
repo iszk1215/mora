@@ -23,7 +23,7 @@ func newUserTypeSession(t *testing.T, server *MoraServer, userID int64, name str
 	t.Helper()
 	sess := NewMoraSession()
 	sess.SetUserID(userID)
-	server.sessionManager.store[name] = sess
+	require.NoError(t, server.sessionManager.store.Put(name, sess))
 	return func(r *http.Request) *http.Request {
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: name})
 		return r

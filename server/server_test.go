@@ -950,7 +950,7 @@ func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
 	sess := NewMoraSession()
 	sess.SetUserID(42)
 	sid := "test-session-id"
-	server.sessionManager.store[sid] = sess
+	require.NoError(t, server.sessionManager.store.Put(sid, sess))
 
 	handler := server.Handler()
 
@@ -1116,7 +1116,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", trk.Id), nil)
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-logged-in"})
-		server.sessionManager.store["test-sess-logged-in"] = sess
+		require.NoError(t, server.sessionManager.store.Put("test-sess-logged-in", sess))
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()
@@ -1180,7 +1180,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", privateTrk.Id), nil)
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-superuser"})
-		server.sessionManager.store["test-sess-superuser"] = sess
+		require.NoError(t, server.sessionManager.store.Put("test-sess-superuser", sess))
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()
@@ -1200,7 +1200,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", privateTrk.Id), nil)
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-nonmember"})
-		server.sessionManager.store["test-sess-nonmember"] = sess
+		require.NoError(t, server.sessionManager.store.Put("test-sess-nonmember", sess))
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()
@@ -1254,7 +1254,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-create-coverage"})
 		sess := NewMoraSessionWithTokenFor(rm)
 		sess.SetUserID(1)
-		server.sessionManager.store["test-sess-create-coverage"] = sess
+		require.NoError(t, server.sessionManager.store.Put("test-sess-create-coverage", sess))
 		return r
 	}
 

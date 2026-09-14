@@ -701,6 +701,12 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		return nil, err
 	}
 
+	sessionStore := newDBSessionStore(db)
+	if err := sessionStore.Init(); err != nil {
+		log.Err(err).Msg("sessionStore.Init")
+		return nil, err
+	}
+
 	repositoryManagers, err := initRepositoryManagers(cfg, rmStore)
 	if err != nil {
 		return nil, err
@@ -738,7 +744,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 
 	s := &MoraServer{
 		db:                 db,
-		sessionManager:     NewMoraSessionManager(cfg.Server.InsecureCookie),
+		sessionManager:     NewMoraSessionManagerWithStore(cfg.Server.InsecureCookie, sessionStore),
 		repositoryManagers: repositoryManagers,
 		repos:              repoStore,
 		userStore:          userStore,

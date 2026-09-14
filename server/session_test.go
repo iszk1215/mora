@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/drone/go-scm/scm"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +26,7 @@ func (f *failReader) Read(p []byte) (int, error) {
 func newTestSessionManager() *MoraSessionManager {
 	return &MoraSessionManager{
 		cookiename: "morasessionid",
-		store:      map[string]*MoraSession{},
+		store:      newMemSessionStore(),
 		lifetime:   24 * time.Hour,
 		stopCh:     make(chan struct{}),
 	}
@@ -227,18 +229,18 @@ func TestMoraSessionManager_GC(t *testing.T) {
 	now := time.Now()
 	sess1 := NewMoraSession()
 	sess1.timestamp = now.Add(-2 * time.Hour) // expired
-	m.store["sid1"] = sess1
+	require.NoError(t, m.store.Put("sid1", sess1))
 
 	sess2 := NewMoraSession()
 	sess2.timestamp = now.Add(-30 * time.Minute) // still valid
-	m.store["sid2"] = sess2
+	require.NoError(t, m.store.Put("sid2", sess2))
 
 	m.GC()
 
-	require.Len(t, m.store, 1)
-	_, ok := m.store["sid1"]
+	require.Equal(t, 1, m.store.Len())
+	_, ok := m.store.Get("sid1")
 	require.False(t, ok, "expired session should be removed")
-	_, ok = m.store["sid2"]
+	_, ok = m.store.Get("sid2")
 	require.True(t, ok, "valid session should remain")
 }
 
@@ -266,4 +268,168 @@ func TestMoraSessionConcurrentHTTPRace(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func TestMoraSessionMarshalUnmarshal_RoundTrip(t *testing.T) {
+	sess := NewMoraSession()
+	sess.SetUserID(42)
+	sess.setToken(1, scm.Token{Token: "access", Refresh: "refresh", Expires: time.Now().Add(time.Hour)})
+	sess.setReposCache(1, map[int64]bool{7: true, 8: false})
+	sess.SetPendingSignup(&pendingSignup{
+		rmID:           2,
+		provider:       "gitea",
+		providerUserID: "user-123",
+		username:       "alice",
+		avatarURL:      "https://example.com/a.png",
+	})
+	sess.loggingInto = 3
+
+	data, err := json.Marshal(sess)
+	require.NoError(t, err)
+
+	got := NewMoraSession()
+	require.NoError(t, json.Unmarshal(data, got))
+
+	require.Equal(t, int64(42), *got.UserID())
+	tok, ok := got.getToken(1)
+	require.True(t, ok)
+	require.Equal(t, "access", tok.Token)
+	require.Equal(t, "refresh", tok.Refresh)
+	require.False(t, tok.Expires.IsZero())
+
+	cache := got.getReposCache(1)
+	require.NotNil(t, cache)
+	require.Equal(t, map[int64]bool{7: true, 8: false}, cache)
+
+	p := got.PendingSignup()
+	require.NotNil(t, p)
+	require.Equal(t, int64(2), p.rmID)
+	require.Equal(t, "alice", p.username)
+
+	require.Equal(t, int64(3), got.loggingInto)
+	require.False(t, got.timestamp.IsZero())
+}
+
+func TestMoraSessionMarshalUnmarshal_EmptyMaps(t *testing.T) {
+	sess := NewMoraSession()
+	data, err := json.Marshal(sess)
+	require.NoError(t, err)
+
+	got := NewMoraSession()
+	require.NoError(t, json.Unmarshal(data, got))
+
+	// Unmarshaled sessions must have usable maps so later mutations do not panic.
+	require.NotNil(t, got.reposMap)
+	require.NotNil(t, got.tokenMap)
+	got.setToken(1, scm.Token{Token: "t"})
+	_, ok := got.getToken(1)
+	require.True(t, ok)
+}
+
+func TestDBSessionStore_CRUD(t *testing.T) {
+	db, err := sqlx.Connect("libsql", ":memory:")
+	require.NoError(t, err)
+
+	store := newDBSessionStore(db)
+	require.NoError(t, store.Init())
+	require.Equal(t, 0, store.Len())
+
+	sess := NewMoraSession()
+	sess.SetUserID(7)
+	require.NoError(t, store.Put("sid-1", sess))
+
+	require.Equal(t, 1, store.Len())
+	require.True(t, store.Has("sid-1"))
+
+	got, ok := store.Get("sid-1")
+	require.True(t, ok)
+	require.Equal(t, int64(7), *got.UserID())
+
+	require.NoError(t, store.Delete("sid-1"))
+	require.False(t, store.Has("sid-1"))
+	require.Equal(t, 0, store.Len())
+	_, ok = store.Get("sid-1")
+	require.False(t, ok)
+}
+
+func TestDBSessionStore_Expiry(t *testing.T) {
+	db, err := sqlx.Connect("libsql", ":memory:")
+	require.NoError(t, err)
+
+	store := newDBSessionStore(db)
+	require.NoError(t, store.Init())
+
+	fresh := NewMoraSession()
+	fresh.timestamp = time.Now().Add(-30 * time.Minute)
+	require.NoError(t, store.Put("fresh", fresh))
+
+	stale := NewMoraSession()
+	now := time.Now()
+	stale.timestamp = now.Add(-2 * time.Hour)
+	require.NoError(t, store.Put("stale", stale))
+
+	require.NoError(t, store.DeleteExpired(now.Add(-time.Hour)))
+	require.True(t, store.Has("fresh"))
+	require.False(t, store.Has("stale"))
+}
+
+func TestDBSessionStore_SharedAcrossStores(t *testing.T) {
+	db, err := sqlx.Connect("libsql", ":memory:")
+	require.NoError(t, err)
+
+	store1 := newDBSessionStore(db)
+	require.NoError(t, store1.Init())
+
+	sess := NewMoraSession()
+	sess.SetUserID(99)
+	require.NoError(t, store1.Put("shared-sid", sess))
+
+	// Another store instance on the same database must see the session,
+	// mimicking a separate Cloud Run instance.
+	store2 := newDBSessionStore(db)
+	require.NoError(t, store2.Init())
+	got, ok := store2.Get("shared-sid")
+	require.True(t, ok)
+	require.Equal(t, int64(99), *got.UserID())
+}
+
+func TestMoraSessionManager_DBPersistenceThroughMiddleware(t *testing.T) {
+	db, err := sqlx.Connect("libsql", ":memory:")
+	require.NoError(t, err)
+
+	store := newDBSessionStore(db)
+	require.NoError(t, store.Init())
+	m := NewMoraSessionManagerWithStore(false, store)
+	defer func() { _ = m.Close() }()
+
+	// First request creates and persists a logged-in session.
+	handler := m.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess, _ := MoraSessionFrom(r.Context())
+		sess.SetUserID(11)
+	}))
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, req)
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+	sid := cookies[0].Value
+
+	require.True(t, store.Has(sid))
+	got, ok := store.Get(sid)
+	require.True(t, ok)
+	require.Equal(t, int64(11), *got.UserID())
+
+	// A second request on a fresh manager (same DB) reuses the session,
+	// like another Cloud Run instance seeing the cookie.
+	m2 := NewMoraSessionManagerWithStore(false, newDBSessionStore(db))
+	defer func() { _ = m2.Close() }()
+	handler2 := m2.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess, _ := MoraSessionFrom(r.Context())
+		require.Equal(t, int64(11), *sess.UserID())
+	}))
+	w2 := httptest.NewRecorder()
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
+	handler2.ServeHTTP(w2, req2)
 }
