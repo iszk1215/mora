@@ -2,11 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData, useMatches } from 'react-router'
-import { SCMList, Header, Breadcrumbs, makeBredcrumbs, resetConfigCache, rootShouldRevalidate } from './main'
+import { SCMList, Header, Breadcrumbs, makeBredcrumbs, resetConfigCache, rootShouldRevalidate, TrackerSearchPage } from './main'
 import { UserProvider } from './user-context'
 
 vi.mock('react-dom/client', () => ({
   default: { createRoot: () => ({ render: vi.fn() }) },
+}))
+
+vi.mock('echarts-for-react', () => ({
+  default: ({ option }: any) => <div data-testid="echart" data-option={JSON.stringify(option)} />,
 }))
 
 vi.mock('react-router', async () => {
@@ -516,5 +520,44 @@ describe('rootShouldRevalidate', () => {
       nextUrl: new URL('http://localhost/'),
       defaultShouldRevalidate: true,
     })).toBe(true)
+  })
+})
+
+describe('TrackerSearchPage', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const tracker = {
+    id: 1, name: 'tracker-a', visibility: 'public', type: 'tracker',
+    chart_config: '{}', role: '', liked: false, like_count: 0,
+  }
+  const paginated = { trackers: [tracker], total: 1, page: 1, per_page: 12 }
+
+  it('shows Loading on cards while previews are being fetched', async () => {
+    let resolvePreview!: (r: Response) => void
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(paginated), { headers: { 'Content-Type': 'application/json' } }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolvePreview = resolve }) as Promise<Response>)
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <TrackerSearchPage />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('tracker-a')).toBeInTheDocument()
+    expect(await screen.findByText('Loading...')).toBeInTheDocument()
+    expect(screen.queryByText('No data')).not.toBeInTheDocument()
+
+    resolvePreview(new Response(JSON.stringify({ tracker, series: [] }), { headers: { 'Content-Type': 'application/json' } }))
+    await waitFor(() => {
+      expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('No data')).toBeInTheDocument()
   })
 })

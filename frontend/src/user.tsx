@@ -53,6 +53,7 @@ export const UserPage = (): React.JSX.Element => {
   const [page, setPage] = useState(1)
   const [perPage] = useState(12)
   const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -81,9 +82,11 @@ export const UserPage = (): React.JSX.Element => {
   useEffect(() => {
     if (trackers.length === 0) {
       setPreviews(new Map())
+      setPreviewLoading(false)
       return
     }
     let cancelled = false
+    setPreviewLoading(true)
     const loadAll = async () => {
       const entries = await Promise.all(
         trackers.map(async (t) => {
@@ -101,6 +104,7 @@ export const UserPage = (): React.JSX.Element => {
         if (entry) map.set(entry[0], entry[1])
       }
       setPreviews(map)
+      setPreviewLoading(false)
     }
     void loadAll()
     return () => {
@@ -149,7 +153,7 @@ export const UserPage = (): React.JSX.Element => {
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {trackers.map((t) => (
-          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} searchQuery={urlQuery} fromUser={userName} />
+          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} loading={previewLoading} searchQuery={urlQuery} fromUser={userName} />
         ))}
       </div>
 

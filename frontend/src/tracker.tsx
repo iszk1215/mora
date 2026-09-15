@@ -341,6 +341,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const navigate = useNavigate()
   const [seriesList, setSeriesList] = useState<SeriesModel[]>(data.series)
   const [seriesValues, setSeriesValues] = useState<SeriesValues[]>([])
+  const [valuesLoaded, setValuesLoaded] = useState(false)
   const [liked, setLiked] = useState(tracker.liked)
   const [likeCount, setLikeCount] = useState(tracker.like_count ?? 0)
   const [likeLoading, setLikeLoading] = useState(false)
@@ -397,13 +398,17 @@ export const TrackerDetailView = (): React.JSX.Element => {
   useEffect(() => { pendingDeletesRef.current = pendingDeletes }, [pendingDeletes])
 
   useEffect(() => {
+    if (seriesList.length === 0) {
+      setValuesLoaded(true)
+      return
+    }
     Promise.all(
       seriesList.map((s) =>
         fetch(`/api/trackers/${tracker.id}/series/${s.id}/values`)
           .then((r) => r.json() as Promise<{ values: ValueModel[] }>)
           .then((d) => ({ series: s, values: mergePendingValues(s.id, d.values ?? []) }))
       )
-    ).then(setSeriesValues).catch(() => {})
+    ).then(setSeriesValues).catch(() => {}).finally(() => setValuesLoaded(true))
   }, [seriesList, tracker.id])
 
   const mergePendingValues = (seriesId: number, fetched: ValueModel[]): ValueModel[] => {
@@ -962,6 +967,10 @@ export const TrackerDetailView = (): React.JSX.Element => {
             <TimeRangeSelector value={range} onChange={setRange} />
             <TrackerChart data={{ datasets }} chartConfig={chartDraft} min={min} max={max} />
           </>
+        ) : seriesList.length > 0 && !valuesLoaded ? (
+          <div className="flex items-center justify-center py-4 text-center">
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
         ) : (
           <div className="flex flex-col items-center gap-3 py-4 text-center">
             <p className="text-muted-foreground">No data to display</p>

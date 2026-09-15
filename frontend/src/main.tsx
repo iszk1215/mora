@@ -42,12 +42,13 @@ import {
 
 // Tracker Search Page (top page)
 
-const TrackerSearchPage = (): React.JSX.Element => {
+export const TrackerSearchPage = (): React.JSX.Element => {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlQuery = searchParams.get('q') ?? ''
   const [query, setQuery] = useState(urlQuery)
   const [trackers, setTrackers] = useState<TrackerResponse[]>([])
   const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [searching, setSearching] = useState(false)
   const [initial, setInitial] = useState(true)
   const search = useSearch()
@@ -79,7 +80,11 @@ const TrackerSearchPage = (): React.JSX.Element => {
 
   // Fetch previews when trackers change
   useEffect(() => {
-    if (trackers.length === 0) return
+    if (trackers.length === 0) {
+      setPreviewLoading(false)
+      return
+    }
+    setPreviewLoading(true)
     const loadAll = async () => {
       const entries = await Promise.all(
         trackers.map(async (t) => {
@@ -96,6 +101,7 @@ const TrackerSearchPage = (): React.JSX.Element => {
         if (entry) map.set(entry[0], entry[1])
       }
       setPreviews(map)
+      setPreviewLoading(false)
       // Update context with previews
       if (urlQuery && search) {
         search.setSearch({ query: urlQuery, results: trackers, previews: map })
@@ -153,7 +159,7 @@ const TrackerSearchPage = (): React.JSX.Element => {
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {trackers.map((t) => (
-          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} searchQuery={urlQuery} />
+          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} loading={previewLoading} searchQuery={urlQuery} />
         ))}
       </div>
     </div>

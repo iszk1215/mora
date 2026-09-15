@@ -240,6 +240,23 @@ describe('TrackerDetailView', () => {
     expect(screen.getByText('test-tracker')).toBeInTheDocument()
   })
 
+  it('shows Loading while series values are being fetched', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }],
+    })
+    let resolveFetch!: (r: Response) => void
+    globalThis.fetch = vi.fn(() => new Promise((resolve) => { resolveFetch = resolve }) as Promise<Response>)
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+    expect(screen.queryByText('No data to display')).not.toBeInTheDocument()
+    resolveFetch({ ok: true, json: () => Promise.resolve({ values: [] }) } as Response)
+    await waitFor(() => {
+      expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+    })
+    expect(screen.getByTestId('echart')).toBeInTheDocument()
+  })
+
   it('renders Like button', () => {
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
@@ -1375,5 +1392,16 @@ describe('TrackerCard', () => {
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} /></MemoryRouter>)
     expect(screen.queryByText('owner')).not.toBeInTheDocument()
+  })
+
+  it('shows Loading while preview data is being fetched', () => {
+    const tracker = {
+      id: 1, name: 'test', visibility: 'public', type: 'tracker',
+      chart_config: '{}',
+      role: '', liked: false, like_count: 0,
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} loading /></MemoryRouter>)
+    expect(screen.getByText('Loading...')).toBeInTheDocument()
+    expect(screen.queryByText('No data')).not.toBeInTheDocument()
   })
 })
