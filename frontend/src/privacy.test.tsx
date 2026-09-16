@@ -30,4 +30,16 @@ describe('Footer', () => {
     const link = within(footer as HTMLElement).getByRole('link', { name: 'Privacy Policy' })
     expect(link).toHaveAttribute('href', '/privacy')
   })
+
+  it('renders a link to the API documentation', () => {
+    render(
+      <MemoryRouter>
+        <Footer />
+      </MemoryRouter>
+    )
+    const footer = document.querySelector('footer')
+    expect(footer).not.toBeNull()
+    const link = within(footer as HTMLElement).getByRole('link', { name: 'API Doc' })
+    expect(link).toHaveAttribute('href', '/swagger/')
+  })
 })
