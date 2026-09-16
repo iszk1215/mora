@@ -107,6 +107,29 @@ describe('UserPage', () => {
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/users/alice/trackers?page=1&per_page=12')
   })
 
+  it('shows Loading on tracker cards while previews are being fetched', async () => {
+    let resolvePreview!: (r: Response) => void
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockTrackers(['tracker-a'])),
+      } as Response)
+      .mockReturnValueOnce(new Promise((resolve) => { resolvePreview = resolve }) as Promise<Response>)
+    render(
+      <MemoryRouter initialEntries={['/users/alice']}>
+        <UserPage />
+      </MemoryRouter>
+    )
+    expect(await screen.findByText('tracker-a')).toBeInTheDocument()
+    expect(await screen.findByText('Loading...')).toBeInTheDocument()
+    expect(screen.queryByText('No data')).not.toBeInTheDocument()
+    resolvePreview({ ok: true, json: () => Promise.resolve(mockPreview()) } as Response)
+    await waitFor(() => {
+      expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('No data')).toBeInTheDocument()
+  })
+
   it('shows No trackers found for a search with no results', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
