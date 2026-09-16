@@ -506,9 +506,12 @@ async function loadRootData(): Promise<{ user: UserData | null }> {
 export const Footer = (): React.JSX.Element => {
   return (
     <footer className="mt-6 py-3">
-      <div className="px-4 sm:px-8 text-xs">
+      <div className="px-4 sm:px-8 text-xs flex gap-4">
         <Link to="/privacy" className="text-muted-foreground no-underline hover:text-foreground hover:underline">
           Privacy Policy
+        </Link>
+        <Link to="/swagger/" className="text-muted-foreground no-underline hover:text-foreground hover:underline">
+          API Doc
         </Link>
       </div>
     </footer>
