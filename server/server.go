@@ -48,10 +48,10 @@ type (
 	// Protocols
 
 	RepositoryManagerResponse struct {
-		ID      int64  `json:"id"`
-		URL     string `json:"url"`
-		Name    string `json:"name"`
-		LoggedIn bool  `json:"logined"`
+		ID       int64  `json:"id"`
+		URL      string `json:"url"`
+		Name     string `json:"name"`
+		LoggedIn bool   `json:"logined"`
 	}
 
 	RepositoryManagerStore interface {
@@ -75,7 +75,7 @@ type (
 		userStore          UserStore
 		coverage           *coverage.CoverageService
 		udm                *udm.Service
-		tracker              *tracker.Service
+		tracker            *tracker.Service
 		apiKey             string
 		siteName           string
 		demo               bool
@@ -168,9 +168,9 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 	for _, rm := range s.repositoryManagers {
 		_, ok := sess.getToken(rm.ID())
 		resp = append(resp, RepositoryManagerResponse{
-			ID:      rm.ID(),
-			URL:     rm.URL().String(),
-			Name:    rm.Driver(),
+			ID:       rm.ID(),
+			URL:      rm.URL().String(),
+			Name:     rm.Driver(),
 			LoggedIn: ok,
 		})
 	}
@@ -511,78 +511,83 @@ func (s *MoraServer) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(s.sessionManager.SessionMiddleware)
 
-	// api
-
-	r.Get("/api/providers", s.handleRepositoryManagerList)
-	r.Get("/api/me", s.handleMe)
-	r.Get("/api/config", s.handleConfig)
-
-	if s.userStore != nil {
-		r.Mount("/api/user/me/api-keys", APIKeyHandler(s.userStore))
-	}
-
-	r.Route("/api/repos", func(r chi.Router) {
-		r.Get("/", s.handleRepoList)
-		r.Route("/{repo_id}", func(r chi.Router) {
-			r.Use(s.injectRepo)
-
-			if s.udm != nil {
-				r.Mount("/udm", s.udm.Handler())
-			}
-		})
+	// Frontend static assets and Swagger docs run before the session
+	// middleware: they do not need a session, and every session load costs a
+	// database round trip (twice per request with the write-back), which is
+	// prohibitively slow against a remote Turso database.
+	r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {
+		s.frontendFileServer.ServeHTTP(w, r)
 	})
-
-	if s.tracker != nil {
-		r.With(s.requireTrackerAuth).Mount("/api/trackers", s.tracker.Handler())
-	}
-
-	if s.tracker != nil && s.userStore != nil {
-		r.Route("/api/users", func(r chi.Router) {
-			r.With(s.requireTrackerAuth).Get("/{userName}", s.handleUserGet)
-			r.With(s.requireTrackerAuth).Get("/{userName}/trackers", s.handleUserTrackers)
-			r.With(s.requireTrackerAuth).Patch("/{userName}/type", s.handleUserSetType)
-		})
-	}
-
-	if s.coverage != nil {
-		r.Route("/api/coverages", func(r chi.Router) {
-			r.With(s.requireTrackerAuth).Post("/", s.handleCreateCoverageTracker)
-			r.Route("/{trackerId}", func(r chi.Router) {
-				// List endpoint - no SCM auth required, but tracker visibility is checked
-				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission).Get("/", s.handleCoverageListPublic)
-				// Preview endpoint - tracker visibility is checked
-				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission).Get("/preview", s.coverage.HandleCoveragePreview)
-				// Other endpoints - tracker visibility + SCM auth required
-				r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission, s.injectTrackerCoverage).Mount("/", s.coverage.Handler())
-			})
-		})
-	}
-
-	// login/logout
-
-	redirectHandler := http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-		})
-
-	r.Mount("/login", LoginHandler(s.repositoryManagers, s.userStore, s.insecureCookie, redirectHandler))
-	r.Mount("/logout", LogoutHandler(s.repositoryManagers, redirectHandler))
-
-	if s.userStore != nil {
-		r.Mount("/api/signup", SignupHandler(s.userStore))
-		r.Mount("/api/auth", PasswordAuthHandler(s.userStore, s.insecureCookie))
-	}
-
-	// frontend
 
 	r.Mount("/swagger/", httpSwagger.WrapHandler)
 
-	r.Route("/", func(r chi.Router) {
-		r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {
-			s.frontendFileServer.ServeHTTP(w, r)
+	r.Group(func(r chi.Router) {
+		r.Use(s.sessionManager.SessionMiddleware)
+
+		// api
+
+		r.Get("/api/providers", s.handleRepositoryManagerList)
+		r.Get("/api/me", s.handleMe)
+		r.Get("/api/config", s.handleConfig)
+
+		if s.userStore != nil {
+			r.Mount("/api/user/me/api-keys", APIKeyHandler(s.userStore))
+		}
+
+		r.Route("/api/repos", func(r chi.Router) {
+			r.Get("/", s.handleRepoList)
+			r.Route("/{repo_id}", func(r chi.Router) {
+				r.Use(s.injectRepo)
+
+				if s.udm != nil {
+					r.Mount("/udm", s.udm.Handler())
+				}
+			})
 		})
+
+		if s.tracker != nil {
+			r.With(s.requireTrackerAuth).Mount("/api/trackers", s.tracker.Handler())
+		}
+
+		if s.tracker != nil && s.userStore != nil {
+			r.Route("/api/users", func(r chi.Router) {
+				r.With(s.requireTrackerAuth).Get("/{userName}", s.handleUserGet)
+				r.With(s.requireTrackerAuth).Get("/{userName}/trackers", s.handleUserTrackers)
+				r.With(s.requireTrackerAuth).Patch("/{userName}/type", s.handleUserSetType)
+			})
+		}
+
+		if s.coverage != nil {
+			r.Route("/api/coverages", func(r chi.Router) {
+				r.With(s.requireTrackerAuth).Post("/", s.handleCreateCoverageTracker)
+				r.Route("/{trackerId}", func(r chi.Router) {
+					// List endpoint - no SCM auth required, but tracker visibility is checked
+					r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission).Get("/", s.handleCoverageListPublic)
+					// Preview endpoint - tracker visibility is checked
+					r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission).Get("/preview", s.coverage.HandleCoveragePreview)
+					// Other endpoints - tracker visibility + SCM auth required
+					r.With(s.requireTrackerAuth, s.tracker.InjectTracker, s.tracker.RequireReadPermission, s.injectTrackerCoverage).Mount("/", s.coverage.Handler())
+				})
+			})
+		}
+
+		// login/logout
+
+		redirectHandler := http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/", http.StatusSeeOther)
+			})
+
+		r.Mount("/login", LoginHandler(s.repositoryManagers, s.userStore, s.insecureCookie, redirectHandler))
+		r.Mount("/logout", LogoutHandler(s.repositoryManagers, redirectHandler))
+
+		if s.userStore != nil {
+			r.Mount("/api/signup", SignupHandler(s.userStore))
+			r.Mount("/api/auth", PasswordAuthHandler(s.userStore, s.insecureCookie))
+		}
+
+		// frontend
 
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 			r.URL.Path = "/"
@@ -751,7 +756,7 @@ func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
 		frontendFileServer: frontendFileServer,
 		coverage:           coverage,
 		udm:                udm,
-		tracker:              trackerService,
+		tracker:            trackerService,
 		apiKey:             os.Getenv("MORA_API_KEY"),
 		siteName:           cfg.Server.SiteName,
 		demo:               cfg.Demo,

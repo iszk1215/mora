@@ -75,7 +75,19 @@ func OpenDB(cfg config.MoraConfig) (*sqlx.DB, error) {
 		}
 	}
 
-	db.SetMaxOpenConns(1)
+	// A single connection serializes writes to a local libSQL file, but for
+	// a remote (Turso) database it becomes a bottleneck: requests queue
+	// behind slow US-region round trips. Allow concurrent connections when
+	// the database is remote.
+	const (
+		maxOpenConnsLocal  = 1
+		maxOpenConnsRemote = 10
+	)
+	if remote {
+		db.SetMaxOpenConns(maxOpenConnsRemote)
+	} else {
+		db.SetMaxOpenConns(maxOpenConnsLocal)
+	}
 
 	return db, nil
 }
