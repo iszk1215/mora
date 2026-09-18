@@ -510,6 +510,7 @@ func (s *trackerStore) findSeriesById(id int64) (*SeriesModel, error) {
 }
 
 func (s *trackerStore) listSeries(trackerId int64) ([]SeriesModel, error) {
+	start := time.Now()
 	query := "SELECT id, tracker_id, name, data_type, config FROM tracker_series WHERE tracker_id = ?"
 
 	rows := []SeriesModel{}
@@ -518,6 +519,8 @@ func (s *trackerStore) listSeries(trackerId int64) ([]SeriesModel, error) {
 		return nil, fmt.Errorf("listSeries select: %w", err)
 	}
 
+	log.Debug().Int64("tracker_id", trackerId).Int("count", len(rows)).
+		Dur("duration", time.Since(start)).Msg("tracker.listSeries")
 	return rows, nil
 }
 
@@ -661,6 +664,7 @@ func (s *trackerStore) listValues(seriesId int64, limit int) ([]ValueModel, erro
 }
 
 func (s *trackerStore) listLatestValues(seriesId int64, limit int) ([]ValueModel, error) {
+	start := time.Now()
 	query := "SELECT id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time DESC"
 
 	rows := make([]ValueModel, 0)
@@ -681,6 +685,8 @@ func (s *trackerStore) listLatestValues(seriesId int64, limit int) ([]ValueModel
 		rows[i], rows[j] = rows[j], rows[i]
 	}
 
+	log.Debug().Int64("series_id", seriesId).Int("count", len(rows)).
+		Dur("duration", time.Since(start)).Msg("tracker.listLatestValues")
 	return rows, nil
 }
 

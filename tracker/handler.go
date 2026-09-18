@@ -538,6 +538,7 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/trackers/{trackerId}/preview [get]
 func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	tracker, _ := trackerFrom(r.Context())
 
 	var previews []PreviewSeriesValues
@@ -549,12 +550,14 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	totalValues := 0
 	for _, s := range series {
 		values, err := h.store.listLatestValues(s.Id, 20)
 		if err != nil {
 			log.Error().Err(err).Msg("tracker.handler.previewTracker listLatestValues")
 			continue
 		}
+		totalValues += len(values)
 		previews = append(previews, PreviewSeriesValues{
 			Series: s,
 			Values: values,
@@ -578,6 +581,9 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	log.Info().Int64("tracker_id", tracker.Id).Int("series_count", len(series)).
+		Int("value_count", totalValues).Dur("duration", time.Since(start)).
+		Msg("tracker.previewTracker")
 	render.JSON(w, PreviewResponse{Tracker: trackerResp, Series: previews}, http.StatusOK)
 }
 

@@ -30,6 +30,10 @@ type sessionStore interface {
 	Delete(sid string) error
 	Has(sid string) bool
 	DeleteExpired(before time.Time) error
+	// Touch refreshes only the last_seen timestamp of an existing session,
+	// without rewriting the stored session data (used to keep active sessions
+	// alive for GC on read-only requests).
+	Touch(sid string, at time.Time) error
 	Len() int
 }
 
@@ -86,6 +90,12 @@ func (s *memSessionStore) DeleteExpired(before time.Time) error {
 	return nil
 }
 
+// Touch is a no-op for the in-memory store; the shared session object keeps
+// its own up-to-date timestamp and expiry is evaluated against it.
+func (s *memSessionStore) Touch(sid string, at time.Time) error {
+	return nil
+}
+
 func (s *memSessionStore) Len() int {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -113,12 +123,14 @@ func (s *dbSessionStore) Init() error {
 }
 
 func (s *dbSessionStore) Get(sid string) (*MoraSession, bool) {
+	start := time.Now()
 	var data string
 	err := s.db.Get(&data, "SELECT data FROM session WHERE sid = ?", sid)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			log.Err(err).Str("sid", sid).Msg("session Get failed")
 		}
+		log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Get (miss)")
 		return nil, false
 	}
 
@@ -128,10 +140,12 @@ func (s *dbSessionStore) Get(sid string) (*MoraSession, bool) {
 		_ = s.Delete(sid)
 		return nil, false
 	}
+	log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Get (hit)")
 	return sess, true
 }
 
 func (s *dbSessionStore) Put(sid string, sess *MoraSession) error {
+	start := time.Now()
 	data, err := json.Marshal(sess)
 	if err != nil {
 		return fmt.Errorf("session Put marshal: %w", err)
@@ -148,29 +162,48 @@ func (s *dbSessionStore) Put(sid string, sess *MoraSession) error {
 	if err != nil {
 		return fmt.Errorf("session Put: %w", err)
 	}
+	log.Debug().Str("sid", sid).Int("bytes", len(data)).Dur("duration", time.Since(start)).Msg("session Put")
+	return nil
+}
+
+// Touch refreshes only the last_seen column, skipping the session data
+// rewrite. A missing session (already GC'd) is a no-op.
+func (s *dbSessionStore) Touch(sid string, at time.Time) error {
+	start := time.Now()
+	_, err := s.db.Exec("UPDATE session SET last_seen = ? WHERE sid = ?", at.UnixNano(), sid)
+	if err != nil {
+		return fmt.Errorf("session Touch: %w", err)
+	}
+	log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Touch")
 	return nil
 }
 
 func (s *dbSessionStore) Delete(sid string) error {
+	start := time.Now()
 	_, err := s.db.Exec("DELETE FROM session WHERE sid = ?", sid)
 	if err != nil {
 		return fmt.Errorf("session Delete: %w", err)
 	}
+	log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Delete")
 	return nil
 }
 
 func (s *dbSessionStore) Has(sid string) bool {
+	start := time.Now()
 	var one int
 	err := s.db.Get(&one, "SELECT 1 FROM session WHERE sid = ?", sid)
+	log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Has")
 	return err == nil
 }
 
 func (s *dbSessionStore) DeleteExpired(before time.Time) error {
+	start := time.Now()
 	cutoff := before.UnixNano()
 	_, err := s.db.Exec("DELETE FROM session WHERE last_seen <= ?", cutoff)
 	if err != nil {
 		return fmt.Errorf("session DeleteExpired: %w", err)
 	}
+	log.Debug().Dur("duration", time.Since(start)).Msg("session DeleteExpired")
 	return nil
 }
 

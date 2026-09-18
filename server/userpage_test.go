@@ -15,7 +15,7 @@ import (
 func setupUserPageServer(t *testing.T) (*MoraServer, http.Handler) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
@@ -163,4 +163,41 @@ func TestHandleUserTrackers(t *testing.T) {
 		defer func() { _ = res.Body.Close() }()
 		require.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
+}
+
+func TestHandler_SPAFallbackSkipsSession(t *testing.T) {
+	server, handler := setupUserPageServer(t)
+	calls := 0
+	server.frontendFileServer = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte("index"))
+	})
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(w, r)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.Equal(t, 1, calls)
+	require.Empty(t, res.Cookies(),
+		"the SPA fallback must not create a session or set a cookie")
+}
+
+func TestHandler_APIRouteStillSetsSession(t *testing.T) {
+	server, handler := setupUserPageServer(t)
+	server.frontendFileServer = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("index"))
+	})
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	handler.ServeHTTP(w, r)
+
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+	require.Equal(t, http.StatusNoContent, res.StatusCode)
+	require.Len(t, res.Cookies(), 1,
+		"API routes must still create a session cookie")
 }

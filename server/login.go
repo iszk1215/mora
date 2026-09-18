@@ -121,7 +121,7 @@ func LoginHandler(repositoryManagers []RepositoryManager, userStore UserStore, i
 		}
 
 		rm_id := sess.loggingInto
-		sess.loggingInto = -1 // reset
+		sess.setLoggingInto(-1) // reset
 
 		handler, ok := handlers[rm_id]
 		if !ok {
@@ -141,7 +141,7 @@ func LoginHandler(repositoryManagers []RepositoryManager, userStore UserStore, i
 
 		sess, _ := MoraSessionFrom(r.Context())
 		if sess != nil {
-			sess.loggingInto = rm_id
+			sess.setLoggingInto(rm_id)
 		}
 
 		handler, ok := handlers[rm_id]
