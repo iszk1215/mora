@@ -512,13 +512,15 @@ func (s *MoraServer) Handler() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// Frontend static assets run before the session middleware: they do not
-	// need a session, and every session load costs a database round trip
-	// (twice per request with the write-back), which is prohibitively slow
-	// against a remote Turso database.
+	// Frontend static assets and Swagger docs run before the session
+	// middleware: they do not need a session, and every session load costs a
+	// database round trip (twice per request with the write-back), which is
+	// prohibitively slow against a remote Turso database.
 	r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {
 		s.frontendFileServer.ServeHTTP(w, r)
 	})
+
+	r.Mount("/swagger/", httpSwagger.WrapHandler)
 
 	r.Group(func(r chi.Router) {
 		r.Use(s.sessionManager.SessionMiddleware)
@@ -586,8 +588,6 @@ func (s *MoraServer) Handler() http.Handler {
 		}
 
 		// frontend
-
-		r.Mount("/swagger/", httpSwagger.WrapHandler)
 
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
 			r.URL.Path = "/"
