@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	stdlog "log"
 	"net/http"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/server"
 	"github.com/rs/zerolog"
@@ -27,10 +29,16 @@ func NewWebCommand() *cobra.Command {
 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			zerolog.TimeFieldFormat = logTimestampFormatMs
+			noColor := false
+			if o, err := os.Stderr.Stat(); err == nil && (o.Mode()&os.ModeCharDevice) != os.ModeCharDevice {
+				noColor = true
+			}
 			log.Logger = log.Output(
-				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: logTimestampFormatMs}).With().Caller().Logger()
-			// The chi access log uses the standard library logger.
-			stdlog.SetFlags(stdlog.LstdFlags | stdlog.Lmicroseconds)
+				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: logTimestampFormatMs, NoColor: noColor}).With().Caller().Logger()
+			// chi's access logger is created in init() with hardcoded flags;
+			// rewire the exported DefaultLogger so it matches the ms-precision
+			// timestamps of the zerolog output and disables colors off-TTY.
+			configureAccessLogger(os.Stderr, noColor)
 
 			config_file, err := cmd.Flags().GetString("config")
 			if err != nil {
@@ -128,4 +136,15 @@ func NewWebCommand() *cobra.Command {
 	webCmd.Flags().Bool("insecure-cookie", false, "Disable Secure cookie attribute (for development over HTTP)")
 
 	return webCmd
+}
+
+// configureAccessLogger rewires chi's exported DefaultLogger hook so the
+// access log uses microsecond timestamps and writes to the given output. chi
+// creates its own logger in init() with second-precision flags, so log flag
+// configuration on the standard logger has no effect on it.
+func configureAccessLogger(out io.Writer, noColor bool) {
+	middleware.DefaultLogger = middleware.RequestLogger(&middleware.DefaultLogFormatter{
+		Logger:  stdlog.New(out, "", stdlog.LstdFlags|stdlog.Lmicroseconds),
+		NoColor: noColor,
+	})
 }
