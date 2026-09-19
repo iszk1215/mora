@@ -19,6 +19,12 @@ CREATE TABLE IF NOT EXISTS session (
     last_seen INTEGER NOT NULL
 )`
 
+// sessionCacheTTL bounds how long a session snapshot may be served from the
+// process-local cache without re-reading the shared database. The TTL is fixed
+// (not refreshed by reads), so cross-instance staleness stays within one TTL
+// and reload bursts are collapsed to a single database read.
+const sessionCacheTTL = 5 * time.Second
+
 // sessionStore persists MoraSession objects keyed by session ID.
 //
 // The in-memory implementation backs unit tests and single-process demo mode.
@@ -213,4 +219,119 @@ func (s *dbSessionStore) Len() int {
 		return 0
 	}
 	return n
+}
+
+// cachedSession is a single entry in cachingSessionStore. sess is nil for
+// negative entries, which remember that a sid had no backing row so a reload
+// burst does not query the shared database for a row that does not exist.
+type cachedSession struct {
+	sess    *MoraSession
+	expires time.Time
+}
+
+// cachingSessionStore decorates a sessionStore with a short-lived
+// process-local read cache. Only the database-backed store is wrapped: every
+// cookie-bearing request would otherwise pay a full remote round trip (about
+// 350ms on Turso) even when the request lands on the same instance that just
+// served or missed that session milliseconds ago.
+//
+// Positive hits reuse the cached *MoraSession object. This is safe because the
+// session middleware serializes requests holding the same sid within an
+// instance via lockSession, so the object is never accessed concurrently while
+// a request holds the sid lock through its write-back. The shared database
+// remains the source of truth; the cache only shortcuts reads within the TTL.
+//
+// Negative entries make the middleware build a fresh anonymous session on each
+// hit (exactly as it does today), but skip the database round trip that would
+// otherwise miss every time. Both entry kinds expire after the fixed TTL and
+// are swept by DeleteExpired.
+type cachingSessionStore struct {
+	inner sessionStore
+	mu    sync.Mutex
+	cache map[string]cachedSession
+	ttl   time.Duration
+}
+
+func newCachingSessionStore(inner sessionStore, ttl time.Duration) *cachingSessionStore {
+	return &cachingSessionStore{
+		inner: inner,
+		cache: map[string]cachedSession{},
+		ttl:   ttl,
+	}
+}
+
+func (s *cachingSessionStore) Get(sid string) (*MoraSession, bool) {
+	now := time.Now()
+	s.mu.Lock()
+	if e, ok := s.cache[sid]; ok {
+		if now.Before(e.expires) {
+			if e.sess == nil {
+				s.mu.Unlock()
+				return nil, false
+			}
+			sess := e.sess
+			s.mu.Unlock()
+			return sess, true
+		}
+		delete(s.cache, sid)
+	}
+	s.mu.Unlock()
+
+	sess, found := s.inner.Get(sid)
+	if !found {
+		// Negative cache: remember that the sid does not exist so a burst of
+		// read-only request does not keep querying a row that is absent.
+		sess = nil
+	}
+	s.mu.Lock()
+	s.cache[sid] = cachedSession{sess: sess, expires: time.Now().Add(s.ttl)}
+	s.mu.Unlock()
+	return sess, found
+}
+
+func (s *cachingSessionStore) Put(sid string, sess *MoraSession) error {
+	if err := s.inner.Put(sid, sess); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.cache[sid] = cachedSession{sess: sess, expires: time.Now().Add(s.ttl)}
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *cachingSessionStore) Touch(sid string, at time.Time) error {
+	return s.inner.Touch(sid, at)
+}
+
+func (s *cachingSessionStore) Delete(sid string) error {
+	if err := s.inner.Delete(sid); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	delete(s.cache, sid)
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *cachingSessionStore) Has(sid string) bool {
+	return s.inner.Has(sid)
+}
+
+func (s *cachingSessionStore) DeleteExpired(before time.Time) error {
+	if err := s.inner.DeleteExpired(before); err != nil {
+		return err
+	}
+	now := time.Now()
+	s.mu.Lock()
+	for sid, e := range s.cache {
+		if !now.Before(e.expires) {
+			delete(s.cache, sid)
+		}
+	}
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *cachingSessionStore) Len() int {
+	return s.inner.Len()
 }

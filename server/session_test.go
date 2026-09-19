@@ -57,6 +57,17 @@ func newTestSessionManager() *MoraSessionManager {
 	}
 }
 
+// newRecordingDBSessionStore returns a database-backed recording session store
+// whose Get/Put/Touch operations are counted.
+func newRecordingDBSessionStore(t *testing.T) *recordingSessionStore {
+	t.Helper()
+	db, err := sqlx.Connect("libsql", ":memory:")
+	require.NoError(t, err)
+	store := newDBSessionStore(db)
+	require.NoError(t, store.Init())
+	return &recordingSessionStore{sessionStore: store}
+}
+
 func TestSessionID_ReturnsErrorOnReadFailure(t *testing.T) {
 	old := rand.Reader
 	rand.Reader = &failReader{}
@@ -542,4 +553,163 @@ func TestSessionManager_TouchesAtMostOncePerInterval(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 	require.Equal(t, 2, store.touches)
+}
+
+// ----------------------------------------------------------------------
+// cachingSessionStore (process-local read cache for the DB store)
+
+func TestCachingSessionStore_PositiveCacheSkipsRepeatedReads(t *testing.T) {
+	inner := newRecordingDBSessionStore(t)
+	store := newCachingSessionStore(inner, time.Hour)
+
+	// Seed the database directly (bypassing the cache) as another instance
+	// would have done.
+	sess := NewMoraSession()
+	sess.SetUserID(7)
+	require.NoError(t, inner.Put("sid-1", sess))
+
+	got, ok := store.Get("sid-1")
+	require.True(t, ok)
+	require.Equal(t, int64(7), *got.UserID())
+	require.Equal(t, 1, inner.gets)
+
+	// A second read within the TTL is served from the process cache without
+	// querying the database again.
+	got, ok = store.Get("sid-1")
+	require.True(t, ok)
+	require.Equal(t, int64(7), *got.UserID())
+	require.Equal(t, 1, inner.gets, "reads within the TTL must not reach the store")
+}
+
+func TestCachingSessionStore_NegativeCacheSkipsRepeatedReads(t *testing.T) {
+	inner := newRecordingDBSessionStore(t)
+	store := newCachingSessionStore(inner, time.Hour)
+
+	// The first read of an unknown sid queries the database and records a
+	// negative result; repeat reads are served from the cache.
+	sess, ok := store.Get("sid-absent")
+	require.False(t, ok)
+	require.Nil(t, sess)
+	sess, ok = store.Get("sid-absent")
+	require.False(t, ok)
+	require.Nil(t, sess)
+	require.Equal(t, 1, inner.gets, "absent sids must be cached as negatives")
+
+	// After the TTL elapses the next read re-queries the database.
+	short := newCachingSessionStore(inner, time.Millisecond)
+	sess, ok = short.Get("sid-absent")
+	require.False(t, ok)
+	require.Nil(t, sess)
+	require.Equal(t, 2, inner.gets)
+	time.Sleep(5 * time.Millisecond)
+	sess, ok = short.Get("sid-absent")
+	require.False(t, ok)
+	require.Nil(t, sess)
+	require.Equal(t, 3, inner.gets, "expired entries must trigger a fresh database read")
+}
+
+func TestCachingSessionStore_PutPromotesNegativeToPositive(t *testing.T) {
+	inner := newRecordingDBSessionStore(t)
+	store := newCachingSessionStore(inner, time.Hour)
+
+	_, ok := store.Get("sid-1")
+	require.False(t, ok)
+	require.Equal(t, 1, inner.gets)
+
+	// Persisting the session flips the negative entry into a positive one, so
+	// the next read does not touch the database.
+	sess := NewMoraSession()
+	sess.SetUserID(3)
+	require.NoError(t, store.Put("sid-1", sess))
+
+	got, ok := store.Get("sid-1")
+	require.True(t, ok)
+	require.Equal(t, int64(3), *got.UserID())
+	require.Equal(t, 1, inner.gets, "Put must upgrade the cache without another read")
+}
+
+func TestCachingSessionStore_DeleteInvalidatesCache(t *testing.T) {
+	inner := newRecordingDBSessionStore(t)
+	store := newCachingSessionStore(inner, time.Hour)
+
+	sess := NewMoraSession()
+	sess.SetUserID(5)
+	require.NoError(t, inner.Put("sid-1", sess))
+	_, ok := store.Get("sid-1")
+	require.True(t, ok)
+	require.Equal(t, 1, inner.gets)
+
+	require.NoError(t, store.Delete("sid-1"))
+	_, ok = store.Get("sid-1")
+	require.False(t, ok)
+	require.Equal(t, 2, inner.gets, "Delete must invalidate the cache entry")
+}
+
+func TestCachingSessionStore_DeleteExpiredSweepsCache(t *testing.T) {
+	inner := newRecordingDBSessionStore(t)
+	store := newCachingSessionStore(inner, time.Millisecond)
+
+	_, ok := store.Get("sid-absent")
+	require.False(t, ok)
+	require.Equal(t, 1, inner.gets)
+
+	time.Sleep(5 * time.Millisecond)
+	require.NoError(t, store.DeleteExpired(time.Now()))
+
+	_, ok = store.Get("sid-absent")
+	require.False(t, ok)
+	require.Equal(t, 2, inner.gets, "DeleteExpired must sweep expired cache entries")
+}
+
+func TestSessionManager_ReusesCachedSessionWithoutRepeatedGet(t *testing.T) {
+	inner := newRecordingDBSessionStore(t)
+	cacheStore := newCachingSessionStore(inner, time.Hour)
+	m := NewMoraSessionManagerWithStore(false, cacheStore)
+	defer func() { _ = m.Close() }()
+
+	// First request (no cookie) signs the user in; the write-back persists
+	// the session and warms the process cache.
+	mutate := m.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess, _ := MoraSessionFrom(r.Context())
+		sess.SetUserID(11)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	mutate.ServeHTTP(w, req)
+	sid := w.Result().Cookies()[0].Value
+
+	// Subsequent read-only requests with the cookie reuse the cached session
+	// without reading the database again.
+	read := m.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess, _ := MoraSessionFrom(r.Context())
+		require.Equal(t, int64(11), *sess.UserID())
+	}))
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
+		read.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	require.Equal(t, 0, inner.gets, "session reads must be served from the process cache")
+	require.Equal(t, 1, inner.puts, "only the mutating request persists the session")
+}
+
+func TestSessionManager_SkipsRepeatedGetsForAnonymousSession(t *testing.T) {
+	inner := newRecordingDBSessionStore(t)
+	cacheStore := newCachingSessionStore(inner, time.Hour)
+	m := NewMoraSessionManagerWithStore(false, cacheStore)
+	defer func() { _ = m.Close() }()
+
+	// An anonymous visitor reloading the top page: only the first request
+	// queries the database (and misses); the rest are negative cache hits.
+	handler := m.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "morasessionid", Value: "anon-sid"})
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	require.Equal(t, 1, inner.gets, "only the first anonymous request reads the database")
+	require.Equal(t, 0, inner.puts, "anonymous sessions are never persisted")
+	require.Equal(t, 0, inner.touches, "absent sessions must not be touched")
 }

@@ -282,9 +282,16 @@ func NewMoraSessionManager(insecureCookie bool) *MoraSessionManager {
 }
 
 // NewMoraSessionManagerWithStore creates a session manager backed by the
-// given session store (e.g. a database store shared across instances).
+// given session store (e.g. a database store shared across instances). When
+// the store is database-backed, reads are short-circuited by a process-local
+// cache (see cachingSessionStore) so bursts of requests for the same session
+// do not pay a remote database round trip each. The in-memory store is left
+// untouched: its reads are already local map lookups.
 func NewMoraSessionManagerWithStore(insecureCookie bool, store sessionStore) *MoraSessionManager {
 	m := NewMoraSessionManager(insecureCookie)
+	if _, ok := store.(*dbSessionStore); ok {
+		store = newCachingSessionStore(store, sessionCacheTTL)
+	}
 	m.store = store
 	return m
 }
