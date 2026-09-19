@@ -122,8 +122,12 @@ Sessions are stored in the shared database (`session` table, JSON-serialized
 instances of a horizontally scaled deployment (e.g. Cloud Run) see the same
 sessions. On every request the session is reloaded from the database and
 written back after the handler runs; a background GC deletes sessions that
-have been idle for the session lifetime (24 hours). A process-local map-based
-store is used in tests and demo mode.
+have been idle for the session lifetime (24 hours). The database-backed store
+is decorated with a process-local read cache (fixed 5s TTL) so bursts of
+requests for the same session - including anonymous sessions that have no
+database row - are served without repeated remote database round trips; the
+shared database remains the source of truth. A process-local map-based store
+is used in tests and demo mode.
 
 Google is configured as an `[[scm]]` entry with `scm = "google"` (login-only
 provider, no SCM client). The default endpoints point at Google's OAuth2
