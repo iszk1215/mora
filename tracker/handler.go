@@ -582,7 +582,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	}
 
 	log.Info().Int64("tracker_id", tracker.Id).Int("series_count", len(series)).
-		Int("value_count", totalValues).Dur("duration", time.Since(start)).
+		Int("value_count", totalValues).Stringer("duration", time.Since(start)).
 		Msg("tracker.previewTracker")
 	render.JSON(w, PreviewResponse{Tracker: trackerResp, Series: previews}, http.StatusOK)
 }

@@ -469,7 +469,9 @@ func (c *udmCommand) newCommand() *cobra.Command {
 
 func NewCommand() *cobra.Command {
 	noColor := false
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
+	logTimestampFormatMs := "2006-01-02T15:04:05.000Z07:00"
+	zerolog.TimeFieldFormat = logTimestampFormatMs
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: logTimestampFormatMs, NoColor: noColor}).With().Caller().Logger()
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	c := udmCommand{}

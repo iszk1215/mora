@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"os"
-	"time"
 
 	"github.com/iszk1215/mora/coverage"
 	"github.com/iszk1215/mora/udm"
@@ -12,6 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// logTimestampFormatMs is the millisecond-precision timestamp format used for
+// both the zerolog time field encoding and the console output.
+const logTimestampFormatMs = "2006-01-02T15:04:05.000Z07:00"
+
 func New() *cobra.Command {
 	noColor := false
 	o, _ := os.Stderr.Stat()
@@ -19,7 +22,9 @@ func New() *cobra.Command {
 		noColor = true
 	}
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339, NoColor: noColor}).With().Caller().Logger()
+	zerolog.TimeFieldFormat = logTimestampFormatMs
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: logTimestampFormatMs, NoColor: noColor}).With().Caller().Logger()
 
 	var cmd = &cobra.Command{
 		Use:     "mora",

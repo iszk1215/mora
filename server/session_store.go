@@ -130,7 +130,7 @@ func (s *dbSessionStore) Get(sid string) (*MoraSession, bool) {
 		if !errors.Is(err, sql.ErrNoRows) {
 			log.Err(err).Str("sid", sid).Msg("session Get failed")
 		}
-		log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Get (miss)")
+		log.Debug().Str("sid", sid).Stringer("duration", time.Since(start)).Msg("session Get (miss)")
 		return nil, false
 	}
 
@@ -140,7 +140,7 @@ func (s *dbSessionStore) Get(sid string) (*MoraSession, bool) {
 		_ = s.Delete(sid)
 		return nil, false
 	}
-	log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Get (hit)")
+	log.Debug().Str("sid", sid).Stringer("duration", time.Since(start)).Msg("session Get (hit)")
 	return sess, true
 }
 
@@ -162,7 +162,7 @@ func (s *dbSessionStore) Put(sid string, sess *MoraSession) error {
 	if err != nil {
 		return fmt.Errorf("session Put: %w", err)
 	}
-	log.Debug().Str("sid", sid).Int("bytes", len(data)).Dur("duration", time.Since(start)).Msg("session Put")
+	log.Debug().Str("sid", sid).Int("bytes", len(data)).Stringer("duration", time.Since(start)).Msg("session Put")
 	return nil
 }
 
@@ -174,7 +174,7 @@ func (s *dbSessionStore) Touch(sid string, at time.Time) error {
 	if err != nil {
 		return fmt.Errorf("session Touch: %w", err)
 	}
-	log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Touch")
+	log.Debug().Str("sid", sid).Stringer("duration", time.Since(start)).Msg("session Touch")
 	return nil
 }
 
@@ -184,7 +184,7 @@ func (s *dbSessionStore) Delete(sid string) error {
 	if err != nil {
 		return fmt.Errorf("session Delete: %w", err)
 	}
-	log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Delete")
+	log.Debug().Str("sid", sid).Stringer("duration", time.Since(start)).Msg("session Delete")
 	return nil
 }
 
@@ -192,7 +192,7 @@ func (s *dbSessionStore) Has(sid string) bool {
 	start := time.Now()
 	var one int
 	err := s.db.Get(&one, "SELECT 1 FROM session WHERE sid = ?", sid)
-	log.Debug().Str("sid", sid).Dur("duration", time.Since(start)).Msg("session Has")
+	log.Debug().Str("sid", sid).Stringer("duration", time.Since(start)).Msg("session Has")
 	return err == nil
 }
 
@@ -203,7 +203,7 @@ func (s *dbSessionStore) DeleteExpired(before time.Time) error {
 	if err != nil {
 		return fmt.Errorf("session DeleteExpired: %w", err)
 	}
-	log.Debug().Dur("duration", time.Since(start)).Msg("session DeleteExpired")
+	log.Debug().Stringer("duration", time.Since(start)).Msg("session DeleteExpired")
 	return nil
 }
 

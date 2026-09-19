@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	stdlog "log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,8 +26,11 @@ func NewWebCommand() *cobra.Command {
 		Short: "Start mora web server",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			zerolog.TimeFieldFormat = logTimestampFormatMs
 			log.Logger = log.Output(
-				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
+				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: logTimestampFormatMs}).With().Caller().Logger()
+			// The chi access log uses the standard library logger.
+			stdlog.SetFlags(stdlog.LstdFlags | stdlog.Lmicroseconds)
 
 			config_file, err := cmd.Flags().GetString("config")
 			if err != nil {
