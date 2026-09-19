@@ -1590,6 +1590,88 @@ func TestHandlerPreviewTracker(t *testing.T) {
 		require.Len(t, got.Series, 0)
 	})
 
+	t.Run("limits values to 20 per series in ASC order", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		s1 := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s1))
+		s2 := &SeriesModel{TrackerId: tr.Id, Name: "s2", DataType: "float"}
+		require.NoError(t, store.addSeries(s2))
+
+		now := time.Now().Round(0)
+		for i := 0; i < 25; i++ {
+			require.NoError(t, store.addValue(&ValueModel{
+				SeriesId: s1.Id, Timestamp: now.Add(time.Duration(i) * time.Minute), Value: float64(i),
+			}))
+			require.NoError(t, store.addValue(&ValueModel{
+				SeriesId: s2.Id, Timestamp: now.Add(time.Duration(i) * time.Minute), Value: float64(i + 100),
+			}))
+		}
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/preview", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got PreviewResponse
+		unmarshalResponse(t, res, &got)
+		seriesByName := make(map[string]int, len(got.Series))
+		for i, pv := range got.Series {
+			seriesByName[pv.Series.Name] = i
+		}
+
+		a := got.Series[seriesByName["s1"]].Values
+		require.Len(t, a, 20)
+		require.Equal(t, 5.0, a[0].Value)
+		require.Equal(t, 24.0, a[19].Value)
+		for i := 1; i < len(a); i++ {
+			require.True(t, a[i].Timestamp.After(a[i-1].Timestamp))
+		}
+
+		b := got.Series[seriesByName["s2"]].Values
+		require.Len(t, b, 20)
+		require.Equal(t, 105.0, b[0].Value)
+		require.Equal(t, 124.0, b[19].Value)
+	})
+
+	t.Run("series without values keeps empty array in JSON", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		s1 := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		require.NoError(t, store.addSeries(s1))
+		sEmpty := &SeriesModel{TrackerId: tr.Id, Name: "empty", DataType: "float"}
+		require.NoError(t, store.addSeries(sEmpty))
+		require.NoError(t, store.addValue(&ValueModel{
+			SeriesId: s1.Id, Timestamp: time.Now().Round(0), Value: 42,
+		}))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/preview", tr.Id)
+		r := httptest.NewRequest(http.MethodGet, path, nil)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.Contains(t, string(body), `"values":[]`)
+
+		var got PreviewResponse
+		require.NoError(t, json.Unmarshal(body, &got))
+		require.Len(t, got.Series, 2)
+		for _, pv := range got.Series {
+			if pv.Series.Name == "empty" {
+				require.Empty(t, pv.Values)
+			} else {
+				require.Len(t, pv.Values, 1)
+			}
+		}
+	})
+
 	t.Run("returns 404 for non-existing tracker", func(t *testing.T) {
 		h := newTestHandler(t)
 		r := httptest.NewRequest(http.MethodGet, "/99999/preview", nil)

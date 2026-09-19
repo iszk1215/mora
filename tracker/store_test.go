@@ -14,7 +14,10 @@ import (
 func initTestStore(t *testing.T) *trackerStore {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	// :memory: databases are isolated per pooled connection; a single
+	// connection keeps concurrent queries on the same (initialized) DB.
+	db.SetMaxOpenConns(1)
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	db.MustExec("PRAGMA foreign_keys = ON")
 
@@ -622,6 +625,68 @@ func TestStoreListLatestValues(t *testing.T) {
 
 	t.Run("no values returns empty", func(t *testing.T) {
 		values, err := s.listLatestValues(999, 5)
+		require.NoError(t, err)
+		require.Empty(t, values)
+	})
+}
+
+func TestStoreListLatestValuesByTracker(t *testing.T) {
+	s := initTestStore(t)
+
+	tr := &TrackerModel{Name: "test_tracker"}
+	require.NoError(t, s.addTracker(tr, 1))
+
+	seriesA := &SeriesModel{TrackerId: tr.Id, Name: "series_a", DataType: "float"}
+	require.NoError(t, s.addSeries(seriesA))
+	seriesB := &SeriesModel{TrackerId: tr.Id, Name: "series_b", DataType: "float"}
+	require.NoError(t, s.addSeries(seriesB))
+
+	now := time.Now().Round(0)
+	for i := 0; i < 25; i++ {
+		require.NoError(t, s.addValue(&ValueModel{
+			SeriesId: seriesA.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i),
+		}))
+		require.NoError(t, s.addValue(&ValueModel{
+			SeriesId: seriesB.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i + 100),
+		}))
+	}
+
+	t.Run("returns latest values per series in ASC order", func(t *testing.T) {
+		values, err := s.listLatestValuesByTracker(tr.Id, 20)
+		require.NoError(t, err)
+		require.Len(t, values, 2)
+
+		a := values[seriesA.Id]
+		require.Len(t, a, 20)
+		// latest 20 out of 25 -> values 5..24, ordered by time ASC
+		require.Equal(t, 5.0, a[0].Value)
+		require.Equal(t, 24.0, a[19].Value)
+		for i := 1; i < len(a); i++ {
+			require.True(t, a[i].Timestamp.After(a[i-1].Timestamp))
+		}
+
+		b := values[seriesB.Id]
+		require.Len(t, b, 20)
+		require.Equal(t, 105.0, b[0].Value)
+		require.Equal(t, 124.0, b[19].Value)
+	})
+
+	t.Run("series without values is absent from the map", func(t *testing.T) {
+		sEmpty := &SeriesModel{TrackerId: tr.Id, Name: "series_empty", DataType: "float"}
+		require.NoError(t, s.addSeries(sEmpty))
+
+		values, err := s.listLatestValuesByTracker(tr.Id, 20)
+		require.NoError(t, err)
+		require.Len(t, values, 2)
+		_, ok := values[sEmpty.Id]
+		require.False(t, ok)
+	})
+
+	t.Run("tracker without series returns empty map", func(t *testing.T) {
+		tr2 := &TrackerModel{Name: "no_series"}
+		require.NoError(t, s.addTracker(tr2, 1))
+
+		values, err := s.listLatestValuesByTracker(tr2.Id, 20)
 		require.NoError(t, err)
 		require.Empty(t, values)
 	})

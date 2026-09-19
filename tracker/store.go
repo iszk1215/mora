@@ -690,6 +690,40 @@ func (s *trackerStore) listLatestValues(seriesId int64, limit int) ([]ValueModel
 	return rows, nil
 }
 
+// listLatestValuesByTracker returns, per series of the tracker, the most
+// recent values up to `limit`, keyed by series id. Each bucket is ordered by
+// time ascending. Map iteration order is not meaningful; callers should walk
+// the tracker's series slice and look buckets up by series id.
+func (s *trackerStore) listLatestValuesByTracker(trackerID int64, limit int) (map[int64][]ValueModel, error) {
+	start := time.Now()
+	query := `
+		SELECT series_id, id, time, value
+		FROM (
+			SELECT id, series_id, time, value,
+				ROW_NUMBER() OVER (PARTITION BY series_id ORDER BY time DESC) AS rn
+			FROM tracker_value
+			WHERE series_id IN (SELECT id FROM tracker_series WHERE tracker_id = ?)
+		)
+		WHERE rn <= ?
+		ORDER BY series_id, time`
+
+	rows := make([]ValueModel, 0)
+	err := s.db.Select(&rows, query, trackerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("listLatestValuesByTracker select: %w", err)
+	}
+
+	values := make(map[int64][]ValueModel, len(rows))
+	for _, v := range rows {
+		values[v.SeriesId] = append(values[v.SeriesId], v)
+	}
+
+	log.Debug().Int64("tracker_id", trackerID).Int("value_count", len(rows)).
+		Int("series_count", len(values)).Dur("duration", time.Since(start)).
+		Msg("tracker.listLatestValuesByTracker")
+	return values, nil
+}
+
 func (s *trackerStore) deleteValues(seriesId int64) error {
 	query := "DELETE FROM tracker_value WHERE series_id = ?"
 	_, err := s.db.Exec(query, seriesId)

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -527,6 +528,30 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 // ----------------------------------------------------------------------
 // Preview
 
+// parallel runs fns concurrently and returns the first non-nil error, if any.
+// All functions run to completion even when one has already failed.
+func parallel(fns ...func() error) error {
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(fns))
+	for _, fn := range fns {
+		wg.Add(1)
+		go func(f func() error) {
+			defer wg.Done()
+			if err := f(); err != nil {
+				errCh <- err
+			}
+		}(fn)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // PreviewTracker godoc
 // @Summary      Preview tracker data
 // @Description  Return tracker info, all series, and latest values (up to 20 per series) for card previews
@@ -541,44 +566,76 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	start := time.Now()
 	tracker, _ := trackerFrom(r.Context())
 
-	var previews []PreviewSeriesValues
+	var series []SeriesModel
+	var values map[int64][]ValueModel
+	var ownerName string
+	var role string
+	var liked bool
+	uid, hasUser := UserIDFromContext(r.Context())
 
-	series, err := h.store.listSeries(tracker.Id)
-	if err != nil {
-		log.Error().Err(err).Msg("tracker.handler.previewTracker listSeries")
-		render.InternalError(w, err)
-		return
+	fns := []func() error{
+		func() error {
+			var err error
+			series, err = h.store.listSeries(tracker.Id)
+			return err
+		},
+		func() error {
+			var err error
+			values, err = h.store.listLatestValuesByTracker(tracker.Id, 20)
+			return err
+		},
+		func() error {
+			name, err := h.store.findUsername(tracker.OwnerId)
+			if err == nil {
+				ownerName = name
+			}
+			return nil
+		},
+	}
+	if hasUser {
+		fns = append(fns,
+			func() error {
+				member, memberRole, err := h.store.isMember(uid, tracker.Id)
+				if err == nil && member {
+					role = memberRole
+				}
+				return nil
+			},
+			func() error {
+				l, err := h.store.isLiked(uid, tracker.Id)
+				if err == nil {
+					liked = l
+				}
+				return nil
+			},
+		)
 	}
 
-	totalValues := 0
-	for _, s := range series {
-		values, err := h.store.listLatestValues(s.Id, 20)
-		if err != nil {
-			log.Error().Err(err).Msg("tracker.handler.previewTracker listLatestValues")
-			continue
-		}
-		totalValues += len(values)
-		previews = append(previews, PreviewSeriesValues{
-			Series: s,
-			Values: values,
-		})
+	if err := parallel(fns...); err != nil {
+		log.Error().Err(err).Msg("tracker.handler.previewTracker")
+		render.InternalError(w, err)
+		return
 	}
 
 	trackerResp := TrackerResponse{
 		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type,
 		ChartConfig: tracker.ChartConfig,
 		OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt,
+		OwnerName: ownerName, Role: role, Liked: liked,
 	}
-	if ownerName, err := h.store.findUsername(tracker.OwnerId); err == nil {
-		trackerResp.OwnerName = ownerName
-	}
-	if uid, ok := UserIDFromContext(r.Context()); ok {
-		if member, role, err := h.store.isMember(uid, tracker.Id); err == nil && member {
-			trackerResp.Role = role
+
+	totalValues := 0
+	previews := make([]PreviewSeriesValues, 0, len(series))
+	for _, s := range series {
+		vs := values[s.Id]
+		if vs == nil {
+			vs = []ValueModel{}
 		}
-		if liked, err := h.store.isLiked(uid, tracker.Id); err == nil {
-			trackerResp.Liked = liked
-		}
+		totalValues += len(vs)
+		previews = append(previews, PreviewSeriesValues{
+			Series: s,
+			Values: vs,
+		})
 	}
 
 	log.Info().Int64("tracker_id", tracker.Id).Int("series_count", len(series)).
@@ -604,33 +661,62 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 
 	var series []SeriesModel
+	var ownerName string
+	var role string
+	var liked bool
+	var likeCount int
+	uid, hasUser := UserIDFromContext(r.Context())
+
+	fns := make([]func() error, 0, 5)
 	if tracker.Type == TypeTracker {
-		var err error
-		series, err = h.store.listSeries(tracker.Id)
-		if err != nil {
-			log.Error().Err(err).Msg("tracker.handler.listSeries")
-			render.InternalError(w, err)
-			return
-		}
+		fns = append(fns, func() error {
+			var err error
+			series, err = h.store.listSeries(tracker.Id)
+			return err
+		})
+	}
+	fns = append(fns,
+		func() error {
+			name, err := h.store.findUsername(tracker.OwnerId)
+			if err == nil {
+				ownerName = name
+			}
+			return nil
+		},
+		func() error {
+			count, err := h.store.countLikes(tracker.Id)
+			if err == nil {
+				likeCount = count
+			}
+			return nil
+		},
+	)
+	if hasUser {
+		fns = append(fns,
+			func() error {
+				_, memberRole, err := h.store.isMember(uid, tracker.Id)
+				if err == nil {
+					role = memberRole
+				}
+				return nil
+			},
+			func() error {
+				l, err := h.store.isLiked(uid, tracker.Id)
+				if err == nil {
+					liked = l
+				}
+				return nil
+			},
+		)
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig, OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt}
-	if ownerName, err := h.store.findUsername(tracker.OwnerId); err == nil {
-		trackerResp.OwnerName = ownerName
+	if err := parallel(fns...); err != nil {
+		log.Error().Err(err).Msg("tracker.handler.listSeries")
+		render.InternalError(w, err)
+		return
 	}
-	if uid, ok := UserIDFromContext(r.Context()); ok {
-		_, role, err := h.store.isMember(uid, tracker.Id)
-		if err == nil {
-			trackerResp.Role = role
-		}
-		liked, err := h.store.isLiked(uid, tracker.Id)
-		if err == nil {
-			trackerResp.Liked = liked
-		}
-	}
-	if likeCount, err := h.store.countLikes(tracker.Id); err == nil {
-		trackerResp.LikeCount = likeCount
-	}
+
+	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig, OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt, OwnerName: ownerName, Role: role, Liked: liked, LikeCount: likeCount}
 
 	resp := ListSeriesResponse{
 		Tracker: trackerResp,
