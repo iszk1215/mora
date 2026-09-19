@@ -23,12 +23,37 @@ func (f *failReader) Read(p []byte) (int, error) {
 	return 0, errors.New("mock read error")
 }
 
+// recordingSessionStore counts session store operations so tests can assert
+// that read-only requests do not hit the database.
+type recordingSessionStore struct {
+	sessionStore
+	gets    int
+	puts    int
+	touches int
+}
+
+func (s *recordingSessionStore) Get(sid string) (*MoraSession, bool) {
+	s.gets++
+	return s.sessionStore.Get(sid)
+}
+
+func (s *recordingSessionStore) Put(sid string, sess *MoraSession) error {
+	s.puts++
+	return s.sessionStore.Put(sid, sess)
+}
+
+func (s *recordingSessionStore) Touch(sid string, at time.Time) error {
+	s.touches++
+	return s.sessionStore.Touch(sid, at)
+}
+
 func newTestSessionManager() *MoraSessionManager {
 	return &MoraSessionManager{
-		cookiename: "morasessionid",
-		store:      newMemSessionStore(),
-		lifetime:   24 * time.Hour,
-		stopCh:     make(chan struct{}),
+		cookiename:    "morasessionid",
+		store:         newMemSessionStore(),
+		lifetime:      24 * time.Hour,
+		stopCh:        make(chan struct{}),
+		touchInterval: time.Hour,
 	}
 }
 
@@ -432,4 +457,89 @@ func TestMoraSessionManager_DBPersistenceThroughMiddleware(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
 	req2.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
 	handler2.ServeHTTP(w2, req2)
+}
+
+func TestSessionManager_SkipsGetWithoutCookie(t *testing.T) {
+	store := &recordingSessionStore{sessionStore: newMemSessionStore()}
+	m := &MoraSessionManager{
+		cookiename:    "morasessionid",
+		store:         store,
+		lifetime:      24 * time.Hour,
+		stopCh:        make(chan struct{}),
+		touchInterval: time.Hour,
+	}
+	defer func() { _ = m.Close() }()
+
+	handler := m.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	require.Equal(t, 0, store.gets, "a request without a session cookie must not read the store")
+	require.Equal(t, 0, store.puts, "an anonymous request must not persist a session")
+	require.Equal(t, 0, store.touches)
+}
+
+func TestSessionManager_PutsOnlyWhenDirty(t *testing.T) {
+	store := &recordingSessionStore{sessionStore: newMemSessionStore()}
+	m := &MoraSessionManager{
+		cookiename:    "morasessionid",
+		store:         store,
+		lifetime:      24 * time.Hour,
+		stopCh:        make(chan struct{}),
+		touchInterval: time.Hour,
+	}
+	defer func() { _ = m.Close() }()
+
+	// Mutating request persists the session.
+	handler := m.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sess, _ := MoraSessionFrom(r.Context())
+		sess.setToken(1, scm.Token{Token: "t"})
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	sid := w.Result().Cookies()[0].Value
+	require.Equal(t, 1, store.puts)
+
+	// Read-only request with cookie must not rewrite the session.
+	handler2 := m.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
+	handler2.ServeHTTP(httptest.NewRecorder(), req2)
+
+	require.Equal(t, 1, store.gets)
+	require.Equal(t, 1, store.puts, "a read-only request must not persist the session")
+}
+
+func TestSessionManager_TouchesAtMostOncePerInterval(t *testing.T) {
+	store := &recordingSessionStore{sessionStore: newMemSessionStore()}
+	m := &MoraSessionManager{
+		cookiename:    "morasessionid",
+		store:         store,
+		lifetime:      24 * time.Hour,
+		stopCh:        make(chan struct{}),
+		touchInterval: time.Hour,
+	}
+	defer func() { _ = m.Close() }()
+
+	// Seed a session through the store directly, as if another instance had
+	// created it (this instance's lastWritten map is empty).
+	sid := "pre-existing-sid"
+	require.NoError(t, store.Put(sid, NewMoraSession()))
+
+	// Two consecutive read-only requests within the interval: one touch.
+	handler := m.SessionMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	require.Equal(t, 1, store.touches, "last_seen must only be refreshed once per interval")
+
+	// After the interval elapses, the next read-only request touches again.
+	m.lastWritten.Store(sid, time.Now().Add(-2*m.touchInterval))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: "morasessionid", Value: sid})
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	require.Equal(t, 2, store.touches)
 }

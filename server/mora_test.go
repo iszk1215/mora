@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/drone/go-scm/scm"
 	"github.com/rs/zerolog"
@@ -75,8 +74,9 @@ func NewMoraSessionWithTokenFor(repositoryManagers ...RepositoryManager) *MoraSe
 }
 
 func TestMain(m *testing.M) {
+	zerolog.TimeFieldFormat = "2006/01/02 15:04:05.000000"
 	log.Logger = log.Output(
-		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
+		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "2006/01/02 15:04:05.000000"}).With().Caller().Logger()
 
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	flag.Parse()

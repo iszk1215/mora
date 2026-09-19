@@ -54,7 +54,7 @@ table. Requires the database path from the server config.`,
 			if err := udm.MigrateUDMToTracker(db); err != nil {
 				return fmt.Errorf("migrate UDM to tracker: %w", err)
 			}
-			log.Info().Dur("elapsed", time.Since(start)).Msg("migration finished")
+			log.Info().Stringer("elapsed", time.Since(start)).Msg("migration finished")
 			return nil
 		},
 	}

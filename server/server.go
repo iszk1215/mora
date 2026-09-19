@@ -586,13 +586,16 @@ func (s *MoraServer) Handler() http.Handler {
 			r.Mount("/api/signup", SignupHandler(s.userStore))
 			r.Mount("/api/auth", PasswordAuthHandler(s.userStore, s.insecureCookie))
 		}
+	})
 
-		// frontend
-
-		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-			r.URL.Path = "/"
-			s.frontendFileServer.ServeHTTP(w, r)
-		})
+	// The SPA fallback serves the frontend entry point for every unmatched
+	// path. It runs outside the session middleware exactly like /assets: pages
+	// do not need a session, and every session round trip is expensive
+	// against a remote Turso database. The session cookie is set by the first
+	// API/login response the browser receives.
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = "/"
+		s.frontendFileServer.ServeHTTP(w, r)
 	})
 
 	return r

@@ -40,6 +40,9 @@ type MoraSession struct {
 	loggingInto   int64
 	userID        *int64
 	pendingSignup *pendingSignup
+	// dirty is set by any mutator so the session middleware can skip the
+	// database write-back for read-only requests.
+	dirty bool
 }
 
 func NewMoraSession() *MoraSession {
@@ -137,6 +140,7 @@ func (s *MoraSession) setReposCache(rmID int64, repos map[int64]bool) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.reposMap[rmID] = repos
+	s.dirty = true
 }
 
 func (s *MoraSession) getToken(rmID int64) (scm.Token, bool) {
@@ -150,6 +154,7 @@ func (s *MoraSession) setToken(rmID int64, token scm.Token) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.tokenMap[rmID] = token
+	s.dirty = true
 }
 
 func (s *MoraSession) Remove(rmID int64) {
@@ -157,6 +162,7 @@ func (s *MoraSession) Remove(rmID int64) {
 	defer s.lock.Unlock()
 	delete(s.tokenMap, rmID)
 	delete(s.reposMap, rmID)
+	s.dirty = true
 }
 
 func (s *MoraSession) WithToken(ctx context.Context, rmID int64) (context.Context, error) {
@@ -170,6 +176,22 @@ func (s *MoraSession) WithToken(ctx context.Context, rmID int64) (context.Contex
 	return scm.WithContext(ctx, &token), nil
 }
 
+// IsDirty reports whether the session was mutated since it was loaded. The
+// session middleware skips the write-back, saving database round trips on
+// read-only requests.
+func (s *MoraSession) IsDirty() bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	return s.dirty
+}
+
+// clearDirty resets the mutation flag after the session has been persisted.
+func (s *MoraSession) clearDirty() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.dirty = false
+}
+
 func (s *MoraSession) IsLoggedIn() bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -180,6 +202,7 @@ func (s *MoraSession) SetUserID(id int64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.userID = &id
+	s.dirty = true
 }
 
 func (s *MoraSession) UserID() *int64 {
@@ -192,12 +215,14 @@ func (s *MoraSession) ClearUserID() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.userID = nil
+	s.dirty = true
 }
 
 func (s *MoraSession) SetPendingSignup(p *pendingSignup) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.pendingSignup = p
+	s.dirty = true
 }
 
 func (s *MoraSession) PendingSignup() *pendingSignup {
@@ -210,6 +235,17 @@ func (s *MoraSession) ClearPendingSignup() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	s.pendingSignup = nil
+	s.dirty = true
+}
+
+// setLoggingInto records which SCM the session is in the middle of logging
+// into. The value must survive the redirect round trip, so it counts as a
+// mutation that triggers the session write-back.
+func (s *MoraSession) setLoggingInto(rmID int64) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	s.loggingInto = rmID
+	s.dirty = true
 }
 
 // Session Manager
@@ -225,6 +261,11 @@ type MoraSessionManager struct {
 	// sessionLocks serializes read-modify-write on a single session within
 	// this instance so concurrent requests cannot lose each other's updates.
 	sessionLocks sync.Map // sid -> *sync.Mutex
+	// lastWritten remembers when each session was last persisted or touched
+	// by this instance, so read-only requests only refresh last_seen at most
+	// once per touchInterval instead of on every request.
+	lastWritten   sync.Map // sid -> time.Time
+	touchInterval time.Duration
 }
 
 func NewMoraSessionManager(insecureCookie bool) *MoraSessionManager {
@@ -234,6 +275,7 @@ func NewMoraSessionManager(insecureCookie bool) *MoraSessionManager {
 		lifetime:       24 * time.Hour,
 		stopCh:         make(chan struct{}),
 		insecureCookie: insecureCookie,
+		touchInterval:  1 * time.Hour,
 	}
 	go m.periodicGC()
 	return m
@@ -311,12 +353,24 @@ func (m *MoraSessionManager) lockSession(sid string) func() {
 	return mu.Unlock
 }
 
+// shouldTouch reports whether a clean (read-only) session's last_seen has not
+// been refreshed by this instance for at least touchInterval. Active sessions
+// are therefore kept alive for GC without a database round trip per request.
+func (m *MoraSessionManager) shouldTouch(sid string) bool {
+	last, ok := m.lastWritten.Load(sid)
+	if !ok {
+		return true
+	}
+	return time.Since(last.(time.Time)) >= m.touchInterval
+}
+
 func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(m.cookiename)
+		hasCookie := err == nil && cookie.Value != ""
 
 		var sid string
-		if err != nil || cookie.Value == "" {
+		if !hasCookie {
 			sid, err = sessionID()
 			if err != nil {
 				log.Err(err).Msg("failed to generate session ID")
@@ -331,23 +385,53 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 		// instance so the read-modify-write below is atomic.
 		unlock := m.lockSession(sid)
 
-		sess, ok := m.store.Get(sid)
-		if !ok {
-			log.Info().Msgf("SessionMiddleware: create new MoraSession")
+		// A freshly generated session ID cannot exist in the store, so
+		// requests without a cookie skip the database read entirely.
+		var sess *MoraSession
+		var loaded bool
+		if hasCookie {
+			var ok bool
+			sess, ok = m.store.Get(sid)
+			if !ok {
+				log.Info().Msgf("SessionMiddleware: create new MoraSession")
+				sess = NewMoraSession()
+			} else {
+				loaded = true
+			}
+		} else {
+			log.Debug().Msg("SessionMiddleware: new anonymous session, skipped store read")
 			sess = NewMoraSession()
 		}
+
 		sess.lock.Lock()
 		sess.timestamp = time.Now()
 		sess.lock.Unlock()
 
-		// Write the session back once the handler chain has run, so every
-		// mutation made by handlers is persisted. The deferred order (LIFO)
-		// keeps the per-session lock held until after the write-back.
+		// Persist the session only when it was mutated, keeping the deferred
+		// order (LIFO) so the per-session lock is held until after the
+		// write-back. Clean loaded sessions refresh last_seen at most once
+		// per touchInterval so GC does not evict active sessions.
 		defer func() {
 			defer unlock()
-			if err := m.store.Put(sid, sess); err != nil {
-				log.Err(err).Str("sid", sid).Msg("SessionMiddleware: failed to persist session")
+			now := time.Now()
+			if sess.IsDirty() {
+				if err := m.store.Put(sid, sess); err != nil {
+					log.Err(err).Str("sid", sid).Msg("SessionMiddleware: failed to persist session")
+					return
+				}
+				sess.clearDirty()
+				m.lastWritten.Store(sid, now)
+				return
 			}
+			if loaded && m.shouldTouch(sid) {
+				if err := m.store.Touch(sid, now); err != nil {
+					log.Err(err).Str("sid", sid).Msg("SessionMiddleware: failed to refresh session last_seen")
+					return
+				}
+				m.lastWritten.Store(sid, now)
+				return
+			}
+			log.Debug().Bool("loaded", loaded).Str("sid", sid).Msg("SessionMiddleware: write skipped (no change)")
 		}()
 
 		cookie = &http.Cookie{

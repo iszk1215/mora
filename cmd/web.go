@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	stdlog "log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/server"
 	"github.com/rs/zerolog"
@@ -25,8 +28,17 @@ func NewWebCommand() *cobra.Command {
 		Short: "Start mora web server",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
+			zerolog.TimeFieldFormat = logTimestampFormatUs
+			noColor := false
+			if o, err := os.Stderr.Stat(); err == nil && (o.Mode()&os.ModeCharDevice) != os.ModeCharDevice {
+				noColor = true
+			}
 			log.Logger = log.Output(
-				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Caller().Logger()
+				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: logTimestampFormatUs, NoColor: noColor}).With().Caller().Logger()
+			// chi's access logger is created in init() with hardcoded flags;
+			// rewire the exported DefaultLogger so it matches the ms-precision
+			// timestamps of the zerolog output and disables colors off-TTY.
+			configureAccessLogger(os.Stderr, noColor)
 
 			config_file, err := cmd.Flags().GetString("config")
 			if err != nil {
@@ -85,35 +97,35 @@ func NewWebCommand() *cobra.Command {
 				IdleTimeout:  120 * time.Second,
 			}
 
-		log.Info().Msg("Started")
+			log.Info().Msg("Started")
 
-		shutdownDone := make(chan struct{})
+			shutdownDone := make(chan struct{})
 
-		go func() {
-			defer close(shutdownDone)
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			<-sigCh
+			go func() {
+				defer close(shutdownDone)
+				sigCh := make(chan os.Signal, 1)
+				signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+				<-sigCh
 
-			log.Info().Msg("Shutting down...")
-			if err := server.Close(); err != nil {
-				log.Error().Err(err).Msg("server.Close")
+				log.Info().Msg("Shutting down...")
+				if err := server.Close(); err != nil {
+					log.Error().Err(err).Msg("server.Close")
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := srv.Shutdown(ctx); err != nil {
+					log.Error().Err(err).Msg("srv.Shutdown")
+				}
+			}()
+
+			err = srv.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Err(err).Msg("server listen failed")
+				return fmt.Errorf("ListenAndServe: %w", err)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := srv.Shutdown(ctx); err != nil {
-				log.Error().Err(err).Msg("srv.Shutdown")
-			}
-		}()
 
-		err = srv.ListenAndServe()
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Err(err).Msg("server listen failed")
-			return fmt.Errorf("ListenAndServe: %w", err)
-		}
-
-		<-shutdownDone
-		return nil
+			<-shutdownDone
+			return nil
 		},
 	}
 
@@ -124,4 +136,15 @@ func NewWebCommand() *cobra.Command {
 	webCmd.Flags().Bool("insecure-cookie", false, "Disable Secure cookie attribute (for development over HTTP)")
 
 	return webCmd
+}
+
+// configureAccessLogger rewires chi's exported DefaultLogger hook so the
+// access log uses microsecond timestamps and writes to the given output. chi
+// creates its own logger in init() with second-precision flags, so log flag
+// configuration on the standard logger has no effect on it.
+func configureAccessLogger(out io.Writer, noColor bool) {
+	middleware.DefaultLogger = middleware.RequestLogger(&middleware.DefaultLogFormatter{
+		Logger:  stdlog.New(out, "", stdlog.LstdFlags|stdlog.Lmicroseconds),
+		NoColor: noColor,
+	})
 }
