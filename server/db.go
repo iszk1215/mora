@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/iszk1215/mora/config"
 	"github.com/jmoiron/sqlx"
@@ -12,6 +13,11 @@ import (
 
 	_ "github.com/tursodatabase/go-libsql"
 )
+
+// defaultMaxIdleConns is the number of idle connections the pool keeps open.
+// It matches the database/sql default and is referenced when rebuilding the
+// pool after dropping stale connections (see resetIdlePool).
+const defaultMaxIdleConns = 2
 
 // OpenDB opens a database connection according to the configuration.
 //
@@ -88,6 +94,16 @@ func OpenDB(cfg config.MoraConfig) (*sqlx.DB, error) {
 	} else {
 		db.SetMaxOpenConns(maxOpenConnsLocal)
 	}
+
+	// Remote Hrana streams are expired server-side after an idle timeout. The
+	// go-libsql driver surfaces those failures as plain query errors (not
+	// driver.ErrBadConn), so database/sql would keep reusing the stale pooled
+	// connection and fail on every query (e.g. recurring "stream not found"
+	// session GC failures). Recycle idle and long-lived connections so the
+	// pool re-establishes fresh Hrana streams.
+	db.SetMaxIdleConns(defaultMaxIdleConns)
+	db.SetConnMaxIdleTime(1 * time.Minute)
+	db.SetConnMaxLifetime(30 * time.Minute)
 
 	return db, nil
 }

@@ -39,4 +39,5 @@ Use libSQL via `github.com/tursodatabase/go-libsql` (CGo driver) with `github.co
 
 - Tests use in-memory libSQL (`:memory:`) for speed; helpers default to `PRAGMA foreign_keys = OFF` to replicate the previous mattn driver behavior, with explicit `PRAGMA foreign_keys = ON` where FK cascade behavior is under test
 - Demo mode uses in-memory libSQL with seeded data
-- `SetMaxOpenConns(1)` is retained for both local and remote modes
+- `SetMaxOpenConns(1)` is retained for local mode; remote (Turso) mode allows concurrent connections (`SetMaxOpenConns(10)`)
+- Remote Hrana streams are expired server-side after an idle timeout, and the go-libsql driver reports the resulting `stream not found` failures as plain errors (not `driver.ErrBadConn`), so stale connections would otherwise be reused forever. The pool is configured with `SetConnMaxIdleTime(1m)` / `SetConnMaxLifetime(30m)` to recycle connections, and `DELETE FROM session` GC retries once after dropping idle connections when it detects a Hrana stream error

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/drone/go-scm/scm"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
@@ -407,6 +408,99 @@ func TestDBSessionStore_Expiry(t *testing.T) {
 	require.NoError(t, store.DeleteExpired(now.Add(-time.Hour)))
 	require.True(t, store.Has("fresh"))
 	require.False(t, store.Has("stale"))
+}
+
+func TestIsHranaStreamError(t *testing.T) {
+	streamErr := errors.New("Error preparing statement: Hrana: `api error: `status=404 Not Found, body={\"error\":\"stream not found: bd5cec4e:968958c\"}`")
+
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "stream not found", err: streamErr, want: true},
+		{name: "stream has expired", err: errors.New("the stream has expired due to inactivity"), want: true},
+		{name: "HRANA_CLOSED", err: errors.New("Hrana: HRANA_CLOSED"), want: true},
+		{name: "unrelated", err: errors.New("sql: no such table: session"), want: false},
+		{name: "nil", err: nil, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isHranaStreamError(tt.err))
+		})
+	}
+}
+
+func TestDBSessionStore_DeleteExpiredRetriesOnHranaStreamError(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer func() { _ = sqlDB.Close() }()
+
+	resetCalled := false
+	orig := resetIdlePool
+	resetIdlePool = func(db *sqlx.DB) { resetCalled = true }
+	defer func() { resetIdlePool = orig }()
+
+	store := newDBSessionStore(sqlx.NewDb(sqlDB, "sqlmock"))
+
+	cutoff := int64(1234567890)
+	streamErr := errors.New("Error preparing statement: Hrana: `api error: `status=404 Not Found, body={\"error\":\"stream not found: bd5cec4e:968958c\"}`")
+
+	mock.ExpectExec("DELETE FROM session WHERE last_seen <= ?").
+		WithArgs(cutoff).
+		WillReturnError(streamErr)
+	mock.ExpectExec("DELETE FROM session WHERE last_seen <= ?").
+		WithArgs(cutoff).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	require.NoError(t, store.DeleteExpired(time.Unix(0, cutoff)))
+	require.True(t, resetCalled, "pool reset must run before the retry")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDBSessionStore_DeleteExpiredErrorAfterRetry(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer func() { _ = sqlDB.Close() }()
+
+	orig := resetIdlePool
+	resetIdlePool = func(db *sqlx.DB) {}
+	defer func() { resetIdlePool = orig }()
+
+	store := newDBSessionStore(sqlx.NewDb(sqlDB, "sqlmock"))
+
+	cutoff := int64(1234567890)
+	streamErr := errors.New("Hrana: `api error: `status=404 Not Found, body={\"error\":\"stream not found: bd5cec4e:968958c\"}`")
+
+	mock.ExpectExec("DELETE FROM session WHERE last_seen <= ?").
+		WithArgs(cutoff).
+		WillReturnError(streamErr)
+	mock.ExpectExec("DELETE FROM session WHERE last_seen <= ?").
+		WithArgs(cutoff).
+		WillReturnError(streamErr)
+
+	err = store.DeleteExpired(time.Unix(0, cutoff))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "session DeleteExpired")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestDBSessionStore_DeleteExpiredNonRetryableError(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherEqual))
+	require.NoError(t, err)
+	defer func() { _ = sqlDB.Close() }()
+
+	store := newDBSessionStore(sqlx.NewDb(sqlDB, "sqlmock"))
+
+	cutoff := int64(1234567890)
+	mock.ExpectExec("DELETE FROM session WHERE last_seen <= ?").
+		WithArgs(cutoff).
+		WillReturnError(errors.New("sql: no such table: session"))
+
+	err = store.DeleteExpired(time.Unix(0, cutoff))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "session DeleteExpired")
+	require.NoError(t, mock.ExpectationsWereMet(), "non-retryable errors must not trigger a retry")
 }
 
 func TestDBSessionStore_SharedAcrossStores(t *testing.T) {
