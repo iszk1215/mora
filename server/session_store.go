@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -205,12 +206,58 @@ func (s *dbSessionStore) Has(sid string) bool {
 func (s *dbSessionStore) DeleteExpired(before time.Time) error {
 	start := time.Now()
 	cutoff := before.UnixNano()
+
 	_, err := s.db.Exec("DELETE FROM session WHERE last_seen <= ?", cutoff)
-	if err != nil {
+	if err != nil && isHranaStreamError(err) {
+		// The failing query hit a stale Hrana stream left over in the pool.
+		// The go-libsql driver reports it as a plain error (not
+		// driver.ErrBadConn), so database/sql would hand the same broken
+		// connection back and keep failing. Drop idle connections and retry
+		// once so the next Exec establishes a fresh Hrana stream.
+		log.Warn().Err(err).Msg("session DeleteExpired: Hrana stream error, resetting pool and retrying")
+		resetIdlePool(s.db)
+		if _, retryErr := s.db.Exec("DELETE FROM session WHERE last_seen <= ?", cutoff); retryErr != nil {
+			return fmt.Errorf("session DeleteExpired: %w", retryErr)
+		}
+	} else if err != nil {
 		return fmt.Errorf("session DeleteExpired: %w", err)
 	}
+
 	log.Debug().Stringer("duration", time.Since(start)).Msg("session DeleteExpired")
 	return nil
+}
+
+// resetIdlePool closes every idle pooled connection so the next query opens a
+// new one with a live Hrana stream. Connections currently in use are left
+// untouched; they are recycled by the pool's max idle/lifetime settings.
+//
+// It is a variable so tests can stub the reset while still exercising the
+// retry flow, avoiding driver lifecycle quirks (sqlmock unregisters its DSN
+// when its last connection is closed).
+var resetIdlePool = func(db *sqlx.DB) {
+	db.SetMaxIdleConns(0)
+	db.SetMaxIdleConns(defaultMaxIdleConns)
+}
+
+// isHranaStreamError reports whether err is a Turso/libSQL Hrana protocol
+// failure caused by a stream being closed or expired server-side. Such errors
+// are transient: the affected pooled connection is stale and should be
+// replaced, after which the operation can be retried.
+func isHranaStreamError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	for _, marker := range []string{
+		"stream not found",
+		"stream has expired",
+		"HRANA_CLOSED",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *dbSessionStore) Len() int {

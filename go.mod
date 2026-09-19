@@ -3,6 +3,7 @@ module github.com/iszk1215/mora
 go 1.25.0
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/drone/go-scm v1.42.3
 	github.com/elliotchance/pie/v2 v2.9.1
 	github.com/go-chi/chi/v5 v5.3.0
