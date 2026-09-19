@@ -28,13 +28,13 @@ func NewWebCommand() *cobra.Command {
 		Short: "Start mora web server",
 
 		RunE: func(cmd *cobra.Command, args []string) error {
-			zerolog.TimeFieldFormat = logTimestampFormatMs
+			zerolog.TimeFieldFormat = logTimestampFormatUs
 			noColor := false
 			if o, err := os.Stderr.Stat(); err == nil && (o.Mode()&os.ModeCharDevice) != os.ModeCharDevice {
 				noColor = true
 			}
 			log.Logger = log.Output(
-				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: logTimestampFormatMs, NoColor: noColor}).With().Caller().Logger()
+				zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: logTimestampFormatUs, NoColor: noColor}).With().Caller().Logger()
 			// chi's access logger is created in init() with hardcoded flags;
 			// rewire the exported DefaultLogger so it matches the ms-precision
 			// timestamps of the zerolog output and disables colors off-TTY.
@@ -97,35 +97,35 @@ func NewWebCommand() *cobra.Command {
 				IdleTimeout:  120 * time.Second,
 			}
 
-		log.Info().Msg("Started")
+			log.Info().Msg("Started")
 
-		shutdownDone := make(chan struct{})
+			shutdownDone := make(chan struct{})
 
-		go func() {
-			defer close(shutdownDone)
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			<-sigCh
+			go func() {
+				defer close(shutdownDone)
+				sigCh := make(chan os.Signal, 1)
+				signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+				<-sigCh
 
-			log.Info().Msg("Shutting down...")
-			if err := server.Close(); err != nil {
-				log.Error().Err(err).Msg("server.Close")
+				log.Info().Msg("Shutting down...")
+				if err := server.Close(); err != nil {
+					log.Error().Err(err).Msg("server.Close")
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				if err := srv.Shutdown(ctx); err != nil {
+					log.Error().Err(err).Msg("srv.Shutdown")
+				}
+			}()
+
+			err = srv.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Err(err).Msg("server listen failed")
+				return fmt.Errorf("ListenAndServe: %w", err)
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := srv.Shutdown(ctx); err != nil {
-				log.Error().Err(err).Msg("srv.Shutdown")
-			}
-		}()
 
-		err = srv.ListenAndServe()
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Err(err).Msg("server listen failed")
-			return fmt.Errorf("ListenAndServe: %w", err)
-		}
-
-		<-shutdownDone
-		return nil
+			<-shutdownDone
+			return nil
 		},
 	}
 

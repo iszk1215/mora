@@ -74,9 +74,9 @@ func NewMoraSessionWithTokenFor(repositoryManagers ...RepositoryManager) *MoraSe
 }
 
 func TestMain(m *testing.M) {
-	zerolog.TimeFieldFormat = "2006-01-02T15:04:05.000Z07:00"
+	zerolog.TimeFieldFormat = "2006/01/02 15:04:05.000000"
 	log.Logger = log.Output(
-		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "2006-01-02T15:04:05.000Z07:00"}).With().Caller().Logger()
+		zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "2006/01/02 15:04:05.000000"}).With().Caller().Logger()
 
 	debug := flag.Bool("debug", false, "sets log level to debug")
 	flag.Parse()
