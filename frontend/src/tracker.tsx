@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { ChevronLeft, ChevronRight, MoreVertical, Pencil, Plus, Settings, Settings2, Star, Trash } from 'lucide-react'
+import { ChartLine, ChevronLeft, ChevronRight, MoreVertical, Pencil, Plus, Settings, Settings2, Star, Trash } from 'lucide-react'
 import { AlertDialog, Dialog, DropdownMenu } from 'radix-ui'
 
 import {
@@ -596,31 +596,24 @@ export const TrackerDetailView = (): React.JSX.Element => {
                 <DropdownMenu.Content align="end" className="bg-popover text-popover-foreground rounded-md border shadow-md p-1 min-w-[12rem] z-50">
                   <DropdownMenu.Item
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
-                    onSelect={() => setShowChartOptions((v) => !v)}
-                  >
-                    <Settings className="w-4 h-4" />
-                    Settings
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item
-                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
                     onSelect={() => setShowSeriesSettings((v) => !v)}
                   >
-                    <Settings2 className="w-4 h-4" />
+                    <ChartLine className="w-4 h-4" />
                     Series
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Item
-                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
-                    onSelect={() => { setAddSeriesError(null); setNewSeriesName(seriesList.length === 0 ? tracker.name : ''); setAddSeriesOpen(true) }}
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Series
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
                     onSelect={openAddValue}
                   >
-                    <Plus className="w-4 h-4" />
-                    Add Data Points
+                    <Settings2 className="w-4 h-4" />
+                    Data Points
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
+                    onSelect={() => setShowChartOptions((v) => !v)}
+                  >
+                    <Settings className="w-4 h-4" />
+                    Settings
                   </DropdownMenu.Item>
                   <DropdownMenu.Separator className="my-1 h-px bg-border" />
                   <DropdownMenu.Item
