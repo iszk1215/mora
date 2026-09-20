@@ -15,9 +15,13 @@ import (
 )
 
 // defaultMaxIdleConns is the number of idle connections the pool keeps open.
-// It matches the database/sql default and is referenced when rebuilding the
-// pool after dropping stale connections (see resetIdlePool).
-const defaultMaxIdleConns = 2
+// For remote databases it is matched to maxOpenConnsRemote so that a handler
+// firing several queries concurrently (e.g. the top-page preview batch)
+// reuses warm connections instead of paying the per-connection Hrana setup
+// round trip. It is referenced when rebuilding the pool after dropping stale
+// connections (see resetIdlePool), and is clamped to MaxOpenConns for local
+// databases.
+const defaultMaxIdleConns = 10
 
 // OpenDB opens a database connection according to the configuration.
 //

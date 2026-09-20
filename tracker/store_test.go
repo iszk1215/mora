@@ -7,14 +7,17 @@ import (
 
 	"github.com/iszk1215/mora/core"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
+	_ "github.com/tursodatabase/go-libsql"
 )
 
 func initTestStore(t *testing.T) *trackerStore {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	// :memory: databases are isolated per pooled connection; a single
+	// connection keeps concurrent queries on the same (initialized) DB.
+	db.SetMaxOpenConns(1)
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	db.MustExec("PRAGMA foreign_keys = ON")
 
@@ -624,6 +627,117 @@ func TestStoreListLatestValues(t *testing.T) {
 		values, err := s.listLatestValues(999, 5)
 		require.NoError(t, err)
 		require.Empty(t, values)
+	})
+}
+
+func TestStoreListLatestValuesByTracker(t *testing.T) {
+	s := initTestStore(t)
+
+	tr := &TrackerModel{Name: "test_tracker"}
+	require.NoError(t, s.addTracker(tr, 1))
+
+	seriesA := &SeriesModel{TrackerId: tr.Id, Name: "series_a", DataType: "float"}
+	require.NoError(t, s.addSeries(seriesA))
+	seriesB := &SeriesModel{TrackerId: tr.Id, Name: "series_b", DataType: "float"}
+	require.NoError(t, s.addSeries(seriesB))
+
+	now := time.Now().Round(0)
+	for i := 0; i < 25; i++ {
+		require.NoError(t, s.addValue(&ValueModel{
+			SeriesId: seriesA.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i),
+		}))
+		require.NoError(t, s.addValue(&ValueModel{
+			SeriesId: seriesB.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i + 100),
+		}))
+	}
+
+	t.Run("returns latest values per series in ASC order", func(t *testing.T) {
+		values, err := s.listLatestValuesByTracker(tr.Id, 20)
+		require.NoError(t, err)
+		require.Len(t, values, 2)
+
+		a := values[seriesA.Id]
+		require.Len(t, a, 20)
+		// latest 20 out of 25 -> values 5..24, ordered by time ASC
+		require.Equal(t, 5.0, a[0].Value)
+		require.Equal(t, 24.0, a[19].Value)
+		for i := 1; i < len(a); i++ {
+			require.True(t, a[i].Timestamp.After(a[i-1].Timestamp))
+		}
+
+		b := values[seriesB.Id]
+		require.Len(t, b, 20)
+		require.Equal(t, 105.0, b[0].Value)
+		require.Equal(t, 124.0, b[19].Value)
+	})
+
+	t.Run("series without values is absent from the map", func(t *testing.T) {
+		sEmpty := &SeriesModel{TrackerId: tr.Id, Name: "series_empty", DataType: "float"}
+		require.NoError(t, s.addSeries(sEmpty))
+
+		values, err := s.listLatestValuesByTracker(tr.Id, 20)
+		require.NoError(t, err)
+		require.Len(t, values, 2)
+		_, ok := values[sEmpty.Id]
+		require.False(t, ok)
+	})
+
+	t.Run("tracker without series returns empty map", func(t *testing.T) {
+		tr2 := &TrackerModel{Name: "no_series"}
+		require.NoError(t, s.addTracker(tr2, 1))
+
+		values, err := s.listLatestValuesByTracker(tr2.Id, 20)
+		require.NoError(t, err)
+		require.Empty(t, values)
+	})
+}
+
+func TestStoreLoadTrackerMeta(t *testing.T) {
+	s := initTestStore(t)
+
+	tr := &TrackerModel{Name: "meta_tracker"}
+	require.NoError(t, s.addTracker(tr, 1))
+
+	// user 2 becomes a member with role=editor; users 2 and 3 like the tracker
+	_, err := s.db.Exec(`INSERT INTO tracker_member (tracker_id, user_id, role) VALUES (?, ?, 'editor')`, tr.Id, 2)
+	require.NoError(t, err)
+	require.NoError(t, s.addLike(2, tr.Id))
+	require.NoError(t, s.addLike(3, tr.Id))
+
+	t.Run("owner sees owner role and metadata", func(t *testing.T) {
+		meta, err := s.loadTrackerMeta(tr.Id, 1)
+		require.NoError(t, err)
+		require.Equal(t, "admin", meta.OwnerName)
+		require.Equal(t, 2, meta.LikeCount)
+		require.Equal(t, "owner", meta.MemberRole)
+		require.False(t, meta.Liked)
+	})
+
+	t.Run("member sees their role and liked state", func(t *testing.T) {
+		meta, err := s.loadTrackerMeta(tr.Id, 2)
+		require.NoError(t, err)
+		require.Equal(t, "admin", meta.OwnerName)
+		require.Equal(t, 2, meta.LikeCount)
+		require.Equal(t, "editor", meta.MemberRole)
+		require.True(t, meta.Liked)
+	})
+
+	t.Run("authenticated non-member gets empty role", func(t *testing.T) {
+		meta, err := s.loadTrackerMeta(tr.Id, 3)
+		require.NoError(t, err)
+		require.Equal(t, "admin", meta.OwnerName)
+		require.Equal(t, 2, meta.LikeCount)
+		require.Empty(t, meta.MemberRole)
+		require.True(t, meta.Liked)
+	})
+
+	t.Run("anonymous visitor gets empty role and not liked", func(t *testing.T) {
+		meta, err := s.loadTrackerMeta(tr.Id, 0)
+		require.NoError(t, err)
+		require.Equal(t, "admin", meta.OwnerName)
+		require.Equal(t, 2, meta.LikeCount)
+		require.Empty(t, meta.MemberRole)
+		require.False(t, meta.Liked)
 	})
 }
 

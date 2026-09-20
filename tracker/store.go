@@ -690,6 +690,96 @@ func (s *trackerStore) listLatestValues(seriesId int64, limit int) ([]ValueModel
 	return rows, nil
 }
 
+// listLatestValuesByTracker returns, per series of the tracker, the most
+// recent values up to `limit`, keyed by series id. Each bucket is ordered by
+// time ascending. Map iteration order is not meaningful; callers should walk
+// the tracker's series slice and look buckets up by series id.
+func (s *trackerStore) listLatestValuesByTracker(trackerID int64, limit int) (map[int64][]ValueModel, error) {
+	start := time.Now()
+	query := `
+		SELECT series_id, id, time, value
+		FROM (
+			SELECT id, series_id, time, value,
+				ROW_NUMBER() OVER (PARTITION BY series_id ORDER BY time DESC) AS rn
+			FROM tracker_value
+			WHERE series_id IN (SELECT id FROM tracker_series WHERE tracker_id = ?)
+		)
+		WHERE rn <= ?
+		ORDER BY series_id, time`
+
+	rows := make([]ValueModel, 0)
+	err := s.db.Select(&rows, query, trackerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("listLatestValuesByTracker select: %w", err)
+	}
+
+	values := make(map[int64][]ValueModel, len(rows))
+	for _, v := range rows {
+		values[v.SeriesId] = append(values[v.SeriesId], v)
+	}
+
+	log.Debug().Int64("tracker_id", trackerID).Int("value_count", len(rows)).
+		Int("series_count", len(values)).Dur("duration", time.Since(start)).
+		Msg("tracker.listLatestValuesByTracker")
+	return values, nil
+}
+
+// TrackerMeta is the per-tracker metadata loaded in a single round trip from
+// the perspective of one user: the owner display name, the like count, the
+// user's membership role (empty when the user is neither owner nor member)
+// and whether the user liked the tracker.
+type TrackerMeta struct {
+	OwnerName  string
+	LikeCount  int
+	MemberRole string
+	Liked      bool
+}
+
+// loadTrackerMeta loads TrackerMeta for one tracker in a single query. A
+// userID of 0 represents an anonymous visitor (no role, not liked).
+func (s *trackerStore) loadTrackerMeta(trackerID, userID int64) (TrackerMeta, error) {
+	start := time.Now()
+	query := `
+		SELECT
+			(SELECT username FROM user WHERE id = t.owner_id) AS owner_name,
+			(SELECT COUNT(*) FROM tracker_like WHERE tracker_id = t.id) AS like_count,
+			CASE
+				WHEN t.owner_id = ?
+				THEN 'owner'
+				WHEN EXISTS (SELECT 1 FROM tracker_member WHERE tracker_id = t.id AND user_id = ?)
+				THEN (SELECT role FROM tracker_member WHERE tracker_id = t.id AND user_id = ?)
+				ELSE NULL
+			END AS member_role,
+			EXISTS (SELECT 1 FROM tracker_like WHERE tracker_id = t.id AND user_id = ?) AS liked
+		FROM tracker t
+		WHERE t.id = ?`
+
+	var row struct {
+		OwnerName  string         `db:"owner_name"`
+		LikeCount  int            `db:"like_count"`
+		MemberRole sql.NullString `db:"member_role"`
+		Liked      bool           `db:"liked"`
+	}
+	err := s.db.Get(&row, query, userID, userID, userID, userID, trackerID)
+	if err != nil {
+		return TrackerMeta{}, fmt.Errorf("loadTrackerMeta select: %w", err)
+	}
+
+	meta := TrackerMeta{
+		OwnerName: row.OwnerName,
+		LikeCount: row.LikeCount,
+		Liked:     row.Liked,
+	}
+	if row.MemberRole.Valid {
+		meta.MemberRole = row.MemberRole.String
+	}
+
+	log.Debug().Int64("tracker_id", trackerID).Int64("user_id", userID).
+		Str("member_role", meta.MemberRole).Bool("liked", meta.Liked).
+		Dur("duration", time.Since(start)).Msg("tracker.loadTrackerMeta")
+	return meta, nil
+}
+
 func (s *trackerStore) deleteValues(seriesId int64) error {
 	query := "DELETE FROM tracker_value WHERE series_id = ?"
 	_, err := s.db.Exec(query, seriesId)
@@ -843,16 +933,6 @@ func (s *trackerStore) isLiked(userID, trackerID int64) (bool, error) {
 		return false, fmt.Errorf("isLiked select: %w", err)
 	}
 	return count > 0, nil
-}
-
-func (s *trackerStore) countLikes(trackerID int64) (int, error) {
-	query := "SELECT COUNT(*) FROM tracker_like WHERE tracker_id = ?"
-	var count int
-	err := s.db.Get(&count, query, trackerID)
-	if err != nil {
-		return 0, fmt.Errorf("countLikes select: %w", err)
-	}
-	return count, nil
 }
 
 // ----------------------------------------------------------------------

@@ -18,7 +18,10 @@ import (
 func initTestService(t *testing.T) *Service {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	// :memory: databases are isolated per pooled connection; a single
+	// connection keeps concurrent queries on the same (initialized) DB.
+	db.SetMaxOpenConns(1)
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.MustExec("PRAGMA foreign_keys = ON")
 	db.MustExec(`
 		CREATE TABLE user (
