@@ -1003,7 +1003,7 @@ describe('TrackerDetailView', () => {
     })
   })
 
-  it('renders a row per series with a date defaulting to today', async () => {
+  it('renders a row per series with a shared date defaulting to today', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
@@ -1019,13 +1019,38 @@ describe('TrackerDetailView', () => {
 
     expect(screen.getByText('s1')).toBeInTheDocument()
     expect(screen.getByText('s2')).toBeInTheDocument()
-    const dateInputs = screen.getAllByLabelText(/date for/i)
-    expect(dateInputs).toHaveLength(2)
-    const today = new Date().toISOString().slice(0, 10)
-    dateInputs.forEach((d) => expect(d).toHaveValue(today))
+    const dateInput = screen.getByLabelText(/data point date/i)
+    expect(dateInput).toHaveValue(new Date().toISOString().slice(0, 10))
+    expect(screen.getAllByLabelText(/value for/i)).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /^add$/i })).toHaveLength(2)
   })
 
-  it('adds a value via POST and refreshes series values', async () => {
+  it('shifts the shared date by one day with previous/next day buttons', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Add Data Points'))
+
+    const dateInput = screen.getByLabelText(/data point date/i) as HTMLInputElement
+    const today = new Date().toISOString().slice(0, 10)
+    expect(dateInput.value).toBe(today)
+
+    await user.click(screen.getByRole('button', { name: 'Next day' }))
+    const [y, m, d] = today.split('-').map(Number)
+    const next = new Date(y, m - 1, d + 1)
+    const expectedNext = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+    expect(dateInput.value).toBe(expectedNext)
+
+    await user.click(screen.getByRole('button', { name: 'Previous day' }))
+    expect(dateInput.value).toBe(today)
+  })
+
+  it('adds a value via POST with the shared date and refreshes series values', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
       tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
@@ -1045,6 +1070,10 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByText('Add Data Points'))
 
+    const dateInput = screen.getByLabelText(/data point date/i)
+    await user.clear(dateInput)
+    await user.type(dateInput, '2024-02-15')
+
     const valueInput = screen.getByRole('spinbutton', { name: /value for/i })
     await user.type(valueInput, '42')
     await user.click(screen.getAllByRole('button', { name: /^add$/i })[0])
@@ -1052,7 +1081,41 @@ describe('TrackerDetailView', () => {
     await waitFor(() => {
       expect(postBody).toHaveBeenCalled()
     })
-    expect(postBody.mock.calls[0][0]).toMatchObject({ value: 42 })
+    expect(postBody.mock.calls[0][0]).toMatchObject({ value: 42, time: '2024-02-15T00:00:00.000Z' })
+  })
+
+  it('adds a value to the clicked series only at the shared date', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: 1, tracker_id: 1, name: 's1', data_type: 'float' },
+        { id: 2, tracker_id: 1, name: 's2', data_type: 'float' },
+      ],
+    })
+    const postBodies: unknown[] = []
+    globalThis.fetch = vi.fn((url: RequestInfo | URL, opts?: RequestInit) => {
+      if (opts?.method === 'POST') {
+        postBodies.push({ url, body: JSON.parse(opts?.body as string) })
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ values: [] }) } as Response)
+    })
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByText('Add Data Points'))
+
+    const valueInputs = screen.getAllByRole('spinbutton', { name: /value for/i })
+    await user.type(valueInputs[1], '7')
+    await user.click(screen.getAllByRole('button', { name: /^add$/i })[1])
+
+    await waitFor(() => {
+      expect(postBodies).toHaveLength(1)
+    })
+    expect(postBodies[0]).toMatchObject({ body: { value: 7 } })
+    expect(String((postBodies[0] as { url: string }).url)).toMatch(/\/api\/trackers\/1\/series\/2\/values/)
   })
 
   const openEditCard = async (user: ReturnType<typeof userEvent.setup>, values: { id: number; time: string; value: number }[]) => {
