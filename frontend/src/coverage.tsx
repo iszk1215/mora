@@ -22,7 +22,7 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
-import { likeTracker, unlikeTracker } from './tracker'
+import { likeTracker, unlikeTracker } from './tracker-api'
 
 
 interface CoverageEntryMetadata {
@@ -78,7 +78,7 @@ export function buildCoverageClickUrl(trackerId: string | undefined, index: numb
   return `/coverages/${trackerId}/${index}/${seriesName}`
 }
 
-const FilePage = (): React.JSX.Element => {
+export const FilePage = (): React.JSX.Element => {
   const data = useLoaderData() as CodeData
   return (
     <div>
@@ -88,7 +88,7 @@ const FilePage = (): React.JSX.Element => {
 
 // CoverageEntryPage
 
-async function loadCoverageEntryByTracker({ params }: LoaderFunctionArgs): Promise<Response> {
+export async function loadCoverageEntryByTracker({ params }: LoaderFunctionArgs): Promise<Response> {
   const url = `/api/coverages/${params.trackerId}/${params.index}/${params.entry}/files`
   const resp = await fetch(url)
   if (resp.status == 403) {
@@ -99,7 +99,7 @@ async function loadCoverageEntryByTracker({ params }: LoaderFunctionArgs): Promi
   return resp
 }
 
-async function loadFileByTracker({ params }: LoaderFunctionArgs): Promise<Response> {
+export async function loadFileByTracker({ params }: LoaderFunctionArgs): Promise<Response> {
   const url = `/api/coverages/${params.trackerId}/${params.index}/${params.entry}/files/${params["*"]}`
   const resp = await fetch(url)
   if (!resp.ok)
@@ -134,7 +134,7 @@ export const CoverageEntryPage = (): React.JSX.Element => {
 }
 
 
-async function loadCoverageListByTracker({ params }: { params: Params }): Promise<Response | {
+export async function loadCoverageListByTracker({ params }: { params: Params }): Promise<Response | {
   trackerName: string,
   repo: Repo,
   coverages: Coverage[],

@@ -15,9 +15,6 @@
   },
   "dependencies": {
     "@fontsource-variable/noto-sans-jp": "^5.2.10",
-    "@fortawesome/fontawesome-svg-core": "^7.2.0",
-    "@fortawesome/free-regular-svg-icons": "^7.2.0",
-    "@fortawesome/react-fontawesome": "^3.3.1",
     "@uiw/react-md-editor": "^4.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -51,6 +48,7 @@
     "eslint-plugin-promise": "^7.3.0",
     "jsdom": "^29.1.1",
     "msw": "^2.14.6",
+    "rollup-plugin-visualizer": "^6.0.0",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1",

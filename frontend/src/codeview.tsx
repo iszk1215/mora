@@ -1,7 +1,39 @@
 import React from 'react'
-import hljs from 'highlight.js'
+import hljs from 'highlight.js/lib/core'
+import bash from 'highlight.js/lib/languages/bash'
+import c from 'highlight.js/lib/languages/c'
+import cpp from 'highlight.js/lib/languages/cpp'
+import css from 'highlight.js/lib/languages/css'
+import go from 'highlight.js/lib/languages/go'
+import java from 'highlight.js/lib/languages/java'
+import javascript from 'highlight.js/lib/languages/javascript'
+import json from 'highlight.js/lib/languages/json'
+import python from 'highlight.js/lib/languages/python'
+import rust from 'highlight.js/lib/languages/rust'
+import sql from 'highlight.js/lib/languages/sql'
+import typescript from 'highlight.js/lib/languages/typescript'
+import xml from 'highlight.js/lib/languages/xml'
+import yaml from 'highlight.js/lib/languages/yaml'
+import 'highlight.js/styles/github.css'
 
 import { Badge } from '@/components/ui/badge'
+
+// Only a curated subset of grammars is registered (highlightAuto picks among
+// these), keeping highlight.js out of the critical bundle weight.
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('c', c)
+hljs.registerLanguage('cpp', cpp)
+hljs.registerLanguage('css', css)
+hljs.registerLanguage('go', go)
+hljs.registerLanguage('java', java)
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('python', python)
+hljs.registerLanguage('rust', rust)
+hljs.registerLanguage('sql', sql)
+hljs.registerLanguage('typescript', typescript)
+hljs.registerLanguage('xml', xml)
+hljs.registerLanguage('yaml', yaml)
 
 export function markupCode(code: string, blocks: number[][]): string[] {
   code = code.replace(/\s+$/g, '') // remove trailing '\n'

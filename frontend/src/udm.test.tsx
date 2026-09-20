@@ -9,7 +9,7 @@ vi.mock('react-router', async () => {
   return { ...actual, useLoaderData: vi.fn() }
 })
 
-vi.mock('echarts-for-react', () => ({
+vi.mock('echarts-for-react/esm/core', () => ({
   default: () => <div data-testid="echart" />,
 }))
 

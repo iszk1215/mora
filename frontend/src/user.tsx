@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { LoaderFunctionArgs, useLoaderData, useSearchParams } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import { TrackerCard, PreviewData, fetchPreview } from './tracker'
+import { TrackerCard } from './tracker-card'
+import { PreviewData, fetchPreview } from './tracker-api'
 import { TrackerResponse } from './core'
 
 interface UserData {

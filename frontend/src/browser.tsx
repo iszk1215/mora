@@ -1,8 +1,7 @@
 import React from 'react'
 import { FileData } from './core'
 import { DefaultLink } from './util'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faFolder, faFolderOpen } from '@fortawesome/free-regular-svg-icons'
+import { Folder, FolderOpen } from 'lucide-react'
 import {
   Table,
   TableHeader,
@@ -140,13 +139,13 @@ const FileBrowserTable = (props: TableProp): React.JSX.Element => {
   props.items.forEach((item: Item, i: number) => {
     const elems: React.JSX.Element[] = []
     for (let j = 0; j < item.depth; j++) {
-      elems.push(<FontAwesomeIcon key={j} icon={faFolder} fixedWidth className="opacity-0 mr-1" />)
+      elems.push(<Folder key={j} className="opacity-0 mr-1 w-4 h-4 shrink-0" />)
     }
     if (item.type === 'dir') {
       if (item.state === 1) {
-        elems.push(<FontAwesomeIcon key={99} icon={faFolderOpen} fixedWidth className="mr-1" />)
+        elems.push(<FolderOpen key={99} className="mr-1 w-4 h-4 shrink-0" />)
       } else {
-        elems.push(<FontAwesomeIcon key={99} icon={faFolder} fixedWidth className="mr-1" />)
+        elems.push(<Folder key={99} className="mr-1 w-4 h-4 shrink-0" />)
       }
       elems.push(
         <a style={{ cursor: 'pointer' }} key={100}

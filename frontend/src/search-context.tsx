@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import { TrackerResponse } from './core'
-import type { PreviewData } from './tracker'
+import type { PreviewData } from './tracker-api'
 
 export interface SearchState {
   query: string
