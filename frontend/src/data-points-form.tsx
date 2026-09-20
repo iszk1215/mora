@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { ValueModel } from './tracker'
+import { ValueModel } from './tracker-api'
 
 export interface EditDraft {
   time: string

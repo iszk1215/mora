@@ -5,3 +5,4 @@ coverage.out
 frontend/node_modules/
 frontend/coverage/
 frontend/test-results/
+frontend/stats.html

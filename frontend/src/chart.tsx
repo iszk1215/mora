@@ -1,12 +1,41 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import ReactECharts from 'echarts-for-react'
-import * as echarts from 'echarts'
+import ReactEChartsCore from 'echarts-for-react/lib/core'
+import * as echarts from 'echarts/core'
+import { BarChart, LineChart } from 'echarts/charts'
+import {
+  DataZoomComponent,
+  GridComponent,
+  LegendComponent,
+  ToolboxComponent,
+  TooltipComponent,
+} from 'echarts/components'
+import { SVGRenderer } from 'echarts/renderers'
 import { ChartConfig, SeriesConfig, YAxisConfig } from './core'
 
 // Must match --font-sans in index.css so chart text uses the page font.
 export const CHART_FONT_FAMILY = "'Noto Sans JP Variable', 'Noto Sans JP', sans-serif"
 
 export const CHART_THEME_NAME = 'mora'
+
+echarts.use([
+  LineChart,
+  BarChart,
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+  DataZoomComponent,
+  ToolboxComponent,
+  SVGRenderer,
+])
+
+// Configured echarts core instance, shared by every chart in the app so the
+// whole library is never pulled into the bundle.
+export { echarts }
+
+// echarts-for-react bound to the tree-shaken echarts core above.
+export const ReactECharts = (props: React.ComponentProps<typeof ReactEChartsCore>): React.JSX.Element => (
+  <ReactEChartsCore {...props} echarts={echarts} />
+)
 
 echarts.registerTheme(CHART_THEME_NAME, {
   textStyle: { fontFamily: CHART_FONT_FAMILY },

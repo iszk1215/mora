@@ -9,7 +9,7 @@ vi.mock('react-dom/client', () => ({
   default: { createRoot: () => ({ render: vi.fn() }) },
 }))
 
-vi.mock('echarts-for-react', () => ({
+vi.mock('echarts-for-react/lib/core', () => ({
   default: ({ option }: any) => <div data-testid="echart" data-option={JSON.stringify(option)} />,
 }))
 

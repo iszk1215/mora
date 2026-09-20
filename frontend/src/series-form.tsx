@@ -1,7 +1,7 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 import { Pencil } from 'lucide-react'
-import { patchSeries, deleteSeries, deleteValues } from './tracker'
+import { patchSeries, deleteSeries, deleteValues } from './tracker-api'
 import { Button } from '@/components/ui/button'
 import {
   Table,

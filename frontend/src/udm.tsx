@@ -4,8 +4,7 @@ import React, {
 } from 'react'
 
 import DatePicker from "react-datepicker";
-
-import ReactECharts from 'echarts-for-react'
+import "react-datepicker/dist/react-datepicker.css";
 
 import {
   Link,
@@ -16,7 +15,7 @@ import {
 } from 'react-router'
 
 import { Repo } from './core'
-import { CHART_THEME_NAME } from './chart'
+import { ReactECharts, CHART_THEME_NAME } from './chart'
 
 export interface UdmMetric {
   id: number,
@@ -69,7 +68,7 @@ export async function loadUdmMetrics(repo_id: number): Promise<UdmMetric[]> {
   return resp.metrics
 }
 
-async function loadUdmMetricsFromParam({ params }: LoaderFunctionArgs): Promise<MetricsResponse> {
+export async function loadUdmMetricsFromParam({ params }: LoaderFunctionArgs): Promise<MetricsResponse> {
   if (params.repo_id)
     return _loadUdmMetrics(parseInt(params.repo_id))
 

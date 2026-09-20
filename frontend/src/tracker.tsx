@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
-import ReactECharts from 'echarts-for-react'
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
 import { MoreVertical, Pencil, Plus, Settings, Settings2, Star, Trash } from 'lucide-react'
@@ -8,331 +7,40 @@ import { AlertDialog, Dialog, DropdownMenu } from 'radix-ui'
 
 import {
   Link,
-  LoaderFunctionArgs,
   Params,
   useLoaderData,
   useNavigate,
 } from 'react-router'
 
 import { Button } from '@/components/ui/button'
-import { ChartConfig, SeriesConfig, SeriesModel, TrackerResponse, YAxisConfig, normalizeChartConfig } from './core'
+import { ChartConfig, SeriesConfig, SeriesModel, YAxisConfig, normalizeChartConfig } from './core'
+import {
+  ValueModel,
+  SeriesValues,
+  TrackerDetailData,
+  ValueUpdate,
+  createTracker,
+  createSeries,
+  patchSeries,
+  createValue,
+  patchValuesBatch,
+  likeTracker,
+  unlikeTracker,
+  patchTracker,
+  deleteTracker,
+  loadTrackerDetail,
+} from './tracker-api'
 import { SettingsForm } from './settings-form'
 import { SeriesTable } from './series-form'
 import { DataPointEditCard, isoToInputValue } from './data-points-form'
-import { formatValue, Dataset, TrackerChart, resolvePalette, areaGradient, CHART_THEME_NAME } from './chart'
+import { Dataset, TrackerChart } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
 
-export interface ValueModel {
-  id: number
-  time: string
-  value: number
-}
-
-interface SeriesValues {
-  series: SeriesModel
-  values: ValueModel[]
-}
-
-interface TrackerDetailData {
-  tracker: TrackerResponse
-  series: SeriesModel[]
-}
-
-interface PaginatedTrackers {
-  trackers: TrackerResponse[]
-  total: number
-  page: number
-  per_page: number
-}
-
-export interface PreviewData {
-  tracker: TrackerResponse
-  series: Array<{
-    series: SeriesModel
-    values: ValueModel[]
-  }>
-}
-
-export async function listTrackers(page?: number, perPage?: number, query?: string): Promise<PaginatedTrackers> {
-  const params = new URLSearchParams()
-  if (page) params.set('page', String(page))
-  if (perPage) params.set('per_page', String(perPage))
-  if (query) params.set('q', query)
-  const qs = params.toString()
-  const url = qs ? `/api/trackers?${qs}` : '/api/trackers'
-  const resp = await fetch(url)
-  if (!resp.ok) throw resp
-  return resp.json()
-}
-
-export async function fetchPreview(trackerId: number, type?: string): Promise<PreviewData> {
-  const path =
-    type === 'coverage'
-      ? `/api/coverages/${trackerId}/preview`
-      : `/api/trackers/${trackerId}/preview`
-  const resp = await fetch(path)
-  if (!resp.ok) throw resp
-  return resp.json()
-}
-async function createTracker(name: string, visibility: string, description?: string): Promise<TrackerResponse> {
-  const body: Record<string, unknown> = { name, visibility }
-  if (description) body.description = description
-  const resp = await fetch('/api/trackers', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!resp.ok) throw resp
-  return resp.json()
-}
-
-async function listSeries(trackerId: number): Promise<TrackerDetailData> {
-  const resp = await fetch(`/api/trackers/${trackerId}/series`)
-  if (!resp.ok) throw resp
-  return resp.json()
-}
-
-async function createSeries(trackerId: number, name: string, dataType: string, config?: string): Promise<SeriesModel> {
-  const body: Record<string, unknown> = { name, data_type: dataType }
-  if (config) body.config = config
-  const resp = await fetch(`/api/trackers/${trackerId}/series`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!resp.ok) throw resp
-  return resp.json()
-}
-
-export async function patchSeries(trackerId: number, seriesId: number, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
-  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(opts),
-  })
-  if (!resp.ok) throw resp
-  return resp.json()
-}
-
-export async function deleteSeries(trackerId: number, seriesId: number): Promise<void> {
-  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, { method: 'DELETE' })
-  if (!resp.ok) throw resp
-}
-
-async function createValue(trackerId: number, seriesId: number, time: string, value: number): Promise<void> {
-  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ time, value }),
-  })
-  if (!resp.ok) throw resp
-}
-
-export async function deleteValues(trackerId: number, seriesId: number): Promise<void> {
-  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, { method: 'DELETE' })
-  if (!resp.ok) throw resp
-}
-
-interface ValueUpdate {
-  id: number
-  time: string
-  value: number
-}
-
-export async function patchValuesBatch(trackerId: number, seriesId: number, updates: ValueUpdate[], deletes: number[]): Promise<ValueModel[]> {
-  const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ updates, deletes }),
-  })
-  if (!resp.ok) throw resp
-  const data = await resp.json()
-  return data.values ?? []
-}
-
-export async function likeTracker(trackerId: number): Promise<void> {
-  const resp = await fetch(`/api/trackers/${trackerId}/like`, { method: 'POST' })
-  if (!resp.ok) throw resp
-}
-
-export async function unlikeTracker(trackerId: number): Promise<void> {
-  const resp = await fetch(`/api/trackers/${trackerId}/like`, { method: 'DELETE' })
-  if (!resp.ok) throw resp
-}
-
-export async function patchTracker(trackerId: number, opts: { name?: string; visibility?: string; chart_config?: string; description?: string; body?: string }): Promise<TrackerResponse> {
-  const resp = await fetch(`/api/trackers/${trackerId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(opts),
-  })
-  if (!resp.ok) throw resp
-  return resp.json()
-}
-
-export async function deleteTracker(trackerId: number): Promise<void> {
-  const resp = await fetch(`/api/trackers/${trackerId}`, { method: 'DELETE' })
-  if (!resp.ok) throw resp
-}
-
-export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise<TrackerDetailData> {
-  if (!params.trackerId) throw new Error('trackerId is required')
-  return listSeries(parseInt(params.trackerId))
-}
-
-export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean; searchQuery?: string; fromUser?: string }): React.JSX.Element => {
-  const chartConfig = useMemo(() => {
-    try { return normalizeChartConfig(JSON.parse(preview?.tracker?.chart_config ?? '{}') as ChartConfig) }
-    catch { return {} as ChartConfig }
-  }, [preview])
-  const colors = useMemo(() => resolvePalette(chartConfig.palette), [chartConfig.palette])
-  const option = useMemo(() => {
-    const datasets = preview?.series?.map((sv) => {
-      let seriesConfig: SeriesConfig | undefined
-      try {
-        seriesConfig = JSON.parse(sv.series.config) as SeriesConfig
-      } catch { /* ignore */ }
-      return {
-        label: sv.series.name,
-        data: sv.values.map((v) => ({ x: v.time, y: String(v.value) })),
-        seriesConfig,
-      }
-    }) ?? []
-
-    const yAxes = chartConfig.y_axes?.length
-      ? chartConfig.y_axes
-      : [{ id: 0, position: 'left' as const }]
-    const hasRightAxis = yAxes.some((a) => a.position === 'right')
-    const isDateOnly = chartConfig.x_axis_type === 'date'
-
-    const xAxis: any = {
-      type: 'time' as const,
-      axisLabel: { hideOverlap: true },
-    }
-    if (isDateOnly) {
-      const currentYear = new Date().getFullYear()
-      xAxis.axisLabel = {
-        hideOverlap: true,
-        formatter: (value: number) => {
-          const d = new Date(value)
-          const m = d.getMonth() + 1
-          const day = d.getDate()
-          if (d.getFullYear() === currentYear) {
-            return `${m}/${day}`
-          }
-          return `${d.getFullYear()}/${m}/${day}`
-        },
-      }
-    }
-
-    return {
-      animation: false,
-      color: colors,
-      grid: { left: 40, right: hasRightAxis ? 50 : 10, top: 10, bottom: 25 },
-      xAxis,
-      yAxis: yAxes.map((a) => ({
-        type: 'value' as const,
-        position: a.position,
-        splitLine: {
-          lineStyle: { type: 'dashed' as const, opacity: 0.3 },
-          show: a.position === 'left' && !hasRightAxis,
-        },
-      })),
-      series: datasets.map((ds, i) => {
-        const seriesType = ds.seriesConfig?.type ?? 'line'
-        const entry: any = {
-          name: ds.label,
-          type: seriesType,
-          yAxisIndex: ds.seriesConfig?.y_axis_index ?? 0,
-          data: ds.data.map((p) => [isDateOnly ? p.x.substring(0, 10) : p.x, Number(p.y)]),
-        }
-        if (seriesType === 'bar') {
-          entry.barMaxWidth = '90%'
-        } else {
-          entry.lineStyle = { width: 1.5 }
-          if (chartConfig.show_symbols !== true) {
-            entry.symbol = 'none'
-          }
-          if (chartConfig.area !== false) {
-            entry.areaStyle = areaGradient(colors[i % colors.length], 0.3)
-          }
-        }
-        return entry
-      }),
-      tooltip: {
-        trigger: 'axis',
-        formatter: (params: any) => {
-          const items = Array.isArray(params) ? params : [params]
-          const axisValue = items[0]?.axisValue ?? ''
-          const header = axisValue
-            ? isDateOnly
-              ? `<b>${new Date(axisValue).toLocaleDateString()}</b><br/>`
-              : `<b>${new Date(axisValue).toLocaleString()}</b><br/>`
-            : ''
-          const body = items.map((p: any) => {
-            const fmt = datasets[p.seriesIndex]?.seriesConfig?.value_format
-            return `${p.marker} ${p.seriesName}: ${formatValue(p.value[1], fmt)}`
-          }).join('<br/>')
-          return header + body
-        },
-      },
-    }
-  }, [preview, colors])
-
-  const linkTo = tracker.type === 'coverage'
-    ? `/coverages/${tracker.id}`
-    : `/trackers/${tracker.id}`
-  const linkState = fromUser
-    ? { fromSearch: searchQuery, fromUser }
-    : searchQuery
-      ? { fromSearch: searchQuery }
-      : undefined
-
-  return (
-    <div className="bg-card border rounded-lg py-4 pl-2 pr-3 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between gap-2 mb-1 pl-2 text-xs text-muted-foreground">
-        {tracker.owner_name ? (
-          <Link to={`/users/${encodeURIComponent(tracker.owner_name)}`} className="truncate hover:text-primary hover:underline">
-            {tracker.owner_name}
-          </Link>
-        ) : (
-          <span />
-        )}
-        <span className="flex-shrink-0">
-          {tracker.last_updated_at ? new Date(tracker.last_updated_at).toLocaleDateString() : ''}
-        </span>
-      </div>
-      <Link to={linkTo} state={linkState} className="block">
-        <div className="flex items-center gap-2 mb-2 pl-2">
-          <h3 className="font-semibold text-lg truncate">{tracker.name}</h3>
-          {tracker.visibility === 'private' && (
-            <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">private</span>
-          )}
-          {tracker.type === 'coverage' && (
-            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
-          )}
-          {(tracker.like_count ?? 0) > 0 && (
-            <span className="relative ml-auto flex-shrink-0">
-              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-              <span className="absolute -bottom-1 -right-1.5 text-[10px] leading-none font-medium text-yellow-700 bg-yellow-50 rounded px-0.5">{tracker.like_count}</span>
-            </span>
-          )}
-        </div>
-        <div className="h-[120px]">
-          {loading ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
-          ) : option.series.length > 0 ? (
-            <ReactECharts option={option} style={{ width: '100%', height: 120 }} opts={{ renderer: 'svg' }} theme={CHART_THEME_NAME} />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">No data</div>
-          )}
-        </div>
-      </Link>
-    </div>
-  )
-}
+// TrackerDetail re-exports for tests / route definitions.
+export { TrackerCard } from './tracker-card'
+export { listTrackers, fetchPreview, patchSeries, deleteSeries, deleteValues, patchValuesBatch, likeTracker, unlikeTracker, patchTracker, deleteTracker, loadTrackerDetail, type PreviewData } from './tracker-api'
 
 export const TrackerDetailView = (): React.JSX.Element => {
   const data = useLoaderData() as TrackerDetailData
@@ -1350,7 +1058,7 @@ export const TrackerCreate = (): React.JSX.Element => {
   )
 }
 
-const TrackerDetailRouter = (): React.JSX.Element => {
+export const TrackerDetailRouter = (): React.JSX.Element => {
   const data = useLoaderData() as TrackerDetailData
   if (data.tracker.type === 'coverage') {
     throw new Response('Not Found', { status: 404 })

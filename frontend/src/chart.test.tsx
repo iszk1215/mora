@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { formatValue, formatDateTick, formatDateTimeTick, TrackerChart, CHART_FONT_FAMILY, CHART_THEME_NAME } from './chart'
 import { normalizeChartConfig } from './core'
 
-vi.mock('echarts-for-react', () => ({
+vi.mock('echarts-for-react/lib/core', () => ({
   default: ({ option, onEvents, theme }: any) => (
     <div
       data-testid="echart"

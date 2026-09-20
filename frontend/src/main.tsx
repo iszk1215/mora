@@ -13,19 +13,15 @@ import {
   useLocation,
 } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
-import 'react-datepicker/dist/react-datepicker.css'
 import './index.css'
 
 import { UserData, TrackerResponse } from './core'
 import { UserProvider, useUser } from './user-context'
 import { SearchContext, useSearch } from './search-context'
 import type { SearchState } from './search-context'
-import { coverageTrackerRoute } from './coverage'
-import { udmRoute } from './udm'
-import { trackerRoute, listTrackers, TrackerCard, fetchPreview, PreviewData } from './tracker'
-import { userPageRoute } from './user'
-import { signupRoute } from './signup'
-import { apiKeyRoute } from './apikey'
+import { listTrackers, fetchPreview } from './tracker-api'
+import type { PreviewData } from './tracker-api'
+import { TrackerCard } from './tracker-card'
 import { PasswordLoginForm } from './auth'
 import { ErrorPage, NotFoundPage } from './error-page'
 import { PrivacyPage } from './privacy'
@@ -574,7 +570,15 @@ export const routes = [
         handle: {
           crumb: (_params: Params, _data: any) => ({ label: "Sign Up", link: "/signup" }),
         },
-        children: [signupRoute],
+        children: [
+          {
+            index: true,
+            async lazy() {
+              const mod = await import('./signup')
+              return { Component: mod.SignupPage, loader: mod.loadPendingSignup }
+            },
+          },
+        ],
       },
       {
         path: '/privacy',
@@ -590,15 +594,55 @@ export const routes = [
       },
       {
         path: '/settings/api-keys',
-        children: [apiKeyRoute],
+        children: [
+          {
+            index: true,
+            async lazy() {
+              const mod = await import('./apikey')
+              return { Component: mod.APIKeyPage }
+            },
+          },
+        ],
       },
       {
         path: '/trackers',
-        children: trackerRoute,
+        children: [
+          {
+            index: true,
+            loader: () => { throw new Response('Not Found', { status: 404 }) },
+          },
+          {
+            path: 'new',
+            async lazy() {
+              const mod = await import('./tracker')
+              return { Component: mod.TrackerCreate }
+            },
+          },
+          {
+            path: ':trackerId',
+            handle: {
+              crumb: (params: Params, data: any) => ({
+                label: data?.tracker?.name ?? `Tracker #${params.trackerId}`,
+              }),
+            },
+            async lazy() {
+              const mod = await import('./tracker')
+              return { Component: mod.TrackerDetailRouter, loader: mod.loadTrackerDetail }
+            },
+          },
+        ],
       },
       {
         path: '/users/:userName',
-        children: userPageRoute,
+        children: [
+          {
+            index: true,
+            async lazy() {
+              const mod = await import('./user')
+              return { Component: mod.UserPage, loader: mod.loadUserPage }
+            },
+          },
+        ],
       },
       {
         path: '/coverages/:trackerId',
@@ -608,7 +652,53 @@ export const routes = [
             link: `/coverages/${params.trackerId}`,
           })
         },
-        children: coverageTrackerRoute,
+        children: [
+          {
+            index: true,
+            async lazy() {
+              const mod = await import('./coverage')
+              return { Component: mod.CoverageTrackerList, loader: mod.loadCoverageListByTracker }
+            },
+          },
+          {
+            path: ':index',
+            handle: {
+              crumb: (params: Params) => {
+                return { label: `#${params.index}` }
+              }
+            },
+            children: [
+              {
+                path: ':entry',
+                handle: {
+                  crumb: (params: Params) => ({
+                    label: params.entry,
+                    link: `/coverages/${params.trackerId}/${params.index}/${params.entry}`
+                  }),
+                },
+                children: [
+                  {
+                    index: true,
+                    async lazy() {
+                      const mod = await import('./coverage')
+                      return { Component: mod.CoverageEntryPage, loader: mod.loadCoverageEntryByTracker }
+                    },
+                  },
+                  {
+                    path: '*',
+                    handle: {
+                      crumb: (params: Params) => ({ label: params["*"] })
+                    },
+                    async lazy() {
+                      const mod = await import('./coverage')
+                      return { Component: mod.FilePage, loader: mod.loadFileByTracker }
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       },
       {
         path: '/repos/:repo_id',
@@ -622,8 +712,25 @@ export const routes = [
         children: [
           {
             path: 'udm',
-            handle: {},
-            children: udmRoute,
+            children: [
+              {
+                index: true,
+                async lazy() {
+                  const mod = await import('./udm')
+                  return { Component: mod.UdmRoot, loader: mod.loadUdmMetricsFromParam }
+                },
+              },
+              {
+                path: 'metrics/:metric_id',
+                handle: {
+                  crumb: (_params: Params, data: any) => ({ label: data.metric.name })
+                },
+                async lazy() {
+                  const mod = await import('./udm')
+                  return { Component: mod.UdmMetricRoot, loader: mod.loadMetricItems }
+                },
+              },
+            ],
           },
         ],
       },
