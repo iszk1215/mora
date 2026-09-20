@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { ChevronLeft, ChevronRight, Hash, MoreVertical, Pencil, Plus, Settings, Settings2, Star, Trash } from 'lucide-react'
+import { ChartLine, ChevronLeft, ChevronRight, MoreVertical, Pencil, Plus, Settings, Settings2, Star, Trash } from 'lucide-react'
 import { AlertDialog, Dialog, DropdownMenu } from 'radix-ui'
 
 import {
@@ -598,14 +598,14 @@ export const TrackerDetailView = (): React.JSX.Element => {
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
                     onSelect={() => setShowSeriesSettings((v) => !v)}
                   >
-                    <Settings2 className="w-4 h-4" />
+                    <ChartLine className="w-4 h-4" />
                     Series
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
                     onSelect={openAddValue}
                   >
-                    <Hash className="w-4 h-4" />
+                    <Settings2 className="w-4 h-4" />
                     Data Points
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
