@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 
 import MDEditor from '@uiw/react-md-editor'
 import '@uiw/react-md-editor/markdown-editor.css'
-import { MoreVertical, Pencil, Plus, Settings, Settings2, Star, Trash } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MoreVertical, Pencil, Plus, Settings, Settings2, Star, Trash } from 'lucide-react'
 import { AlertDialog, Dialog, DropdownMenu } from 'radix-ui'
 
 import {
@@ -80,7 +80,8 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [showAddValue, setShowAddValue] = useState(false)
   const [addingValues, setAddingValues] = useState<Record<number, boolean>>({})
   const [addValueError, setAddValueError] = useState<string | null>(null)
-  const [valueInputs, setValueInputs] = useState<Record<number, { time: string; value: string }>>({})
+  const [selectedDate, setSelectedDate] = useState('')
+  const [addValues, setAddValues] = useState<Record<number, string>>({})
 
   const [editSeriesId, setEditSeriesId] = useState<number | null>(null)
   const [editPage, setEditPage] = useState(1)
@@ -313,32 +314,43 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const editDirty = Object.keys(pendingEdits).length > 0 || pendingDeletes.size > 0
   const editSeries = editSeriesId != null ? seriesList.find((s) => s.id === editSeriesId) : undefined
 
+  const shiftDate = (base: string, deltaDays: number, isDate: boolean): string => {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    if (isDate) {
+      const [y, m, d] = base.split('-').map(Number)
+      const dt = new Date(y, m - 1, d + deltaDays)
+      return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
+    }
+    const dt = new Date(base)
+    dt.setDate(dt.getDate() + deltaDays)
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+  }
+
   const openAddValue = () => {
-    setValueInputs(Object.fromEntries(seriesList.map((s) => [s.id, { time: todayValue, value: '' }])))
+    setSelectedDate(todayValue)
+    setAddValues(Object.fromEntries(seriesList.map((s) => [s.id, ''])))
     setAddValueError(null)
     setShowAddValue(true)
   }
 
   const closeAddValue = () => {
-    setValueInputs({})
+    setSelectedDate('')
+    setAddValues({})
     setAddValueError(null)
     setShowAddValue(false)
   }
 
-  const setValueInput = (seriesId: number, field: 'time' | 'value', val: string) => {
-    setValueInputs((prev) => {
-      const current = prev[seriesId] ?? { time: todayValue, value: '' }
-      return { ...prev, [seriesId]: { ...current, [field]: val } }
-    })
+  const setAddValue = (seriesId: number, val: string) => {
+    setAddValues((prev) => ({ ...prev, [seriesId]: val }))
   }
 
   const handleAddValue = async (seriesId: number) => {
-    const input = valueInputs[seriesId]
-    if (!input?.time || !input?.value) return
+    const value = addValues[seriesId]
+    if (!selectedDate || !value) return
     setAddingValues((prev) => ({ ...prev, [seriesId]: true }))
     setAddValueError(null)
     try {
-      await createValue(tracker.id, seriesId, new Date(input.time).toISOString(), parseFloat(input.value))
+      await createValue(tracker.id, seriesId, new Date(selectedDate).toISOString(), parseFloat(value))
       const resp = await fetch(`/api/trackers/${tracker.id}/series/${seriesId}/values`)
       const data = await resp.json()
       setSeriesValues((prev) =>
@@ -346,7 +358,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
           sv.series.id === seriesId ? { ...sv, values: data.values ?? [] } : sv
         )
       )
-      setValueInput(seriesId, 'value', '')
+      setAddValue(seriesId, '')
     } catch {
       setAddValueError('Failed to add value. Please try again.')
     } finally {
@@ -725,12 +737,36 @@ export const TrackerDetailView = (): React.JSX.Element => {
               Close
             </Button>
           </div>
+          <div className="flex items-center gap-2 mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label="Previous day"
+              onClick={() => setSelectedDate((cur) => shiftDate(cur, -1, xAxisType === 'date'))}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <input
+              type={xAxisType === 'date' ? 'date' : 'datetime-local'}
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              aria-label="Data point date"
+              className="border rounded px-2 py-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label="Next day"
+              onClick={() => setSelectedDate((cur) => shiftDate(cur, 1, xAxisType === 'date'))}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
           {seriesList.length === 0 ? (
             <p className="text-muted-foreground">No series yet. Add a series first.</p>
           ) : (
             <div className="space-y-3">
               {seriesList.map((s) => {
-                const input = valueInputs[s.id]
                 const adding = addingValues[s.id]
                 return (
                   <div key={s.id} className="flex items-center gap-2">
@@ -742,16 +778,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
                       {s.name}
                     </button>
                     <input
-                      type={xAxisType === 'date' ? 'date' : 'datetime-local'}
-                      value={input?.time ?? todayValue}
-                      onChange={(e) => setValueInput(s.id, 'time', e.target.value)}
-                      aria-label={`Date for ${s.name}`}
-                      className="border rounded px-2 py-1"
-                    />
-                    <input
                       type="number"
-                      value={input?.value ?? ''}
-                      onChange={(e) => setValueInput(s.id, 'value', e.target.value)}
+                      value={addValues[s.id] ?? ''}
+                      onChange={(e) => setAddValue(s.id, e.target.value)}
                       placeholder="Value"
                       aria-label={`Value for ${s.name}`}
                       className="border rounded px-2 py-1 w-32"
@@ -759,7 +788,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                     <Button
                       size="sm"
                       onClick={() => handleAddValue(s.id)}
-                      disabled={adding || !input?.time || !input?.value}
+                      disabled={adding || !selectedDate || !addValues[s.id]}
                     >
                       {adding ? 'Adding...' : 'Add'}
                     </Button>
