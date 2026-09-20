@@ -97,7 +97,7 @@ type (
 	}
 
 	PreviewResponse struct {
-		Tracker TrackerResponse      `json:"tracker"`
+		Tracker TrackerResponse       `json:"tracker"`
 		Series  []PreviewSeriesValues `json:"series"`
 	}
 
@@ -191,8 +191,6 @@ func (h *trackerHandler) requireAuth(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-
 
 // ----------------------------------------------------------------------
 // Tracker
@@ -572,6 +570,9 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	var role string
 	var liked bool
 	uid, hasUser := UserIDFromContext(r.Context())
+	if !hasUser {
+		uid = 0
+	}
 
 	fns := []func() error{
 		func() error {
@@ -585,30 +586,14 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 			return err
 		},
 		func() error {
-			name, err := h.store.findUsername(tracker.OwnerId)
+			meta, err := h.store.loadTrackerMeta(tracker.Id, uid)
 			if err == nil {
-				ownerName = name
+				ownerName = meta.OwnerName
+				role = meta.MemberRole
+				liked = meta.Liked
 			}
 			return nil
 		},
-	}
-	if hasUser {
-		fns = append(fns,
-			func() error {
-				member, memberRole, err := h.store.isMember(uid, tracker.Id)
-				if err == nil && member {
-					role = memberRole
-				}
-				return nil
-			},
-			func() error {
-				l, err := h.store.isLiked(uid, tracker.Id)
-				if err == nil {
-					liked = l
-				}
-				return nil
-			},
-		)
 	}
 
 	if err := parallel(fns...); err != nil {
@@ -620,7 +605,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	trackerResp := TrackerResponse{
 		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type,
 		ChartConfig: tracker.ChartConfig,
-		OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt,
+		OwnerId:     tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt,
 		OwnerName: ownerName, Role: role, Liked: liked,
 	}
 
@@ -666,8 +651,11 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 	var liked bool
 	var likeCount int
 	uid, hasUser := UserIDFromContext(r.Context())
+	if !hasUser {
+		uid = 0
+	}
 
-	fns := make([]func() error, 0, 5)
+	fns := make([]func() error, 0, 2)
 	if tracker.Type == TypeTracker {
 		fns = append(fns, func() error {
 			var err error
@@ -675,40 +663,16 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 			return err
 		})
 	}
-	fns = append(fns,
-		func() error {
-			name, err := h.store.findUsername(tracker.OwnerId)
-			if err == nil {
-				ownerName = name
-			}
-			return nil
-		},
-		func() error {
-			count, err := h.store.countLikes(tracker.Id)
-			if err == nil {
-				likeCount = count
-			}
-			return nil
-		},
-	)
-	if hasUser {
-		fns = append(fns,
-			func() error {
-				_, memberRole, err := h.store.isMember(uid, tracker.Id)
-				if err == nil {
-					role = memberRole
-				}
-				return nil
-			},
-			func() error {
-				l, err := h.store.isLiked(uid, tracker.Id)
-				if err == nil {
-					liked = l
-				}
-				return nil
-			},
-		)
-	}
+	fns = append(fns, func() error {
+		meta, err := h.store.loadTrackerMeta(tracker.Id, uid)
+		if err == nil {
+			ownerName = meta.OwnerName
+			likeCount = meta.LikeCount
+			role = meta.MemberRole
+			liked = meta.Liked
+		}
+		return nil
+	})
 
 	if err := parallel(fns...); err != nil {
 		log.Error().Err(err).Msg("tracker.handler.listSeries")

@@ -7,8 +7,8 @@ import (
 
 	"github.com/iszk1215/mora/core"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
+	_ "github.com/tursodatabase/go-libsql"
 )
 
 func initTestStore(t *testing.T) *trackerStore {
@@ -689,6 +689,55 @@ func TestStoreListLatestValuesByTracker(t *testing.T) {
 		values, err := s.listLatestValuesByTracker(tr2.Id, 20)
 		require.NoError(t, err)
 		require.Empty(t, values)
+	})
+}
+
+func TestStoreLoadTrackerMeta(t *testing.T) {
+	s := initTestStore(t)
+
+	tr := &TrackerModel{Name: "meta_tracker"}
+	require.NoError(t, s.addTracker(tr, 1))
+
+	// user 2 becomes a member with role=editor; users 2 and 3 like the tracker
+	_, err := s.db.Exec(`INSERT INTO tracker_member (tracker_id, user_id, role) VALUES (?, ?, 'editor')`, tr.Id, 2)
+	require.NoError(t, err)
+	require.NoError(t, s.addLike(2, tr.Id))
+	require.NoError(t, s.addLike(3, tr.Id))
+
+	t.Run("owner sees owner role and metadata", func(t *testing.T) {
+		meta, err := s.loadTrackerMeta(tr.Id, 1)
+		require.NoError(t, err)
+		require.Equal(t, "admin", meta.OwnerName)
+		require.Equal(t, 2, meta.LikeCount)
+		require.Equal(t, "owner", meta.MemberRole)
+		require.False(t, meta.Liked)
+	})
+
+	t.Run("member sees their role and liked state", func(t *testing.T) {
+		meta, err := s.loadTrackerMeta(tr.Id, 2)
+		require.NoError(t, err)
+		require.Equal(t, "admin", meta.OwnerName)
+		require.Equal(t, 2, meta.LikeCount)
+		require.Equal(t, "editor", meta.MemberRole)
+		require.True(t, meta.Liked)
+	})
+
+	t.Run("authenticated non-member gets empty role", func(t *testing.T) {
+		meta, err := s.loadTrackerMeta(tr.Id, 3)
+		require.NoError(t, err)
+		require.Equal(t, "admin", meta.OwnerName)
+		require.Equal(t, 2, meta.LikeCount)
+		require.Empty(t, meta.MemberRole)
+		require.True(t, meta.Liked)
+	})
+
+	t.Run("anonymous visitor gets empty role and not liked", func(t *testing.T) {
+		meta, err := s.loadTrackerMeta(tr.Id, 0)
+		require.NoError(t, err)
+		require.Equal(t, "admin", meta.OwnerName)
+		require.Equal(t, 2, meta.LikeCount)
+		require.Empty(t, meta.MemberRole)
+		require.False(t, meta.Liked)
 	})
 }
 
