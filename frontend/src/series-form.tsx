@@ -1,7 +1,7 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 import { Pencil } from 'lucide-react'
-import { patchSeries, deleteSeries, deleteValues } from './tracker-api'
+import { patchSeries, deleteSeries } from './tracker-api'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -23,12 +23,11 @@ interface SeriesTableProps {
   yAxes: YAxisConfig[]
   onSelectSeries?: (seriesId: number) => void
   onDeleteSeries?: (seriesId: number) => void
-  onValuesCleared?: (seriesId: number) => void
   onRenameSeries?: (seriesId: number, name: string) => Promise<boolean>
   ref?: React.Ref<SeriesTableHandle>
 }
 
-export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDeleteSeries, onValuesCleared, onRenameSeries, ref }: SeriesTableProps): React.JSX.Element => {
+export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDeleteSeries, onRenameSeries, ref }: SeriesTableProps): React.JSX.Element => {
   const [seriesValueFormats, setSeriesValueFormats] = useState<Record<number, string>>(() => {
     const map: Record<number, string> = {}
     for (const s of seriesList) {
@@ -175,15 +174,6 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     }
   }
 
-  const handleDeleteValues = async (seriesId: number) => {
-    try {
-      await deleteValues(trackerId, seriesId)
-      if (onValuesCleared) onValuesCleared(seriesId)
-    } catch {
-      // ignore
-    }
-  }
-
   return (
     <Table>
       <TableHeader>
@@ -266,9 +256,6 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
                 <Button variant="destructive" size="sm" onClick={() => handleDeleteSeries(s.id)}>
                   Delete
                 </Button>
-                <Button variant="secondary" size="sm" onClick={() => handleDeleteValues(s.id)}>
-                  Clear Values
-                </Button>
               </TableCell>
             </TableRow>
           ))
@@ -349,6 +336,13 @@ function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId
     }
   }
 
+  const handleCancel = () => {
+    setValue(initialName)
+    setError(null)
+    setSaved(false)
+    setEditing(false)
+  }
+
   if (!editing) {
     return (
       <div className="flex items-center gap-1">
@@ -375,11 +369,14 @@ function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId
         maxLength={200}
         autoFocus
         className="border rounded px-1 py-0.5 w-40 text-sm"
-        onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel() }}
         aria-label={`Rename series ${initialName}`}
       />
       <Button size="sm" variant="outline" onClick={handleSave} disabled={saving}>
         {saving ? '...' : saved ? 'Saved' : 'Save'}
+      </Button>
+      <Button size="sm" variant="ghost" onClick={handleCancel} disabled={saving}>
+        Cancel
       </Button>
       {error && <span className="text-xs text-red-600">{error}</span>}
     </div>

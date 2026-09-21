@@ -422,6 +422,57 @@ describe('TrackerDetailView', () => {
     })
   })
 
+  it('cancels a series rename without patching', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: 1, tracker_id: 1, name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
+      ],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve({ values: [] }) } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    await user.click(screen.getByRole('button', { name: /rename series series-a/i }))
+    const nameInput = screen.getByRole('textbox', { name: /rename series series-a/i })
+    await user.clear(nameInput)
+    await user.type(nameInput, 'never-renamed')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('textbox', { name: /rename series series-a/i })).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('series-a')).toBeInTheDocument()
+    expect(screen.queryByText('never-renamed')).not.toBeInTheDocument()
+    const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
+      ([url, init]) => url === '/api/trackers/1/series/1' && (init as RequestInit)?.method === 'PATCH'
+    )
+    expect(patchCall).toBeUndefined()
+  })
+
+  it('does not render Clear Values button in series settings', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: 1, tracker_id: 1, name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
+      ],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve({ values: [] }) } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear Values' })).not.toBeInTheDocument()
+  })
+
   it('adds a series from the series settings panel button', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({

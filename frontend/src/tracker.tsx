@@ -521,14 +521,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
-  const handleValuesCleared = (seriesId: number) => {
-    setSeriesValues((prev) =>
-      prev.map((sv) =>
-        sv.series.id === seriesId ? { ...sv, values: [] } : sv
-      )
-    )
-  }
-
   return (
     <div>
       <div className="my-4">
@@ -716,7 +708,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
             seriesList={seriesList}
             yAxes={yAxes}
             onDeleteSeries={handleSeriesDeleted}
-            onValuesCleared={handleValuesCleared}
             onRenameSeries={handleSeriesRename}
           />
         </div>
