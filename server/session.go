@@ -258,8 +258,12 @@ type MoraSessionManager struct {
 	// insecureCookie disables the Secure attribute on the session cookie
 	// (for development over plain HTTP).
 	insecureCookie bool
-	// sessionLocks serializes read-modify-write on a single session within
-	// this instance so concurrent requests cannot lose each other's updates.
+	// sessionLocks serialize the session load and the write-back for requests
+	// bearing the same sid within this instance. The (potentially slow) handler
+	// runs concurrently per session, so requests no longer queue up behind each
+	// other; only the short read, the dirty check and the persistence are
+	// ordered. Concurrent mutation of a shared *MoraSession is safe because
+	// every access is guarded by the object's own lock.
 	sessionLocks sync.Map // sid -> *sync.Mutex
 	// lastWritten remembers when each session was last persisted or touched
 	// by this instance, so read-only requests only refresh last_seen at most
@@ -340,7 +344,7 @@ func (m *MoraSessionManager) GC() {
 
 	// Prune per-session locks whose sessions no longer exist. Holding the
 	// mutex while deleting the entry guarantees no in-flight request still
-	// references it (requests hold their lock through the write-back).
+	// references it (in-flight requests hold the lock while writing back).
 	m.sessionLocks.Range(func(key, value any) bool {
 		sid := key.(string)
 		mu := value.(*sync.Mutex)
@@ -353,11 +357,11 @@ func (m *MoraSessionManager) GC() {
 	})
 }
 
-func (m *MoraSessionManager) lockSession(sid string) func() {
+// lockSession returns the per-session mutex for sid. It is left unlocked:
+// callers guard only the short load and the write-back with it.
+func (m *MoraSessionManager) lockSession(sid string) *sync.Mutex {
 	l, _ := m.sessionLocks.LoadOrStore(sid, &sync.Mutex{})
-	mu := l.(*sync.Mutex)
-	mu.Lock()
-	return mu.Unlock
+	return l.(*sync.Mutex)
 }
 
 // shouldTouch reports whether a clean (read-only) session's last_seen has not
@@ -388,15 +392,21 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 			sid = cookie.Value
 		}
 
-		// Serialize concurrent requests on the same session within this
-		// instance so the read-modify-write below is atomic.
-		unlock := m.lockSession(sid)
+		// The per-session lock serializes only the short load below and the
+		// write-back deferred until the end. The handler itself runs
+		// concurrently with every other request bearing the same sid, which is
+		// what the top page needs: it fires many preview fetches in parallel
+		// for one session and previously queued them all behind the first
+		// slow (cloud database) round trip. Concurrent mutation of the shared
+		// *MoraSession is guarded by the object's own lock.
+		mu := m.lockSession(sid)
 
 		// A freshly generated session ID cannot exist in the store, so
 		// requests without a cookie skip the database read entirely.
 		var sess *MoraSession
 		var loaded bool
 		if hasCookie {
+			mu.Lock()
 			var ok bool
 			sess, ok = m.store.Get(sid)
 			if !ok {
@@ -405,6 +415,7 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 			} else {
 				loaded = true
 			}
+			mu.Unlock()
 		} else {
 			log.Debug().Msg("SessionMiddleware: new anonymous session, skipped store read")
 			sess = NewMoraSession()
@@ -414,12 +425,16 @@ func (m *MoraSessionManager) SessionMiddleware(next http.Handler) http.Handler {
 		sess.timestamp = time.Now()
 		sess.lock.Unlock()
 
-		// Persist the session only when it was mutated, keeping the deferred
-		// order (LIFO) so the per-session lock is held until after the
-		// write-back. Clean loaded sessions refresh last_seen at most once
-		// per touchInterval so GC does not evict active sessions.
+		// Persist the session only when it was mutated. Clean loaded sessions
+		// refresh last_seen at most once per touchInterval so GC does not
+		// evict active sessions. The whole write-back runs under the
+		// per-session lock: with concurrent requests mutating one shared
+		// object, the snapshot taken here (under the object's lock) already
+		// contains every change made so far, so a single Put persists them
+		// all and later requests observe a clean session.
 		defer func() {
-			defer unlock()
+			mu.Lock()
+			defer mu.Unlock()
 			now := time.Now()
 			if sess.IsDirty() {
 				if err := m.store.Put(sid, sess); err != nil {

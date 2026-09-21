@@ -307,6 +307,81 @@ func TestMoraSessionConcurrentHTTPRace(t *testing.T) {
 	wg.Wait()
 }
 
+func TestSessionManager_ConcurrentReadsDoNotSerialize(t *testing.T) {
+	t.Parallel()
+	m := newTestSessionManager()
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	next := func(w http.ResponseWriter, r *http.Request) {
+		entered <- struct{}{}
+		<-release
+	}
+	handler := m.SessionMiddleware(http.HandlerFunc(next))
+	cookie := &http.Cookie{Name: "morasessionid", Value: "shared-sid"}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.AddCookie(cookie)
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+		}()
+	}
+
+	// Both handlers must be running at the same time. If the per-session lock
+	// were still held across the whole handler, the second request could not
+	// enter until the first (blocked on release) had finished.
+	for i := 0; i < 2; i++ {
+		select {
+		case <-entered:
+		case <-time.After(2 * time.Second):
+			t.Fatal("a request never entered the handler: same-sid requests are still serialized")
+		}
+	}
+	close(release)
+	wg.Wait()
+}
+
+func TestSessionManager_ConcurrentMutators_NoLostUpdate(t *testing.T) {
+	t.Parallel()
+	m := newTestSessionManager()
+	const requests = 8
+	handler := m.SessionMiddleware(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			rmID := int64(strings.Count(r.URL.RawQuery, "x")) + 1
+			sess, _ := MoraSessionFrom(r.Context())
+			sess.setToken(rmID, scm.Token{Token: r.URL.RawQuery})
+		},
+	))
+	cookie := &http.Cookie{Name: "morasessionid", Value: "shared-mut-sid"}
+
+	var wg sync.WaitGroup
+	for i := 0; i < requests; i++ {
+		wg.Add(1)
+		go func(query string) {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/?"+query, nil)
+			req.AddCookie(cookie)
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+		}(strings.Repeat("x", i))
+	}
+	wg.Wait()
+
+	// Concurrent mutators share one session object, so every write-back
+	// snapshot (serialized per session) already contains all changes made so
+	// far; no update may be lost.
+	sess, ok := m.store.Get("shared-mut-sid")
+	require.True(t, ok)
+	require.Len(t, sess.tokenMap, requests)
+	for i := 1; i <= requests; i++ {
+		tok, ok := sess.getToken(int64(i))
+		require.True(t, ok, "token for rm %d was lost", i)
+		require.Equal(t, strings.Repeat("x", i-1), tok.Token)
+	}
+}
+
 func TestMoraSessionMarshalUnmarshal_RoundTrip(t *testing.T) {
 	sess := NewMoraSession()
 	sess.SetUserID(42)
