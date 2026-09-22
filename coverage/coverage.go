@@ -37,8 +37,9 @@ type (
 		FindRevision(id int64, revision string) (*Coverage, error)
 		List(id int64) ([]*Coverage, error)
 		Put(*Coverage) (int64, error)
-		Timeline(trackerID int64, limit int) (map[string][]CoverageTimelinePoint, error)
-		FindRepoByTrackerID(trackerID int64) (*core.Repository, error)
+Timeline(trackerID int64, limit int) (map[string][]CoverageTimelinePoint, error)
+	TimelineByTrackerIDs(trackerIDs []int64, limit int) (map[int64]map[string][]CoverageTimelinePoint, error)
+	FindRepoByTrackerID(trackerID int64) (*core.Repository, error)
 	}
 )
 

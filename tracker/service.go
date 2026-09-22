@@ -67,6 +67,62 @@ func (s *Service) ListTrackersByOwner(ownerID, viewerID int64, searchQuery strin
 	return s.store.listTrackersByOwner(ownerID, viewerID, searchQuery, page, perPage)
 }
 
+// ListTrackers lists trackers visible to `userID` (owned + member + liked,
+// plus public when a search query is provided). Used by the top page.
+func (s *Service) ListTrackers(userID int64, searchQuery string, page, perPage int) ([]TrackerResponse, int, error) {
+	return s.store.listTrackers(userID, searchQuery, page, perPage)
+}
+
+// BatchPreview returns preview data (all series plus their latest up-to-20
+// values) for the given tracker ids in a few batched round trips. Only
+// non-coverage trackers are expected; coverage trackers are handled by the
+// coverage store in the server package.
+func (s *Service) BatchPreview(trackerIDs []int64) (map[int64][]PreviewSeriesValues, error) {
+	if len(trackerIDs) == 0 {
+		return map[int64][]PreviewSeriesValues{}, nil
+	}
+
+	var seriesMap map[int64][]SeriesModel
+	var valuesMap map[int64]map[int64][]ValueModel
+
+	fns := []func() error{
+		func() error {
+			var err error
+			seriesMap, err = s.store.listSeriesByTrackerIDs(trackerIDs)
+			return err
+		},
+		func() error {
+			var err error
+			valuesMap, err = s.store.listLatestValuesByTrackerIDs(trackerIDs, 20)
+			return err
+		},
+	}
+
+	if err := parallel(fns...); err != nil {
+		return nil, fmt.Errorf("BatchPreview: %w", err)
+	}
+
+	result := make(map[int64][]PreviewSeriesValues, len(trackerIDs))
+	for _, tid := range trackerIDs {
+		series := seriesMap[tid]
+		if len(series) == 0 {
+			result[tid] = []PreviewSeriesValues{}
+			continue
+		}
+		previews := make([]PreviewSeriesValues, 0, len(series))
+		for _, se := range series {
+			vs := valuesMap[tid][se.Id]
+			if vs == nil {
+				vs = []ValueModel{}
+			}
+			previews = append(previews, PreviewSeriesValues{Series: se, Values: vs})
+		}
+		result[tid] = previews
+	}
+
+	return result, nil
+}
+
 func (s *Service) FindTrackerById(id int64) (*TrackerModel, error) {
 	return s.store.findTrackerById(id)
 }

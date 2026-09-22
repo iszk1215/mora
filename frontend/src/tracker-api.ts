@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from 'react-router'
-import type { SeriesModel, TrackerResponse } from './core'
+import type { PreviewSeriesValues, SeriesModel, TrackerResponse } from './core'
 
 export interface ValueModel {
   id: number
@@ -26,10 +26,18 @@ export interface PaginatedTrackers {
 
 export interface PreviewData {
   tracker: TrackerResponse
-  series: Array<{
-    series: SeriesModel
-    values: ValueModel[]
-  }>
+  series: PreviewSeriesValues[]
+}
+
+// previewsFromTrackers builds the per-tracker preview map from a list response
+// that was requested with include=preview. Trackers without preview data map to
+// an empty series list so cards render their "No data" state.
+export function previewsFromTrackers(trackers: TrackerResponse[]): Map<number, PreviewData> {
+  const map = new Map<number, PreviewData>()
+  for (const t of trackers) {
+    map.set(t.id, { tracker: t, series: t.series ?? [] })
+  }
+  return map
 }
 
 export interface ValueUpdate {
@@ -38,24 +46,15 @@ export interface ValueUpdate {
   value: number
 }
 
-export async function listTrackers(page?: number, perPage?: number, query?: string): Promise<PaginatedTrackers> {
+export async function listTrackers(page?: number, perPage?: number, query?: string, includePreview?: boolean): Promise<PaginatedTrackers> {
   const params = new URLSearchParams()
   if (page) params.set('page', String(page))
   if (perPage) params.set('per_page', String(perPage))
   if (query) params.set('q', query)
+  if (includePreview) params.set('include', 'preview')
   const qs = params.toString()
   const url = qs ? `/api/trackers?${qs}` : '/api/trackers'
   const resp = await fetch(url)
-  if (!resp.ok) throw resp
-  return resp.json()
-}
-
-export async function fetchPreview(trackerId: number, type?: string): Promise<PreviewData> {
-  const path =
-    type === 'coverage'
-      ? `/api/coverages/${trackerId}/preview`
-      : `/api/trackers/${trackerId}/preview`
-  const resp = await fetch(path)
   if (!resp.ok) throw resp
   return resp.json()
 }

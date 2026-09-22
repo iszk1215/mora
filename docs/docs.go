@@ -999,22 +999,42 @@ const docTemplate = `{
         },
         "/api/trackers": {
             "get": {
-                "description": "Return trackers owned, edited, or liked by the current user",
+                "description": "Return trackers owned, edited, or liked by the current user. With include=preview, each tracker also embeds its preview data (all series plus their latest values) fetched in a few batched queries.",
                 "tags": [
-                    "tracker"
+                    "server"
                 ],
                 "summary": "List trackers for current user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Set to \\",
+                        "name": "include",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search query (partial match on tracker name)",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Items per page",
+                        "name": "per_page",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/tracker.ListTrackersResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/core.ErrorResponse"
                         }
                     }
                 }
@@ -1986,6 +2006,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Set to \\",
+                        "name": "include",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Search query (partial match on tracker name)",
                         "name": "q",
                         "in": "query"
@@ -2752,6 +2778,13 @@ const docTemplate = `{
                 "role": {
                     "description": "\"\" | \"owner\" | \"editor\"",
                     "type": "string"
+                },
+                "series": {
+                    "description": "Series carries preview data (all series plus their latest values) when\nthe list is requested with include=preview. Omitted otherwise.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/tracker.PreviewSeriesValues"
+                    }
                 },
                 "type": {
                     "type": "string"

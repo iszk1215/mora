@@ -3,7 +3,8 @@ import { LoaderFunctionArgs, useLoaderData, useSearchParams } from 'react-router
 
 import { Button } from '@/components/ui/button'
 import { TrackerCard } from './tracker-card'
-import { PreviewData, fetchPreview } from './tracker-api'
+import { previewsFromTrackers } from './tracker-api'
+import type { PreviewData } from './tracker-api'
 import { TrackerResponse } from './core'
 
 interface UserData {
@@ -36,8 +37,9 @@ async function loadUserTrackers(userName: string, page?: number, perPage?: numbe
   if (page) params.set('page', String(page))
   if (perPage) params.set('per_page', String(perPage))
   if (query) params.set('q', query)
+  params.set('include', 'preview')
   const qs = params.toString()
-  const url = `/api/users/${encodeURIComponent(userName)}/trackers${qs ? `?${qs}` : ''}`
+  const url = `/api/users/${encodeURIComponent(userName)}/trackers?${qs}`
   const resp = await fetch(url)
   if (!resp.ok) throw resp
   return resp.json()
@@ -54,7 +56,6 @@ export const UserPage = (): React.JSX.Element => {
   const [page, setPage] = useState(1)
   const [perPage] = useState(12)
   const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
-  const [previewLoading, setPreviewLoading] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -66,10 +67,12 @@ export const UserPage = (): React.JSX.Element => {
         if (cancelled) return
         setTrackers(data.trackers)
         setTotal(data.total)
+        setPreviews(previewsFromTrackers(data.trackers))
       } catch {
         if (cancelled) return
         setTrackers([])
         setTotal(0)
+        setPreviews(new Map())
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -79,39 +82,6 @@ export const UserPage = (): React.JSX.Element => {
       cancelled = true
     }
   }, [userName, page, perPage, urlQuery])
-
-  useEffect(() => {
-    if (trackers.length === 0) {
-      setPreviews(new Map())
-      setPreviewLoading(false)
-      return
-    }
-    let cancelled = false
-    setPreviewLoading(true)
-    const loadAll = async () => {
-      const entries = await Promise.all(
-        trackers.map(async (t) => {
-          try {
-            const data = await fetchPreview(t.id, t.type)
-            return [t.id, data] as const
-          } catch {
-            return null
-          }
-        })
-      )
-      if (cancelled) return
-      const map = new Map<number, PreviewData>()
-      for (const entry of entries) {
-        if (entry) map.set(entry[0], entry[1])
-      }
-      setPreviews(map)
-      setPreviewLoading(false)
-    }
-    void loadAll()
-    return () => {
-      cancelled = true
-    }
-  }, [trackers])
 
   const handleSearch = () => {
     const q = query.trim()
@@ -154,7 +124,7 @@ export const UserPage = (): React.JSX.Element => {
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {trackers.map((t) => (
-          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} loading={previewLoading} searchQuery={urlQuery} fromUser={userName} />
+          <TrackerCard key={t.id} tracker={t} preview={previews.get(t.id)} searchQuery={urlQuery} fromUser={userName} />
         ))}
       </div>
 

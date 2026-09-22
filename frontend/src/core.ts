@@ -75,6 +75,11 @@ export interface SeriesModel {
   config: string
 }
 
+export interface PreviewSeriesValues {
+  series: SeriesModel
+  values: Array<{ id: number; time: string; value: number }>
+}
+
 export interface TrackerResponse {
   id: number
   name: string
@@ -90,4 +95,5 @@ export interface TrackerResponse {
   role: string
   liked: boolean
   like_count: number
+  series?: PreviewSeriesValues[]
 }

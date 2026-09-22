@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/iszk1215/mora/core"
@@ -608,6 +609,73 @@ func (s *coverageStoreImpl) Timeline(trackerID int64, limit int) (map[string][]C
 			points[i], points[j] = points[j], points[i]
 		}
 		result[name] = points
+	}
+
+	return result, nil
+}
+
+// TimelineByTrackerIDs returns coverage timelines for the given trackers in
+// a single round trip, grouped by tracker id and then by entry name. Each
+// entry group is limited to `limit` points and reversed into ascending time
+// order, matching Timeline.
+func (s *coverageStoreImpl) TimelineByTrackerIDs(trackerIDs []int64, limit int) (map[int64]map[string][]CoverageTimelinePoint, error) {
+	if len(trackerIDs) == 0 {
+		return map[int64]map[string][]CoverageTimelinePoint{}, nil
+	}
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(trackerIDs)), ",")
+	query := `
+		SELECT c.tracker_id, c.time, e.name, e.hits, e.lines
+		FROM coverage c
+		JOIN coverage_entry e ON e.coverage_id = c.id
+		WHERE c.tracker_id IN (` + placeholders + `)
+		ORDER BY c.time DESC`
+
+	args := make([]interface{}, len(trackerIDs))
+	for i, id := range trackerIDs {
+		args[i] = id
+	}
+
+	type row struct {
+		TrackerID int64     `db:"tracker_id"`
+		Time      time.Time `db:"time"`
+		Name      string    `db:"name"`
+		Hits      int       `db:"hits"`
+		Lines     int       `db:"lines"`
+	}
+	var rows []row
+	if err := s.db.Select(&rows, query, args...); err != nil {
+		return nil, fmt.Errorf("TimelineByTrackerIDs select: %w", err)
+	}
+
+	result := make(map[int64]map[string][]CoverageTimelinePoint, len(trackerIDs))
+
+	// First pass: build per-tracker, per-name groups honoring the limit.
+	for _, r := range rows {
+		tr := result[r.TrackerID]
+		if tr == nil {
+			tr = make(map[string][]CoverageTimelinePoint)
+			result[r.TrackerID] = tr
+		}
+		list := tr[r.Name]
+		if limit > 0 && len(list) >= limit {
+			continue
+		}
+		pct := 0.0
+		if r.Lines > 0 {
+			pct = float64(r.Hits) / float64(r.Lines) * 100
+		}
+		tr[r.Name] = append(list, CoverageTimelinePoint{Time: r.Time, Value: pct})
+	}
+
+	// Reverse each group into ascending time order.
+	for _, tr := range result {
+		for name, points := range tr {
+			for i, j := 0, len(points)-1; i < j; i, j = i+1, j-1 {
+				points[i], points[j] = points[j], points[i]
+			}
+			tr[name] = points
+		}
 	}
 
 	return result, nil
