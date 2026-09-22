@@ -282,11 +282,13 @@ type cachedSession struct {
 // 350ms on Turso) even when the request lands on the same instance that just
 // served or missed that session milliseconds ago.
 //
-// Positive hits reuse the cached *MoraSession object. This is safe because the
-// session middleware serializes requests holding the same sid within an
-// instance via lockSession, so the object is never accessed concurrently while
-// a request holds the sid lock through its write-back. The shared database
-// remains the source of truth; the cache only shortcuts reads within the TTL.
+// Positive hits reuse the cached *MoraSession object. This is safe because
+// the session middleware keeps requests for the same sid concurrent and every
+// access to a *MoraSession is guarded by the object's own lock; only the load
+// and the write-back are serialized per session (via lockSession), and the
+// write-back marshals its snapshot under the object's lock. The shared
+// database remains the source of truth; the cache only shortcuts reads within
+// the TTL.
 //
 // Negative entries make the middleware build a fresh anonymous session on each
 // hit (exactly as it does today), but skip the database round trip that would
