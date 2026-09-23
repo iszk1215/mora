@@ -442,6 +442,13 @@ definitions:
       role:
         description: '"" | "owner" | "editor"'
         type: string
+      series:
+        description: |-
+          Series carries preview data (all series plus their latest values) when
+          the list is requested with include=preview. Omitted otherwise.
+        items:
+          $ref: '#/definitions/tracker.PreviewSeriesValues'
+        type: array
       type:
         type: string
       visibility:
@@ -1189,19 +1196,34 @@ paths:
       - auth
   /api/trackers:
     get:
-      description: Return trackers owned, edited, or liked by the current user
+      description: Return trackers owned, edited, or liked by the current user. With
+        include=preview, each tracker also embeds its preview data (all series plus
+        their latest values) fetched in a few batched queries.
+      parameters:
+      - description: Set to \
+        in: query
+        name: include
+        type: string
+      - description: Search query (partial match on tracker name)
+        in: query
+        name: q
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Items per page
+        in: query
+        name: per_page
+        type: integer
       responses:
         "200":
           description: OK
           schema:
             $ref: '#/definitions/tracker.ListTrackersResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/core.ErrorResponse'
       summary: List trackers for current user
       tags:
-      - tracker
+      - server
     post:
       consumes:
       - application/json
@@ -1850,6 +1872,10 @@ paths:
         in: path
         name: userName
         required: true
+        type: string
+      - description: Set to \
+        in: query
+        name: include
         type: string
       - description: Search query (partial match on tracker name)
         in: query

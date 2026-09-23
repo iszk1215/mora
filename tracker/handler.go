@@ -195,57 +195,6 @@ func (h *trackerHandler) requireAuth(next http.Handler) http.Handler {
 // ----------------------------------------------------------------------
 // Tracker
 
-// ListTrackers godoc
-// @Summary      List trackers for current user
-// @Description  Return trackers owned, edited, or liked by the current user
-// @Tags         tracker
-// @Success      200  {object}  tracker.ListTrackersResponse
-// @Failure      401  {object}  core.ErrorResponse
-// @Router       /api/trackers [get]
-func (h *trackerHandler) listTrackers(w http.ResponseWriter, r *http.Request) {
-	uid, ok := UserIDFromContext(r.Context())
-	if !ok {
-		uid = 0
-	}
-
-	q := r.URL.Query().Get("q")
-
-	if q == "" && !ok {
-		render.JSON(w, ListTrackersResponse{
-			Trackers: []TrackerResponse{}, Total: 0, Page: 1, PerPage: 0,
-		}, http.StatusOK)
-		return
-	}
-
-	page := 1
-	perPage := 0
-
-	if p := r.URL.Query().Get("page"); p != "" {
-		if n, err := strconv.Atoi(p); err == nil && n > 0 {
-			page = n
-		}
-	}
-	if pp := r.URL.Query().Get("per_page"); pp != "" {
-		if n, err := strconv.Atoi(pp); err == nil && n > 0 {
-			perPage = n
-		}
-	}
-
-	trackers, total, err := h.store.listTrackers(uid, q, page, perPage)
-	if err != nil {
-		log.Error().Err(err).Msg("tracker.handler.listTrackers")
-		render.InternalError(w, err)
-		return
-	}
-
-	render.JSON(w, ListTrackersResponse{
-		Trackers: trackers,
-		Total:    total,
-		Page:     page,
-		PerPage:  perPage,
-	}, http.StatusOK)
-}
-
 // CreateTracker godoc
 // @Summary      Create a tracker
 // @Description  Add a new tracker. The name must be unique. Creator becomes owner.
@@ -1163,7 +1112,6 @@ func newHandler(store *trackerStore) http.Handler {
 	r.Use(h.requireAuth)
 
 	r.Route("/", func(r chi.Router) {
-		r.Get("/", h.listTrackers)
 		r.Post("/", h.createTracker)
 
 		r.Route("/{trackerId}", func(r chi.Router) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/iszk1215/mora/core"
@@ -122,6 +123,9 @@ type TrackerResponse struct {
 	Role          string    `json:"role"` // "" | "owner" | "editor"
 	Liked         bool      `json:"liked"`
 	LikeCount     int       `json:"like_count" db:"like_count"`
+	// Series carries preview data (all series plus their latest values) when
+	// the list is requested with include=preview. Omitted otherwise.
+	Series []PreviewSeriesValues `json:"series,omitempty"`
 }
 
 func newTrackerStore(db *sqlx.DB) *trackerStore {
@@ -524,6 +528,44 @@ func (s *trackerStore) listSeries(trackerId int64) ([]SeriesModel, error) {
 	return rows, nil
 }
 
+// inClause returns a SQL placeholder list ("?,?,?") with len(args) items.
+func inClause(args []int64) string {
+	return strings.TrimSuffix(strings.Repeat("?,", len(args)), ",")
+}
+
+// listSeriesByTrackerIDs returns all series for the given trackers in a
+// single round trip, grouped by tracker id. Series are ordered by id so the
+// grouping is deterministic.
+func (s *trackerStore) listSeriesByTrackerIDs(trackerIDs []int64) (map[int64][]SeriesModel, error) {
+	if len(trackerIDs) == 0 {
+		return map[int64][]SeriesModel{}, nil
+	}
+	start := time.Now()
+	query := fmt.Sprintf(`SELECT id, tracker_id, name, data_type, config
+		FROM tracker_series
+		WHERE tracker_id IN (%s)
+		ORDER BY tracker_id, id`, inClause(trackerIDs))
+
+	args := make([]interface{}, len(trackerIDs))
+	for i, id := range trackerIDs {
+		args[i] = id
+	}
+
+	rows := []SeriesModel{}
+	if err := s.db.Select(&rows, query, args...); err != nil {
+		return nil, fmt.Errorf("listSeriesByTrackerIDs select: %w", err)
+	}
+
+	result := make(map[int64][]SeriesModel, len(trackerIDs))
+	for _, se := range rows {
+		result[se.TrackerId] = append(result[se.TrackerId], se)
+	}
+
+	log.Debug().Int("tracker_count", len(trackerIDs)).Int("series_count", len(rows)).
+		Dur("duration", time.Since(start)).Msg("tracker.listSeriesByTrackerIDs")
+	return result, nil
+}
+
 // seriesNameExists reports whether another series in the same tracker already
 // uses the given name. The series with excludeId (if any) is not counted.
 func (s *trackerStore) seriesNameExists(trackerId int64, name string, excludeId int64) (bool, error) {
@@ -722,6 +764,55 @@ func (s *trackerStore) listLatestValuesByTracker(trackerID int64, limit int) (ma
 		Int("series_count", len(values)).Dur("duration", time.Since(start)).
 		Msg("tracker.listLatestValuesByTracker")
 	return values, nil
+}
+
+// listLatestValuesByTrackerIDs returns the latest up-to-`limit` values per
+// series for the given trackers in a single round trip. The result is grouped
+// by tracker id, then by series id.
+func (s *trackerStore) listLatestValuesByTrackerIDs(trackerIDs []int64, limit int) (map[int64]map[int64][]ValueModel, error) {
+	if len(trackerIDs) == 0 {
+		return map[int64]map[int64][]ValueModel{}, nil
+	}
+	start := time.Now()
+	query := fmt.Sprintf(`
+		SELECT v.tracker_id, v.series_id, v.id, v.time, v.value
+		FROM (
+			SELECT ts.tracker_id, tv.id, tv.series_id, tv.time, tv.value,
+				ROW_NUMBER() OVER (PARTITION BY tv.series_id ORDER BY tv.time DESC) AS rn
+			FROM tracker_value tv
+			JOIN tracker_series ts ON ts.id = tv.series_id
+			WHERE ts.tracker_id IN (%s)
+		) v
+		WHERE v.rn <= ?
+		ORDER BY v.tracker_id, v.series_id, v.time`, inClause(trackerIDs))
+
+	args := make([]interface{}, len(trackerIDs)+1)
+	for i, id := range trackerIDs {
+		args[i] = id
+	}
+	args[len(trackerIDs)] = limit
+
+	rows := make([]struct {
+		TrackerID int64     `db:"tracker_id"`
+		ValueModel
+	}, 0)
+	if err := s.db.Select(&rows, query, args...); err != nil {
+		return nil, fmt.Errorf("listLatestValuesByTrackerIDs select: %w", err)
+	}
+
+	result := make(map[int64]map[int64][]ValueModel, len(trackerIDs))
+	for _, r := range rows {
+		series, ok := result[r.TrackerID]
+		if !ok {
+			series = make(map[int64][]ValueModel)
+			result[r.TrackerID] = series
+		}
+		series[r.SeriesId] = append(series[r.SeriesId], r.ValueModel)
+	}
+
+	log.Debug().Int("tracker_count", len(trackerIDs)).Int("value_count", len(rows)).
+		Dur("duration", time.Since(start)).Msg("tracker.listLatestValuesByTrackerIDs")
+	return result, nil
 }
 
 // TrackerMeta is the per-tracker metadata loaded in a single round trip from

@@ -80,15 +80,15 @@ func strPtr(s string) *string { return &s }
 func TestRequireAuth(t *testing.T) {
 	t.Run("allows all (auth is delegated to server middleware)", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		getResponse(t, http.StatusOK, h, r)
+		r := httptest.NewRequest(http.MethodGet, "/999", nil)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 
 	t.Run("respects context auth", func(t *testing.T) {
 		h := newTestHandler(t)
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r := httptest.NewRequest(http.MethodGet, "/999", nil)
 		r = r.WithContext(superuserCtx())
-		getResponse(t, http.StatusOK, h, r)
+		getResponse(t, http.StatusNotFound, h, r)
 	})
 }
 
@@ -266,145 +266,6 @@ func TestHandlerCreateTracker(t *testing.T) {
 			r := newRequestWithJSON(t, http.MethodPost, "/", req).WithContext(superuserCtx())
 			getResponse(t, http.StatusCreated, h, r)
 		}
-	})
-}
-
-func TestHandlerListTrackers(t *testing.T) {
-	t.Run("empty for authenticated user", func(t *testing.T) {
-		h := newTestHandler(t)
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		r = r.WithContext(superuserCtx())
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got ListTrackersResponse
-		unmarshalResponse(t, res, &got)
-		require.Empty(t, got.Trackers)
-		require.Equal(t, 0, got.Total)
-		require.Equal(t, 1, got.Page)
-		require.Equal(t, 0, got.PerPage)
-	})
-
-	t.Run("with trackers", func(t *testing.T) {
-		store := initTestStore(t)
-		tr1 := &TrackerModel{Name: "tracker1"}
-		tr2 := &TrackerModel{Name: "tracker2"}
-		require.NoError(t, store.addTracker(tr1, 1))
-		require.NoError(t, store.addTracker(tr2, 1))
-
-		h := newHandler(store)
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		r = r.WithContext(superuserCtx())
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got ListTrackersResponse
-		unmarshalResponse(t, res, &got)
-		require.Equal(t, 2, len(got.Trackers))
-		require.Equal(t, 2, got.Total)
-	})
-
-	t.Run("with pagination", func(t *testing.T) {
-		store := initTestStore(t)
-		for i := 0; i < 5; i++ {
-			tr := &TrackerModel{Name: fmt.Sprintf("tracker_%d", i)}
-			require.NoError(t, store.addTracker(tr, 1))
-		}
-
-		h := newHandler(store)
-		r := httptest.NewRequest(http.MethodGet, "/?page=1&per_page=2", nil)
-		r = r.WithContext(superuserCtx())
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got ListTrackersResponse
-		unmarshalResponse(t, res, &got)
-		require.Equal(t, 2, len(got.Trackers))
-		require.Equal(t, 5, got.Total)
-		require.Equal(t, 1, got.Page)
-		require.Equal(t, 2, got.PerPage)
-	})
-
-	t.Run("returns empty for anonymous", func(t *testing.T) {
-		h := newTestHandler(t)
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got ListTrackersResponse
-		unmarshalResponse(t, res, &got)
-		require.Empty(t, got.Trackers)
-		require.Equal(t, 0, got.Total)
-	})
-}
-
-func TestHandlerListTrackersSearch(t *testing.T) {
-	t.Run("anonymous with query searches public only", func(t *testing.T) {
-		store := initTestStore(t)
-		tr1 := &TrackerModel{Name: "alpha", Visibility: "private"}
-		tr2 := &TrackerModel{Name: "alpha_public", Visibility: "public"}
-		tr3 := &TrackerModel{Name: "beta_public", Visibility: "public"}
-		require.NoError(t, store.addTracker(tr1, 1))
-		require.NoError(t, store.addTracker(tr2, 2))
-		require.NoError(t, store.addTracker(tr3, 2))
-
-		h := newHandler(store)
-		r := httptest.NewRequest(http.MethodGet, "/?q=alpha", nil)
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got ListTrackersResponse
-		unmarshalResponse(t, res, &got)
-		require.Equal(t, 1, len(got.Trackers))
-		require.Equal(t, tr2.Id, got.Trackers[0].Id)
-	})
-
-	t.Run("anonymous without query returns empty", func(t *testing.T) {
-		store := initTestStore(t)
-		tr := &TrackerModel{Name: "test", Visibility: "public"}
-		require.NoError(t, store.addTracker(tr, 1))
-
-		h := newHandler(store)
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got ListTrackersResponse
-		unmarshalResponse(t, res, &got)
-		require.Empty(t, got.Trackers)
-	})
-
-	t.Run("logged in with query searches user and public", func(t *testing.T) {
-		store := initTestStore(t)
-		tr1 := &TrackerModel{Name: "my_tracker", Visibility: "private"}
-		tr2 := &TrackerModel{Name: "public_tracker", Visibility: "public"}
-		tr3 := &TrackerModel{Name: "other_public", Visibility: "public"}
-		require.NoError(t, store.addTracker(tr1, 1))
-		require.NoError(t, store.addTracker(tr2, 2))
-		require.NoError(t, store.addTracker(tr3, 2))
-
-		h := newHandler(store)
-		r := httptest.NewRequest(http.MethodGet, "/?q=tracker", nil)
-		r = r.WithContext(superuserCtx())
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got ListTrackersResponse
-		unmarshalResponse(t, res, &got)
-		// "my_tracker" matches (user 1's), "public_tracker" matches (public)
-		// "other_public" does not match "tracker"
-		require.Equal(t, 2, len(got.Trackers))
-	})
-
-	t.Run("logged in without query returns user's trackers", func(t *testing.T) {
-		store := initTestStore(t)
-		tr1 := &TrackerModel{Name: "my_tracker"}
-		tr2 := &TrackerModel{Name: "other_tracker"}
-		require.NoError(t, store.addTracker(tr1, 1))
-		require.NoError(t, store.addTracker(tr2, 2))
-
-		h := newHandler(store)
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		r = r.WithContext(superuserCtx())
-		res := getResponse(t, http.StatusOK, h, r)
-
-		var got ListTrackersResponse
-		unmarshalResponse(t, res, &got)
-		require.Equal(t, 1, len(got.Trackers))
-		require.Equal(t, tr1.Id, got.Trackers[0].Id)
 	})
 }
 
@@ -1468,14 +1329,11 @@ func TestHandlerLike(t *testing.T) {
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusCreated, h, r)
 
-		// Verify liked in list
-		listR := httptest.NewRequest(http.MethodGet, "/", nil)
-		listR = listR.WithContext(superuserCtx())
-		listRes := getResponse(t, http.StatusOK, h, listR)
-		var list ListTrackersResponse
-		unmarshalResponse(t, listRes, &list)
-		require.Len(t, list.Trackers, 1)
-		require.True(t, list.Trackers[0].Liked)
+		// Verify liked via the store (the list endpoint now lives in the server package)
+		list, _, err := store.listTrackers(1, "", 0, 0)
+		require.NoError(t, err)
+		require.Len(t, list, 1)
+		require.True(t, list[0].Liked)
 
 		// Unlike
 		r2 := httptest.NewRequest(http.MethodDelete, path, nil)
@@ -1483,12 +1341,10 @@ func TestHandlerLike(t *testing.T) {
 		getResponse(t, http.StatusNoContent, h, r2)
 
 		// Verify no longer liked
-		listR2 := httptest.NewRequest(http.MethodGet, "/", nil)
-		listR2 = listR2.WithContext(superuserCtx())
-		listRes2 := getResponse(t, http.StatusOK, h, listR2)
-		var list2 ListTrackersResponse
-		unmarshalResponse(t, listRes2, &list2)
-		require.False(t, list2.Trackers[0].Liked)
+		list2, _, err := store.listTrackers(1, "", 0, 0)
+		require.NoError(t, err)
+		require.Len(t, list2, 1)
+		require.False(t, list2[0].Liked)
 	})
 
 	t.Run("like requires auth", func(t *testing.T) {

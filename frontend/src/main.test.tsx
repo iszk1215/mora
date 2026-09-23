@@ -538,26 +538,52 @@ describe('TrackerSearchPage', () => {
   }
   const paginated = { trackers: [tracker], total: 1, page: 1, per_page: 12 }
 
-  it('shows Loading on cards while previews are being fetched', async () => {
-    let resolvePreview!: (r: Response) => void
+  it('requests previews folded into the list response', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify(paginated), { headers: { 'Content-Type': 'application/json' } }))
-      .mockReturnValueOnce(new Promise((resolve) => { resolvePreview = resolve }) as Promise<Response>)
 
     render(
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={['/?q=tracker-a']}>
         <TrackerSearchPage />
       </MemoryRouter>
     )
 
     expect(await screen.findByText('tracker-a')).toBeInTheDocument()
-    expect(await screen.findByText('Loading...')).toBeInTheDocument()
-    expect(screen.queryByText('No data')).not.toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('include=preview'))
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
 
-    resolvePreview(new Response(JSON.stringify({ tracker, series: [] }), { headers: { 'Content-Type': 'application/json' } }))
-    await waitFor(() => {
-      expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
-    })
+  it('renders preview data from the folded response', async () => {
+    const withSeries = {
+      ...tracker,
+      chart_config: '{}',
+      series: [{ series: { id: 1, tracker_id: 1, name: 'temp', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2026-01-01T00:00:00Z', value: 12.5 }] }],
+    }
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ trackers: [withSeries], total: 1, page: 1, per_page: 12 }), { headers: { 'Content-Type': 'application/json' } }))
+
+    render(
+      <MemoryRouter initialEntries={['/?q=tracker-a']}>
+        <TrackerSearchPage />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('tracker-a')).toBeInTheDocument()
+    expect(screen.getByTestId('echart')).toBeInTheDocument()
+    expect(screen.queryByText('No data')).not.toBeInTheDocument()
+  })
+
+  it('shows No data when no preview series arrive', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(paginated), { headers: { 'Content-Type': 'application/json' } }))
+
+    render(
+      <MemoryRouter initialEntries={['/?q=tracker-a']}>
+        <TrackerSearchPage />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('tracker-a')).toBeInTheDocument()
     expect(screen.getByText('No data')).toBeInTheDocument()
   })
 })

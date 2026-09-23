@@ -40,7 +40,7 @@ import { useUser } from './user-context'
 
 // TrackerDetail re-exports for tests / route definitions.
 export { TrackerCard } from './tracker-card'
-export { listTrackers, fetchPreview, patchSeries, deleteSeries, deleteValues, patchValuesBatch, likeTracker, unlikeTracker, patchTracker, deleteTracker, loadTrackerDetail, type PreviewData } from './tracker-api'
+export { listTrackers, patchSeries, deleteSeries, deleteValues, patchValuesBatch, likeTracker, unlikeTracker, patchTracker, deleteTracker, loadTrackerDetail, type PreviewData } from './tracker-api'
 
 export const TrackerDetailView = (): React.JSX.Element => {
   const data = useLoaderData() as TrackerDetailData

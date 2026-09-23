@@ -40,6 +40,7 @@ func (s *MoraServer) handleUserGet(w http.ResponseWriter, r *http.Request) {
 // @Description  Return trackers owned by the user. Public trackers are visible to everyone; private ones only to the owner.
 // @Tags         server
 // @Param        userName  path  string  true  "Username"
+// @Param        include   query  string  false  "Set to \"preview\" to embed series preview data"
 // @Param        q         query  string  false  "Search query (partial match on tracker name)"
 // @Param        page      query  int     false  "Page number"
 // @Param        per_page  query  int     false  "Items per page"
@@ -81,6 +82,14 @@ func (s *MoraServer) handleUserTrackers(w http.ResponseWriter, r *http.Request) 
 		log.Error().Err(err).Msg("server.handleUserTrackers ListTrackersByOwner")
 		render.InternalError(w, err)
 		return
+	}
+
+	if r.URL.Query().Get("include") == "preview" && len(trackers) > 0 {
+		if err := s.attachPreviews(trackers); err != nil {
+			log.Error().Err(err).Msg("server.handleUserTrackers attachPreviews")
+			render.InternalError(w, err)
+			return
+		}
 	}
 
 	render.JSON(w, tracker.ListTrackersResponse{

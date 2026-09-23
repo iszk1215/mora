@@ -31,8 +31,6 @@ const mockTrackers = (names: string[]) => ({
   per_page: 12,
 })
 
-const mockPreview = () => ({ tracker: {}, series: [] })
-
 describe('loadUserPage', () => {
   beforeEach(() => {
     globalThis.fetch = vi.fn()
@@ -94,9 +92,31 @@ describe('UserPage', () => {
         ok: true,
         json: () => Promise.resolve(mockTrackers(['tracker-a'])),
       } as Response)
+    render(
+      <MemoryRouter initialEntries={['/users/alice']}>
+        <UserPage />
+      </MemoryRouter>
+    )
+    expect(await screen.findByText('tracker-a')).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/users/alice/trackers?page=1&per_page=12&include=preview')
+  })
+
+  it('renders preview data folded into the list response', async () => {
+    const withSeries = {
+      id: 1,
+      name: 'tracker-a',
+      visibility: 'public',
+      type: 'tracker',
+      chart_config: '{}',
+      role: '',
+      liked: false,
+      like_count: 0,
+      series: [{ series: { id: 1, tracker_id: 1, name: 'temp', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2026-01-01T00:00:00Z', value: 12.5 }] }],
+    }
+    vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockPreview()),
+        json: () => Promise.resolve({ trackers: [withSeries], total: 1, page: 1, per_page: 12 }),
       } as Response)
     render(
       <MemoryRouter initialEntries={['/users/alice']}>
@@ -104,29 +124,22 @@ describe('UserPage', () => {
       </MemoryRouter>
     )
     expect(await screen.findByText('tracker-a')).toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/users/alice/trackers?page=1&per_page=12')
+    expect(screen.getByTestId('echart')).toBeInTheDocument()
+    expect(screen.queryByText('No data')).not.toBeInTheDocument()
   })
 
-  it('shows Loading on tracker cards while previews are being fetched', async () => {
-    let resolvePreview!: (r: Response) => void
+  it('shows No data when a tracker has no preview series', async () => {
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTrackers(['tracker-a'])),
       } as Response)
-      .mockReturnValueOnce(new Promise((resolve) => { resolvePreview = resolve }) as Promise<Response>)
     render(
       <MemoryRouter initialEntries={['/users/alice']}>
         <UserPage />
       </MemoryRouter>
     )
     expect(await screen.findByText('tracker-a')).toBeInTheDocument()
-    expect(await screen.findByText('Loading...')).toBeInTheDocument()
-    expect(screen.queryByText('No data')).not.toBeInTheDocument()
-    resolvePreview({ ok: true, json: () => Promise.resolve(mockPreview()) } as Response)
-    await waitFor(() => {
-      expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
-    })
     expect(screen.getByText('No data')).toBeInTheDocument()
   })
 
@@ -141,7 +154,7 @@ describe('UserPage', () => {
       </MemoryRouter>
     )
     expect(await screen.findByText('No trackers found.')).toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/users/alice/trackers?page=1&per_page=12&q=nope')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/users/alice/trackers?page=1&per_page=12&q=nope&include=preview')
   })
 
   it('searches within the user trackers', async () => {
@@ -153,10 +166,6 @@ describe('UserPage', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockTrackers(['tracker-b'])),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockPreview()),
       } as Response)
     render(
       <MemoryRouter initialEntries={['/users/alice']}>
@@ -170,14 +179,13 @@ describe('UserPage', () => {
     fireEvent.change(input, { target: { value: 'b' } })
     fireEvent.click(screen.getByText('Search'))
     expect(await screen.findByText('tracker-b')).toBeInTheDocument()
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/users/alice/trackers?page=1&per_page=12&q=b')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/users/alice/trackers?page=1&per_page=12&q=b&include=preview')
   })
 
   it('shows pagination controls and navigates pages', async () => {
     const page1 = { ...mockTrackers(['one']), total: 25, page: 1 }
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(page1) } as Response)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockPreview()) } as Response)
     render(
       <MemoryRouter initialEntries={['/users/alice']}>
         <UserPage />
@@ -189,7 +197,6 @@ describe('UserPage', () => {
     const page2 = { ...mockTrackers(['two']), total: 25, page: 2 }
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(page2) } as Response)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockPreview()) } as Response)
     fireEvent.click(screen.getByText('Next'))
     expect(await screen.findByText('two')).toBeInTheDocument()
     expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()

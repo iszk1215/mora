@@ -248,6 +248,29 @@ func (s *CoverageHandler) HandleCoverageListPublic(w http.ResponseWriter, r *htt
 // HandleCoveragePreview returns coverage timeline data as virtual series,
 // mirroring the tracker preview response shape.
 //
+// TimelineToPreviewSeries converts a coverage timeline into the virtual
+// series representation used for tracker preview cards.
+func TimelineToPreviewSeries(trackerID int64, timeline map[string][]CoverageTimelinePoint) []tracker.PreviewSeriesValues {
+	previews := make([]tracker.PreviewSeriesValues, 0, len(timeline))
+	for name, points := range timeline {
+		values := make([]tracker.ValueModel, len(points))
+		for i, p := range points {
+			values[i] = tracker.ValueModel{Timestamp: p.Time, Value: p.Value}
+		}
+		previews = append(previews, tracker.PreviewSeriesValues{
+			Series: tracker.SeriesModel{
+				Id:        0,
+				TrackerId: trackerID,
+				Name:      name,
+				DataType:  "float",
+				Config:    `{"value_format":"%.1f%%"}`,
+			},
+			Values: values,
+		})
+	}
+	return previews
+}
+
 // HandleCoveragePreview godoc
 // @Summary      Preview coverage data
 // @Description  Return coverage timeline data as virtual series for a tracker
@@ -264,30 +287,13 @@ func (s *CoverageHandler) HandleCoveragePreview(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var previews []tracker.PreviewSeriesValues
-
 	timeline, err := s.coverages.Timeline(tr.Id, 20)
 	if err != nil {
 		log.Error().Err(err).Msg("coverage.handler.HandleCoveragePreview Timeline")
 		render.InternalError(w, err)
 		return
 	}
-	for name, points := range timeline {
-		values := make([]tracker.ValueModel, len(points))
-		for i, p := range points {
-			values[i] = tracker.ValueModel{Timestamp: p.Time, Value: p.Value}
-		}
-		previews = append(previews, tracker.PreviewSeriesValues{
-			Series: tracker.SeriesModel{
-				Id:        0,
-				TrackerId: tr.Id,
-				Name:      name,
-				DataType:  "float",
-				Config:    `{"value_format":"%.1f%%"}`,
-			},
-			Values: values,
-		})
-	}
+	previews := TimelineToPreviewSeries(tr.Id, timeline)
 
 	trackerResp := tracker.TrackerResponse{
 		Id:          tr.Id,

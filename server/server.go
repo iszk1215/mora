@@ -547,7 +547,10 @@ func (s *MoraServer) Handler() http.Handler {
 		})
 
 		if s.tracker != nil {
-			r.With(s.requireTrackerAuth).Mount("/api/trackers", s.tracker.Handler())
+			r.Route("/api/trackers", func(r chi.Router) {
+				r.With(s.requireTrackerAuth).Get("/", s.handleTrackersList)
+				r.With(s.requireTrackerAuth).Mount("/", s.tracker.Handler())
+			})
 		}
 
 		if s.tracker != nil && s.userStore != nil {

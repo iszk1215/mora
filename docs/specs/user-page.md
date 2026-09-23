@@ -17,9 +17,11 @@ User page (`/users/:userName`) shows the trackers owned by a user. Anyone can vi
 
 - Returns the public user profile (`server.User`)
 
-`GET /api/users/:userName/trackers?q=<query>&page=N&per_page=N`
+`GET /api/users/:userName/trackers?q=<query>&page=N&per_page=N&include=preview`
 
 - `q`: partial match on tracker name, scoped to this user's trackers
+- `include=preview`: embed each tracker's preview data (`series` + latest values)
+  so cards render without per-card round trips (always sent by the frontend)
 - Visibility: public only for everyone; private also for the owner
 - Response format: `tracker.ListTrackersResponse`
 
@@ -37,6 +39,8 @@ User page (`/users/:userName`) shows the trackers owned by a user. Anyone can vi
 
 - `handleUserGet`: resolve username via `UserStore.FindByUsername`, 404 when missing
 - `handleUserTrackers`: resolve owner, read viewerID from context, delegate to `Service.ListTrackersByOwner`
+- When `include=preview`, embed preview data via the shared `attachPreviews`
+  helper (`server/tracker_list.go`), using batched queries
 
 ## Frontend
 
@@ -45,6 +49,7 @@ User page (`/users/:userName`) shows the trackers owned by a user. Anyone can vi
 - `UserPage` component: search box at the top, username heading, tracker card grid, Prev/Next pagination (no breadcrumb, no avatar)
 - `loadUserPage` loader: fetch `/api/users/:userName`, throw 404 response when missing
 - Cards pass `fromUser` navigation state so the tracker detail breadcrumb can return to this user's search
+- The trackers request always sends `include=preview`; cards get their data from the list response (`previewsFromTrackers`), no separate preview fetches
 
 ### main.tsx
 
