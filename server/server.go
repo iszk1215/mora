@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -12,6 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
@@ -702,7 +705,65 @@ func initFrontendFileServer() (http.Handler, error) {
 		return nil, fmt.Errorf("fs.Sub(static/public): %w", err)
 	}
 
-	return http.FileServer(http.FS(frontendFS)), nil
+	return newFrontendHandler(frontendFS)
+}
+
+// immutableCache wraps a ResponseWriter and marks only successful responses as
+// immutable. Applying the header unconditionally would let a 404 or a redirect
+// be pinned in the browser cache for a year.
+type immutableCache struct {
+	http.ResponseWriter
+}
+
+func (w *immutableCache) WriteHeader(status int) {
+	if status == http.StatusOK {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+// isAssetPath reports whether a request path addresses a file under /assets/.
+// The bare /assets/ directory is not an asset: handing it to the file server
+// would render a listing of every built file name, so it falls back to the
+// entry point instead.
+func isAssetPath(path string) bool {
+	rest := strings.TrimPrefix(path, "/assets/")
+
+	return rest != "" && rest != path
+}
+
+// newFrontendHandler serves the built frontend with an explicit cache policy.
+// Every file under /assets/ carries a content hash in its name, so a changed
+// body always means a changed URL and the response can be cached immutably for
+// a year. Every other path is the SPA entry point (the router rewrites
+// unmatched paths to "/"), which has no hash in its URL and therefore must be
+// revalidated: it is served with no-cache plus a strong ETag computed once at
+// startup. http.ServeContent answers If-None-Match, including "*", with 304
+// against the ETag set here.
+func newFrontendHandler(fsys fs.FS) (http.Handler, error) {
+	index, err := fs.ReadFile(fsys, "index.html")
+	if err != nil {
+		return nil, fmt.Errorf("read static/public/index.html: %w", err)
+	}
+	etag := fmt.Sprintf("\"%x\"", sha256.Sum256(index))
+
+	fileServer := http.FileServer(http.FS(fsys))
+	assets := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fileServer.ServeHTTP(&immutableCache{ResponseWriter: w}, r)
+	})
+	entryPoint := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("ETag", etag)
+		http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(index))
+	})
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isAssetPath(r.URL.Path) {
+			assets.ServeHTTP(w, r)
+			return
+		}
+		entryPoint.ServeHTTP(w, r)
+	}), nil
 }
 
 func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {

@@ -83,8 +83,15 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 ├── /api/signup/*           User signup
 ├── /api/auth/*             Password auth
 ├── /swagger/*              Swagger UI (generated from swaggo annotations)
-└── /                       SPA frontend (static files)
+├── /assets/*               Hashed frontend assets (immutable, no session)
+└── /                       SPA frontend entry point (ETag revalidation, no session)
 ```
+
+`/assets/*` and the SPA fallback share one handler (`newFrontendFileServer` in
+`server/server.go`): hashed assets are served with `Cache-Control: public,
+max-age=31536000, immutable`, every other path is the embedded `index.html`
+served with `no-cache` plus a strong `ETag` and `304` revalidation. See
+[docs/specs/static-assets.md](specs/static-assets.md).
 
 ## Middleware Chain
 
@@ -242,6 +249,7 @@ Current migrations:
 - React Router v7 with `RouterProvider` (not `react-router-dom`)
 - ECharts for charts (not chart.js)
 - Build output: `server/static/public/` (committed to git)
+- Every built file name under `assets/` carries a content hash, which the server relies on for immutable caching
 - Dev server: `cd frontend && npm run dev -- --no-open`
 - All source files must contain only ASCII characters
 
