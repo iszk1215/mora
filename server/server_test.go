@@ -177,6 +177,11 @@ func (b *MoraServerBuilder) WithUserStore(u UserStore) *MoraServerBuilder {
 	return b
 }
 
+func (b *MoraServerBuilder) WithFrontendFileServer(h http.Handler) *MoraServerBuilder {
+	b.Server.frontendFileServer = h
+	return b
+}
+
 func (b *MoraServerBuilder) Finish() *MoraServer {
 	return b.Server
 }

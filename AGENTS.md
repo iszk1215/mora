@@ -63,6 +63,7 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - [docs/specs/tracker-search.md](docs/specs/tracker-search.md) - Tracker search spec (top page search feature)
 - [docs/specs/user-page.md](docs/specs/user-page.md) - User page spec (/users/:userName)
 - [docs/specs/coverage.md](docs/specs/coverage.md) - Coverage URL spec (URLs, middleware, upload)
+- [docs/specs/static-assets.md](docs/specs/static-assets.md) - Static asset cache policy (/assets immutable, index.html ETag)
 - [docs/decisions/0001-use-libsql.md](docs/decisions/0001-use-libsql.md) - ADR: libSQL/Turso
 - [docs/decisions/0002-use-go-chi.md](docs/decisions/0002-use-go-chi.md) - ADR: chi router
 
