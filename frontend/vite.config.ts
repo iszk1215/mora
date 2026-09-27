@@ -29,6 +29,9 @@ export default defineConfig({
   build: {
     outDir: '../server/static/public',
     emptyOutDir: true,
+    // The server reads this manifest to tell content-hashed bundle output
+    // (cacheable forever) apart from verbatim copies of public/ (revalidated).
+    manifest: true,
     chunkSizeWarningLimit: 1300,
     rollupOptions: {
       output: {
