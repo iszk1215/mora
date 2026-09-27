@@ -8,12 +8,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/drone/go-scm/scm"
@@ -515,14 +518,10 @@ func (s *MoraServer) Handler() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// Frontend static assets and Swagger docs run before the session
-	// middleware: they do not need a session, and every session load costs a
+	// Frontend static files and Swagger docs are registered outside the session
+	// middleware below: neither needs a session, and every session load costs a
 	// database round trip (twice per request with the write-back), which is
 	// prohibitively slow against a remote Turso database.
-	r.Get("/assets/*", func(w http.ResponseWriter, r *http.Request) {
-		s.frontendFileServer.ServeHTTP(w, r)
-	})
-
 	r.Mount("/swagger/", httpSwagger.WrapHandler)
 
 	r.Group(func(r chi.Router) {
@@ -594,13 +593,16 @@ func (s *MoraServer) Handler() http.Handler {
 		}
 	})
 
-	// The SPA fallback serves the frontend entry point for every unmatched
-	// path. It runs outside the session middleware exactly like /assets: pages
-	// do not need a session, and every session round trip is expensive
-	// against a remote Turso database. The session cookie is set by the first
+	// The frontend file server resolves the request path itself: a path that
+	// names a file is served as that file, and anything else falls back to the
+	// entry point. It sits outside the session middleware, so no page or asset
+	// request costs a session round trip. The session cookie is set by the first
 	// API/login response the browser receives.
 	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-		r.URL.Path = "/"
+		if s.frontendFileServer == nil {
+			http.NotFound(w, r)
+			return
+		}
 		s.frontendFileServer.ServeHTTP(w, r)
 	})
 
@@ -696,8 +698,25 @@ func initStore(cfg config.MoraConfig) (*sqlx.DB, RepositoryManagerStore, Reposit
 	return db, rmStore, repoStore, userStore, nil
 }
 
-//go:embed static
+//go:embed all:static
 var staticFS embed.FS
+
+const (
+	// indexFileName is the SPA entry point, served for every path that does not
+	// address a file of its own.
+	indexFileName = "index.html"
+	// manifestDir holds bundler metadata rather than site content.
+	manifestDir = ".vite"
+	// manifestPath is the Vite manifest that lists the files the bundler
+	// emitted with a content hash in their name.
+	manifestPath = manifestDir + "/manifest.json"
+	// bundleOutputDir is where the bundler writes hashed chunks and assets by
+	// convention. A request for one of those files is never a client-side route.
+	bundleOutputDir = "assets"
+
+	immutableCacheControl  = "public, max-age=31536000, immutable"
+	revalidateCacheControl = "no-cache"
+)
 
 func initFrontendFileServer() (http.Handler, error) {
 	frontendFS, err := fs.Sub(staticFS, "static/public")
@@ -717,53 +736,214 @@ type immutableCache struct {
 
 func (w *immutableCache) WriteHeader(status int) {
 	if status == http.StatusOK {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		w.Header().Set("Cache-Control", immutableCacheControl)
 	}
 	w.ResponseWriter.WriteHeader(status)
 }
 
-// isAssetPath reports whether a request path addresses a file under /assets/.
-// The bare /assets/ directory is not an asset: handing it to the file server
-// would render a listing of every built file name, so it falls back to the
-// entry point instead.
-func isAssetPath(path string) bool {
-	rest := strings.TrimPrefix(path, "/assets/")
-
-	return rest != "" && rest != path
+// frontendHandler serves the embedded frontend. One rule decides the cache
+// policy: a file the bundler content-hashed is immutable for a year, every other
+// file must be revalidated with an ETag. The immutable set comes from the
+// bundler manifest rather than from the directory layout, so a file copied
+// verbatim out of frontend/public/ is revalidated even though it sits next to
+// hashed output, and a hashed file stays immutable wherever it lands.
+//
+// Paths that do not address a file are client-side routes and are answered with
+// the entry point, except inside a build output directory: a missing script must
+// stay a 404 rather than receive HTML.
+type frontendHandler struct {
+	fsys       fs.FS
+	fileServer http.Handler
+	immutable  map[string]bool
+	etags      sync.Map
+	entryPoint []byte
+	entryETag  string
 }
 
-// newFrontendHandler serves the built frontend with an explicit cache policy.
-// Every file under /assets/ carries a content hash in its name, so a changed
-// body always means a changed URL and the response can be cached immutably for
-// a year. Every other path is the SPA entry point (the router rewrites
-// unmatched paths to "/"), which has no hash in its URL and therefore must be
-// revalidated: it is served with no-cache plus a strong ETag computed once at
-// startup. http.ServeContent answers If-None-Match, including "*", with 304
-// against the ETag set here.
-func newFrontendHandler(fsys fs.FS) (http.Handler, error) {
-	index, err := fs.ReadFile(fsys, "index.html")
+// newFrontendHandler fails fast when the embedded site has no entry point, since
+// every unmatched path would then answer with an error.
+func newFrontendHandler(fsys fs.FS) (*frontendHandler, error) {
+	entryPoint, err := fs.ReadFile(fsys, indexFileName)
 	if err != nil {
-		return nil, fmt.Errorf("read static/public/index.html: %w", err)
+		return nil, fmt.Errorf("read static/public/%s: %w", indexFileName, err)
 	}
-	etag := fmt.Sprintf("\"%x\"", sha256.Sum256(index))
 
-	fileServer := http.FileServer(http.FS(fsys))
-	assets := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fileServer.ServeHTTP(&immutableCache{ResponseWriter: w}, r)
-	})
-	entryPoint := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("ETag", etag)
-		http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(index))
-	})
+	return &frontendHandler{
+		fsys:       fsys,
+		fileServer: http.FileServer(http.FS(fsys)),
+		immutable:  loadImmutablePaths(fsys),
+		entryPoint: entryPoint,
+		entryETag:  etagOf(entryPoint),
+	}, nil
+}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isAssetPath(r.URL.Path) {
-			assets.ServeHTTP(w, r)
+func (h *frontendHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	name, ok := h.resolve(r.URL.Path)
+	if !ok {
+		if underBuildOutput(r.URL.Path) {
+			http.NotFound(w, r)
 			return
 		}
-		entryPoint.ServeHTTP(w, r)
-	}), nil
+		h.serveEntryPoint(w, r)
+
+		return
+	}
+
+	if h.immutable[name] {
+		h.fileServer.ServeHTTP(&immutableCache{ResponseWriter: w}, requestFor(r, name))
+		return
+	}
+
+	if etag := h.etag(name); etag != "" {
+		w.Header().Set("ETag", etag)
+	}
+	w.Header().Set("Cache-Control", revalidateCacheControl)
+	h.fileServer.ServeHTTP(w, requestFor(r, name))
+}
+
+// serveEntryPoint answers every path that does not name a file. The document is
+// held in memory because it is needed for each navigation and is a few hundred
+// bytes, and because the file server would redirect a request for /index.html
+// to / rather than return it.
+func (h *frontendHandler) serveEntryPoint(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", revalidateCacheControl)
+	w.Header().Set("ETag", h.entryETag)
+	http.ServeContent(w, r, indexFileName, time.Time{}, bytes.NewReader(h.entryPoint))
+}
+
+// resolve maps a request path to a regular file inside the embedded filesystem.
+// It reports false for SPA routes, for directories, and for the bundler manifest,
+// which describes the build but is not part of the site.
+func (h *frontendHandler) resolve(requestPath string) (string, bool) {
+	name := strings.TrimPrefix(path.Clean("/"+requestPath), "/")
+	if name == "" || !fs.ValidPath(name) || isManifest(name) {
+		return "", false
+	}
+	info, err := fs.Stat(h.fsys, name)
+	if err != nil || !info.Mode().IsRegular() {
+		return "", false
+	}
+
+	return name, true
+}
+
+// etag returns a strong validator for name, hashing the file the first time it
+// is requested and caching the result. The content is streamed into the hash so
+// that a large asset is never buffered. An empty result means the file could
+// not be read, in which case the response carries no validator and the client
+// simply receives the whole file.
+func (h *frontendHandler) etag(name string) string {
+	if cached, ok := h.etags.Load(name); ok {
+		return cached.(string)
+	}
+
+	f, err := h.fsys.Open(name)
+	if err != nil {
+		log.Warn().Err(err).Str("name", name).Msg("frontend: open for ETag")
+		return ""
+	}
+	defer func() { _ = f.Close() }()
+
+	sum := sha256.New()
+	if _, err := io.Copy(sum, f); err != nil {
+		log.Warn().Err(err).Str("name", name).Msg("frontend: hash for ETag")
+		return ""
+	}
+
+	etag := quotedETag(sum.Sum(nil))
+	h.etags.Store(name, etag)
+
+	return etag
+}
+
+// etagOf formats a strong validator for content the server already holds.
+func etagOf(content []byte) string {
+	sum := sha256.Sum256(content)
+
+	return quotedETag(sum[:])
+}
+
+func quotedETag(sum []byte) string {
+	return fmt.Sprintf("\"%x\"", sum)
+}
+
+// loadImmutablePaths reads the bundler manifest and returns every file it
+// emitted. A manifest that is missing or unparsable is not fatal: the server
+// then revalidates everything, which costs a round trip but is always correct.
+func loadImmutablePaths(fsys fs.FS) map[string]bool {
+	data, err := fs.ReadFile(fsys, manifestPath)
+	if err != nil {
+		log.Warn().Err(err).Msgf("frontend: no %s, every file is revalidated", manifestPath)
+		return nil
+	}
+
+	var chunks map[string]struct {
+		File   string   `json:"file"`
+		CSS    []string `json:"css"`
+		Assets []string `json:"assets"`
+	}
+	if err := json.Unmarshal(data, &chunks); err != nil {
+		log.Warn().Err(err).Msgf("frontend: parse %s", manifestPath)
+		return nil
+	}
+
+	paths := make(map[string]bool, len(chunks)*2)
+	for _, chunk := range chunks {
+		if chunk.File != "" {
+			paths[chunk.File] = true
+		}
+		for _, name := range chunk.CSS {
+			paths[name] = true
+		}
+		for _, name := range chunk.Assets {
+			paths[name] = true
+		}
+	}
+	// The entry point names no content, so it is revalidated even if a future
+	// bundler starts listing it.
+	delete(paths, indexFileName)
+
+	return paths
+}
+
+// requestFor returns a shallow copy of r whose URL addresses name, so the file
+// server can serve a name the request did not spell out.
+func requestFor(r *http.Request, name string) *http.Request {
+	clone := new(http.Request)
+	*clone = *r
+	target := new(url.URL)
+	*target = *r.URL
+	target.Path = "/" + name
+	target.RawPath = ""
+	clone.URL = target
+
+	return clone
+}
+
+// buildOutputDirs are the directories the build writes into: hashed bundle output
+// and the manifest describing it. Neither is reachable as a client-side route.
+var buildOutputDirs = []string{bundleOutputDir, manifestDir}
+
+// underBuildOutput reports whether a path names something inside a build output
+// directory. Such a request names one specific file, so a miss has to be a 404:
+// answering it with the entry point would hand HTML to a script, a stylesheet,
+// or a font request. The bare directory is not included, because it has no file
+// of its own and answering it with the entry point is what keeps a listing of
+// every built file name off the wire.
+func underBuildOutput(requestPath string) bool {
+	name := strings.TrimPrefix(path.Clean("/"+requestPath), "/")
+	for _, dir := range buildOutputDirs {
+		if strings.HasPrefix(name, dir+"/") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isManifest reports whether a name is bundler metadata rather than site content.
+func isManifest(name string) bool {
+	return name == manifestDir || strings.HasPrefix(name, manifestDir+"/")
 }
 
 func NewMoraServerFromConfig(cfg config.MoraConfig) (*MoraServer, error) {
