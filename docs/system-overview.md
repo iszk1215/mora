@@ -83,14 +83,16 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 ├── /api/signup/*           User signup
 ├── /api/auth/*             Password auth
 ├── /swagger/*              Swagger UI (generated from swaggo annotations)
-├── /assets/*               Hashed frontend assets (immutable, no session)
-└── /                       SPA frontend entry point (ETag revalidation, no session)
+└── /*                      Frontend files and SPA entry point (no session)
 ```
 
-`/assets/*` and the SPA fallback share one handler (`newFrontendFileServer` in
-`server/server.go`): hashed assets are served with `Cache-Control: public,
-max-age=31536000, immutable`, every other path is the embedded `index.html`
-served with `no-cache` plus a strong `ETag` and `304` revalidation. See
+One handler (`newFrontendFileServer` in `server/server.go`) backs the last route
+and resolves each request itself: a path that names a file is served as that file,
+any other path is the embedded `index.html`. Files the bundler content-hashed,
+which it records in `.vite/manifest.json`, are served with `Cache-Control:
+public, max-age=31536000, immutable`; everything else, including files copied
+out of `frontend/public/`, is served with `no-cache` plus a strong `ETag` and
+`304` revalidation. A miss under `assets/` is a `404` rather than HTML. See
 [docs/specs/static-assets.md](specs/static-assets.md).
 
 ## Middleware Chain
@@ -248,8 +250,9 @@ Current migrations:
 
 - React Router v7 with `RouterProvider` (not `react-router-dom`)
 - ECharts for charts (not chart.js)
-- Build output: `server/static/public/` (committed to git)
-- Every built file name under `assets/` carries a content hash, which the server relies on for immutable caching
+- Build output: `server/static/public/` (committed to git, `.vite/manifest.json` included)
+- `build.manifest` is on: the manifest is how the server tells hashed bundle output from verbatim copies of `frontend/public/`, which are revalidated instead
+- `frontend/public/` is copied to the site root, so a file added there is served at `/<name>`; being unhashed, it is never `immutable`
 - Dev server: `cd frontend && npm run dev -- --no-open`
 - All source files must contain only ASCII characters
 

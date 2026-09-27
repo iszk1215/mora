@@ -33,7 +33,10 @@ Go module: `github.com/iszk1215/mora` (Go 1.25.0, no toolchain directive)
 - React 19 + ReactDOM 19 (matching `@types/react` 19)
 - Vite 8 (rolldown bundler), Tailwind CSS v4 (`@tailwindcss/vite` plugin, no PostCSS), TypeScript 6.0
 - Test: Vitest + `@testing-library/react` + jsdom
-- Build output: `server/static/public/` (committed to git, `emptyOutDir: true`)
+- Build output: `server/static/public/` (committed to git, `emptyOutDir: true`, includes `.vite/manifest.json`)
+- `build.manifest: true` is required: the server reads the manifest to mark content-hashed bundle output `immutable` and everything else `no-cache` (see [docs/specs/static-assets.md](docs/specs/static-assets.md))
+- `frontend/public/` is copied verbatim to the site root (e.g. `frontend/public/favicon.svg` -> `/favicon.svg`); unhashed, so served with `no-cache` + ETag
+- `//go:embed all:static` is required, otherwise the dot-prefixed `.vite/` directory is excluded from the binary
 - Dev server: `cd frontend && npm run dev -- --no-open`
 
 ## Workflow
