@@ -62,8 +62,7 @@ func newTestSessionManager() *MoraSessionManager {
 // whose Get/Put/Touch operations are counted.
 func newRecordingDBSessionStore(t *testing.T) *recordingSessionStore {
 	t.Helper()
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
+	db := openTestDB(t)
 	store := newDBSessionStore(db)
 	require.NoError(t, store.Init())
 	return &recordingSessionStore{sessionStore: store}
@@ -439,9 +438,7 @@ func TestMoraSessionMarshalUnmarshal_EmptyMaps(t *testing.T) {
 }
 
 func TestDBSessionStore_CRUD(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-
+	db := openTestDB(t)
 	store := newDBSessionStore(db)
 	require.NoError(t, store.Init())
 	require.Equal(t, 0, store.Len())
@@ -465,9 +462,7 @@ func TestDBSessionStore_CRUD(t *testing.T) {
 }
 
 func TestDBSessionStore_Expiry(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-
+	db := openTestDB(t)
 	store := newDBSessionStore(db)
 	require.NoError(t, store.Init())
 
@@ -579,9 +574,7 @@ func TestDBSessionStore_DeleteExpiredNonRetryableError(t *testing.T) {
 }
 
 func TestDBSessionStore_SharedAcrossStores(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-
+	db := openTestDB(t)
 	store1 := newDBSessionStore(db)
 	require.NoError(t, store1.Init())
 
@@ -599,9 +592,7 @@ func TestDBSessionStore_SharedAcrossStores(t *testing.T) {
 }
 
 func TestMoraSessionManager_DBPersistenceThroughMiddleware(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-
+	db := openTestDB(t)
 	store := newDBSessionStore(db)
 	require.NoError(t, store.Init())
 	m := NewMoraSessionManagerWithStore(false, store)

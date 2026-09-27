@@ -9,15 +9,12 @@ import (
 
 	"github.com/drone/go-scm/scm"
 	"github.com/iszk1215/mora/core"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func newTestUserStore(t *testing.T) UserStore {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	store := NewUserStore(db)
 	require.NoError(t, store.Init())
 	return store
@@ -746,9 +743,7 @@ func TestCreateUserForSession_FindByProviderError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	store := NewUserStore(db)
 	require.NoError(t, store.Init())
 	_ = db.Close()

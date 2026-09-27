@@ -9,17 +9,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
 
 const testCSRFToken = "test-csrf-token-value"
 
 func newTestAPIKeyHandler(t *testing.T) (http.Handler, *MoraSessionManager, UserStore) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
-
+	db := openTestDB(t)
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
