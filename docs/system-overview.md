@@ -140,7 +140,7 @@ is decorated with a process-local read cache (fixed 5s TTL) so bursts of
 requests for the same session - including anonymous sessions that have no
 database row - are served without repeated remote database round trips; the
 shared database remains the source of truth. A process-local map-based store
-is used in tests and demo mode.
+is used in tests only.
 
 Google is configured as an `[[scm]]` entry with `scm = "google"` (login-only
 provider, no SCM client). The default endpoints point at Google's OAuth2
@@ -279,3 +279,11 @@ Current migrations:
 
 In demo mode the login page (`/auth`) pre-fills the username and password
 fields with the demo account credentials (`demo`/`demo`).
+
+Demo mode runs on an in-memory libSQL DSN, where the whole database - schema
+included - lives inside a single connection rather than in a file. The pool
+therefore pins the connection count to 1 and skips connection recycling
+(`SetConnMaxIdleTime` / `SetConnMaxLifetime`); dropping the connection would
+discard the database itself, and the next query would open a fresh empty one
+and fail with "no such table". Session rows still go through the
+database-backed store, so the demo is fully reset whenever the process exits.
