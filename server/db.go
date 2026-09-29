@@ -23,6 +23,19 @@ import (
 // databases.
 const defaultMaxIdleConns = 10
 
+// connMaxIdleTime and connMaxLifetime recycle pooled connections. Remote
+// libSQL (Turso) expires Hrana streams server-side after an idle timeout, and
+// the go-libsql driver surfaces a stale stream as a plain query error rather
+// than driver.ErrBadConn, so database/sql would keep handing the same dead
+// connection back. Recycling is what keeps that from wedging the pool.
+//
+// They are variables so tests can shorten the window instead of sleeping
+// through it, the same reason resetIdlePool is a variable.
+var (
+	connMaxIdleTime = 1 * time.Minute
+	connMaxLifetime = 30 * time.Minute
+)
+
 // OpenDB opens a database connection according to the configuration.
 //
 // When TursoURL (or the TURSO_DATABASE_URL environment variable) is set, the
@@ -106,8 +119,19 @@ func OpenDB(cfg config.MoraConfig) (*sqlx.DB, error) {
 	// session GC failures). Recycle idle and long-lived connections so the
 	// pool re-establishes fresh Hrana streams.
 	db.SetMaxIdleConns(defaultMaxIdleConns)
-	db.SetConnMaxIdleTime(1 * time.Minute)
-	db.SetConnMaxLifetime(30 * time.Minute)
+	if isMemoryDSN(dsn) {
+		// A memory DSN holds the entire database, schema included, inside the
+		// connection itself. Recycling that connection throws the database
+		// away, and the next query opens a fresh empty one, so every table
+		// vanishes behind a "no such table" error once the pool goes idle.
+		// Demo mode forces ":memory:" (see cmd/web.go), where the session GC
+		// would otherwise fail ten minutes in on an empty database.
+		db.SetConnMaxIdleTime(0)
+		db.SetConnMaxLifetime(0)
+	} else {
+		db.SetConnMaxIdleTime(connMaxIdleTime)
+		db.SetConnMaxLifetime(connMaxLifetime)
+	}
 
 	return db, nil
 }
