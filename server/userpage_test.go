@@ -8,15 +8,11 @@ import (
 	"testing"
 
 	"github.com/iszk1215/mora/tracker"
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
 
 func setupUserPageServer(t *testing.T) (*MoraServer, http.Handler) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	db.MustExec("PRAGMA foreign_keys = OFF")
-
+	db := openTestDB(t)
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 

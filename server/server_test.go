@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,13 +27,55 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func setupRepositoryStore(t *testing.T, repos ...*Repository) RepositoryStore {
+// openTestDB returns an in-memory libSQL database for a test, with foreign keys
+// disabled and the connection pool pinned to a single connection.
+//
+// SQLite gives every connection in a :memory: pool its own empty database, so a
+// second connection would see no schema at all. A test that queries
+// concurrently then fails intermittently with "no such table: ...", depending on
+// whether the pool got to reuse an already warm connection. initStore pins the
+// pool the same way for a local libSQL file (see server/db.go).
+func openTestDB(t *testing.T) *sqlx.DB {
+	t.Helper()
+
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.SetMaxOpenConns(1)
+	db.MustExec("PRAGMA foreign_keys = OFF")
+	t.Cleanup(func() { _ = db.Close() })
 
+	return db
+}
+
+// TestOpenTestDB_PinsTheConnectionPool guards the reason openTestDB exists:
+// without the pin, a second connection is a second, empty database.
+func TestOpenTestDB_PinsTheConnectionPool(t *testing.T) {
+	db := openTestDB(t)
+	db.MustExec("CREATE TABLE probe (x int)")
+	db.MustExec("INSERT INTO probe VALUES (1)")
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i := range errs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			var n int
+			errs[i] = db.Get(&n, "SELECT x FROM probe")
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		require.NoError(t, err, "concurrent query %d sees no schema", i)
+	}
+	require.Equal(t, 1, db.Stats().OpenConnections)
+}
+
+func setupRepositoryStore(t *testing.T, repos ...*Repository) RepositoryStore {
+	db := openTestDB(t)
 	store := NewRepositoryStore(db)
-	err = store.Init()
+	err := store.Init()
 	require.NoError(t, err)
 
 	for _, repo := range repos {
@@ -333,11 +376,9 @@ func Test_initRepositoryManager_EmptySecretFile(t *testing.T) {
 }
 
 func Test_initRepositoryManager_UnknownDriver(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	store := NewRepositoryManagerStore(db)
-	err = store.Init()
+	err := store.Init()
 	require.NoError(t, err)
 
 	cfg := config.RepositoryManagerConfig{
@@ -815,9 +856,7 @@ insecure_skip_verify = false
 }
 
 func TestHandleMe_Anonymous(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
@@ -836,9 +875,7 @@ func TestHandleMe_Anonymous(t *testing.T) {
 }
 
 func TestHandleMe_NoSession(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
@@ -854,9 +891,7 @@ func TestHandleMe_NoSession(t *testing.T) {
 }
 
 func TestHandleMe_LoggedIn(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
@@ -888,10 +923,7 @@ func TestHandleMe_LoggedIn(t *testing.T) {
 }
 
 func TestTrackerEndpointIsMounted(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
-
+	db := openTestDB(t)
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
@@ -938,9 +970,7 @@ func TestTrackerEndpointIsMounted(t *testing.T) {
 // requireTrackerAuth
 
 func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	seedTestUserTable(db)
 
 	trackerService, err := tracker.NewService(db)
@@ -972,13 +1002,11 @@ func TestRequireTrackerAuth_SessionLoggedIn(t *testing.T) {
 }
 
 func TestRequireTrackerAuth_APIKey(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	seedTestUserTable(db)
 
 	userStore := newTestUserStore(t)
-	_, err = userStore.CreateUser("apiuser", "")
+	_, err := userStore.CreateUser("apiuser", "")
 	require.NoError(t, err)
 
 	key, err := userStore.CreateAPIKey(1, "test-key")
@@ -1008,10 +1036,7 @@ func TestRequireTrackerAuth_APIKey(t *testing.T) {
 }
 
 func TestRequireTrackerAuth_AnonymousFallback(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
-
+	db := openTestDB(t)
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
 
@@ -1073,9 +1098,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 	rm := NewMockRepositoryManager(1)
 	rm.client.Repositories = createMockRepoService(controller, repo)
 
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	seedTestUserTable(db)
 
 	coverageService, err := coverage.NewCoverageService(db)
@@ -1232,9 +1255,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 	rm := NewMockRepositoryManager(1)
 	rm.client.Repositories = createMockRepoService(controller, repo)
 
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	seedTestUserTable(db)
 
 	coverageService, err := coverage.NewCoverageService(db)
@@ -1355,9 +1376,7 @@ func TestHandleCoveragePreview(t *testing.T) {
 	rm := NewMockRepositoryManager(1)
 	rm.client.Repositories = createMockRepoService(controller, repo)
 
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	seedTestUserTable(db)
 
 	coverageService, err := coverage.NewCoverageService(db)

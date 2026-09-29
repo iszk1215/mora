@@ -3,17 +3,13 @@ package server
 import (
 	"testing"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
 
 func setupScmStore(t *testing.T) RepositoryManagerStore {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
-
+	db := openTestDB(t)
 	s := NewRepositoryManagerStore(db)
-	err = s.Init()
+	err := s.Init()
 	require.NoError(t, err)
 
 	return s
@@ -63,13 +59,11 @@ func TestScmStore_FindURL_AfterInsert(t *testing.T) {
 }
 
 func TestScmStore_Init_DBError(t *testing.T) {
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db := openTestDB(t)
 	require.NoError(t, db.Close())
 
 	s := NewRepositoryManagerStore(db)
-	err = s.Init()
+	err := s.Init()
 	require.Error(t, err)
 }
 

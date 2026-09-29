@@ -16,10 +16,7 @@ import (
 
 func setupTrackersListServer(t *testing.T) (*MoraServer, http.Handler, *sqlx.DB) {
 	t.Helper()
-	db, err := sqlx.Connect("libsql", ":memory:")
-	require.NoError(t, err)
-	db.MustExec("PRAGMA foreign_keys = OFF")
-
+	db := openTestDB(t)
 	userStore := NewUserStore(db)
 	require.NoError(t, userStore.Init())
 
