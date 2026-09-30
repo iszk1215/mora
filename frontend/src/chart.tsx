@@ -112,6 +112,12 @@ export function formatDateTimeTick(value: number): string {
   return `${base} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+// The canvas follows the container width so the plot keeps a readable aspect
+// ratio: a fixed 300px renders almost square on a phone (273x230 of plot) while
+// staying tall enough on desktop. The minimum keeps the plot usable when the
+// legend, toolbox and slider margins are stacked.
+const CHART_FRAME_CLASS = 'w-full aspect-[2/1] min-h-[240px] max-h-[300px]'
+
 const DEFAULT_Y_AXIS: YAxisConfig = { id: 0, position: 'left' }
 
 function buildYAxes(yAxes?: YAxisConfig[]): YAxisConfig[] {
@@ -272,13 +278,15 @@ export const TrackerChart = (params: TrackerChartProps): React.JSX.Element => {
   }, [datasets, cc, params.min, params.max, params.animation, colors, narrow])
 
   return (
-    <ReactECharts
-      option={option}
-      notMerge
-      style={{ width: '100%', height: 300 }}
-      onEvents={params.onChartClick ? { click: params.onChartClick } : undefined}
-      opts={{ renderer: 'svg' }}
-      theme={CHART_THEME_NAME}
-    />
+    <div className={CHART_FRAME_CLASS}>
+      <ReactECharts
+        option={option}
+        notMerge
+        style={{ width: '100%', height: '100%' }}
+        onEvents={params.onChartClick ? { click: params.onChartClick } : undefined}
+        opts={{ renderer: 'svg' }}
+        theme={CHART_THEME_NAME}
+      />
+    </div>
   )
 }
