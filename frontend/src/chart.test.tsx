@@ -5,11 +5,13 @@ import { formatValue, formatDateTick, formatDateTimeTick, TrackerChart, CHART_FO
 import { normalizeChartConfig } from './core'
 
 vi.mock('echarts-for-react/esm/core', () => ({
-  default: ({ option, onEvents, theme }: any) => (
+  default: ({ option, onEvents, theme, style, className }: any) => (
     <div
       data-testid="echart"
       data-option={JSON.stringify(option)}
       data-theme={theme}
+      data-style={JSON.stringify(style ?? null)}
+      data-class={className ?? ''}
       onClick={() => onEvents?.click?.({ seriesName: 'go', data: { value: ['2024-01-15', 90], index: 1 } })}
     />
   ),
@@ -600,6 +602,22 @@ describe('TrackerChart', () => {
     const el = screen.getByTestId('echart')
     const option = JSON.parse(el.getAttribute('data-option')!)
     expect(option.grid.top).toBe(40)
+  })
+
+  it('clamps the canvas height to the container aspect ratio', () => {
+    render(<TrackerChart data={{ datasets }} />)
+    const frame = screen.getByTestId('echart').parentElement
+    expect(frame).not.toBeNull()
+    expect(frame!.className).toContain('aspect-[2/1]')
+    expect(frame!.className).toContain('min-h-[240px]')
+    expect(frame!.className).toContain('max-h-[300px]')
+  })
+
+  it('lets the echart fill the height computed by the frame', () => {
+    render(<TrackerChart data={{ datasets }} />)
+    const style = JSON.parse(screen.getByTestId('echart').getAttribute('data-style')!)
+    expect(style.width).toBe('100%')
+    expect(style.height).toBe('100%')
   })
 })
 
