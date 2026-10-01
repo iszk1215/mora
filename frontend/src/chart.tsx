@@ -114,9 +114,9 @@ export function formatDateTimeTick(value: number): string {
 
 // The canvas follows the container width so the plot keeps a readable aspect
 // ratio: a fixed 300px renders almost square on a phone (273x230 of plot) while
-// staying tall enough on desktop. The minimum keeps the plot usable when the
-// legend, toolbox and slider margins are stacked.
-const CHART_FRAME_CLASS = 'w-full aspect-[2/1] min-h-[240px] max-h-[300px]'
+// staying tall enough on desktop. The floor only guards the pathological case
+// where the legend, toolbox and slider margins stack up on a narrow screen.
+const CHART_FRAME_CLASS = 'w-full aspect-[2/1] min-h-[200px] max-h-[300px]'
 
 const DEFAULT_Y_AXIS: YAxisConfig = { id: 0, position: 'left' }
 
