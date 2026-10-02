@@ -609,7 +609,7 @@ describe('TrackerChart', () => {
     const frame = screen.getByTestId('echart').parentElement
     expect(frame).not.toBeNull()
     expect(frame!.className).toContain('aspect-[2/1]')
-    expect(frame!.className).toContain('min-h-[240px]')
+    expect(frame!.className).toContain('min-h-[200px]')
     expect(frame!.className).toContain('max-h-[300px]')
   })
 
