@@ -20,11 +20,12 @@ async function ownedTrackerId(page: any): Promise<number> {
 async function valueRowBoxes(page: any) {
   const row = page.getByRole('group', { name: 'Add value' })
   await row.waitFor({ timeout: 15_000 })
+  const rowBox = await row.boundingBox()
   const date = await row.getByLabel('Value date').boundingBox()
   const series = await row.getByRole('button', { name: 'Series' }).boundingBox()
   const value = await row.getByRole('spinbutton', { name: 'Value', exact: true }).boundingBox()
   const add = await row.getByRole('button', { name: 'Add' }).boundingBox()
-  return { date: date!, series: series!, value: value!, add: add! }
+  return { row: rowBox!, date: date!, series: series!, value: value!, add: add! }
 }
 
 test.describe('Quick value input layout', () => {
@@ -44,7 +45,7 @@ test.describe('Quick value input layout', () => {
     expect(value.x).toBeGreaterThan(series.x + series.width - 1)
   })
 
-  test('stacks the date, series and value controls on mobile', async ({ page }) => {
+  test('stacks the date control and the series/value controls on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 })
     await signIn(page)
 
@@ -52,13 +53,14 @@ test.describe('Quick value input layout', () => {
     expect(trackerId).toBeGreaterThan(0)
 
     await page.goto(`/trackers/${trackerId}`)
-    const { date, series, value, add } = await valueRowBoxes(page)
+    const { row, date, series, value, add } = await valueRowBoxes(page)
 
+    // Row 1: the date control. Row 2: series, value and Add.
     expect(series.y).toBeGreaterThan(date.y + date.height - 1)
-    expect(value.y).toBeGreaterThan(series.y + series.height - 1)
-    // The value box and the Add button share the third row.
-    expect(Math.abs(add.y - value.y)).toBeLessThan(4)
-    // Each row spans the full width on mobile.
-    expect(Math.abs(value.width + add.width - series.width)).toBeLessThan(12)
+    expect(Math.abs(value.y - series.y)).toBeLessThan(4)
+    expect(Math.abs(add.y - series.y)).toBeLessThan(4)
+    // The series dropdown keeps more than half of the second row.
+    expect(series.width).toBeGreaterThan(row.width / 2)
+    expect(value.x).toBeGreaterThan(series.x + series.width - 1)
   })
 })
