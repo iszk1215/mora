@@ -1262,6 +1262,19 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: 's1' }))
   }
 
+  it('shrinks the tracker title and its rename input on mobile only', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    expect(screen.getByRole('heading', { level: 1, name: 'test' })).toHaveClass('text-2xl', 'sm:text-3xl')
+
+    fireEvent.click(screen.getByRole('button', { name: /edit title/i }))
+    expect(screen.getByRole('textbox')).toHaveClass('text-2xl', 'sm:text-3xl')
+  })
+
   it('opens the data point edit card and lists values newest-first', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({

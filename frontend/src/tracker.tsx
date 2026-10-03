@@ -526,7 +526,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 maxLength={200}
-                className="text-3xl border rounded px-2 py-1 flex-1"
+                className="text-2xl sm:text-3xl border rounded px-2 py-1 flex-1"
                 autoFocus
               />
               <Button size="sm" onClick={handleSaveTitle} disabled={savingTitle || !draftName.trim()}>
@@ -538,7 +538,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
             </div>
           ) : (
             <>
-              <h1 className="text-3xl">{trackerName}</h1>
+              <h1 className="text-2xl sm:text-3xl">{trackerName}</h1>
               {isOwner && (
                 <button
                   type="button"

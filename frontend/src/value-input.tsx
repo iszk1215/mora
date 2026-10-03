@@ -88,55 +88,57 @@ export const ValueInput = ({ seriesList, isDate, defaultDate, onAdd }: ValueInpu
         </Button>
       </div>
 
-      <div className="w-full sm:w-44">
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger asChild>
-            <button
-              type="button"
-              aria-label="Series"
-              className="flex w-full items-center justify-between gap-1 border rounded px-2 py-1 text-sm"
-            >
-              <span className="truncate">{selected?.name ?? ''}</span>
-              <ChevronDown className="w-4 h-4 shrink-0" />
-            </button>
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content align="start" className="bg-popover text-popover-foreground rounded-md border shadow-md p-1 min-w-[12rem] z-50">
-              <DropdownMenu.RadioGroup
-                value={seriesId != null ? String(seriesId) : ''}
-                onValueChange={(v) => setSelectedId(parseInt(v))}
+      <div className="flex w-full items-center gap-2 sm:flex-1">
+        <div className="w-[55%] sm:w-44">
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                type="button"
+                aria-label="Series"
+                className="flex w-full items-center justify-between gap-1 border rounded px-2 py-1 text-sm"
               >
-                {seriesList.map((s) => (
-                  <DropdownMenu.RadioItem
-                    key={s.id}
-                    value={String(s.id)}
-                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
-                  >
-                    <DropdownMenu.ItemIndicator>
-                      <Check className="w-4 h-4" />
-                    </DropdownMenu.ItemIndicator>
-                    <span className="truncate">{s.name}</span>
-                  </DropdownMenu.RadioItem>
-                ))}
-              </DropdownMenu.RadioGroup>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
-      </div>
+                <span className="truncate">{selected?.name ?? ''}</span>
+                <ChevronDown className="w-4 h-4 shrink-0" />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="start" className="bg-popover text-popover-foreground rounded-md border shadow-md p-1 min-w-[12rem] z-50">
+                <DropdownMenu.RadioGroup
+                  value={seriesId != null ? String(seriesId) : ''}
+                  onValueChange={(v) => setSelectedId(parseInt(v))}
+                >
+                  {seriesList.map((s) => (
+                    <DropdownMenu.RadioItem
+                      key={s.id}
+                      value={String(s.id)}
+                      className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
+                    >
+                      <DropdownMenu.ItemIndicator>
+                        <Check className="w-4 h-4" />
+                      </DropdownMenu.ItemIndicator>
+                      <span className="truncate">{s.name}</span>
+                    </DropdownMenu.RadioItem>
+                  ))}
+                </DropdownMenu.RadioGroup>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+        </div>
 
-      <div className="flex items-center gap-2 sm:flex-1">
-        <input
-          ref={valueRef}
-          type="number"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Value"
-          aria-label="Value"
-          className="border rounded px-2 py-1 flex-1 min-w-0 sm:flex-none sm:w-32"
-        />
-        <Button size="sm" onClick={submit} disabled={adding || seriesId == null || !date || !value.trim()}>
-          {adding ? 'Adding...' : 'Add'}
-        </Button>
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+          <input
+            ref={valueRef}
+            type="number"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Value"
+            aria-label="Value"
+            className="border rounded px-2 py-1 flex-1 min-w-0 sm:flex-none sm:w-32"
+          />
+          <Button size="sm" onClick={submit} disabled={adding || seriesId == null || !date || !value.trim()}>
+            {adding ? 'Adding...' : 'Add'}
+          </Button>
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
