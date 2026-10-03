@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { useLoaderData } from 'react-router'
@@ -376,8 +376,9 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
 
-    expect(screen.getByText('series-a')).toBeInTheDocument()
-    expect(screen.getByText('series-b')).toBeInTheDocument()
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('series-a')).toBeInTheDocument()
+    expect(table.getByText('series-b')).toBeInTheDocument()
     expect(screen.getAllByText('Delete')).toHaveLength(2)
   })
 
@@ -418,7 +419,7 @@ describe('TrackerDetailView', () => {
     })
 
     await vi.waitFor(() => {
-      expect(screen.getByText('series-a-renamed')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('series-a-renamed')).toBeInTheDocument()
     })
   })
 
@@ -446,7 +447,7 @@ describe('TrackerDetailView', () => {
     await vi.waitFor(() => {
       expect(screen.queryByRole('textbox', { name: /rename series series-a/i })).not.toBeInTheDocument()
     })
-    expect(screen.getByText('series-a')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getByText('series-a')).toBeInTheDocument()
     expect(screen.queryByText('never-renamed')).not.toBeInTheDocument()
     const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
       ([url, init]) => url === '/api/trackers/1/series/1' && (init as RequestInit)?.method === 'PATCH'
@@ -498,7 +499,7 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
     await vi.waitFor(() => {
-      expect(screen.getByText('added-from-panel')).toBeInTheDocument()
+      expect(within(screen.getByRole('table')).getByText('added-from-panel')).toBeInTheDocument()
     })
   })
 
@@ -1064,12 +1065,13 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Data Points' }))
 
-    expect(screen.getByText('s1')).toBeInTheDocument()
-    expect(screen.getByText('s2')).toBeInTheDocument()
-    const dateInput = screen.getByLabelText(/data point date/i)
+    const card = within(screen.getByTestId('data-points-card'))
+    expect(card.getByText('s1')).toBeInTheDocument()
+    expect(card.getByText('s2')).toBeInTheDocument()
+    const dateInput = card.getByLabelText(/data point date/i)
     expect(dateInput).toHaveValue(new Date().toISOString().slice(0, 10))
-    expect(screen.getAllByLabelText(/value for/i)).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: /^add$/i })).toHaveLength(2)
+    expect(card.getAllByLabelText(/value for/i)).toHaveLength(2)
+    expect(card.getAllByRole('button', { name: /^add$/i })).toHaveLength(2)
   })
 
   it('shifts the shared date by one day with previous/next day buttons', async () => {
@@ -1083,17 +1085,18 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Data Points' }))
 
-    const dateInput = screen.getByLabelText(/data point date/i) as HTMLInputElement
+    const card = within(screen.getByTestId('data-points-card'))
+    const dateInput = card.getByLabelText(/data point date/i) as HTMLInputElement
     const today = new Date().toISOString().slice(0, 10)
     expect(dateInput.value).toBe(today)
 
-    await user.click(screen.getByRole('button', { name: 'Next day' }))
+    await user.click(card.getByRole('button', { name: 'Next day' }))
     const [y, m, d] = today.split('-').map(Number)
     const next = new Date(y, m - 1, d + 1)
     const expectedNext = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
     expect(dateInput.value).toBe(expectedNext)
 
-    await user.click(screen.getByRole('button', { name: 'Previous day' }))
+    await user.click(card.getByRole('button', { name: 'Previous day' }))
     expect(dateInput.value).toBe(today)
   })
 
@@ -1117,13 +1120,14 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Data Points' }))
 
-    const dateInput = screen.getByLabelText(/data point date/i)
+    const card = within(screen.getByTestId('data-points-card'))
+    const dateInput = card.getByLabelText(/data point date/i)
     await user.clear(dateInput)
     await user.type(dateInput, '2024-02-15')
 
-    const valueInput = screen.getByRole('spinbutton', { name: /value for/i })
+    const valueInput = card.getByRole('spinbutton', { name: /value for/i })
     await user.type(valueInput, '42')
-    await user.click(screen.getAllByRole('button', { name: /^add$/i })[0])
+    await user.click(card.getAllByRole('button', { name: /^add$/i })[0])
 
     await waitFor(() => {
       expect(postBody).toHaveBeenCalled()
@@ -1154,15 +1158,95 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Data Points' }))
 
-    const valueInputs = screen.getAllByRole('spinbutton', { name: /value for/i })
+    const card = within(screen.getByTestId('data-points-card'))
+    const valueInputs = card.getAllByRole('spinbutton', { name: /value for/i })
     await user.type(valueInputs[1], '7')
-    await user.click(screen.getAllByRole('button', { name: /^add$/i })[1])
+    await user.click(card.getAllByRole('button', { name: /^add$/i })[1])
 
     await waitFor(() => {
       expect(postBodies).toHaveLength(1)
     })
     expect(postBodies[0]).toMatchObject({ body: { value: 7 } })
     expect(String((postBodies[0] as { url: string }).url)).toMatch(/\/api\/trackers\/1\/series\/2\/values/)
+  })
+
+  const quickRow = () => screen.getByRole('group', { name: 'Add value' })
+
+  it('shows the quick value row below the chart for the role owner', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    const row = quickRow()
+    expect(row).toBeInTheDocument()
+    expect(within(row).getByLabelText('Value date')).toHaveValue(new Date().toISOString().slice(0, 10))
+    expect(within(row).getByRole('button', { name: 'Series' })).toHaveTextContent('s1')
+  })
+
+  it('hides the quick value row for editors', () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    expect(screen.queryByRole('group', { name: 'Add value' })).not.toBeInTheDocument()
+  })
+
+  it('hides the quick value row for coverage trackers and trackers without series', () => {
+    const detail = (type: string, series: unknown[]) => {
+      vi.mocked(useLoaderData).mockReturnValue({
+        tracker: { id: 1, name: 'test', visibility: 'private', type, chart_config: '{}', role: 'owner', liked: false },
+        series,
+      } as never)
+      const { unmount } = render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+      return unmount
+    }
+
+    const unmount = detail('coverage', [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }])
+    expect(screen.queryByRole('group', { name: 'Add value' })).not.toBeInTheDocument()
+
+    unmount()
+    detail('tracker', [])
+    expect(screen.queryByRole('group', { name: 'Add value' })).not.toBeInTheDocument()
+  })
+
+  it('adds a value to the series chosen in the dropdown and refreshes the chart', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: 1, tracker_id: 1, name: 's1', data_type: 'float' },
+        { id: 2, tracker_id: 1, name: 's2', data_type: 'float' },
+      ],
+    })
+    const posts: { url: string; body: unknown }[] = []
+    globalThis.fetch = vi.fn((url: RequestInfo | URL, opts?: RequestInit) => {
+      if (opts?.method === 'POST') {
+        posts.push({ url: String(url), body: JSON.parse(opts.body as string) })
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response)
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ values: [{ id: 9, time: '2024-01-01T00:00:00Z', value: 99 }] }) } as Response)
+    })
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    const row = within(quickRow())
+    await user.click(row.getByRole('button', { name: 'Series' }))
+    await user.click((await screen.findAllByRole('menuitemradio'))[1])
+    await user.type(row.getByLabelText('Value'), '99')
+    await user.click(row.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => {
+      expect(posts).toHaveLength(1)
+    })
+    expect(posts[0].url).toMatch(/\/api\/trackers\/1\/series\/2\/values/)
+    expect(posts[0].body).toMatchObject({ value: 99 })
+    await waitFor(() => {
+      expect(screen.getByTestId('echart').getAttribute('data-option')).toContain('99')
+    })
   })
 
   const openEditCard = async (user: ReturnType<typeof userEvent.setup>, values: { id: number; time: string; value: number }[]) => {

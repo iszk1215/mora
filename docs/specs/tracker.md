@@ -282,7 +282,7 @@ Coverage-type trackers (`type="coverage"`) are created exclusively through the c
 |------|-----------|-------------|
 | `/trackers` | TrackerView | Card grid with preview charts |
 | `/trackers/new` | TrackerCreate | Create form |
-| `/trackers/:trackerId` | TrackerDetailView | Detail (tracker type). Owner menu offers a "Data Points" card (Add Data Points) with a date picker (defaults to today), a value input, and an Add button per series; values are added live to the chart without a page reload. Clicking a series name in that card opens an inline data-point edit card (owner only): it lists that series' values newest-first (paginable, 10/20/50/100 per page, default 20) with editable date/time and value inputs and a delete button per row; edits and deletes reflect instantly in the chart. "Save" commits all pending edits/deletes to the backend in a single `PATCH values` batch. Owner menu also opens a "Settings" card with chart options and visibility |
+| `/trackers/:trackerId` | TrackerDetailView | Detail (tracker type). Directly below the chart card sits a quick value row (owner only, non-`tracker` types excluded, hidden while the tracker has no series): a date control (native date/datetime-local input, defaulting to today, with buttons that shift it by one day), a series dropdown, a value input and an `Add` button. It is a single row from the `sm` breakpoint (640px) up and stacks into three rows (date / series / value+Add) on narrow screens. Adding a value `POST`s it and refreshes that series' values so the chart updates without a reload; on success the value input is cleared and refocused while the date and series are kept, and a failure shows an inline error. Owner menu offers a "Data Points" card (Add Data Points) with a date picker (defaults to today), a value input, and an Add button per series; values are added live to the chart without a page reload. Clicking a series name in that card opens an inline data-point edit card (owner only): it lists that series' values newest-first (paginable, 10/20/50/100 per page, default 20) with editable date/time and value inputs and a delete button per row; edits and deletes reflect instantly in the chart. "Save" commits all pending edits/deletes to the backend in a single `PATCH values` batch. Owner menu also opens a "Settings" card with chart options and visibility |
 
 ## Key Files
 
@@ -295,6 +295,9 @@ Coverage-type trackers (`type="coverage"`) are created exclusively through the c
 | `tracker/handler_test.go` | Handler unit tests |
 | `tracker/service_test.go` | Service unit tests |
 | `frontend/src/tracker.tsx` | Frontend components |
+| `frontend/src/value-input.tsx` | Quick value row below the chart (ValueInput, shiftDate) |
 | `frontend/src/chart.tsx` | Chart rendering (TrackerChart, ECharts) |
 | `frontend/src/tracker.test.tsx` | Frontend tests |
+| `frontend/src/value-input.test.tsx` | Quick value row tests |
+| `frontend/e2e/value-input.spec.ts` | Responsive layout of the quick value row (Playwright) |
 | `frontend/src/chart.test.tsx` | Chart tests |

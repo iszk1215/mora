@@ -33,6 +33,7 @@ import {
 import { SettingsForm } from './settings-form'
 import { SeriesTable } from './series-form'
 import { DataPointEditCard, isoToInputValue } from './data-points-form'
+import { QuickAddValue, ValueInput, shiftDate } from './value-input'
 import { Dataset, TrackerChart } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
@@ -314,18 +315,6 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const editDirty = Object.keys(pendingEdits).length > 0 || pendingDeletes.size > 0
   const editSeries = editSeriesId != null ? seriesList.find((s) => s.id === editSeriesId) : undefined
 
-  const shiftDate = (base: string, deltaDays: number, isDate: boolean): string => {
-    const pad = (n: number) => String(n).padStart(2, '0')
-    if (isDate) {
-      const [y, m, d] = base.split('-').map(Number)
-      const dt = new Date(y, m - 1, d + deltaDays)
-      return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
-    }
-    const dt = new Date(base)
-    dt.setDate(dt.getDate() + deltaDays)
-    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
-  }
-
   const openAddValue = () => {
     setSelectedDate(todayValue)
     setAddValues(Object.fromEntries(seriesList.map((s) => [s.id, ''])))
@@ -364,6 +353,11 @@ export const TrackerDetailView = (): React.JSX.Element => {
     } finally {
       setAddingValues((prev) => ({ ...prev, [seriesId]: false }))
     }
+  }
+
+  const handleQuickAddValue = async ({ seriesId, time, value }: QuickAddValue) => {
+    await createValue(tracker.id, seriesId, time, value)
+    await refetchSeriesValues(seriesId)
   }
 
   const openEditSeries = (seriesId: number) => {
@@ -689,6 +683,15 @@ export const TrackerDetailView = (): React.JSX.Element => {
         )}
       </div>
 
+      {isRoleOwner && tracker.type !== 'coverage' && seriesList.length > 0 && (
+        <ValueInput
+          seriesList={seriesList}
+          isDate={xAxisType === 'date'}
+          defaultDate={todayValue}
+          onAdd={handleQuickAddValue}
+        />
+      )}
+
       {isRoleOwner && showSeriesSettings && (
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
           <div className="flex items-center justify-between mb-4">
@@ -714,7 +717,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
       )}
 
       {isOwner && tracker.type !== 'coverage' && showAddValue && (
-        <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
+        <div data-testid="data-points-card" className="mt-6 bg-card border rounded-lg p-4 shadow-md">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl">Data Points</h2>
             <Button variant="outline" size="sm" onClick={closeAddValue}>
