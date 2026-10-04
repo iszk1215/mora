@@ -518,15 +518,15 @@ export const TrackerDetailView = (): React.JSX.Element => {
   return (
     <div>
       <div className="my-4">
-        <div className="flex items-center gap-3 pr-3 sm:pr-4">
+        <div className="flex items-center gap-2 pr-2 sm:gap-3 sm:pr-4">
           {editingTitle ? (
-            <div className="flex items-center gap-2 flex-1">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <input
                 type="text"
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 maxLength={200}
-                className="text-2xl sm:text-3xl border rounded px-2 py-1 flex-1"
+                className="text-2xl sm:text-3xl border rounded px-2 py-1 flex-1 min-w-0"
                 autoFocus
               />
               <Button size="sm" onClick={handleSaveTitle} disabled={savingTitle || !draftName.trim()}>
@@ -538,13 +538,13 @@ export const TrackerDetailView = (): React.JSX.Element => {
             </div>
           ) : (
             <>
-              <h1 className="text-2xl sm:text-3xl">{trackerName}</h1>
+              <h1 className="text-2xl sm:text-3xl min-w-0 flex-1 truncate" title={trackerName}>{trackerName}</h1>
               {isOwner && (
                 <button
                   type="button"
                   aria-label="Edit title"
                   onClick={() => { setDraftName(trackerName); setEditingTitle(true) }}
-                  className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Pencil className="w-4 h-4" />
                 </button>
@@ -556,7 +556,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
             aria-label={liked ? 'Unlike' : 'Like'}
             onClick={handleLikeToggle}
             disabled={likeLoading || !user}
-            className="flex items-center gap-1 p-1.5 rounded hover:bg-accent hover:-translate-y-0.5 hover:shadow-sm transition-all disabled:opacity-50"
+            className="flex items-center gap-1 p-1 sm:p-1.5 rounded hover:bg-accent hover:-translate-y-0.5 hover:shadow-sm transition-all disabled:opacity-50"
           >
             <Star
               className={`w-5 h-5 transition-colors ${liked ? 'text-yellow-500 fill-yellow-500' : 'text-gray-400 fill-gray-200'}`}
@@ -573,7 +573,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                 <button
                   type="button"
                   aria-label="Tracker menu"
-                  className="ml-auto p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                  className="ml-auto p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <MoreVertical className="w-5 h-5" />
                 </button>
