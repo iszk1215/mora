@@ -2,12 +2,13 @@ import React, { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { ChartConfig, YAxisConfig } from './core'
-import { PALETTE_NAMES } from './chart'
+import { DEFAULT_GRID_LEVELS, MAX_GRID_LEVELS, MIN_GRID_LEVELS, PALETTE_NAMES, resolveGridColors } from './chart'
 
 export interface SettingsFormProps {
   initialConfig: ChartConfig
   baselineConfig?: ChartConfig
   initialVisibility?: string
+  trackerType?: string
   onChange?: (config: ChartConfig) => void
   onSave?: (config: ChartConfig, visibility?: string) => Promise<void> | void
   onCancel?: (config: ChartConfig) => void
@@ -15,7 +16,8 @@ export interface SettingsFormProps {
   onRemoveYAxis?: (removed: YAxisConfig) => void
 }
 
-export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility, onChange, onSave, onCancel, onYAxesChange, onRemoveYAxis }: SettingsFormProps): React.JSX.Element => {
+export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility, trackerType, onChange, onSave, onCancel, onYAxesChange, onRemoveYAxis }: SettingsFormProps): React.JSX.Element => {
+  const isGrid = trackerType === 'activity_grid'
   const [xLabel, setXLabel] = useState(initialConfig.x_axis_label ?? '')
   const [xAxisType, setXAxisType] = useState<'date' | 'datetime'>(initialConfig.x_axis_type ?? 'date')
   const [area, setArea] = useState(initialConfig.area ?? true)
@@ -24,6 +26,7 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
   const [showSlider, setShowSlider] = useState(initialConfig.show_slider ?? false)
   const [showToolbox, setShowToolbox] = useState(initialConfig.show_toolbox ?? true)
   const [palette, setPalette] = useState(initialConfig.palette ?? 'default')
+  const [gridLevels, setGridLevels] = useState<number>(initialConfig.grid_levels ?? DEFAULT_GRID_LEVELS)
   const [yAxes, setYAxes] = useState<YAxisConfig[]>(() => initialConfig.y_axes?.length ? initialConfig.y_axes : [{ id: 0, position: 'left' }])
   const [visibility, setVisibility] = useState(initialVisibility ?? 'private')
 
@@ -41,12 +44,19 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
     setShowSlider(cc.show_slider ?? false)
     setShowToolbox(cc.show_toolbox ?? true)
     setPalette(cc.palette ?? 'default')
+    setGridLevels(cc.grid_levels ?? DEFAULT_GRID_LEVELS)
     setYAxes(cc.y_axes?.length ? cc.y_axes : [{ id: 0, position: 'left' }])
     setVisibility(baselineVisibilityRef.current)
     setSaved(false)
   }
 
   const buildConfig = (yAxesOverride?: YAxisConfig[]): ChartConfig => {
+    if (isGrid) {
+      const cc: ChartConfig = {}
+      cc.palette = palette
+      if (gridLevels !== DEFAULT_GRID_LEVELS) cc.grid_levels = gridLevels
+      return cc
+    }
     const cc: ChartConfig = {}
     if (xLabel.trim()) cc.x_axis_label = xLabel.trim()
     cc.x_axis_type = xAxisType
@@ -72,7 +82,7 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
   useEffect(() => {
     onChange?.(buildConfig())
     setSaved(false)
-  }, [xLabel, xAxisType, area, showLegend, showSymbols, showSlider, showToolbox, palette, yAxes])
+  }, [xLabel, xAxisType, area, showLegend, showSymbols, showSlider, showToolbox, palette, gridLevels, yAxes, isGrid])
 
   const handleSave = async () => {
     setSaving(true)
@@ -96,29 +106,31 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <span className="text-lg">Chart Options</span>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={area} onChange={(e) => setArea(e.target.checked)} />
-          Area
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
-          Legend
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showSymbols} onChange={(e) => setShowSymbols(e.target.checked)} />
-          Symbols
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showSlider} onChange={(e) => setShowSlider(e.target.checked)} />
-          Slider
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input type="checkbox" checked={showToolbox} onChange={(e) => setShowToolbox(e.target.checked)} />
-          Toolbox
-        </label>
-      </div>
+      {!isGrid && (
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <span className="text-lg">Chart Options</span>
+          <label className="flex items-center gap-1 text-sm">
+            <input type="checkbox" checked={area} onChange={(e) => setArea(e.target.checked)} />
+            Area
+          </label>
+          <label className="flex items-center gap-1 text-sm">
+            <input type="checkbox" checked={showLegend} onChange={(e) => setShowLegend(e.target.checked)} />
+            Legend
+          </label>
+          <label className="flex items-center gap-1 text-sm">
+            <input type="checkbox" checked={showSymbols} onChange={(e) => setShowSymbols(e.target.checked)} />
+            Symbols
+          </label>
+          <label className="flex items-center gap-1 text-sm">
+            <input type="checkbox" checked={showSlider} onChange={(e) => setShowSlider(e.target.checked)} />
+            Slider
+          </label>
+          <label className="flex items-center gap-1 text-sm">
+            <input type="checkbox" checked={showToolbox} onChange={(e) => setShowToolbox(e.target.checked)} />
+            Toolbox
+          </label>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <span className="text-lg">Color</span>
@@ -131,100 +143,125 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
             <option key={name} value={name}>{name}</option>
           ))}
         </select>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <span className="text-lg">X-Axis</span>
-        <select
-          value={xAxisType}
-          onChange={(e) => setXAxisType(e.target.value as 'date' | 'datetime')}
-          className="border rounded px-2 py-1"
-        >
-          <option value="date">Date</option>
-          <option value="datetime">Datetime</option>
-        </select>
-        <input
-          type="text"
-          value={xLabel}
-          onChange={(e) => setXLabel(e.target.value)}
-          placeholder="X-axis label"
-          className="border rounded px-2 py-1 w-40"
-        />
-      </div>
-
-      <h3 className="text-lg my-2">Y-Axes</h3>
-      <div className="flex flex-col gap-2 mb-4">
-        {(['left', 'right'] as const).map((pos) => {
-          const axis = yAxes.find((a) => a.position === pos)
-          const active = !!axis
-          const canRemove = yAxes.length > 1
-
-          const updateAxis = (patch: Partial<YAxisConfig>) => {
-            setYAxes((prev) => prev.map((a) => a.position === pos ? { ...a, ...patch } : a))
-          }
-
-          const commitYAxes = (next: YAxisConfig[]) => {
-            const config = buildConfig(next)
-            setYAxes(next)
-            setSaved(false)
-            onYAxesChange?.(config)
-          }
-
-          return (
-            <div key={pos} className="flex items-center gap-2">
-              <span className="text-sm font-medium w-12">{pos === 'left' ? 'Left' : 'Right'}</span>
-              {active ? (
-                <>
-                  <input
-                    type="text"
-                    value={axis.label ?? ''}
-                    onChange={(e) => updateAxis({ label: e.target.value || undefined })}
-                    placeholder="Label"
-                    className="border rounded px-2 py-1 w-32 text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={axis.min ?? ''}
-                    onChange={(e) => updateAxis({ min: e.target.value ? parseFloat(e.target.value) : undefined })}
-                    placeholder="Min"
-                    className="border rounded px-2 py-1 w-20 text-sm"
-                  />
-                  <input
-                    type="number"
-                    value={axis.max ?? ''}
-                    onChange={(e) => updateAxis({ max: e.target.value ? parseFloat(e.target.value) : undefined })}
-                    placeholder="Max"
-                    className="border rounded px-2 py-1 w-20 text-sm"
-                  />
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={!canRemove}
-                    onClick={() => {
-                      const next = yAxes.filter((a) => a.position !== pos)
-                      commitYAxes(next.length ? next : [{ id: 0, position: 'left' }])
-                      onRemoveYAxis?.(axis)
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const id = yAxes.length > 0 ? Math.max(...yAxes.map((a) => a.id)) + 1 : 0
-                    commitYAxes([...yAxes, { id, position: pos }])
-                  }}
-                >
-                  Add
-                </Button>
-              )}
+        {isGrid && (
+          <>
+            <label className="flex items-center gap-1 text-sm">
+              Levels
+              <select
+                value={gridLevels}
+                onChange={(e) => setGridLevels(parseInt(e.target.value))}
+                className="border rounded px-2 py-1"
+              >
+                {Array.from({ length: MAX_GRID_LEVELS - MIN_GRID_LEVELS + 1 }, (_, i) => MIN_GRID_LEVELS + i).map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-center gap-1" aria-label="Color preview">
+              {resolveGridColors({ palette, grid_levels: gridLevels }).map((c, i) => (
+                <span key={i} className="inline-block w-4 h-4 rounded-sm border border-black/10" style={{ backgroundColor: c }} />
+              ))}
             </div>
-          )
-        })}
+          </>
+        )}
       </div>
+
+      {!isGrid && (
+        <>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <span className="text-lg">X-Axis</span>
+            <select
+              value={xAxisType}
+              onChange={(e) => setXAxisType(e.target.value as 'date' | 'datetime')}
+              className="border rounded px-2 py-1"
+            >
+              <option value="date">Date</option>
+              <option value="datetime">Datetime</option>
+            </select>
+            <input
+              type="text"
+              value={xLabel}
+              onChange={(e) => setXLabel(e.target.value)}
+              placeholder="X-axis label"
+              className="border rounded px-2 py-1 w-40"
+            />
+          </div>
+
+          <h3 className="text-lg my-2">Y-Axes</h3>
+          <div className="flex flex-col gap-2 mb-4">
+            {(['left', 'right'] as const).map((pos) => {
+              const axis = yAxes.find((a) => a.position === pos)
+              const active = !!axis
+              const canRemove = yAxes.length > 1
+
+              const updateAxis = (patch: Partial<YAxisConfig>) => {
+                setYAxes((prev) => prev.map((a) => a.position === pos ? { ...a, ...patch } : a))
+              }
+
+              const commitYAxes = (next: YAxisConfig[]) => {
+                const config = buildConfig(next)
+                setYAxes(next)
+                setSaved(false)
+                onYAxesChange?.(config)
+              }
+
+              return (
+                <div key={pos} className="flex items-center gap-2">
+                  <span className="text-sm font-medium w-12">{pos === 'left' ? 'Left' : 'Right'}</span>
+                  {active ? (
+                    <>
+                      <input
+                        type="text"
+                        value={axis.label ?? ''}
+                        onChange={(e) => updateAxis({ label: e.target.value || undefined })}
+                        placeholder="Label"
+                        className="border rounded px-2 py-1 w-32 text-sm"
+                      />
+                      <input
+                        type="number"
+                        value={axis.min ?? ''}
+                        onChange={(e) => updateAxis({ min: e.target.value ? parseFloat(e.target.value) : undefined })}
+                        placeholder="Min"
+                        className="border rounded px-2 py-1 w-20 text-sm"
+                      />
+                      <input
+                        type="number"
+                        value={axis.max ?? ''}
+                        onChange={(e) => updateAxis({ max: e.target.value ? parseFloat(e.target.value) : undefined })}
+                        placeholder="Max"
+                        className="border rounded px-2 py-1 w-20 text-sm"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={!canRemove}
+                        onClick={() => {
+                          const next = yAxes.filter((a) => a.position !== pos)
+                          commitYAxes(next.length ? next : [{ id: 0, position: 'left' }])
+                          onRemoveYAxis?.(axis)
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const id = yAxes.length > 0 ? Math.max(...yAxes.map((a) => a.id)) + 1 : 0
+                        commitYAxes([...yAxes, { id, position: pos }])
+                      }}
+                    >
+                      Add
+                    </Button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <span className="text-lg">Visibility</span>

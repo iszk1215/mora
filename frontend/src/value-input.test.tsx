@@ -133,3 +133,43 @@ describe('ValueInput', () => {
     expect(screen.getByLabelText('Value')).toHaveValue(3)
   })
 })
+
+describe('ValueInput with levels', () => {
+  const colors = ['#111111', '#222222', '#333333']
+
+  it('renders a color swatch per level and hides the numeric input', () => {
+    render(
+      <ValueInput
+        seriesList={series}
+        isDate
+        defaultDate="2024-02-15"
+        onAdd={vi.fn()}
+        levels={colors}
+      />
+    )
+    expect(screen.queryByLabelText('Value')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+    for (let i = 1; i <= 3; i++) {
+      expect(screen.getByRole('button', { name: `Set level ${i}` })).toBeInTheDocument()
+    }
+  })
+
+  it('submits the level index when a swatch is clicked', async () => {
+    const user = userEvent.setup()
+    const onAdd = vi.fn().mockResolvedValue(undefined)
+    render(
+      <ValueInput
+        seriesList={series}
+        isDate
+        defaultDate="2024-02-15"
+        onAdd={onAdd}
+        levels={colors}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Set level 3' }))
+    await waitFor(() => {
+      expect(onAdd).toHaveBeenCalledWith({ seriesId: 1, time: '2024-02-15T00:00:00.000Z', value: 2 })
+    })
+  })
+})

@@ -231,4 +231,69 @@ describe('SettingsForm', () => {
       )
     })
   })
+
+  describe('activity grid', () => {
+    it('hides the line chart options and x/y axis sections', () => {
+      render(
+        <SettingsForm
+          initialConfig={{}}
+          trackerType="activity_grid"
+        />,
+      )
+      expect(screen.queryByLabelText('Area')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Legend')).not.toBeInTheDocument()
+      expect(screen.queryByText('X-Axis')).not.toBeInTheDocument()
+      expect(screen.queryByText('Y-Axes')).not.toBeInTheDocument()
+      expect(screen.getByText('Levels')).toBeInTheDocument()
+    })
+
+    it('emits only palette and grid_levels by default', () => {
+      const onChange = vi.fn()
+      render(
+        <SettingsForm
+          initialConfig={{}}
+          trackerType="activity_grid"
+          onChange={onChange}
+        />,
+      )
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0]
+      expect(lastCall).toEqual({ palette: 'default' })
+    })
+
+    it('emits grid_levels when the levels select changes', async () => {
+      const onChange = vi.fn()
+      render(
+        <SettingsForm
+          initialConfig={{}}
+          trackerType="activity_grid"
+          onChange={onChange}
+        />,
+      )
+      const select = screen.getByDisplayValue('5')
+      await act(() => {
+        fireEvent.change(select, { target: { value: '7' } })
+      })
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0]
+      expect(lastCall.grid_levels).toBe(7)
+    })
+
+    it('calls onSave with palette and grid_levels', async () => {
+      const onSave = vi.fn()
+      render(
+        <SettingsForm
+          initialConfig={{ grid_levels: 3 }}
+          trackerType="activity_grid"
+          onSave={onSave}
+        />,
+      )
+      const saveButton = screen.getByRole('button', { name: /save/i })
+      await act(() => {
+        fireEvent.click(saveButton)
+      })
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ palette: 'default', grid_levels: 3 }),
+        expect.any(String),
+      )
+    })
+  })
 })

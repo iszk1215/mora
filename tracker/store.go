@@ -40,6 +40,9 @@ const (
 	TypeTracker = "tracker"
 	// TypeCoverage is the coverage-type tracker, managed by the coverage package.
 	TypeCoverage = "coverage"
+	// TypeActivityGrid is the activity grid tracker type (GitHub-style grass
+	// graph): one row per series, day columns, cell color by integer level.
+	TypeActivityGrid = "activity_grid"
 
 	// MaxSeriesPerTracker is the hard limit on the number of series a single
 	// tracker may have, regardless of user type (issue #195).

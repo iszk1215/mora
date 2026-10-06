@@ -1617,3 +1617,154 @@ func TestHandlerDeleteValuesCoverageTracker(t *testing.T) {
 	r = r.WithContext(superuserCtx())
 	getResponse(t, http.StatusBadRequest, h, r)
 }
+
+// ----------------------------------------------------------------------
+// Activity grid type
+
+func TestHandlerCreateTrackerActivityGridType(t *testing.T) {
+	h := newTestHandler(t)
+	r := newRequestWithJSON(t, http.MethodPost, "/", CreateTrackerRequest{
+		Name:       "grid",
+		Visibility: "private",
+		Type:       "activity_grid",
+	})
+	r = r.WithContext(superuserCtx())
+	res := getResponse(t, http.StatusCreated, h, r)
+
+	var got TrackerModel
+	unmarshalResponse(t, res, &got)
+	require.Equal(t, TypeActivityGrid, got.Type)
+}
+
+func TestHandlerSeriesActivityGridTracker(t *testing.T) {
+	store := initTestStore(t)
+	tr := &TrackerModel{Name: "grid", Type: TypeActivityGrid}
+	require.NoError(t, store.addTracker(tr, 1))
+
+	h := newHandler(store)
+	path := fmt.Sprintf("/%d/series", tr.Id)
+	r := newRequestWithJSON(t, http.MethodPost, path, CreateSeriesRequest{Name: "s1", DataType: "int"})
+	r = r.WithContext(superuserCtx())
+	res := getResponse(t, http.StatusCreated, h, r)
+
+	var got SeriesModel
+	unmarshalResponse(t, res, &got)
+	require.Equal(t, "s1", got.Name)
+}
+
+func TestHandlerCreateValueActivityGridTracker(t *testing.T) {
+	newGridTracker := func(t *testing.T) (*trackerStore, int64, int64) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "grid", Type: TypeActivityGrid}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "int"}
+		require.NoError(t, store.addSeries(s))
+		return store, tr.Id, s.Id
+	}
+
+	t.Run("integer accepted", func(t *testing.T) {
+		store, trId, sId := newGridTracker(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		now := time.Now().Round(0)
+		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 2.0})
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusCreated, h, r)
+
+		var got ValueModel
+		unmarshalResponse(t, res, &got)
+		require.Equal(t, 2.0, got.Value)
+	})
+
+	t.Run("float rejected", func(t *testing.T) {
+		store, trId, sId := newGridTracker(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		now := time.Now().Round(0)
+		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 2.5})
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusBadRequest, h, r)
+
+		var got core.ErrorResponse
+		unmarshalResponse(t, res, &got)
+		require.Contains(t, got.Message, "integers")
+	})
+
+	t.Run("negative rejected", func(t *testing.T) {
+		store, trId, sId := newGridTracker(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		now := time.Now().Round(0)
+		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: -1.0})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+}
+
+func TestHandlerPatchValuesActivityGridTracker(t *testing.T) {
+	setup := func(t *testing.T) (*trackerStore, int64, int64, ValueModel) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "grid", Type: TypeActivityGrid}
+		require.NoError(t, store.addTracker(tr, 1))
+		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "int"}
+		require.NoError(t, store.addSeries(s))
+		v := &ValueModel{SeriesId: s.Id, Timestamp: time.Now().Round(0), Value: 1.0}
+		require.NoError(t, store.addValue(v))
+		return store, tr.Id, s.Id, *v
+	}
+
+	t.Run("integer accepted", func(t *testing.T) {
+		store, trId, sId, v := setup(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: v.Id, Time: v.Timestamp, Value: 3.0}}}
+		r := newRequestWithJSON(t, http.MethodPatch, path, req)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListValuesResponse
+		unmarshalResponse(t, res, &got)
+		require.Len(t, got.Values, 1)
+		require.Equal(t, 3.0, got.Values[0].Value)
+	})
+
+	t.Run("float rejected", func(t *testing.T) {
+		store, trId, sId, v := setup(t)
+		h := newHandler(store)
+		path := fmt.Sprintf("/%d/series/%d/values", trId, sId)
+		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: v.Id, Time: v.Timestamp, Value: 2.5}}}
+		r := newRequestWithJSON(t, http.MethodPatch, path, req)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+}
+
+func TestValidateChartConfigActivityGrid(t *testing.T) {
+	t.Run("valid levels", func(t *testing.T) {
+		require.NoError(t, validateChartConfig(TypeActivityGrid, `{"grid_levels": 5, "palette": "default"}`))
+	})
+
+	t.Run("defaults allowed", func(t *testing.T) {
+		require.NoError(t, validateChartConfig(TypeActivityGrid, `{}`))
+	})
+
+	t.Run("levels too small", func(t *testing.T) {
+		require.Error(t, validateChartConfig(TypeActivityGrid, `{"grid_levels": 0}`))
+	})
+
+	t.Run("levels too large", func(t *testing.T) {
+		require.Error(t, validateChartConfig(TypeActivityGrid, `{"grid_levels": 11}`))
+	})
+
+	t.Run("levels not an integer", func(t *testing.T) {
+		require.Error(t, validateChartConfig(TypeActivityGrid, `{"grid_levels": "many"}`))
+	})
+
+	t.Run("palette not a string", func(t *testing.T) {
+		require.Error(t, validateChartConfig(TypeActivityGrid, `{"palette": 3}`))
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		require.Error(t, validateChartConfig(TypeActivityGrid, `{`))
+	})
+}

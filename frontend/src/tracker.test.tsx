@@ -189,9 +189,38 @@ describe('TrackerCreate', () => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'new-tracker', visibility: 'private' }),
+        body: JSON.stringify({ name: 'new-tracker', visibility: 'private', type: 'tracker' }),
       })
       expect(mockNavigate).toHaveBeenCalledWith('/trackers/42')
+    })
+  })
+
+  it('creates activity grid tracker when type selected', async () => {
+    const created = { id: 43, name: 'grid-tracker', visibility: 'private', type: 'activity_grid', chart_config: '{}', role: 'owner', liked: false }
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(created),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerCreate /></UserProvider></MemoryRouter>)
+    const input = screen.getByPlaceholderText('Tracker name')
+    const createBtn = screen.getByText('Create')
+    const typeSelect = screen.getByLabelText('Type')
+
+    fireEvent.change(typeSelect, { target: { value: 'activity_grid' } })
+    input.focus()
+    input.setAttribute('value', 'grid-tracker')
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+
+    createBtn.click()
+
+    await vi.waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'grid-tracker', visibility: 'private', type: 'activity_grid' }),
+      })
+      expect(mockNavigate).toHaveBeenCalledWith('/trackers/43')
     })
   })
 
@@ -641,6 +670,69 @@ describe('TrackerDetailView', () => {
       expect(body.name).toBe('bar-series')
       expect(body.data_type).toBe('int')
       expect(body.config).toBe('{"type":"bar"}')
+    })
+  })
+
+  it('renders an activity grid heatmap and color swatch value entry', async () => {
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'grid', visibility: 'private', type: 'activity_grid', chart_config: '{"grid_levels":3}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'int' }],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ values: [{ id: 1, time: '2024-02-01T00:00:00.000Z', value: 2 }] }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await vi.waitFor(() => {
+      const echart = document.querySelector('[data-testid="echart"]')
+      expect(echart).toBeInTheDocument()
+      const option = JSON.parse(echart!.getAttribute('data-option') ?? '{}')
+      expect(option.series[0].type).toBe('heatmap')
+      expect(option.yAxis.data).toEqual(['s1'])
+    })
+
+    expect(screen.queryByLabelText('Value for s1')).not.toBeInTheDocument()
+    expect(screen.getAllByLabelText('Set level 1')).not.toHaveLength(0)
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
+  })
+
+  it('creates an int series without config for activity grid trackers', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: 1, name: 'grid', visibility: 'private', type: 'activity_grid', chart_config: '{}', role: 'owner', liked: false },
+      series: [],
+    })
+    vi.mocked(globalThis.fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 's1', data_type: 'int' }),
+    } as Response)
+
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    const addSeriesButtons = await screen.findAllByRole('button', { name: /add series/i })
+    await user.click(addSeriesButtons[addSeriesButtons.length - 1])
+
+    expect(screen.queryByLabelText('Data Type')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Chart Type')).not.toBeInTheDocument()
+    const nameInput = screen.getByPlaceholderText('Series name')
+    await user.clear(nameInput)
+    await user.type(nameInput, 's1')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await vi.waitFor(() => {
+      const postCall = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) => url === '/api/trackers/1/series' && (init as RequestInit)?.method === 'POST'
+      )
+      expect(postCall).toBeDefined()
+      const body = JSON.parse((postCall![1] as RequestInit).body as string)
+      expect(body.name).toBe('s1')
+      expect(body.data_type).toBe('int')
+      expect(body.config).toBeUndefined()
     })
   })
 
@@ -1610,5 +1702,44 @@ describe('TrackerCard', () => {
     render(<MemoryRouter><TrackerCard tracker={tracker} loading /></MemoryRouter>)
     expect(screen.getByText('Loading...')).toBeInTheDocument()
     expect(screen.queryByText('No data')).not.toBeInTheDocument()
+  })
+
+  it('shows Activity Grid badge and renders a compact heatmap preview', () => {
+    const tracker = {
+      id: 1, name: 'grid', visibility: 'private', type: 'activity_grid',
+      chart_config: '{}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'int', config: '' }, values: [{ id: 1, time: '2024-02-01T00:00:00.000Z', value: 2 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    expect(screen.getByText('Activity Grid')).toBeInTheDocument()
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    expect(option.series[0].type).toBe('heatmap')
+    expect(option.yAxis.data).toEqual(['s1'])
+  })
+
+  it('renders heatmap preview with levels from chart config', () => {
+    const tracker = {
+      id: 1, name: 'grid', visibility: 'public', type: 'activity_grid',
+      chart_config: '{"grid_levels":4}',
+      role: 'owner', liked: false, like_count: 0,
+    }
+    const preview = {
+      tracker,
+      series: [
+        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'int', config: '' }, values: [{ id: 1, time: '2024-02-01T00:00:00.000Z', value: 3 }] },
+      ],
+    }
+    render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
+    const el = screen.getByTestId('echart')
+    const option = JSON.parse(el.getAttribute('data-option')!)
+    const innerColors = option.visualMap.pieces.slice(1).map((p: any) => p.color)
+    expect(innerColors).toHaveLength(4)
   })
 })

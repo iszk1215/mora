@@ -17,6 +17,7 @@ export type ValueInputProps = {
   isDate: boolean
   defaultDate: string
   onAdd: (added: QuickAddValue) => Promise<void>
+  levels?: string[]
 }
 
 export const shiftDate = (base: string, deltaDays: number, isDate: boolean): string => {
@@ -31,7 +32,7 @@ export const shiftDate = (base: string, deltaDays: number, isDate: boolean): str
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
 }
 
-export const ValueInput = ({ seriesList, isDate, defaultDate, onAdd }: ValueInputProps): React.JSX.Element => {
+export const ValueInput = ({ seriesList, isDate, defaultDate, onAdd, levels }: ValueInputProps): React.JSX.Element => {
   const [date, setDate] = useState(defaultDate)
   const [selectedId, setSelectedId] = useState<number | null>(seriesList[0]?.id ?? null)
   const [value, setValue] = useState('')
@@ -44,6 +45,19 @@ export const ValueInput = ({ seriesList, isDate, defaultDate, onAdd }: ValueInpu
     [selectedId, seriesList]
   )
   const selected = seriesId != null ? seriesList.find((s) => s.id === seriesId) : undefined
+
+  const submitLevel = async (level: number) => {
+    if (adding || seriesId == null || !date) return
+    setAdding(true)
+    setError(null)
+    try {
+      await onAdd({ seriesId, time: new Date(date).toISOString(), value: level })
+    } catch {
+      setError('Failed to add value. Please try again.')
+    } finally {
+      setAdding(false)
+    }
+  }
 
   const submit = async () => {
     if (adding || seriesId == null || !date || !value.trim()) return
@@ -126,18 +140,36 @@ export const ValueInput = ({ seriesList, isDate, defaultDate, onAdd }: ValueInpu
         </div>
 
         <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
-          <input
-            ref={valueRef}
-            type="number"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Value"
-            aria-label="Value"
-            className="border rounded px-2 py-1 flex-1 min-w-0 sm:flex-none sm:w-32"
-          />
-          <Button size="sm" onClick={submit} disabled={adding || seriesId == null || !date || !value.trim()}>
-            {adding ? 'Adding...' : 'Add'}
-          </Button>
+          {levels ? (
+            <div role="group" aria-label="Value level" className="flex items-center gap-1 flex-wrap">
+              {levels.map((c, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  aria-label={`Set level ${i + 1}`}
+                  onClick={() => submitLevel(i)}
+                  disabled={adding || seriesId == null || !date}
+                  className="inline-block w-6 h-6 rounded-sm border border-black/10 cursor-pointer disabled:opacity-50"
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          ) : (
+            <>
+              <input
+                ref={valueRef}
+                type="number"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Value"
+                aria-label="Value"
+                className="border rounded px-2 py-1 flex-1 min-w-0 sm:flex-none sm:w-32"
+              />
+              <Button size="sm" onClick={submit} disabled={adding || seriesId == null || !date || !value.trim()}>
+                {adding ? 'Adding...' : 'Add'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

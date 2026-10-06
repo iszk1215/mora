@@ -22,6 +22,7 @@ tracker
 - `tracker.created_at` / `tracker.last_updated_at`: RFC3339 timestamps. `last_updated_at` is set at creation and bumped whenever a value is added, updated, or deleted (`POST`/`PATCH`/`DELETE values`) or coverage data is uploaded for a linked repository.
 
 - **type=`tracker`**: Normal time-series data (tracker -> series -> values)
+- **type=`activity_grid`**: Activity grid / contribution heatmap (tracker -> series -> integer values). See [activity-grid.md](activity-grid.md)
 - **type=`coverage`**: Links to a repository via the `tracker_coverage` table, owned and managed by the coverage package. No series/values of its own. Created via the coverage API, not `POST /api/trackers`.
 
 ## Limits
@@ -155,7 +156,7 @@ Only two values are allowed: `"public"` and `"private"`.
 ### CreateTrackerRequest
 
 ```json
-{ "name": "string", "description": "string", "body": "string", "visibility": "public|private", "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
+{ "name": "string", "description": "string", "body": "string", "visibility": "public|private", "type": "tracker", "chart_config": "{\"y_axes\":[{\"id\":0,\"position\":\"left\"}]}" }
 ```
 
 | Field | Type | Required | Description |
@@ -164,9 +165,10 @@ Only two values are allowed: `"public"` and `"private"`.
 | `description` | string | no | One-line description (max 200 characters) |
 | `body` | string | no | Free-form Markdown body shown below the chart (max 100000 characters) |
 | `visibility` | "public" \| "private" | yes | Access control |
+| `type` | "tracker" \| "activity_grid" | no | Tracker type (default `"tracker"`). Coverage-type trackers cannot be created through this endpoint (returns 400); use `POST /api/coverages` instead |
 | `chart_config` | string | no | JSON string of ChartConfig |
 
-The tracker type is always `"tracker"`. Coverage-type trackers cannot be created through this endpoint (returns 400); use `POST /api/coverages` instead.
+The tracker type accepts `"tracker"` and `"activity_grid"`; any other value returns 400.
 
 ### PatchTrackerRequest
 
@@ -196,7 +198,7 @@ All fields are optional. Only provided fields are updated.
 | `description` | string | One-line description |
 | `body` | string | Free-form Markdown body shown below the chart |
 | `visibility` | "public" \| "private" | Access control |
-| `type` | "tracker" \| "coverage" | Tracker type |
+| `type` | "tracker" \| "activity_grid" \| "coverage" | Tracker type |
 | `chart_config` | string | JSON string of ChartConfig |
 | `owner_id` | number | Owner user ID |
 | `owner_name` | string | Owner username |
@@ -227,6 +229,7 @@ All fields are optional. Only provided fields are updated.
 | `area` | boolean | true | Show area fill under line series |
 | `show_legend` | boolean | true | Show legend (also for a single series; set to false to hide) |
 | `palette` | string | "random" | Named color palette |
+| `grid_levels` | number | 5 | Number of distinct value levels for `activity_grid` trackers (1-10). Only honored by activity grid charts |
 | `y_axes` | YAxisConfig[] | `[{id:0,position:"left"}]` | Y-axis definitions |
 
 ### YAxisConfig
@@ -273,7 +276,7 @@ Coverage-type trackers (`type="coverage"`) are created exclusively through the c
 
 - A coverage tracker links to a repository via the `tracker_coverage` table, owned and managed by the coverage package.
 - Preview data is served by the coverage handler at `GET /api/coverages/{trackerId}/preview`, which fetches from `CoverageStore.Timeline(repoID, 20)` and maps coverage entries as series.
-- Series/values endpoints return empty or 400 for non-`tracker` types
+- Series/values endpoints return empty or 400 for `coverage` types; `activity_grid` trackers serve series/values with integer-only validation (see [activity-grid.md](activity-grid.md))
 - Frontend routes to `/coverages/:trackerId` for coverage detail view
 
 ## Frontend Routes
