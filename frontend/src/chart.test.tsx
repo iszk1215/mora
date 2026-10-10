@@ -1,7 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { formatValue, formatDateTick, formatDateTimeTick, TrackerChart, CHART_FONT_FAMILY, CHART_THEME_NAME } from './chart'
+import { formatValue, formatDateTick, formatDateTimeTick, TrackerChart, CHART_FONT_FAMILY, CHART_THEME_NAME, resolveGridColors, isActivityGrid, DEFAULT_GRID_LEVELS } from './chart'
 import { normalizeChartConfig } from './core'
 
 vi.mock('echarts-for-react/esm/core', () => ({
@@ -652,5 +652,40 @@ describe('normalizeChartConfig', () => {
     expect(result.x_axis_type).toBe('date')
     expect(result.palette).toBe('dark')
     expect(result.area).toBe(false)
+  })
+})
+
+describe('resolveGridColors', () => {
+  it('returns one color per level by default', () => {
+    const colors = resolveGridColors({})
+    expect(colors).toHaveLength(DEFAULT_GRID_LEVELS)
+    expect(colors).toEqual(['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'])
+  })
+
+  it('honors grid_levels below the default', () => {
+    expect(resolveGridColors({ grid_levels: 2 })).toEqual(['#5470c6', '#91cc75'])
+  })
+
+  it('clamps to the palette length', () => {
+    const colors = resolveGridColors({ palette: 'halloween', grid_levels: 10 })
+    expect(colors).toHaveLength(10)
+    expect(colors[colors.length - 1]).toBe('#715c87')
+  })
+
+  it('uses the palette when specified', () => {
+    expect(resolveGridColors({ palette: 'dark', grid_levels: 3 })[0]).toBe('#dd6b66')
+  })
+
+  it('ignores grid_levels above the cap', () => {
+    const colors = resolveGridColors({ grid_levels: 99 })
+    expect(colors).toHaveLength(99)
+  })
+})
+
+describe('isActivityGrid', () => {
+  it('is true only for the activity_grid type', () => {
+    expect(isActivityGrid('activity_grid')).toBe(true)
+    expect(isActivityGrid('tracker')).toBe(false)
+    expect(isActivityGrid(undefined)).toBe(false)
   })
 })

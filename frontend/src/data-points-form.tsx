@@ -35,6 +35,7 @@ export interface DataPointEditCardProps {
   onSave: () => void
   onCancel: () => void
   onClose: () => void
+  levels?: string[]
 }
 
 const PER_PAGE_OPTIONS = [10, 20, 50, 100]
@@ -73,6 +74,7 @@ export const DataPointEditCard = ({
   onSave,
   onCancel,
   onClose,
+  levels,
 }: DataPointEditCardProps): React.JSX.Element => {
   const totalPages = Math.max(1, Math.ceil(total / perPage))
   const inputType = isDate ? 'date' : 'datetime-local'
@@ -118,14 +120,29 @@ export const DataPointEditCard = ({
                   />
                 </TableCell>
                 <TableCell>
-                  <input
-                    type="number"
-                    step="any"
-                    value={displayValue(v, pendingEdits)}
-                    onChange={(e) => onEdit(v.id, 'value', e.target.value)}
-                    aria-label={`Data point value for ${seriesName}`}
-                    className="border rounded px-2 py-1 w-32"
-                  />
+                  {levels ? (
+                    <div role="group" aria-label={`Value levels for ${seriesName}`} className="flex items-center gap-1">
+                      {levels.map((c, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          aria-label={`Set value to level ${i + 1}`}
+                          onClick={() => onEdit(v.id, 'value', String(i))}
+                          className="inline-block w-5 h-5 rounded-sm border border-black/10 cursor-pointer"
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="any"
+                      value={displayValue(v, pendingEdits)}
+                      onChange={(e) => onEdit(v.id, 'value', e.target.value)}
+                      aria-label={`Data point value for ${seriesName}`}
+                      className="border rounded px-2 py-1 w-32"
+                    />
+                  )}
                 </TableCell>
                 <TableCell>
                   <Button

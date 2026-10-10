@@ -55,6 +55,7 @@ export interface ChartConfig {
   show_toolbox?: boolean
   palette?: string
   y_axes?: YAxisConfig[]
+  grid_levels?: number
 }
 
 export function normalizeChartConfig(cc: ChartConfig): ChartConfig {

@@ -2,8 +2,9 @@ import React, { useMemo } from 'react'
 import { Link } from 'react-router'
 import { Star } from 'lucide-react'
 
+import { ActivityGridChart } from './activity-grid'
 import { ChartConfig, SeriesConfig, TrackerResponse, normalizeChartConfig } from './core'
-import { ReactECharts, CHART_THEME_NAME, areaGradient, formatValue, resolvePalette } from './chart'
+import { isActivityGrid, ReactECharts, CHART_THEME_NAME, areaGradient, formatValue, resolvePalette } from './chart'
 import type { PreviewData } from './tracker-api'
 
 export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }: { tracker: TrackerResponse; preview?: PreviewData; loading?: boolean; searchQuery?: string; fromUser?: string }): React.JSX.Element => {
@@ -12,6 +13,13 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
     catch { return {} as ChartConfig }
   }, [preview])
   const colors = useMemo(() => resolvePalette(chartConfig.palette), [chartConfig.palette])
+  const gridDatasets = useMemo(
+    () => (preview?.series ?? []).map((sv) => ({
+      label: sv.series.name,
+      data: sv.values.map((v) => ({ x: v.time, y: String(v.value) })),
+    })),
+    [preview]
+  )
   const option = useMemo(() => {
     const datasets = preview?.series?.map((sv) => {
       let seriesConfig: SeriesConfig | undefined
@@ -137,6 +145,9 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
           {tracker.type === 'coverage' && (
             <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Coverage</span>
           )}
+          {isActivityGrid(tracker.type) && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Activity Grid</span>
+          )}
           {(tracker.like_count ?? 0) > 0 && (
             <span className="relative ml-auto flex-shrink-0">
               <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
@@ -144,9 +155,11 @@ export const TrackerCard = ({ tracker, preview, loading, searchQuery, fromUser }
             </span>
           )}
         </div>
-        <div className="h-[120px]">
+        <div className="h-[120px] overflow-x-auto overflow-y-hidden">
           {loading ? (
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading...</div>
+          ) : isActivityGrid(tracker.type) && gridDatasets.length > 0 ? (
+            <ActivityGridChart data={{ datasets: gridDatasets }} chartConfig={chartConfig} compact />
           ) : option.series.length > 0 ? (
             <ReactECharts option={option} style={{ width: '100%', height: 120 }} opts={{ renderer: 'svg' }} theme={CHART_THEME_NAME} />
           ) : (

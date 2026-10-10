@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -55,7 +56,7 @@ type (
 		Description string  `json:"description"`
 		Body        string  `json:"body"`
 		Visibility  string  `json:"visibility"` // required: "public"|"private"
-		Type        string  `json:"type"`       // "tracker", defaults to "tracker"
+		Type        string  `json:"type"`       // "tracker" (default) | "activity_grid"
 		ChartConfig *string `json:"chart_config"`
 	}
 
@@ -197,7 +198,7 @@ func (h *trackerHandler) requireAuth(next http.Handler) http.Handler {
 
 // CreateTracker godoc
 // @Summary      Create a tracker
-// @Description  Add a new tracker. The name must be unique. Creator becomes owner.
+// @Description  Add a new tracker. The name must be unique. Creator becomes owner. type is "tracker" (default) or "activity_grid".
 // @Tags         tracker
 // @Accept       json
 // @Produce      json
@@ -234,8 +235,8 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	if req.Type == "" {
 		req.Type = TypeTracker
 	}
-	if req.Type != TypeTracker {
-		render.BadRequest(w, errors.New("type must be 'tracker'"))
+	if req.Type != TypeTracker && req.Type != TypeActivityGrid {
+		render.BadRequest(w, errors.New("type must be 'tracker' or 'activity_grid'"))
 		return
 	}
 
@@ -263,7 +264,7 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 			render.BadRequest(w, errors.New("chart_config must be valid JSON"))
 			return
 		}
-		if err := validateChartConfigYAxes(*req.ChartConfig); err != nil {
+		if err := validateChartConfig(req.Type, *req.ChartConfig); err != nil {
 			render.BadRequest(w, err)
 			return
 		}
@@ -401,12 +402,14 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	tracker, _ := trackerFrom(r.Context())
+
 	if req.ChartConfig != nil {
 		if !json.Valid([]byte(*req.ChartConfig)) {
 			render.BadRequest(w, errors.New("chart_config must be valid JSON"))
 			return
 		}
-		if err := validateChartConfigYAxes(*req.ChartConfig); err != nil {
+		if err := validateChartConfig(tracker.Type, *req.ChartConfig); err != nil {
 			render.BadRequest(w, err)
 			return
 		}
@@ -422,7 +425,6 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tracker, _ := trackerFrom(r.Context())
 	err = h.store.updateTracker(tracker.Id, req.Name, req.Visibility, req.ChartConfig, req.Description, req.Body)
 	if err != nil {
 		log.Error().Err(err).Msg("patchTracker updateTracker")
@@ -605,7 +607,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fns := make([]func() error, 0, 2)
-	if tracker.Type == TypeTracker {
+	if supportsSeries(tracker.Type) {
 		fns = append(fns, func() error {
 			var err error
 			series, err = h.store.listSeries(tracker.Id)
@@ -662,7 +664,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type != TypeTracker {
+	if !supportsSeries(tracker.Type) {
 		render.BadRequest(w, errors.New("cannot modify series for this tracker type"))
 		return
 	}
@@ -733,7 +735,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/trackers/{trackerId}/series/{seriesId} [delete]
 func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type != TypeTracker {
+	if !supportsSeries(tracker.Type) {
 		render.BadRequest(w, errors.New("cannot modify series for this tracker type"))
 		return
 	}
@@ -774,7 +776,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type != TypeTracker {
+	if !supportsSeries(tracker.Type) {
 		render.BadRequest(w, errors.New("cannot modify series for this tracker type"))
 		return
 	}
@@ -918,7 +920,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type != TypeTracker {
+	if !supportsSeries(tracker.Type) {
 		render.BadRequest(w, errors.New("cannot modify values for this tracker type"))
 		return
 	}
@@ -928,6 +930,11 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Warn().Err(err).Msg("invalid value request body")
 		render.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+
+	if tracker.Type == TypeActivityGrid && !isGridLevel(req.Value) {
+		render.BadRequest(w, errors.New("activity_grid values must be non-negative integers"))
 		return
 	}
 
@@ -967,7 +974,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // @Router       /api/trackers/{trackerId}/series/{seriesId}/values [delete]
 func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type != TypeTracker {
+	if !supportsSeries(tracker.Type) {
 		render.BadRequest(w, errors.New("cannot modify values for this tracker type"))
 		return
 	}
@@ -1008,7 +1015,7 @@ func (h *trackerHandler) patchValues(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	tracker, _ := trackerFrom(r.Context())
-	if tracker.Type != TypeTracker {
+	if !supportsSeries(tracker.Type) {
 		render.BadRequest(w, errors.New("cannot modify values for this tracker type"))
 		return
 	}
@@ -1022,6 +1029,15 @@ func (h *trackerHandler) patchValues(w http.ResponseWriter, r *http.Request) {
 	}
 
 	series, _ := seriesFrom(r.Context())
+
+	if tracker.Type == TypeActivityGrid {
+		for _, u := range req.Updates {
+			if !isGridLevel(u.Value) {
+				render.BadRequest(w, errors.New("activity_grid values must be non-negative integers"))
+				return
+			}
+		}
+	}
 
 	updates := make([]ValuePatch, 0, len(req.Updates))
 	for _, u := range req.Updates {
@@ -1147,10 +1163,26 @@ func newHandler(store *trackerStore) http.Handler {
 	return r
 }
 
-func validateChartConfigYAxes(raw string) error {
+// supportsSeries reports whether the tracker type manages its own series/values.
+func supportsSeries(t string) bool {
+	return t == TypeTracker || t == TypeActivityGrid
+}
+
+// isGridLevel reports whether v is a valid activity grid level (non-negative integer).
+func isGridLevel(v float64) bool {
+	return v >= 0 && math.Trunc(v) == v
+}
+
+// maxGridLevels is the maximum number of color levels an activity grid may use.
+const maxGridLevels = 10
+
+func validateChartConfig(trackerType, raw string) error {
 	var rawMap map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(raw), &rawMap); err != nil {
 		return errors.New("chart_config must be valid JSON")
+	}
+	if trackerType == TypeActivityGrid {
+		return validateActivityGridChartConfig(rawMap)
 	}
 	if v, ok := rawMap["x_axis_type"]; ok {
 		var s string
@@ -1174,6 +1206,25 @@ func validateChartConfigYAxes(raw string) error {
 	}
 	if len(yAxes) > 2 {
 		return errors.New("chart_config: y_axes must have at most 2 axes")
+	}
+	return nil
+}
+
+func validateActivityGridChartConfig(rawMap map[string]json.RawMessage) error {
+	if v, ok := rawMap["grid_levels"]; ok {
+		var n int
+		if err := json.Unmarshal(v, &n); err != nil {
+			return errors.New("chart_config: grid_levels must be an integer")
+		}
+		if n < 1 || n > maxGridLevels {
+			return errors.New("chart_config: grid_levels must be between 1 and 10")
+		}
+	}
+	if v, ok := rawMap["palette"]; ok {
+		var s string
+		if err := json.Unmarshal(v, &s); err != nil {
+			return errors.New("chart_config: palette must be a string")
+		}
 	}
 	return nil
 }

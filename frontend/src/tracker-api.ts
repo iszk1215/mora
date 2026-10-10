@@ -59,9 +59,10 @@ export async function listTrackers(page?: number, perPage?: number, query?: stri
   return resp.json()
 }
 
-export async function createTracker(name: string, visibility: string, description?: string): Promise<TrackerResponse> {
+export async function createTracker(name: string, visibility: string, description?: string, type?: string): Promise<TrackerResponse> {
   const body: Record<string, unknown> = { name, visibility }
   if (description) body.description = description
+  if (type) body.type = type
   const resp = await fetch('/api/trackers', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -34,7 +34,8 @@ import { SettingsForm } from './settings-form'
 import { SeriesTable } from './series-form'
 import { DataPointEditCard, isoToInputValue } from './data-points-form'
 import { QuickAddValue, ValueInput, shiftDate } from './value-input'
-import { Dataset, TrackerChart } from './chart'
+import { ActivityGridChart } from './activity-grid'
+import { Dataset, TrackerChart, isActivityGrid, resolveGridColors } from './chart'
 import { TimeRangeSelector, computeDateRange } from './time_range'
 import type { TimeRangeKey } from './time_range'
 import { useUser } from './user-context'
@@ -181,8 +182,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
     setAddingSeries(true)
     setAddSeriesError(null)
     try {
-      const config = JSON.stringify({ type: newSeriesChartType })
-      const created = await createSeries(tracker.id, name, newSeriesDataType, config)
+      const dataType = isGrid ? 'int' : newSeriesDataType
+      const config = isGrid ? undefined : JSON.stringify({ type: newSeriesChartType })
+      const created = await createSeries(tracker.id, name, dataType, config)
       setSeriesList((prev) => [...prev, created])
       setAddSeriesOpen(false)
       setNewSeriesName('')
@@ -289,6 +291,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [range, setRange] = useState<TimeRangeKey>('all')
   const { min, max } = computeDateRange(range)
 
+  const isGrid = isActivityGrid(tracker.type)
+  const gridColors = useMemo(() => resolveGridColors(chartDraft ?? chartConfig ?? {}), [chartDraft, chartConfig])
+
   const xAxisType = chartConfig?.x_axis_type ?? 'date'
   const yAxes: YAxisConfig[] = useMemo(() => {
     if (chartConfig?.y_axes && chartConfig.y_axes.length > 0) {
@@ -333,13 +338,14 @@ export const TrackerDetailView = (): React.JSX.Element => {
     setAddValues((prev) => ({ ...prev, [seriesId]: val }))
   }
 
-  const handleAddValue = async (seriesId: number) => {
-    const value = addValues[seriesId]
-    if (!selectedDate || !value) return
+  const handleAddValue = async (seriesId: number, level?: number) => {
+    if (!selectedDate) return
+    const numberValue = level !== undefined ? level : parseFloat(addValues[seriesId] ?? '')
+    if (Number.isNaN(numberValue)) return
     setAddingValues((prev) => ({ ...prev, [seriesId]: true }))
     setAddValueError(null)
     try {
-      await createValue(tracker.id, seriesId, new Date(selectedDate).toISOString(), parseFloat(value))
+      await createValue(tracker.id, seriesId, new Date(selectedDate).toISOString(), numberValue)
       const resp = await fetch(`/api/trackers/${tracker.id}/series/${seriesId}/values`)
       const data = await resp.json()
       setSeriesValues((prev) =>
@@ -664,7 +670,11 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
         {datasets.length > 0 ? (
           <>
             <TimeRangeSelector value={range} onChange={setRange} />
-            <TrackerChart data={{ datasets }} chartConfig={chartDraft} min={min} max={max} />
+            {isGrid ? (
+              <ActivityGridChart data={{ datasets }} chartConfig={chartDraft} min={min} max={max} />
+            ) : (
+              <TrackerChart data={{ datasets }} chartConfig={chartDraft} min={min} max={max} />
+            )}
           </>
         ) : seriesList.length > 0 && !valuesLoaded ? (
           <div className="flex items-center justify-center py-4 text-center">
@@ -689,6 +699,7 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
           isDate={xAxisType === 'date'}
           defaultDate={todayValue}
           onAdd={handleQuickAddValue}
+          levels={isGrid ? gridColors : undefined}
         />
       )}
 
@@ -764,21 +775,37 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
                     >
                       {s.name}
                     </button>
-                    <input
-                      type="number"
-                      value={addValues[s.id] ?? ''}
-                      onChange={(e) => setAddValue(s.id, e.target.value)}
-                      placeholder="Value"
-                      aria-label={`Value for ${s.name}`}
-                      className="border rounded px-2 py-1 w-32"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={() => handleAddValue(s.id)}
-                      disabled={adding || !selectedDate || !addValues[s.id]}
-                    >
-                      {adding ? 'Adding...' : 'Add'}
-                    </Button>
+                    {isGrid ? (
+                      <div role="group" aria-label={`Value levels for ${s.name}`} className="flex items-center gap-1">
+                        {gridColors.map((c, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            aria-label={`Set value to level ${i + 1}`}
+                            onClick={() => handleAddValue(s.id, i)}
+                            disabled={adding || !selectedDate}
+                            className="inline-block w-6 h-6 rounded-sm border border-black/10 cursor-pointer disabled:opacity-50"
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        type="number"
+                        value={addValues[s.id] ?? ''}
+                        onChange={(e) => setAddValue(s.id, e.target.value)}
+                        placeholder="Value"
+                        aria-label={`Value for ${s.name}`}
+                        className="border rounded px-2 py-1 w-32"
+                      />
+                    )}
+                  <Button
+                    size="sm"
+                    onClick={() => handleAddValue(s.id)}
+                    disabled={adding || !selectedDate || (!isGrid && !addValues[s.id])}
+                  >
+                    {adding ? 'Adding...' : 'Add'}
+                  </Button>
                   </div>
                 )
               })}
@@ -807,6 +834,7 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
           onSave={handleSaveValues}
           onCancel={cancelEditChanges}
           onClose={closeEditSeries}
+          levels={isGrid ? gridColors : undefined}
         />
       )}
 
@@ -822,6 +850,7 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
             initialConfig={chartDraft ?? chartConfig ?? {}}
             baselineConfig={chartConfig ?? {}}
             initialVisibility={trackerVisibility}
+            trackerType={tracker.type}
             onChange={setChartDraft}
             onSave={async (config, visibility) => {
               const updated = await patchTracker(tracker.id, { chart_config: JSON.stringify(config), visibility })
@@ -935,30 +964,34 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
                   autoFocus
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <label htmlFor="add-series-datatype" className="text-sm w-20 shrink-0">Data Type</label>
-                <select
-                  id="add-series-datatype"
-                  value={newSeriesDataType}
-                  onChange={(e) => setNewSeriesDataType(e.target.value)}
-                  className="border rounded px-2 py-1 flex-1"
-                >
-                  <option value="float">float</option>
-                  <option value="int">int</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label htmlFor="add-series-charttype" className="text-sm w-20 shrink-0">Chart Type</label>
-                <select
-                  id="add-series-charttype"
-                  value={newSeriesChartType}
-                  onChange={(e) => setNewSeriesChartType(e.target.value as 'line' | 'bar')}
-                  className="border rounded px-2 py-1 flex-1"
-                >
-                  <option value="line">Line</option>
-                  <option value="bar">Bar</option>
-                </select>
-              </div>
+              {!isGrid && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="add-series-datatype" className="text-sm w-20 shrink-0">Data Type</label>
+                    <select
+                      id="add-series-datatype"
+                      value={newSeriesDataType}
+                      onChange={(e) => setNewSeriesDataType(e.target.value)}
+                      className="border rounded px-2 py-1 flex-1"
+                    >
+                      <option value="float">float</option>
+                      <option value="int">int</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="add-series-charttype" className="text-sm w-20 shrink-0">Chart Type</label>
+                    <select
+                      id="add-series-charttype"
+                      value={newSeriesChartType}
+                      onChange={(e) => setNewSeriesChartType(e.target.value as 'line' | 'bar')}
+                      className="border rounded px-2 py-1 flex-1"
+                    >
+                      <option value="line">Line</option>
+                      <option value="bar">Bar</option>
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
             {addSeriesError && <p className="mt-3 text-sm text-red-600">{addSeriesError}</p>}
             <div className="mt-6 flex justify-end gap-2">
@@ -982,6 +1015,7 @@ export const TrackerCreate = (): React.JSX.Element => {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [visibility, setVisibility] = useState('private')
+  const [trackerType, setTrackerType] = useState<'tracker' | 'activity_grid'>('tracker')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -1006,6 +1040,7 @@ export const TrackerCreate = (): React.JSX.Element => {
         name.trim(),
         visibility,
         description.trim() || undefined,
+        trackerType,
       )
       navigate(`/trackers/${created.id}`)
     } catch {
@@ -1046,6 +1081,20 @@ export const TrackerCreate = (): React.JSX.Element => {
             className="border rounded px-2 py-1 w-full"
             disabled={loading}
           />
+        </div>
+
+        <div>
+          <label className="block mb-1">Type</label>
+          <select
+            value={trackerType}
+            onChange={(e) => setTrackerType(e.target.value as 'tracker' | 'activity_grid')}
+            aria-label="Type"
+            className="border rounded px-2 py-1 w-full"
+            disabled={loading}
+          >
+            <option value="tracker">Time Series</option>
+            <option value="activity_grid">Activity Grid</option>
+          </select>
         </div>
 
         <div>

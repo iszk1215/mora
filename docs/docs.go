@@ -1040,7 +1040,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Add a new tracker. The name must be unique. Creator becomes owner.",
+                "description": "Add a new tracker. The name must be unique. Creator becomes owner. type is \"tracker\" (default) or \"activity_grid\".",
                 "consumes": [
                     "application/json"
                 ],
@@ -2523,7 +2523,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "description": "\"tracker\", defaults to \"tracker\"",
+                    "description": "\"tracker\" (default) | \"activity_grid\"",
                     "type": "string"
                 },
                 "visibility": {

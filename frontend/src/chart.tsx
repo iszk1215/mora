@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import ReactEChartsCore from 'echarts-for-react/esm/core'
 import * as echarts from 'echarts/core'
-import { BarChart, LineChart } from 'echarts/charts'
+import { BarChart, HeatmapChart, LineChart } from 'echarts/charts'
 import {
   DataZoomComponent,
   GridComponent,
   LegendComponent,
   ToolboxComponent,
   TooltipComponent,
+  VisualMapComponent,
 } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
 import { ChartConfig, SeriesConfig, YAxisConfig } from './core'
@@ -20,11 +21,13 @@ export const CHART_THEME_NAME = 'mora'
 echarts.use([
   LineChart,
   BarChart,
+  HeatmapChart,
   GridComponent,
   TooltipComponent,
   LegendComponent,
   DataZoomComponent,
   ToolboxComponent,
+  VisualMapComponent,
   SVGRenderer,
 ])
 
@@ -57,6 +60,28 @@ export const PALETTE_NAMES = Object.keys(PALETTE_MAP)
 export function resolvePalette(name?: string): string[] {
   if (!name) return PALETTE_MAP.default
   return PALETTE_MAP[name] ?? PALETTE_MAP.default
+}
+
+export const DEFAULT_GRID_LEVELS = 5
+export const MIN_GRID_LEVELS = 1
+export const MAX_GRID_LEVELS = 10
+export const ACTIVITY_GRID_EMPTY_COLOR = '#ebedf0'
+
+// resolveGridColors returns the level colors for an activity grid chart, with
+// one color per level. Levels beyond the palette length clamp to the last
+// palette color so the count is always honored.
+export function resolveGridColors(config?: ChartConfig): string[] {
+  const levels = config?.grid_levels ?? DEFAULT_GRID_LEVELS
+  const palette = resolvePalette(config?.palette)
+  const colors: string[] = []
+  for (let i = 0; i < levels; i++) {
+    colors.push(palette[i] ?? palette[palette.length - 1])
+  }
+  return colors
+}
+
+export function isActivityGrid(type?: string): boolean {
+  return type === 'activity_grid'
 }
 
 export function areaGradient(hex: string, topAlpha = 0.35): object {

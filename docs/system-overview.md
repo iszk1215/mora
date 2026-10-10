@@ -250,6 +250,7 @@ Current migrations:
 
 - React Router v7 with `RouterProvider` (not `react-router-dom`)
 - ECharts for charts (not chart.js)
+- Tracker types: `tracker` (time series) and `activity_grid` (contribution heatmap, see [docs/specs/activity-grid.md](specs/activity-grid.md))
 - Build output: `server/static/public/` (committed to git, `.vite/manifest.json` included)
 - `build.manifest` is on: the manifest is how the server tells hashed bundle output from verbatim copies of `frontend/public/`, which are revalidated instead
 - `frontend/public/` is copied to the site root, so a file added there is served at `/<name>`; being unhashed, it is never `immutable`
