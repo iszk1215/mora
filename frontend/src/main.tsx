@@ -478,9 +478,9 @@ export const Footer = (): React.JSX.Element => {
         <Link to="/privacy" className="text-muted-foreground no-underline hover:text-foreground hover:underline">
           Privacy Policy
         </Link>
-        <Link to="/swagger/" className="text-muted-foreground no-underline hover:text-foreground hover:underline">
+        <a href="/swagger/" className="text-muted-foreground no-underline hover:text-foreground hover:underline">
           API Doc
-        </Link>
+        </a>
       </div>
     </footer>
   )
