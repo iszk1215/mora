@@ -26,7 +26,7 @@ test.describe('Tracker title font size', () => {
     expect(tracker.id).toBeGreaterThan(0)
 
     await page.goto(`/trackers/${tracker.id}`)
-    await expect(page.getByRole('heading', { level: 1, name: tracker.name })).toHaveCSS('font-size', '24px', { timeout: 15_000 })
+    await expect(page.getByRole('heading', { level: 1, name: tracker.name })).toHaveCSS('font-size', '20px', { timeout: 15_000 })
   })
 
   test('keeps the desktop tracker name at text-3xl', async ({ page }) => {

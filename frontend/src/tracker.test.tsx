@@ -1361,10 +1361,10 @@ describe('TrackerDetailView', () => {
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
-    expect(screen.getByRole('heading', { level: 1, name: 'test' })).toHaveClass('text-2xl', 'sm:text-3xl')
+    expect(screen.getByRole('heading', { level: 1, name: 'test' })).toHaveClass('text-xl', 'sm:text-3xl')
 
     fireEvent.click(screen.getByRole('button', { name: /edit title/i }))
-    expect(screen.getByRole('textbox')).toHaveClass('text-2xl', 'sm:text-3xl')
+    expect(screen.getByRole('textbox')).toHaveClass('text-xl', 'sm:text-3xl')
   })
 
   it('opens the data point edit card and lists values newest-first', async () => {

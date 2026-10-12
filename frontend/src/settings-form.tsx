@@ -206,8 +206,8 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
               }
 
               return (
-                <div key={pos} className="flex items-center gap-2">
-                  <span className="text-sm font-medium w-12">{pos === 'left' ? 'Left' : 'Right'}</span>
+                <div key={pos} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <span className="text-sm font-medium sm:w-12">{pos === 'left' ? 'Left' : 'Right'}</span>
                   {active ? (
                     <>
                       <input
@@ -215,25 +215,26 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
                         value={axis.label ?? ''}
                         onChange={(e) => updateAxis({ label: e.target.value || undefined })}
                         placeholder="Label"
-                        className="border rounded px-2 py-1 w-32 text-sm"
+                        className="border rounded px-2 py-1 w-full text-sm sm:w-32"
                       />
                       <input
                         type="number"
                         value={axis.min ?? ''}
                         onChange={(e) => updateAxis({ min: e.target.value ? parseFloat(e.target.value) : undefined })}
                         placeholder="Min"
-                        className="border rounded px-2 py-1 w-20 text-sm"
+                        className="border rounded px-2 py-1 w-full text-sm sm:w-20"
                       />
                       <input
                         type="number"
                         value={axis.max ?? ''}
                         onChange={(e) => updateAxis({ max: e.target.value ? parseFloat(e.target.value) : undefined })}
                         placeholder="Max"
-                        className="border rounded px-2 py-1 w-20 text-sm"
+                        className="border rounded px-2 py-1 w-full text-sm sm:w-20"
                       />
                       <Button
                         variant="destructive"
                         size="sm"
+                        className="w-full sm:w-auto"
                         disabled={!canRemove}
                         onClick={() => {
                           const next = yAxes.filter((a) => a.position !== pos)
@@ -248,6 +249,7 @@ export const SettingsForm = ({ initialConfig, baselineConfig, initialVisibility,
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full sm:w-auto"
                       onClick={() => {
                         const id = yAxes.length > 0 ? Math.max(...yAxes.map((a) => a.id)) + 1 : 0
                         commitYAxes([...yAxes, { id, position: pos }])
