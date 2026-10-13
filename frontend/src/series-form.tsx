@@ -176,7 +176,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
 
   return (
     <Table>
-      <TableHeader>
+      <TableHeader className="hidden sm:table-header-group">
         <TableRow>
           <TableHead>Name</TableHead>
           <TableHead>Data Type</TableHead>
@@ -188,15 +188,16 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
       </TableHeader>
       <TableBody>
         {seriesList.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={6} className="text-center text-muted-foreground">
+          <TableRow className="block sm:table-row">
+            <TableCell colSpan={6} className="block text-center text-muted-foreground sm:table-cell">
               No series yet
             </TableCell>
           </TableRow>
         ) : (
           seriesList.map((s) => (
-            <TableRow key={s.id}>
-              <TableCell>
+            <TableRow key={s.id} className="block py-2 sm:table-row sm:py-0">
+              <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
+                <span className="text-sm font-medium text-muted-foreground sm:hidden">Name</span>
                 {onSelectSeries ? (
                   <button
                     className="text-blue-600 dark:text-blue-500 hover:underline"
@@ -213,8 +214,12 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
                   />
                 )}
               </TableCell>
-              <TableCell>{s.data_type}</TableCell>
-              <TableCell>
+              <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
+                <span className="text-sm font-medium text-muted-foreground sm:hidden">Data Type</span>
+                {s.data_type}
+              </TableCell>
+              <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
+                <span className="text-sm font-medium text-muted-foreground sm:hidden">Chart Type</span>
                 <select
                   value={seriesTypes[s.id] ?? 'line'}
                   onChange={(e) => handleSeriesTypeChange(s.id, e.target.value as 'line' | 'bar')}
@@ -224,7 +229,8 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
                   <option value="bar">Bar</option>
                 </select>
               </TableCell>
-              <TableCell>
+              <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
+                <span className="text-sm font-medium text-muted-foreground sm:hidden">Y-Axis</span>
                 {(() => {
                   const sorted = yAxes.map((a, i) => ({ ...a, origIdx: i }))
                     .sort((a) => (a.position === 'left' ? -1 : 1))
@@ -245,14 +251,16 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
                   )
                 })()}
               </TableCell>
-              <TableCell>
+              <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
+                <span className="text-sm font-medium text-muted-foreground sm:hidden">Value Format</span>
                 <ValueFormatCell
                   seriesId={s.id}
                   initialFormat={seriesValueFormats[s.id] ?? ''}
                   onSave={handleSaveValueFormat}
                 />
               </TableCell>
-              <TableCell className="flex gap-2">
+              <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
+                <span className="text-sm font-medium text-muted-foreground sm:hidden">Actions</span>
                 <Button variant="destructive" size="sm" onClick={() => handleDeleteSeries(s.id)}>
                   Delete
                 </Button>

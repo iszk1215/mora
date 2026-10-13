@@ -532,7 +532,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 maxLength={200}
-                className="text-2xl sm:text-3xl border rounded px-2 py-1 flex-1 min-w-0"
+                className="text-xl sm:text-3xl border rounded px-2 py-1 flex-1 min-w-0"
                 autoFocus
               />
               <Button size="sm" onClick={handleSaveTitle} disabled={savingTitle || !draftName.trim()}>
@@ -544,7 +544,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
             </div>
           ) : (
             <>
-              <h1 className="text-2xl sm:text-3xl min-w-0 flex-1 truncate" title={trackerName}>{trackerName}</h1>
+              <h1 className="text-xl sm:text-3xl min-w-0 flex-1 truncate" title={trackerName}>{trackerName}</h1>
               {isOwner && (
                 <button
                   type="button"
@@ -705,7 +705,7 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
 
       {isRoleOwner && showSeriesSettings && (
         <div className="mt-6 bg-card border rounded-lg p-4 shadow-md">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h2 className="text-xl">Series</h2>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => { setAddSeriesError(null); setNewSeriesName(seriesList.length === 0 ? tracker.name : ''); setAddSeriesOpen(true) }}>
@@ -735,7 +735,7 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
               Close
             </Button>
           </div>
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <Button
               variant="outline"
               size="sm"
@@ -767,7 +767,7 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
               {seriesList.map((s) => {
                 const adding = addingValues[s.id]
                 return (
-                  <div key={s.id} className="flex items-center gap-2">
+                  <div key={s.id} className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={() => openEditSeries(s.id)}
