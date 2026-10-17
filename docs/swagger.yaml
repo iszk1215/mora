@@ -536,7 +536,7 @@ definitions:
     - ValueTypeInt
 info:
   contact: {}
-  description: Mora is a code coverage tracker API.
+  description: Mora is a tracker API.
   title: Mora API
   version: "1.0"
 paths:
@@ -1223,7 +1223,7 @@ paths:
             $ref: '#/definitions/tracker.ListTrackersResponse'
       summary: List trackers for current user
       tags:
-      - server
+      - tracker
     post:
       consumes:
       - application/json
@@ -1786,7 +1786,7 @@ paths:
             $ref: '#/definitions/core.ErrorResponse'
       summary: List API keys
       tags:
-      - api-key
+      - user
     post:
       consumes:
       - application/json
@@ -1815,7 +1815,7 @@ paths:
             $ref: '#/definitions/core.ErrorResponse'
       summary: Create an API key
       tags:
-      - api-key
+      - user
   /api/user/me/api-keys/{keyId}:
     delete:
       description: Revoke an API key by ID
@@ -1842,7 +1842,7 @@ paths:
             $ref: '#/definitions/core.ErrorResponse'
       summary: Revoke an API key
       tags:
-      - api-key
+      - user
   /api/users/{userName}:
     get:
       description: Return the public user profile for the given username
@@ -1863,7 +1863,7 @@ paths:
             $ref: '#/definitions/core.ErrorResponse'
       summary: Get a user by username
       tags:
-      - server
+      - user
   /api/users/{userName}/trackers:
     get:
       description: Return trackers owned by the user. Public trackers are visible
@@ -1901,7 +1901,7 @@ paths:
             $ref: '#/definitions/core.ErrorResponse'
       summary: List trackers owned by a user
       tags:
-      - server
+      - user
   /api/users/{userName}/type:
     patch:
       description: Update the user type of the given username. Only admins may call
@@ -1937,5 +1937,18 @@ paths:
             $ref: '#/definitions/core.ErrorResponse'
       summary: Set a user's type (admin only)
       tags:
-      - server
+      - user
 swagger: "2.0"
+tags:
+- description: Trackers, series, and values
+  name: tracker
+- description: Code coverage upload and retrieval
+  name: coverage
+- description: User-defined metrics
+  name: udm
+- description: Users, profiles, and API keys
+  name: user
+- description: Authentication and sign-up
+  name: auth
+- description: Server configuration and repositories
+  name: server

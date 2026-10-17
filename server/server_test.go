@@ -522,6 +522,55 @@ func TestServerAPIConfig_Default(t *testing.T) {
 	require.Equal(t, "Mora", got.SiteName)
 }
 
+// fetchSwaggerInfo serves GET /swagger/doc.json and returns its info block.
+func fetchSwaggerInfo(t *testing.T, server *MoraServer) swaggerInfo {
+	t.Helper()
+
+	handler := server.Handler()
+	req := httptest.NewRequest(http.MethodGet, "/swagger/doc.json", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	res := w.Result()
+	defer func() { _ = res.Body.Close() }()
+
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	var doc struct {
+		Info swaggerInfo `json:"info"`
+	}
+	require.NoError(t, json.Unmarshal(body, &doc))
+
+	return doc.Info
+}
+
+type swaggerInfo struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}
+
+func TestServerSwaggerInfo_UsesSiteName(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithSessionManager().Finish()
+	server.siteName = "My Mora"
+
+	info := fetchSwaggerInfo(t, server)
+	require.Equal(t, "My Mora API", info.Title)
+	require.Equal(t, "My Mora is a tracker API.", info.Description)
+}
+
+func TestServerSwaggerInfo_DefaultsToMora(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+
+	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithSessionManager().Finish()
+
+	info := fetchSwaggerInfo(t, server)
+	require.Equal(t, "Mora API", info.Title)
+	require.Equal(t, "Mora is a tracker API.", info.Description)
+}
+
 func TestServerRepoList(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()

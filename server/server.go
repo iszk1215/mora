@@ -25,7 +25,7 @@ import (
 	"github.com/iszk1215/mora/config"
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/coverage"
-	_ "github.com/iszk1215/mora/docs"
+	"github.com/iszk1215/mora/docs"
 	"github.com/iszk1215/mora/render"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/iszk1215/mora/udm"
@@ -213,6 +213,15 @@ type ConfigResponse struct {
 	Demo     bool   `json:"demo"`
 }
 
+// effectiveSiteName returns the configured site name, defaulting to "Mora"
+// when it is not set.
+func (s *MoraServer) effectiveSiteName() string {
+	if s.siteName == "" {
+		return "Mora"
+	}
+	return s.siteName
+}
+
 // handleConfig godoc
 // @Summary      Get server config
 // @Description  Return server configuration (e.g. site name)
@@ -220,12 +229,8 @@ type ConfigResponse struct {
 // @Success      200  {object}  server.ConfigResponse
 // @Router       /api/config [get]
 func (s *MoraServer) handleConfig(w http.ResponseWriter, r *http.Request) {
-	name := s.siteName
-	if name == "" {
-		name = "Mora"
-	}
 	render.JSON(w, ConfigResponse{
-		SiteName: name,
+		SiteName: s.effectiveSiteName(),
 		Demo:     s.demo,
 	}, http.StatusOK)
 }
@@ -522,6 +527,12 @@ func (s *MoraServer) Handler() http.Handler {
 	// middleware below: neither needs a session, and every session load costs a
 	// database round trip (twice per request with the write-back), which is
 	// prohibitively slow against a remote Turso database.
+	//
+	// The swagger document is rendered from these fields on every request, so
+	// overriding them here brands the docs with the configured site name.
+	name := s.effectiveSiteName()
+	docs.SwaggerInfo.Title = name + " API"
+	docs.SwaggerInfo.Description = name + " is a tracker API."
 	r.Mount("/swagger/", httpSwagger.WrapHandler)
 
 	r.Group(func(r chi.Router) {
