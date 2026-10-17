@@ -33,7 +33,7 @@ func (s *MoraServer) isAdminUser(userID int64) bool {
 // handleUserSetType godoc
 // @Summary      Set a user's type (admin only)
 // @Description  Update the user type of the given username. Only admins may call this endpoint, and admins cannot change their own type.
-// @Tags         server
+// @Tags         user
 // @Param        userName  path  string              true  "Username"
 // @Param        body      body  server.setUserTypeRequest  true  "New user type"
 // @Success      200  {object}  server.User

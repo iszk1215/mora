@@ -1001,7 +1001,7 @@ const docTemplate = `{
             "get": {
                 "description": "Return trackers owned, edited, or liked by the current user. With include=preview, each tracker also embeds its preview data (all series plus their latest values) fetched in a few batched queries.",
                 "tags": [
-                    "server"
+                    "tracker"
                 ],
                 "summary": "List trackers for current user",
                 "parameters": [
@@ -1850,7 +1850,7 @@ const docTemplate = `{
             "get": {
                 "description": "Return API keys for the current user",
                 "tags": [
-                    "api-key"
+                    "user"
                 ],
                 "summary": "List API keys",
                 "responses": {
@@ -1880,7 +1880,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "api-key"
+                    "user"
                 ],
                 "summary": "Create an API key",
                 "parameters": [
@@ -1920,7 +1920,7 @@ const docTemplate = `{
             "delete": {
                 "description": "Revoke an API key by ID",
                 "tags": [
-                    "api-key"
+                    "user"
                 ],
                 "summary": "Revoke an API key",
                 "parameters": [
@@ -1961,7 +1961,7 @@ const docTemplate = `{
             "get": {
                 "description": "Return the public user profile for the given username",
                 "tags": [
-                    "server"
+                    "user"
                 ],
                 "summary": "Get a user by username",
                 "parameters": [
@@ -1993,7 +1993,7 @@ const docTemplate = `{
             "get": {
                 "description": "Return trackers owned by the user. Public trackers are visible to everyone; private ones only to the owner.",
                 "tags": [
-                    "server"
+                    "user"
                 ],
                 "summary": "List trackers owned by a user",
                 "parameters": [
@@ -2049,7 +2049,7 @@ const docTemplate = `{
             "patch": {
                 "description": "Update the user type of the given username. Only admins may call this endpoint, and admins cannot change their own type.",
                 "tags": [
-                    "server"
+                    "user"
                 ],
                 "summary": "Set a user's type (admin only)",
                 "parameters": [
@@ -2917,7 +2917,33 @@ const docTemplate = `{
                 "ValueTypeInt"
             ]
         }
-    }
+    },
+    "tags": [
+        {
+            "description": "Trackers, series, and values",
+            "name": "tracker"
+        },
+        {
+            "description": "Code coverage upload and retrieval",
+            "name": "coverage"
+        },
+        {
+            "description": "User-defined metrics",
+            "name": "udm"
+        },
+        {
+            "description": "Users, profiles, and API keys",
+            "name": "user"
+        },
+        {
+            "description": "Authentication and sign-up",
+            "name": "auth"
+        },
+        {
+            "description": "Server configuration and repositories",
+            "name": "server"
+        }
+    ]
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
@@ -2927,7 +2953,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Mora API",
-	Description:      "Mora is a code coverage tracker API.",
+	Description:      "Mora is a tracker API.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -31,7 +31,7 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 		// listAPIKeys godoc
 		// @Summary      List API keys
 		// @Description  Return API keys for the current user
-		// @Tags         api-key
+		// @Tags         user
 		// @Success      200  {array}   server.UserAPIKey
 		// @Failure      401  {object}  core.ErrorResponse
 		// @Router       /api/user/me/api-keys [get]
@@ -57,7 +57,7 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 		// createAPIKey godoc
 		// @Summary      Create an API key
 		// @Description  Create a new API key for the current user
-		// @Tags         api-key
+		// @Tags         user
 		// @Accept       json
 		// @Produce      json
 		// @Param        body  body  server.CreateAPIKeyRequest  true  "API key name"
@@ -123,7 +123,7 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 		// revokeAPIKey godoc
 		// @Summary      Revoke an API key
 		// @Description  Revoke an API key by ID
-		// @Tags         api-key
+		// @Tags         user
 		// @Param        keyId  path  int  true  "API key ID"
 		// @Success      204
 		// @Failure      400  {object}  core.ErrorResponse

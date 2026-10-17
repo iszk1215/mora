@@ -15,7 +15,7 @@ import (
 // handleUserGet godoc
 // @Summary      Get a user by username
 // @Description  Return the public user profile for the given username
-// @Tags         server
+// @Tags         user
 // @Param        userName  path  string  true  "Username"
 // @Success      200  {object}  server.User
 // @Failure      404  {object}  core.ErrorResponse
@@ -38,7 +38,7 @@ func (s *MoraServer) handleUserGet(w http.ResponseWriter, r *http.Request) {
 // handleUserTrackers godoc
 // @Summary      List trackers owned by a user
 // @Description  Return trackers owned by the user. Public trackers are visible to everyone; private ones only to the owner.
-// @Tags         server
+// @Tags         user
 // @Param        userName  path  string  true  "Username"
 // @Param        include   query  string  false  "Set to \"preview\" to embed series preview data"
 // @Param        q         query  string  false  "Search query (partial match on tracker name)"

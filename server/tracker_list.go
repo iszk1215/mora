@@ -14,7 +14,7 @@ import (
 // handleTrackersList godoc
 // @Summary      List trackers for current user
 // @Description  Return trackers owned, edited, or liked by the current user. With include=preview, each tracker also embeds its preview data (all series plus their latest values) fetched in a few batched queries.
-// @Tags         server
+// @Tags         tracker
 // @Param        include  query  string  false  "Set to \"preview\" to embed series preview data"
 // @Param        q        query  string  false  "Search query (partial match on tracker name)"
 // @Param        page     query  int     false  "Page number"
