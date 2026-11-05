@@ -84,9 +84,9 @@ func (s *MoraServer) attachPreviews(trackers []tracker.TrackerResponse) error {
 	var coverageIDs []int64
 	for i := range trackers {
 		if trackers[i].Type == tracker.TypeCoverage {
-			coverageIDs = append(coverageIDs, trackers[i].Id)
+			coverageIDs = append(coverageIDs, trackers[i].InternalId)
 		} else {
-			trackerIDs = append(trackerIDs, trackers[i].Id)
+			trackerIDs = append(trackerIDs, trackers[i].InternalId)
 		}
 	}
 
@@ -104,7 +104,7 @@ func (s *MoraServer) attachPreviews(trackers []tracker.TrackerResponse) error {
 			}
 			for i := range trackers {
 				if trackers[i].Type != tracker.TypeCoverage {
-					trackers[i].Series = data[trackers[i].Id]
+					trackers[i].Series = data[trackers[i].InternalId]
 				}
 			}
 		}()
@@ -123,8 +123,8 @@ func (s *MoraServer) attachPreviews(trackers []tracker.TrackerResponse) error {
 				if trackers[i].Type != tracker.TypeCoverage {
 					continue
 				}
-				timeline := timelineByTracker[trackers[i].Id]
-				trackers[i].Series = coverage.TimelineToPreviewSeries(trackers[i].Id, timeline)
+				timeline := timelineByTracker[trackers[i].InternalId]
+				trackers[i].Series = coverage.TimelineToPreviewSeries(trackers[i].InternalId, string(trackers[i].Id), timeline)
 			}
 		}()
 	}

@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	_ "github.com/tursodatabase/go-libsql"
 )
 
 func initTestService(t *testing.T) *Service {
@@ -182,7 +182,11 @@ func TestServiceRequireReadPermission(t *testing.T) {
 
 	makeRequest := func(trackerID int64, ctx context.Context) *httptest.ResponseRecorder {
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("trackerId", fmt.Sprintf("%d", trackerID))
+		if tr, err := svc.FindTrackerById(trackerID); err == nil {
+			rctx.URLParams.Add("trackerId", string(tr.ExternalId))
+		} else {
+			rctx.URLParams.Add("trackerId", fmt.Sprintf("%d", trackerID))
+		}
 		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req = req.WithContext(ctx)
@@ -249,7 +253,14 @@ func TestServiceRequireReadPermission(t *testing.T) {
 	})
 
 	t.Run("non-existent tracker returns 404", func(t *testing.T) {
-		w := makeRequest(999, context.Background())
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("trackerId", "trk_0195f3a6-5b8c-7e6a-8f43-123456789abc")
+		ctx := context.WithValue(context.Background(), chi.RouteCtxKey, rctx)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+		nextCalled = false
+		handler.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 		assert.False(t, nextCalled)
 	})
@@ -279,7 +290,11 @@ func TestServiceRequireEditPermission(t *testing.T) {
 
 	makeRequest := func(trackerID int64, ctx context.Context) *httptest.ResponseRecorder {
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("trackerId", fmt.Sprintf("%d", trackerID))
+		if tr, err := svc.FindTrackerById(trackerID); err == nil {
+			rctx.URLParams.Add("trackerId", string(tr.ExternalId))
+		} else {
+			rctx.URLParams.Add("trackerId", fmt.Sprintf("%d", trackerID))
+		}
 		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req = req.WithContext(ctx)
@@ -341,7 +356,14 @@ func TestServiceRequireEditPermission(t *testing.T) {
 	})
 
 	t.Run("non-existent tracker returns 404", func(t *testing.T) {
-		w := makeRequest(999, context.Background())
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("trackerId", "trk_0195f3a6-5b8c-7e6a-8f43-123456789abc")
+		ctx := context.WithValue(context.Background(), chi.RouteCtxKey, rctx)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req = req.WithContext(ctx)
+		w := httptest.NewRecorder()
+		nextCalled = false
+		handler.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 		assert.False(t, nextCalled)
 	})

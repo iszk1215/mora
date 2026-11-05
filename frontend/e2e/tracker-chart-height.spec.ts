@@ -9,13 +9,13 @@ async function signIn(page: any): Promise<void> {
   await expect(page.locator('header .bg-blue-500')).toBeVisible({ timeout: 10_000 })
 }
 
-async function firstMetricTrackerId(page: any): Promise<number> {
+async function firstMetricTrackerId(page: any): Promise<string> {
   return page.evaluate(async () => {
     const res = await fetch('/api/trackers?page=1&per_page=100')
     const body: any = await res.json()
     const trackers = body.trackers ?? body.data ?? []
     const found = trackers.find((t: any) => t.type !== 'coverage')
-    return found ? found.id : 0
+    return found ? found.id : ''
   })
 }
 
@@ -25,7 +25,7 @@ test.describe('Tracker chart sizing', () => {
     await signIn(page)
 
     const trackerId = await firstMetricTrackerId(page)
-    expect(trackerId).toBeGreaterThan(0)
+    expect(trackerId).not.toBe('')
 
     await page.goto(`/trackers/${trackerId}`)
     const frame = page.locator(CHART_FRAME).first()
@@ -46,7 +46,7 @@ test.describe('Tracker chart sizing', () => {
     await signIn(page)
 
     const trackerId = await firstMetricTrackerId(page)
-    expect(trackerId).toBeGreaterThan(0)
+    expect(trackerId).not.toBe('')
 
     await page.goto(`/trackers/${trackerId}`)
     const frame = page.locator(CHART_FRAME).first()

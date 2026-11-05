@@ -38,19 +38,19 @@ describe('loadTrackerDetail', () => {
 
   it('returns tracker detail from API response', async () => {
     const mockResponse = {
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(mockResponse),
     } as Response)
 
-    const params = { trackerId: '1' }
+    const params = { trackerId: 'trk_1' }
     const args = { params, request: {} as Request, url: new URL('http://localhost'), pattern: '/', context: {} }
     const result = await loadTrackerDetail(args)
     expect(result).toEqual(mockResponse)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1/series')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/trk_1/series')
   })
 
   it('throws on missing trackerId', async () => {
@@ -70,15 +70,15 @@ describe('patchTracker', () => {
   })
 
   it('sends PATCH request with visibility and returns updated tracker', async () => {
-    const updated = { id: 1, name: 'test', visibility: 'public', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
+    const updated = { id: "trk_1", name: 'test', visibility: 'public', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(updated),
     } as Response)
 
-    const result = await patchTracker(1, { visibility: 'public' })
+    const result = await patchTracker('trk_1', { visibility: 'public' })
     expect(result).toEqual(updated)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', {
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/trk_1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ visibility: 'public' }),
@@ -86,15 +86,15 @@ describe('patchTracker', () => {
   })
 
   it('sends PATCH request with chart_config', async () => {
-    const updated = { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}', role: 'owner', liked: false }
+    const updated = { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}', role: 'owner', liked: false }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(updated),
     } as Response)
 
-    const result = await patchTracker(1, { chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}' })
+    const result = await patchTracker('trk_1', { chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}' })
     expect(result).toEqual(updated)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', {
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/trk_1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chart_config: '{"x_axis_label":"Time","y_axis_label":"Value"}' }),
@@ -107,19 +107,19 @@ describe('patchTracker', () => {
       status: 403,
     } as Response)
 
-    await expect(patchTracker(1, { visibility: 'public' })).rejects.toBeDefined()
+    await expect(patchTracker('trk_1', { visibility: 'public' })).rejects.toBeDefined()
   })
 
   it('sends PATCH request with name', async () => {
-    const updated = { id: 1, name: 'renamed', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
+    const updated = { id: "trk_1", name: 'renamed', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(updated),
     } as Response)
 
-    const result = await patchTracker(1, { name: 'renamed' })
+    const result = await patchTracker('trk_1', { name: 'renamed' })
     expect(result).toEqual(updated)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', {
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/trk_1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'renamed' }),
@@ -169,7 +169,7 @@ describe('TrackerCreate', () => {
   })
 
   it('creates tracker and navigates on submit', async () => {
-    const created = { id: 42, name: 'new-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
+    const created = { id: "trk_42", name: 'new-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(created),
@@ -191,12 +191,12 @@ describe('TrackerCreate', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'new-tracker', visibility: 'private', type: 'tracker' }),
       })
-      expect(mockNavigate).toHaveBeenCalledWith('/trackers/42')
+      expect(mockNavigate).toHaveBeenCalledWith('/trackers/trk_42')
     })
   })
 
   it('creates activity grid tracker when type selected', async () => {
-    const created = { id: 43, name: 'grid-tracker', visibility: 'private', type: 'activity_grid', chart_config: '{}', role: 'owner', liked: false }
+    const created = { id: "trk_43", name: 'grid-tracker', visibility: 'private', type: 'activity_grid', chart_config: '{}', role: 'owner', liked: false }
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve(created),
@@ -220,7 +220,7 @@ describe('TrackerCreate', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'grid-tracker', visibility: 'private', type: 'activity_grid' }),
       })
-      expect(mockNavigate).toHaveBeenCalledWith('/trackers/43')
+      expect(mockNavigate).toHaveBeenCalledWith('/trackers/trk_43')
     })
   })
 
@@ -262,7 +262,7 @@ describe('TrackerDetailView', () => {
 
   it('renders tracker name', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      tracker: { id: "trk_1", name: 'test-tracker', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -271,8 +271,8 @@ describe('TrackerDetailView', () => {
 
   it('shows Loading while series values are being fetched', async () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '{}' }],
     })
     let resolveFetch!: (r: Response) => void
     globalThis.fetch = vi.fn(() => new Promise((resolve) => { resolveFetch = resolve }) as Promise<Response>)
@@ -288,7 +288,7 @@ describe('TrackerDetailView', () => {
 
   it('renders Like button', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -297,7 +297,7 @@ describe('TrackerDetailView', () => {
 
   it('renders Unlike button when liked', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: true },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: true },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -306,7 +306,7 @@ describe('TrackerDetailView', () => {
 
   it('disables Like button when user is not logged in', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={null}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -316,7 +316,7 @@ describe('TrackerDetailView', () => {
 
   it('shows tracker menu when user is owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -325,7 +325,7 @@ describe('TrackerDetailView', () => {
 
   it('hides tracker menu when user is editor', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -334,7 +334,7 @@ describe('TrackerDetailView', () => {
 
   it('hides tracker menu when user has no role', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -344,7 +344,7 @@ describe('TrackerDetailView', () => {
   it('orders tracker menu as Series, Data Points, Settings and omits Add Series', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -360,7 +360,7 @@ describe('TrackerDetailView', () => {
   it('opens and closes chart options panel from tracker menu', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -377,7 +377,7 @@ describe('TrackerDetailView', () => {
   it('opens and closes series settings panel from tracker menu', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -394,10 +394,10 @@ describe('TrackerDetailView', () => {
   it('shows series rows in the series settings panel', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [
-        { id: 1, tracker_id: 1, name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
-        { id: 2, tracker_id: 1, name: 'series-b', data_type: 'int', config: '{"type":"bar"}' },
+        { id: 1, tracker_id: "trk_1", name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
+        { id: 2, tracker_id: "trk_1", name: 'series-b', data_type: 'int', config: '{"type":"bar"}' },
       ],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -414,14 +414,14 @@ describe('TrackerDetailView', () => {
   it('renames a series from the series settings panel', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [
-        { id: 1, tracker_id: 1, name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
+        { id: 1, tracker_id: "trk_1", name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
       ],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 'series-a-renamed', data_type: 'float', config: '{"type":"line"}' }),
+      json: () => Promise.resolve({ id: 1, tracker_id: "trk_1", name: 'series-a-renamed', data_type: 'float', config: '{"type":"line"}' }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -440,7 +440,7 @@ describe('TrackerDetailView', () => {
 
     await vi.waitFor(() => {
       const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
-        ([url, init]) => url === '/api/trackers/1/series/1' && (init as RequestInit)?.method === 'PATCH'
+        ([url, init]) => url === '/api/trackers/trk_1/series/1' && (init as RequestInit)?.method === 'PATCH'
       )
       expect(patchCall).toBeDefined()
       const body = JSON.parse((patchCall![1] as RequestInit).body as string)
@@ -455,9 +455,9 @@ describe('TrackerDetailView', () => {
   it('cancels a series rename without patching', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [
-        { id: 1, tracker_id: 1, name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
+        { id: 1, tracker_id: "trk_1", name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
       ],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve({ values: [] }) } as Response)
@@ -479,7 +479,7 @@ describe('TrackerDetailView', () => {
     expect(within(screen.getByRole('table')).getByText('series-a')).toBeInTheDocument()
     expect(screen.queryByText('never-renamed')).not.toBeInTheDocument()
     const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
-      ([url, init]) => url === '/api/trackers/1/series/1' && (init as RequestInit)?.method === 'PATCH'
+      ([url, init]) => url === '/api/trackers/trk_1/series/1' && (init as RequestInit)?.method === 'PATCH'
     )
     expect(patchCall).toBeUndefined()
   })
@@ -487,9 +487,9 @@ describe('TrackerDetailView', () => {
   it('does not render Clear Values button in series settings', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [
-        { id: 1, tracker_id: 1, name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
+        { id: 1, tracker_id: "trk_1", name: 'series-a', data_type: 'float', config: '{"type":"line"}' },
       ],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve({ values: [] }) } as Response)
@@ -506,12 +506,12 @@ describe('TrackerDetailView', () => {
   it('adds a series from the series settings panel button', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 'added-from-panel', data_type: 'float', config: '{"type":"line"}' }),
+      json: () => Promise.resolve({ id: 1, tracker_id: "trk_1", name: 'added-from-panel', data_type: 'float', config: '{"type":"line"}' }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -535,12 +535,12 @@ describe('TrackerDetailView', () => {
   it('saves chart options via PATCH from panel', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"palette":"default"}', role: 'owner', liked: false }),
+      json: () => Promise.resolve({ id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{"palette":"default"}', role: 'owner', liked: false }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -553,7 +553,7 @@ describe('TrackerDetailView', () => {
 
     await vi.waitFor(() => {
       const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
-        ([url, init]) => url === '/api/trackers/1' && (init as RequestInit)?.method === 'PATCH'
+        ([url, init]) => url === '/api/trackers/trk_1' && (init as RequestInit)?.method === 'PATCH'
       )
       expect(patchCall).toBeDefined()
       const body = JSON.parse((patchCall![1] as RequestInit).body as string)
@@ -564,12 +564,12 @@ describe('TrackerDetailView', () => {
   it('saves visibility via PATCH from settings panel', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'public', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }),
+      json: () => Promise.resolve({ id: "trk_1", name: 'test', visibility: 'public', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -584,7 +584,7 @@ describe('TrackerDetailView', () => {
 
     await vi.waitFor(() => {
       const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
-        ([url, init]) => url === '/api/trackers/1' && (init as RequestInit)?.method === 'PATCH'
+        ([url, init]) => url === '/api/trackers/trk_1' && (init as RequestInit)?.method === 'PATCH'
       )
       expect(patchCall).toBeDefined()
       const body = JSON.parse((patchCall![1] as RequestInit).body as string)
@@ -595,12 +595,12 @@ describe('TrackerDetailView', () => {
   it('adds a series with default line type from series settings panel', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 'new-series', data_type: 'float', config: '{"type":"line"}' }),
+      json: () => Promise.resolve({ id: 1, tracker_id: "trk_1", name: 'new-series', data_type: 'float', config: '{"type":"line"}' }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -621,7 +621,7 @@ describe('TrackerDetailView', () => {
 
     await vi.waitFor(() => {
       const postCall = vi.mocked(globalThis.fetch).mock.calls.find(
-        ([url, init]) => url === '/api/trackers/1/series' && (init as RequestInit)?.method === 'POST'
+        ([url, init]) => url === '/api/trackers/trk_1/series' && (init as RequestInit)?.method === 'POST'
       )
       expect(postCall).toBeDefined()
       const body = JSON.parse((postCall![1] as RequestInit).body as string)
@@ -636,12 +636,12 @@ describe('TrackerDetailView', () => {
   it('adds a series with bar type and int data type', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 'bar-series', data_type: 'int', config: '{"type":"bar"}' }),
+      json: () => Promise.resolve({ id: 1, tracker_id: "trk_1", name: 'bar-series', data_type: 'int', config: '{"type":"bar"}' }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -663,7 +663,7 @@ describe('TrackerDetailView', () => {
 
     await vi.waitFor(() => {
       const postCall = vi.mocked(globalThis.fetch).mock.calls.find(
-        ([url, init]) => url === '/api/trackers/1/series' && (init as RequestInit)?.method === 'POST'
+        ([url, init]) => url === '/api/trackers/trk_1/series' && (init as RequestInit)?.method === 'POST'
       )
       expect(postCall).toBeDefined()
       const body = JSON.parse((postCall![1] as RequestInit).body as string)
@@ -675,8 +675,8 @@ describe('TrackerDetailView', () => {
 
   it('renders an activity grid heatmap and color swatch value entry', async () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'grid', visibility: 'private', type: 'activity_grid', chart_config: '{"grid_levels":3}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'int' }],
+      tracker: { id: "trk_1", name: 'grid', visibility: 'private', type: 'activity_grid', chart_config: '{"grid_levels":3}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'int' }],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
@@ -701,12 +701,12 @@ describe('TrackerDetailView', () => {
   it('creates an int series without config for activity grid trackers', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'grid', visibility: 'private', type: 'activity_grid', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'grid', visibility: 'private', type: 'activity_grid', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, tracker_id: 1, name: 's1', data_type: 'int' }),
+      json: () => Promise.resolve({ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'int' }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -726,7 +726,7 @@ describe('TrackerDetailView', () => {
 
     await vi.waitFor(() => {
       const postCall = vi.mocked(globalThis.fetch).mock.calls.find(
-        ([url, init]) => url === '/api/trackers/1/series' && (init as RequestInit)?.method === 'POST'
+        ([url, init]) => url === '/api/trackers/trk_1/series' && (init as RequestInit)?.method === 'POST'
       )
       expect(postCall).toBeDefined()
       const body = JSON.parse((postCall![1] as RequestInit).body as string)
@@ -739,7 +739,7 @@ describe('TrackerDetailView', () => {
   it('shows error when adding a series fails', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({ ok: false, status: 500 } as Response)
@@ -764,7 +764,7 @@ describe('TrackerDetailView', () => {
   it('cancels chart options changes without saving', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve({}) } as Response)
@@ -782,7 +782,7 @@ describe('TrackerDetailView', () => {
 
     expect(areaCheckbox).toBeChecked()
     const patchCall = vi.mocked(globalThis.fetch).mock.calls.find(
-      ([url, init]) => url === '/api/trackers/1' && (init as RequestInit)?.method === 'PATCH'
+      ([url, init]) => url === '/api/trackers/trk_1' && (init as RequestInit)?.method === 'PATCH'
     )
     expect(patchCall).toBeUndefined()
   })
@@ -790,7 +790,7 @@ describe('TrackerDetailView', () => {
   it('keeps chart options edits when panel is closed and reopened', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     vi.mocked(globalThis.fetch).mockResolvedValue({ ok: true, json: () => Promise.resolve({}) } as Response)
@@ -818,7 +818,7 @@ describe('TrackerDetailView', () => {
     const user = userEvent.setup()
     mockNavigate.mockClear()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -830,7 +830,7 @@ describe('TrackerDetailView', () => {
   it('hides Delete item in tracker menu when editor', () => {
     mockNavigate.mockClear()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -841,7 +841,7 @@ describe('TrackerDetailView', () => {
     const user = userEvent.setup()
     mockNavigate.mockClear()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -857,7 +857,7 @@ describe('TrackerDetailView', () => {
     const user = userEvent.setup()
     mockNavigate.mockClear()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -868,7 +868,7 @@ describe('TrackerDetailView', () => {
 
     expect(screen.queryByText('Delete Tracker?')).not.toBeInTheDocument()
     const deleteCall = vi.mocked(globalThis.fetch).mock.calls.find(
-      ([url, init]) => url === '/api/trackers/1' && (init as RequestInit)?.method === 'DELETE'
+      ([url, init]) => url === '/api/trackers/trk_1' && (init as RequestInit)?.method === 'DELETE'
     )
     expect(deleteCall).toBeUndefined()
   })
@@ -877,7 +877,7 @@ describe('TrackerDetailView', () => {
     const user = userEvent.setup()
     mockNavigate.mockClear()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: true } as Response)
@@ -888,7 +888,7 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /^delete$/i }))
 
     await vi.waitFor(() => {
-      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({ method: 'DELETE' }))
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/trk_1', expect.objectContaining({ method: 'DELETE' }))
     })
     expect(mockNavigate).toHaveBeenCalledWith('/users/testuser')
   })
@@ -897,7 +897,7 @@ describe('TrackerDetailView', () => {
     const user = userEvent.setup()
     mockNavigate.mockClear()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: false } as Response)
@@ -915,7 +915,7 @@ describe('TrackerDetailView', () => {
 
   it('renders markdown body below the chart', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '## Overview\n\nSome **notes** here' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '## Overview\n\nSome **notes** here' },
       series: [],
     })
     const { container } = render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -928,7 +928,7 @@ describe('TrackerDetailView', () => {
 
   it('renders markdown lists in the body', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '- first\n- second\n\n1. one\n2. two' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '- first\n- second\n\n1. one\n2. two' },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -939,7 +939,7 @@ describe('TrackerDetailView', () => {
 
   it('does not render body when empty and user is not owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '' },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -948,7 +948,7 @@ describe('TrackerDetailView', () => {
 
   it('shows empty body placeholder for owner when body is empty', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '' },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -957,7 +957,7 @@ describe('TrackerDetailView', () => {
 
   it('renders description in the same foreground color as the title', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, description: 'Short description' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, description: 'Short description' },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -968,7 +968,7 @@ describe('TrackerDetailView', () => {
 
   it('renders chart section inside a card', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -980,7 +980,7 @@ describe('TrackerDetailView', () => {
 
   it('hides empty state Add Series button when user is not owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -991,7 +991,7 @@ describe('TrackerDetailView', () => {
   it('opens Add Series dialog from empty state button', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1006,7 +1006,7 @@ describe('TrackerDetailView', () => {
 
   it('renders markdown body inside a card', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '## Overview\n\nSome **notes** here' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false, body: '## Overview\n\nSome **notes** here' },
       series: [],
     })
     const { container } = render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1017,7 +1017,7 @@ describe('TrackerDetailView', () => {
 
   it('shows pencil icon for title when owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1026,7 +1026,7 @@ describe('TrackerDetailView', () => {
 
   it('hides pencil icon for title when not owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: '', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1035,12 +1035,12 @@ describe('TrackerDetailView', () => {
 
   it('enters title edit mode on pencil click and saves', async () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'old-name', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'old-name', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, name: 'new-name', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }),
+      json: () => Promise.resolve({ id: "trk_1", name: 'new-name', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1056,12 +1056,12 @@ describe('TrackerDetailView', () => {
     await vi.waitFor(() => {
       expect(screen.getByText('new-name')).toBeInTheDocument()
     })
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/1', expect.objectContaining({ method: 'PATCH' }))
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/trackers/trk_1', expect.objectContaining({ method: 'PATCH' }))
   })
 
   it('cancels title edit and restores original value', async () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'original', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'original', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
 
@@ -1076,7 +1076,7 @@ describe('TrackerDetailView', () => {
 
   it('shows pencil icon for description when owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'desc' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'desc' },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1085,12 +1085,12 @@ describe('TrackerDetailView', () => {
 
   it('enters description edit mode and saves', async () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'old desc' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'old desc' },
       series: [],
     })
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'new desc' }),
+      json: () => Promise.resolve({ id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, description: 'new desc' }),
     } as Response)
 
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1106,7 +1106,7 @@ describe('TrackerDetailView', () => {
 
   it('shows pencil icon for body when owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '## Hello' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '## Hello' },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1115,7 +1115,7 @@ describe('TrackerDetailView', () => {
 
   it('enters body edit mode and shows markdown editor', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '## Hello' },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false, body: '## Hello' },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1127,8 +1127,8 @@ describe('TrackerDetailView', () => {
   it('opens Data Points card from tracker menu and closes it', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
@@ -1146,10 +1146,10 @@ describe('TrackerDetailView', () => {
   it('renders a row per series with a shared date defaulting to today', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [
-        { id: 1, tracker_id: 1, name: 's1', data_type: 'float' },
-        { id: 2, tracker_id: 1, name: 's2', data_type: 'float' },
+        { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' },
+        { id: 2, tracker_id: "trk_1", name: 's2', data_type: 'float' },
       ],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1169,8 +1169,8 @@ describe('TrackerDetailView', () => {
   it('shifts the shared date by one day with previous/next day buttons', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
@@ -1195,8 +1195,8 @@ describe('TrackerDetailView', () => {
   it('adds a value via POST with the shared date and refreshes series values', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     const postBody = vi.fn()
     globalThis.fetch = vi.fn((url: RequestInfo | URL, opts?: RequestInit) => {
@@ -1230,10 +1230,10 @@ describe('TrackerDetailView', () => {
   it('adds a value to the clicked series only at the shared date', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [
-        { id: 1, tracker_id: 1, name: 's1', data_type: 'float' },
-        { id: 2, tracker_id: 1, name: 's2', data_type: 'float' },
+        { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' },
+        { id: 2, tracker_id: "trk_1", name: 's2', data_type: 'float' },
       ],
     })
     const postBodies: unknown[] = []
@@ -1259,15 +1259,15 @@ describe('TrackerDetailView', () => {
       expect(postBodies).toHaveLength(1)
     })
     expect(postBodies[0]).toMatchObject({ body: { value: 7 } })
-    expect(String((postBodies[0] as { url: string }).url)).toMatch(/\/api\/trackers\/1\/series\/2\/values/)
+    expect(String((postBodies[0] as { url: string }).url)).toMatch(/\/api\/trackers\/trk_1\/series\/2\/values/)
   })
 
   const quickRow = () => screen.getByRole('group', { name: 'Add value' })
 
   it('shows the quick value row below the chart for the role owner', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
@@ -1279,8 +1279,8 @@ describe('TrackerDetailView', () => {
 
   it('hides the quick value row for editors', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'editor', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
 
@@ -1290,14 +1290,14 @@ describe('TrackerDetailView', () => {
   it('hides the quick value row for coverage trackers and trackers without series', () => {
     const detail = (type: string, series: unknown[]) => {
       vi.mocked(useLoaderData).mockReturnValue({
-        tracker: { id: 1, name: 'test', visibility: 'private', type, chart_config: '{}', role: 'owner', liked: false },
+        tracker: { id: "trk_1", name: 'test', visibility: 'private', type, chart_config: '{}', role: 'owner', liked: false },
         series,
       } as never)
       const { unmount } = render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
       return unmount
     }
 
-    const unmount = detail('coverage', [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }])
+    const unmount = detail('coverage', [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }])
     expect(screen.queryByRole('group', { name: 'Add value' })).not.toBeInTheDocument()
 
     unmount()
@@ -1308,10 +1308,10 @@ describe('TrackerDetailView', () => {
   it('adds a value to the series chosen in the dropdown and refreshes the chart', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [
-        { id: 1, tracker_id: 1, name: 's1', data_type: 'float' },
-        { id: 2, tracker_id: 1, name: 's2', data_type: 'float' },
+        { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' },
+        { id: 2, tracker_id: "trk_1", name: 's2', data_type: 'float' },
       ],
     })
     const posts: { url: string; body: unknown }[] = []
@@ -1334,7 +1334,7 @@ describe('TrackerDetailView', () => {
     await waitFor(() => {
       expect(posts).toHaveLength(1)
     })
-    expect(posts[0].url).toMatch(/\/api\/trackers\/1\/series\/2\/values/)
+    expect(posts[0].url).toMatch(/\/api\/trackers\/trk_1\/series\/2\/values/)
     expect(posts[0].body).toMatchObject({ value: 99 })
     await waitFor(() => {
       expect(screen.getByTestId('echart').getAttribute('data-option')).toContain('99')
@@ -1356,7 +1356,7 @@ describe('TrackerDetailView', () => {
 
   it('shrinks the tracker title and its rename input on mobile only', () => {
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
       series: [],
     })
     render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
@@ -1370,8 +1370,8 @@ describe('TrackerDetailView', () => {
   it('opens the data point edit card and lists values newest-first', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     await openEditCard(user, [
       { id: 1, time: '2024-01-01T00:00:00Z', value: 10 },
@@ -1389,8 +1389,8 @@ describe('TrackerDetailView', () => {
   it('paginates edit card values and supports changing per page', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     const values = Array.from({ length: 25 }, (_, i) => ({
       id: i + 1,
@@ -1414,8 +1414,8 @@ describe('TrackerDetailView', () => {
   it('reflects edit card value changes in the chart immediately without saving', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     const patchSpy = vi.fn()
     await openEditCard(user, [{ id: 1, time: '2024-01-01T00:00:00Z', value: 10 }])
@@ -1439,8 +1439,8 @@ describe('TrackerDetailView', () => {
   it('saves all edits and deletes in a single batch request', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     const patchBody = vi.fn()
     const values = [
@@ -1473,8 +1473,8 @@ describe('TrackerDetailView', () => {
   it('reverts pending edits without closing when cancel is clicked', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     await openEditCard(user, [{ id: 1, time: '2024-01-01T00:00:00Z', value: 10 }])
 
@@ -1495,8 +1495,8 @@ describe('TrackerDetailView', () => {
   it('discards pending edits and refetches values when closed', async () => {
     const user = userEvent.setup()
     vi.mocked(useLoaderData).mockReturnValue({
-      tracker: { id: 1, name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
-      series: [{ id: 1, tracker_id: 1, name: 's1', data_type: 'float' }],
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [{ id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float' }],
     })
     await openEditCard(user, [{ id: 1, time: '2024-01-01T00:00:00Z', value: 10 }])
 
@@ -1519,15 +1519,15 @@ describe('TrackerDetailView', () => {
 describe('TrackerCard', () => {
   it('renders multi-axis yAxis and yAxisIndex from chartConfig', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'private', type: 'tracker',
       chart_config: '{"y_axes":[{"id":0,"position":"left"},{"id":1,"position":"right"}]}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"y_axis_index":0}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
-        { series: { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '{"y_axis_index":1}' }, values: [{ id: 1, time: '2024-01-01', value: 80 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '{"y_axis_index":0}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
+        { series: { id: 2, tracker_id: "trk_1", name: 's2', data_type: 'float', config: '{"y_axis_index":1}' }, values: [{ id: 1, time: '2024-01-01', value: 80 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1543,14 +1543,14 @@ describe('TrackerCard', () => {
 
   it('defaults to single left axis when chartConfig has no y_axes', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'private', type: 'tracker',
       chart_config: '{}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1563,14 +1563,14 @@ describe('TrackerCard', () => {
 
   it('applies areaStyle for line series when area is not false', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'private', type: 'tracker',
       chart_config: '{}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1581,14 +1581,14 @@ describe('TrackerCard', () => {
 
   it('omits areaStyle for line series when area is false', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'private', type: 'tracker',
       chart_config: '{"area":false}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1599,14 +1599,14 @@ describe('TrackerCard', () => {
 
   it('omits areaStyle for bar series regardless of area config', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'private', type: 'tracker',
       chart_config: '{}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{"type":"bar"}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '{"type":"bar"}' }, values: [{ id: 1, time: '2024-01-01', value: 10 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1617,14 +1617,14 @@ describe('TrackerCard', () => {
 
   it('strips time portion from x values when x_axis_type is date', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'private', type: 'tracker',
       chart_config: '{"x_axis_type":"date"}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-15T10:30:00Z', value: 90 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-15T10:30:00Z', value: 90 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1635,14 +1635,14 @@ describe('TrackerCard', () => {
 
   it('defaults to date-only x values when x_axis_type is not set', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'private', type: 'tracker',
       chart_config: '{}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-15T10:30:00Z', value: 90 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2024-01-15T10:30:00Z', value: 90 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1653,7 +1653,7 @@ describe('TrackerCard', () => {
 
   it('shows private badge for private trackers', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'private', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'private', type: 'tracker',
       chart_config: '{}',
       role: 'owner', liked: false, like_count: 0,
     }
@@ -1663,7 +1663,7 @@ describe('TrackerCard', () => {
 
   it('does not show private badge for public trackers', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'public', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'public', type: 'tracker',
       chart_config: '{}',
       role: '', liked: false, like_count: 0,
     }
@@ -1673,7 +1673,7 @@ describe('TrackerCard', () => {
 
   it('shows owner name and links to user page', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'public', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'public', type: 'tracker',
       chart_config: '{}',
       role: '', liked: false, like_count: 0,
       owner_name: 'alice',
@@ -1685,7 +1685,7 @@ describe('TrackerCard', () => {
 
   it('does not show owner name when not provided', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'public', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'public', type: 'tracker',
       chart_config: '{}',
       role: '', liked: false, like_count: 0,
     }
@@ -1695,7 +1695,7 @@ describe('TrackerCard', () => {
 
   it('shows Loading while preview data is being fetched', () => {
     const tracker = {
-      id: 1, name: 'test', visibility: 'public', type: 'tracker',
+      id: "trk_1", name: 'test', visibility: 'public', type: 'tracker',
       chart_config: '{}',
       role: '', liked: false, like_count: 0,
     }
@@ -1706,14 +1706,14 @@ describe('TrackerCard', () => {
 
   it('shows Activity Grid badge and renders a compact heatmap preview', () => {
     const tracker = {
-      id: 1, name: 'grid', visibility: 'private', type: 'activity_grid',
+      id: "trk_1", name: 'grid', visibility: 'private', type: 'activity_grid',
       chart_config: '{}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'int', config: '' }, values: [{ id: 1, time: '2024-02-01T00:00:00.000Z', value: 2 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'int', config: '' }, values: [{ id: 1, time: '2024-02-01T00:00:00.000Z', value: 2 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)
@@ -1726,14 +1726,14 @@ describe('TrackerCard', () => {
 
   it('renders heatmap preview with levels from chart config', () => {
     const tracker = {
-      id: 1, name: 'grid', visibility: 'public', type: 'activity_grid',
+      id: "trk_1", name: 'grid', visibility: 'public', type: 'activity_grid',
       chart_config: '{"grid_levels":4}',
       role: 'owner', liked: false, like_count: 0,
     }
     const preview = {
       tracker,
       series: [
-        { series: { id: 1, tracker_id: 1, name: 's1', data_type: 'int', config: '' }, values: [{ id: 1, time: '2024-02-01T00:00:00.000Z', value: 3 }] },
+        { series: { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'int', config: '' }, values: [{ id: 1, time: '2024-02-01T00:00:00.000Z', value: 3 }] },
       ],
     }
     render(<MemoryRouter><TrackerCard tracker={tracker} preview={preview} /></MemoryRouter>)

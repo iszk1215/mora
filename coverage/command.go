@@ -56,9 +56,12 @@ func newUploadCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("failed to get yes flag: %w", err)
 			}
-			trackerID, err := cmd.Flags().GetInt64("tracker")
+			trackerID, err := cmd.Flags().GetString("tracker")
 			if err != nil {
 				return fmt.Errorf("failed to get tracker flag: %w", err)
+			}
+			if trackerID == "" {
+				return fmt.Errorf("tracker flag is required")
 			}
 
 			cmd.SilenceUsage = true
@@ -74,7 +77,7 @@ func newUploadCommand() *cobra.Command {
 	uploadCmd.Flags().BoolP("force", "f", false, "force upload even when working tree is dirty")
 	uploadCmd.Flags().Bool("dry-run", false, "test")
 	uploadCmd.Flags().BoolP("yes", "y", false, "yes")
-	uploadCmd.Flags().Int64("tracker", 0, "tracker ID (required for upload)")
+	uploadCmd.Flags().String("tracker", "", "tracker ID (required for upload)")
 
 	return uploadCmd
 }

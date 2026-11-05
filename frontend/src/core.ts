@@ -70,7 +70,7 @@ export interface SeriesConfig {
 
 export interface SeriesModel {
   id: number
-  tracker_id: number
+  tracker_id: string
   name: string
   data_type: string
   config: string
@@ -82,7 +82,7 @@ export interface PreviewSeriesValues {
 }
 
 export interface TrackerResponse {
-  id: number
+  id: string
   name: string
   description?: string
   body?: string

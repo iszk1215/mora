@@ -347,12 +347,12 @@ func (s *MoraServer) requireTrackerAuth(next http.Handler) http.Handler {
 
 func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		trackerID, err := strconv.ParseInt(chi.URLParam(r, "trackerId"), 10, 64)
-		if err != nil {
-			log.Err(err).Msg("invalid trackerId in URL")
+		tr, ok := tracker.TrackerFromContext(r.Context())
+		if !ok {
 			render.BadRequest(w, errors.New("invalid tracker id"))
 			return
 		}
+		trackerID := tr.Id
 
 		repo, err := s.coverage.FindRepoByTrackerID(trackerID)
 		if err != nil {
@@ -405,18 +405,18 @@ func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 // @Summary      List coverages for a tracker
 // @Description  Return coverage history for a tracker (public list endpoint)
 // @Tags         coverage
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Success      200  {object}  coverage.CoverageListResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
 // @Router       /api/coverages/{trackerId} [get]
 func (s *MoraServer) handleCoverageListPublic(w http.ResponseWriter, r *http.Request) {
-	trackerID, err := strconv.ParseInt(chi.URLParam(r, "trackerId"), 10, 64)
-	if err != nil {
-		log.Err(err).Msg("invalid trackerId in URL")
+	tr, ok := tracker.TrackerFromContext(r.Context())
+	if !ok {
 		render.BadRequest(w, errors.New("invalid tracker id"))
 		return
 	}
+	trackerID := tr.Id
 
 	repo, err := s.coverage.FindRepoByTrackerID(trackerID)
 	if err != nil {

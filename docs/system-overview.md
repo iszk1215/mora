@@ -77,7 +77,7 @@ e2e/               E2E test infrastructure (mock OAuth provider)
 ├── /api/trackers/*         Tracker (requireTrackerAuth)
 ├── /api/coverages
 │   ├── POST /              Create coverage tracker (requireTrackerAuth)
-│   └── /{trackerId}/*      Coverage (injectTrackerCoverage)
+│   └── /{trackerId}/*      Coverage (InjectTracker + injectTrackerCoverage; trackerId = trk_ external ID)
 ├── /login/*                OAuth login
 ├── /logout/*               Logout
 ├── /api/signup/*           User signup
@@ -109,8 +109,8 @@ out of `frontend/public/`, is served with `no-cache` plus a strong `ETag` and
 3. Neither -> pass-through (anonymous, no 401)
 
 ### injectTrackerCoverage (`/api/coverages/{trackerId}/*`)
-1. Parse `trackerId` from URL
-2. Resolve to the linked repository via the `tracker_coverage` table (managed by coverage: `coverage.FindRepoByTrackerID()`), which stores the scm/namespace/name/url directly
+1. `InjectTracker` parses the external ID (`trk_<uuidv7>`) and loads the tracker (invalid format -> 400, unknown -> 404)
+2. Resolve the internal tracker ID to the linked repository via the `tracker_coverage` table (managed by coverage: `coverage.FindRepoByTrackerID()`), which stores the scm/namespace/name/url directly
 3. Load repository and repository manager
 4. Verify access
 5. Inject into context

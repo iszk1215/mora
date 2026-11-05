@@ -823,9 +823,9 @@ func TestNewMoraServerFromConfig_Gitea_InsecureSkipVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name   string
-		toml   string
-		want   bool
+		name string
+		toml string
+		want bool
 	}{
 		{
 			name: "enabled",
@@ -1191,7 +1191,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		sess := NewMoraSessionWithTokenFor(rm)
 		sess.SetUserID(1)
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", trk.Id), nil)
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%s", string(trk.ExternalId)), nil)
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-logged-in"})
 		require.NoError(t, server.sessionManager.store.Put("test-sess-logged-in", sess))
 		handler.ServeHTTP(w, r)
@@ -1213,7 +1213,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 
 	t.Run("not logged in", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", trk.Id), nil)
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%s", string(trk.ExternalId)), nil)
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()
@@ -1243,7 +1243,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 
 	t.Run("private tracker - anonymous returns 404", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", privateTrk.Id), nil)
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%s", string(privateTrk.ExternalId)), nil)
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()
@@ -1255,7 +1255,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		sess := NewMoraSessionWithTokenFor(rm)
 		sess.SetUserID(1)
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", privateTrk.Id), nil)
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%s", string(privateTrk.ExternalId)), nil)
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-superuser"})
 		require.NoError(t, server.sessionManager.store.Put("test-sess-superuser", sess))
 		handler.ServeHTTP(w, r)
@@ -1275,7 +1275,7 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		sess := NewMoraSessionWithTokenFor(rm)
 		sess.SetUserID(user2.ID)
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d", privateTrk.Id), nil)
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%s", string(privateTrk.ExternalId)), nil)
 		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-nonmember"})
 		require.NoError(t, server.sessionManager.store.Put("test-sess-nonmember", sess))
 		handler.ServeHTTP(w, r)
@@ -1391,7 +1391,10 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 		require.Equal(t, "coverage", trk.Type)
 		require.Equal(t, "public", trk.Visibility)
 
-		got, err := coverageService.FindRepoByTrackerID(trk.Id)
+		list, _, err := trackerService.ListTrackersByOwner(1, 1, "my cov tracker", 0, 0)
+		require.NoError(t, err)
+		require.Len(t, list, 1)
+		got, err := coverageService.FindRepoByTrackerID(list[0].InternalId)
 		require.NoError(t, err)
 		require.NotNil(t, got)
 		require.Equal(t, "http://mock.scm/owner/repo", got.Url)
@@ -1460,7 +1463,7 @@ func TestHandleCoveragePreview(t *testing.T) {
 
 	t.Run("public coverage tracker returns preview series", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%d/preview", trk.Id), nil)
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%s/preview", string(trk.ExternalId)), nil)
 		handler.ServeHTTP(w, r)
 
 		res := w.Result()

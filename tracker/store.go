@@ -59,6 +59,7 @@ const (
 var schemaTracker = `
 CREATE TABLE IF NOT EXISTS tracker (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_id TEXT,
     name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     body TEXT NOT NULL DEFAULT '',
@@ -112,20 +113,21 @@ type (
 
 // TrackerResponse is returned in tracker lists and includes user-specific flags.
 type TrackerResponse struct {
-	Id            int64     `json:"id"    db:"id"`
-	Name          string    `json:"name"  db:"name"`
-	Description   string    `json:"description" db:"description"`
-	Body          string    `json:"body" db:"body"`
-	Visibility    string    `json:"visibility"` // "public" | "private"
-	Type          string    `json:"type"`
-	ChartConfig   string    `json:"chart_config" db:"chart_config"`
-	OwnerId       int64     `json:"owner_id" db:"owner_id"`
-	OwnerName     string    `json:"owner_name" db:"owner_name"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-	LastUpdatedAt time.Time `json:"last_updated_at" db:"last_updated_at"`
-	Role          string    `json:"role"` // "" | "owner" | "editor"
-	Liked         bool      `json:"liked"`
-	LikeCount     int       `json:"like_count" db:"like_count"`
+	Id            ExternalID `json:"id"    db:"external_id"`
+	InternalId    int64      `json:"-"     db:"internal_id"`
+	Name          string     `json:"name"  db:"name"`
+	Description   string     `json:"description" db:"description"`
+	Body          string     `json:"body" db:"body"`
+	Visibility    string     `json:"visibility"` // "public" | "private"
+	Type          string     `json:"type"`
+	ChartConfig   string     `json:"chart_config" db:"chart_config"`
+	OwnerId       int64      `json:"owner_id" db:"owner_id"`
+	OwnerName     string     `json:"owner_name" db:"owner_name"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	LastUpdatedAt time.Time  `json:"last_updated_at" db:"last_updated_at"`
+	Role          string     `json:"role"` // "" | "owner" | "editor"
+	Liked         bool       `json:"liked"`
+	LikeCount     int        `json:"like_count" db:"like_count"`
 	// Series carries preview data (all series plus their latest values) when
 	// the list is requested with include=preview. Omitted otherwise.
 	Series []PreviewSeriesValues `json:"series,omitempty"`
@@ -219,9 +221,14 @@ func (s *trackerStore) addTracker(tracker *TrackerModel, userID int64) error {
 	tracker.OwnerId = userID
 	tracker.CreatedAt = now
 	tracker.LastUpdatedAt = now
-	query := "INSERT INTO tracker (name, description, body, visibility, type, chart_config, owner_id, created_at, last_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	eid, err := NewExternalID()
+	if err != nil {
+		return err
+	}
+	tracker.ExternalId = eid
+	query := "INSERT INTO tracker (name, description, body, visibility, type, chart_config, owner_id, created_at, last_updated_at, external_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
-	res, err := s.db.Exec(query, tracker.Name, tracker.Description, tracker.Body, tracker.Visibility, tracker.Type, tracker.ChartConfig, tracker.OwnerId, tracker.CreatedAt, tracker.LastUpdatedAt)
+	res, err := s.db.Exec(query, tracker.Name, tracker.Description, tracker.Body, tracker.Visibility, tracker.Type, tracker.ChartConfig, tracker.OwnerId, tracker.CreatedAt, tracker.LastUpdatedAt, eid.Bare())
 	if err != nil {
 		return fmt.Errorf("addTracker insert: %w", err)
 	}
@@ -274,7 +281,7 @@ func (s *trackerStore) listTrackers(userID int64, searchQuery string, page, perP
 	}
 
 	selectQuery := fmt.Sprintf(`
-		SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
+		SELECT t.external_id, t.id AS internal_id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
 		       t.owner_id, u.username AS owner_name, t.created_at, t.last_updated_at,
 		       CASE WHEN t.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, '') END AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
@@ -329,7 +336,7 @@ func (s *trackerStore) listTrackersByOwner(ownerID, viewerID int64, searchQuery 
 	}
 
 	selectQuery := fmt.Sprintf(`
-		SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
+		SELECT t.external_id, t.id AS internal_id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
 		       t.owner_id, u.username AS owner_name, t.created_at, t.last_updated_at,
 		       CASE WHEN t.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, '') END AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
@@ -361,7 +368,7 @@ func (s *trackerStore) listTrackersByOwner(ownerID, viewerID int64, searchQuery 
 }
 
 func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
-	query := `SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
+	query := `SELECT t.id, t.external_id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
 		t.owner_id, t.created_at, t.last_updated_at
 		FROM tracker t
 		WHERE t.id = ?`
@@ -379,9 +386,28 @@ func (s *trackerStore) findTrackerById(id int64) (*TrackerModel, error) {
 	return &rows[0], nil
 }
 
+func (s *trackerStore) findTrackerByExternalID(ext ExternalID) (*TrackerModel, error) {
+	query := `SELECT t.id, t.external_id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
+		t.owner_id, t.created_at, t.last_updated_at
+		FROM tracker t
+		WHERE t.external_id = ?`
+
+	rows := []TrackerModel{}
+	err := s.db.Select(&rows, query, ext)
+	if err != nil {
+		return nil, fmt.Errorf("findTrackerByExternalID select: %w", err)
+	}
+
+	if len(rows) == 0 {
+		return nil, errorTrackerNotFound
+	}
+
+	return &rows[0], nil
+}
+
 func (s *trackerStore) findTrackerResponseById(id, userID int64) (*TrackerResponse, error) {
 	query := `
-		SELECT t.id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
+		SELECT t.external_id, t.id AS internal_id, t.name, t.description, t.body, t.visibility, t.type, t.chart_config,
 		       t.owner_id, u.username AS owner_name, t.created_at, t.last_updated_at,
 		       CASE WHEN t.owner_id = ? THEN 'owner' ELSE COALESCE(m.role, '') END AS role,
 		       CASE WHEN l.user_id IS NOT NULL THEN 1 ELSE 0 END AS liked,
@@ -466,10 +492,12 @@ func (s *trackerStore) updateTracker(id int64, name, visibility, chartConfig, de
 // Series
 
 func (s *trackerStore) addSeries(series *SeriesModel) error {
-	_, err := s.findTrackerById(series.TrackerId)
+	tr, err := s.findTrackerById(series.TrackerId)
 	if err != nil {
 		return fmt.Errorf("addSeries findTrackerById: %w", err)
 	}
+
+	series.TrackerExternalId = tr.ExternalId
 
 	count, err := s.countSeriesByTracker(series.TrackerId)
 	if err != nil {
@@ -501,7 +529,10 @@ func (s *trackerStore) addSeries(series *SeriesModel) error {
 }
 
 func (s *trackerStore) findSeriesById(id int64) (*SeriesModel, error) {
-	query := "SELECT id, tracker_id, name, data_type, config FROM tracker_series WHERE id = ?"
+	query := `SELECT s.id, s.tracker_id, t.external_id, s.name, s.data_type, s.config
+		FROM tracker_series s
+		JOIN tracker t ON t.id = s.tracker_id
+		WHERE s.id = ?`
 
 	rows := []SeriesModel{}
 	err := s.db.Select(&rows, query, id)
@@ -518,7 +549,10 @@ func (s *trackerStore) findSeriesById(id int64) (*SeriesModel, error) {
 
 func (s *trackerStore) listSeries(trackerId int64) ([]SeriesModel, error) {
 	start := time.Now()
-	query := "SELECT id, tracker_id, name, data_type, config FROM tracker_series WHERE tracker_id = ?"
+	query := `SELECT s.id, s.tracker_id, t.external_id, s.name, s.data_type, s.config
+		FROM tracker_series s
+		JOIN tracker t ON t.id = s.tracker_id
+		WHERE s.tracker_id = ?`
 
 	rows := []SeriesModel{}
 	err := s.db.Select(&rows, query, trackerId)
@@ -544,10 +578,11 @@ func (s *trackerStore) listSeriesByTrackerIDs(trackerIDs []int64) (map[int64][]S
 		return map[int64][]SeriesModel{}, nil
 	}
 	start := time.Now()
-	query := fmt.Sprintf(`SELECT id, tracker_id, name, data_type, config
-		FROM tracker_series
-		WHERE tracker_id IN (%s)
-		ORDER BY tracker_id, id`, inClause(trackerIDs))
+	query := fmt.Sprintf(`SELECT s.id, s.tracker_id, t.external_id, s.name, s.data_type, s.config
+		FROM tracker_series s
+		JOIN tracker t ON t.id = s.tracker_id
+		WHERE s.tracker_id IN (%s)
+		ORDER BY s.tracker_id, s.id`, inClause(trackerIDs))
 
 	args := make([]interface{}, len(trackerIDs))
 	for i, id := range trackerIDs {
@@ -796,7 +831,7 @@ func (s *trackerStore) listLatestValuesByTrackerIDs(trackerIDs []int64, limit in
 	args[len(trackerIDs)] = limit
 
 	rows := make([]struct {
-		TrackerID int64     `db:"tracker_id"`
+		TrackerID int64 `db:"tracker_id"`
 		ValueModel
 	}, 0)
 	if err := s.db.Select(&rows, query, args...); err != nil {
@@ -1040,6 +1075,46 @@ func (s *trackerStore) migrate() error {
 		if err != nil {
 			return fmt.Errorf("migrate tracker body column: %w", err)
 		}
+	}
+	if !s.hasColumn("tracker", "external_id") {
+		_, err := s.db.Exec("ALTER TABLE tracker ADD COLUMN external_id TEXT")
+		if err != nil {
+			return fmt.Errorf("migrate tracker external_id column: %w", err)
+		}
+	}
+	// Backfill external_id for existing rows.
+	rows, err := s.db.Query("SELECT id FROM tracker WHERE external_id IS NULL OR external_id = ''")
+	if err != nil {
+		return fmt.Errorf("migrate external_id select: %w", err)
+	}
+	type row struct {
+		id int64
+	}
+	var ids []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("migrate external_id scan: %w", err)
+		}
+		ids = append(ids, r)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return fmt.Errorf("migrate external_id rows: %w", err)
+	}
+	_ = rows.Close()
+	for _, r := range ids {
+		eid, err := NewExternalID()
+		if err != nil {
+			return err
+		}
+		if _, err := s.db.Exec("UPDATE tracker SET external_id = ? WHERE id = ?", eid.Bare(), r.id); err != nil {
+			return fmt.Errorf("migrate external_id update: %w", err)
+		}
+	}
+	if _, err := s.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tracker_external_id ON tracker(external_id)"); err != nil {
+		return fmt.Errorf("migrate idx_tracker_external_id: %w", err)
 	}
 	return nil
 }

@@ -12,14 +12,15 @@ import (
 
 func InjectTracker(store *trackerStore, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(chi.URLParam(r, "trackerId"), 10, 64)
+		param := chi.URLParam(r, "trackerId")
+		ext, err := ParseExternalID(param)
 		if err != nil {
 			log.Warn().Err(err).Msg("tracker.middleware.InjectTracker")
 			render.BadRequest(w, errors.New("invalid tracker id"))
 			return
 		}
 
-		tracker, err := store.findTrackerById(id)
+		tracker, err := store.findTrackerByExternalID(ext)
 		if err == errorTrackerNotFound {
 			render.NotFound(w, errors.New("tracker not found"))
 			return

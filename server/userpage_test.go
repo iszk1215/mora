@@ -108,7 +108,7 @@ func TestHandleUserTrackers(t *testing.T) {
 		var got tracker.ListTrackersResponse
 		require.NoError(t, json.NewDecoder(res.Body).Decode(&got))
 		require.Equal(t, 1, len(got.Trackers))
-		require.Equal(t, pub.Id, got.Trackers[0].Id)
+		require.Equal(t, string(pub.ExternalId), string(got.Trackers[0].Id))
 		require.Equal(t, "public", got.Trackers[0].Visibility)
 	})
 
@@ -130,7 +130,7 @@ func TestHandleUserTrackers(t *testing.T) {
 		var got tracker.ListTrackersResponse
 		require.NoError(t, json.NewDecoder(res.Body).Decode(&got))
 		require.Equal(t, 1, len(got.Trackers))
-		require.Equal(t, pub.Id, got.Trackers[0].Id)
+		require.Equal(t, string(pub.ExternalId), string(got.Trackers[0].Id))
 	})
 
 	t.Run("search query filters owner's trackers", func(t *testing.T) {

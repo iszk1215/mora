@@ -5,7 +5,7 @@ import type { PreviewData } from './tracker-api'
 export interface SearchState {
   query: string
   results: TrackerResponse[]
-  previews: Map<number, PreviewData>
+  previews: Map<string, PreviewData>
 }
 
 export interface SearchContextValue extends SearchState {

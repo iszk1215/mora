@@ -7,13 +7,13 @@ async function signIn(page: any): Promise<void> {
   await expect(page.locator('header .bg-blue-500')).toBeVisible({ timeout: 10_000 })
 }
 
-async function ownedTracker(page: any): Promise<{ id: number; name: string }> {
+async function ownedTracker(page: any): Promise<{ id: string; name: string }> {
   return page.evaluate(async () => {
     const res = await fetch('/api/trackers?page=1&per_page=100')
     const body: any = await res.json()
     const trackers = body.trackers ?? body.data ?? []
     const found = trackers.find((t: any) => t.type !== 'coverage' && t.role === 'owner')
-    return found ? { id: found.id, name: found.name } : { id: 0, name: '' }
+    return found ? { id: found.id, name: found.name } : { id: '', name: '' }
   })
 }
 
@@ -31,7 +31,7 @@ test.describe('Tracker detail mobile layout', () => {
     await signIn(page)
 
     const tracker = await ownedTracker(page)
-    expect(tracker.id).toBeGreaterThan(0)
+    expect(tracker.id).not.toBe('')
 
     await page.goto(`/trackers/${tracker.id}`)
     await expect(page.getByRole('heading', { level: 1, name: tracker.name })).toBeVisible({ timeout: 15_000 })

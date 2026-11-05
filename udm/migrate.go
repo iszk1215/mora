@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 )
@@ -192,10 +193,14 @@ func insertMigratedTracker(tx *sqlx.Tx, metricID int64, name string) (int64, tim
 		return 0, time.Time{}, time.Time{}, err
 	}
 
+	ext, err := tracker.NewExternalID()
+	if err != nil {
+		return 0, time.Time{}, time.Time{}, err
+	}
 	res, err := tx.Exec(`
-		INSERT INTO tracker (name, description, body, visibility, type, chart_config, owner_id, created_at, last_updated_at)
-		VALUES (?, '', '', 'public', 'tracker', '{}', ?, ?, ?)`,
-		name, UdmTrackerOwnerID, createdAt, lastUpdatedAt)
+		INSERT INTO tracker (name, description, body, visibility, type, chart_config, owner_id, created_at, last_updated_at, external_id)
+		VALUES (?, '', '', 'public', 'tracker', '{}', ?, ?, ?, ?)`,
+		name, UdmTrackerOwnerID, createdAt, lastUpdatedAt, ext.Bare())
 	if err != nil {
 		return 0, time.Time{}, time.Time{}, fmt.Errorf("insertMigratedTracker insert: %w", err)
 	}

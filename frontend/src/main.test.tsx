@@ -277,13 +277,13 @@ describe('Breadcrumbs', () => {
         handle: {},
       },
       {
-        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/trk_1', params: { trackerId: 'trk_1' },
+        data: { tracker: { id: "trk_1", name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/trackers/1' }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/trk_1' }]}>
         <Breadcrumbs />
       </MemoryRouter>
     )
@@ -300,13 +300,13 @@ describe('Breadcrumbs', () => {
         handle: {},
       },
       {
-        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/trk_1', params: { trackerId: 'trk_1' },
+        data: { tracker: { id: "trk_1", name: 'My Tracker' } }, loaderData: undefined,
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/trackers/1' }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/trk_1' }]}>
         <Breadcrumbs />
       </MemoryRouter>
     )
@@ -322,13 +322,13 @@ describe('Breadcrumbs', () => {
         handle: {},
       },
       {
-        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/trk_1', params: { trackerId: 'trk_1' },
+        data: { tracker: { id: "trk_1", name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/trackers/1', state: { fromSearch: 'foo' } }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/trk_1', state: { fromSearch: 'foo' } }]}>
         <Breadcrumbs />
       </MemoryRouter>
     )
@@ -348,38 +348,38 @@ describe('Breadcrumbs', () => {
         handle: {},
       },
       {
-        id: 'routes/coverages/:trackerId', pathname: '/coverages/3', params: { trackerId: '3' },
+        id: 'routes/coverages/:trackerId', pathname: '/coverages/trk_3', params: { trackerId: 'trk_3' },
         data: { trackerName: 'My Coverage Tracker' }, loaderData: undefined,
-        handle: { crumb: (params: any, data: any) => ({ label: data?.trackerName ?? `Coverage #${params.trackerId}`, link: `/coverages/${params.trackerId}` }) },
+        handle: { crumb: (params: any, data: any) => ({ label: data?.trackerName ?? `Coverage ${params.trackerId}`, link: `/coverages/${params.trackerId}` }) },
       },
     ])
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/coverages/3' }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/coverages/trk_3' }]}>
         <Breadcrumbs />
       </MemoryRouter>
     )
     expect(screen.getByText('My Coverage Tracker')).toBeInTheDocument()
-    expect(screen.queryByText('Coverage #3')).toBeNull()
+    expect(screen.queryByText('Coverage 3')).toBeNull()
   })
 
-  it('falls back to Coverage #id when data is missing', () => {
+  it('falls back to Coverage id when data is missing', () => {
     vi.mocked(useMatches).mockReturnValue([
       {
         id: '0', pathname: '/', params: {}, data: undefined, loaderData: undefined,
         handle: {},
       },
       {
-        id: 'routes/coverages/:trackerId', pathname: '/coverages/5', params: { trackerId: '5' },
+        id: 'routes/coverages/:trackerId', pathname: '/coverages/trk_5', params: { trackerId: 'trk_5' },
         data: undefined, loaderData: undefined,
-        handle: { crumb: (params: any, data: any) => ({ label: data?.trackerName ?? `Coverage #${params.trackerId}`, link: `/coverages/${params.trackerId}` }) },
+        handle: { crumb: (params: any, data: any) => ({ label: data?.trackerName ?? `Coverage ${params.trackerId}`, link: `/coverages/${params.trackerId}` }) },
       },
     ])
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/coverages/5' }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/coverages/trk_5' }]}>
         <Breadcrumbs />
       </MemoryRouter>
     )
-    expect(screen.getByText('Coverage #5')).toBeInTheDocument()
+    expect(screen.getByText('Coverage trk_5')).toBeInTheDocument()
   })
 
   it('Search Results link includes encoded query', () => {
@@ -389,13 +389,13 @@ describe('Breadcrumbs', () => {
         handle: {},
       },
       {
-        id: '0-4-2', pathname: '/trackers/1', params: { trackerId: '1' }, 
-        data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+        id: '0-4-2', pathname: '/trackers/trk_1', params: { trackerId: 'trk_1' },
+        data: { tracker: { id: "trk_1", name: 'My Tracker' } }, loaderData: undefined,
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/trackers/1', state: { fromSearch: 'foo bar' } }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/trk_1', state: { fromSearch: 'foo bar' } }]}>
         <Breadcrumbs />
       </MemoryRouter>
     )
@@ -410,13 +410,13 @@ describe('Breadcrumbs', () => {
         handle: {},
       },
       {
-        id: 'routes/trackers/:trackerId', pathname: '/trackers/1', params: { trackerId: '1' },
-        data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
+        id: 'routes/trackers/:trackerId', pathname: '/trackers/trk_1', params: { trackerId: 'trk_1' },
+        data: { tracker: { id: "trk_1", name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
         handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
       },
     ])
     render(
-      <MemoryRouter initialEntries={[{ pathname: '/trackers/1', state: { fromSearch: 'foo', fromUser: 'alice' } }]}>
+      <MemoryRouter initialEntries={[{ pathname: '/trackers/trk_1', state: { fromSearch: 'foo', fromUser: 'alice' } }]}>
         <Breadcrumbs />
       </MemoryRouter>
     )
@@ -442,13 +442,13 @@ describe('Breadcrumbs', () => {
           handle: {},
         },
         {
-          id: '0-4-2', pathname: '/trackers/1', params: { trackerId: '1' },
-          data: { tracker: { id: 1, name: 'My Tracker' } }, loaderData: undefined,
+          id: '0-4-2', pathname: '/trackers/trk_1', params: { trackerId: 'trk_1' },
+          data: { tracker: { id: "trk_1", name: 'My Tracker' } }, loaderData: undefined,
           handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
         },
       ])
       render(
-        <MemoryRouter initialEntries={[{ pathname: '/trackers/1', state: { fromSearch: 'foo' } }]}>
+        <MemoryRouter initialEntries={[{ pathname: '/trackers/trk_1', state: { fromSearch: 'foo' } }]}>
           <Breadcrumbs />
         </MemoryRouter>
       )
@@ -469,13 +469,13 @@ describe('Breadcrumbs', () => {
           handle: {},
         },
         {
-          id: '0-4-2', pathname: '/trackers/1', params: { trackerId: '1' },
-          data: { tracker: { id: 1, name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
+          id: '0-4-2', pathname: '/trackers/trk_1', params: { trackerId: 'trk_1' },
+          data: { tracker: { id: "trk_1", name: 'My Tracker', owner_name: 'alice' } }, loaderData: undefined,
           handle: { crumb: (params: any, data: any) => ({ label: data?.tracker?.name ?? 'Tracker' }) },
         },
       ])
       render(
-        <MemoryRouter initialEntries={[{ pathname: '/trackers/1' }]}>
+        <MemoryRouter initialEntries={[{ pathname: '/trackers/trk_1' }]}>
           <Breadcrumbs />
         </MemoryRouter>
       )
@@ -557,7 +557,7 @@ describe('TrackerSearchPage', () => {
     const withSeries = {
       ...tracker,
       chart_config: '{}',
-      series: [{ series: { id: 1, tracker_id: 1, name: 'temp', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2026-01-01T00:00:00Z', value: 12.5 }] }],
+      series: [{ series: { id: 1, tracker_id: "trk_1", name: 'temp', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2026-01-01T00:00:00Z', value: 12.5 }] }],
     }
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify({ trackers: [withSeries], total: 1, page: 1, per_page: 12 }), { headers: { 'Content-Type': 'application/json' } }))

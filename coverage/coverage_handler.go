@@ -52,7 +52,7 @@ type (
 	}
 
 	FileListResponse struct {
-		Metadata MetaResponse     `json:"meta"`
+		Metadata MetaResponse    `json:"meta"`
 		Repo     core.Repository `json:"repo"`
 		Files    []*FileResponse `json:"files"`
 	}
@@ -250,7 +250,7 @@ func (s *CoverageHandler) HandleCoverageListPublic(w http.ResponseWriter, r *htt
 //
 // TimelineToPreviewSeries converts a coverage timeline into the virtual
 // series representation used for tracker preview cards.
-func TimelineToPreviewSeries(trackerID int64, timeline map[string][]CoverageTimelinePoint) []tracker.PreviewSeriesValues {
+func TimelineToPreviewSeries(trackerID int64, trackerExternalID string, timeline map[string][]CoverageTimelinePoint) []tracker.PreviewSeriesValues {
 	previews := make([]tracker.PreviewSeriesValues, 0, len(timeline))
 	for name, points := range timeline {
 		values := make([]tracker.ValueModel, len(points))
@@ -259,11 +259,12 @@ func TimelineToPreviewSeries(trackerID int64, timeline map[string][]CoverageTime
 		}
 		previews = append(previews, tracker.PreviewSeriesValues{
 			Series: tracker.SeriesModel{
-				Id:        0,
-				TrackerId: trackerID,
-				Name:      name,
-				DataType:  "float",
-				Config:    `{"value_format":"%.1f%%"}`,
+				Id:                0,
+				TrackerId:         trackerID,
+				TrackerExternalId: tracker.ExternalID(trackerExternalID),
+				Name:              name,
+				DataType:          "float",
+				Config:            `{"value_format":"%.1f%%"}`,
 			},
 			Values: values,
 		})
@@ -275,7 +276,7 @@ func TimelineToPreviewSeries(trackerID int64, timeline map[string][]CoverageTime
 // @Summary      Preview coverage data
 // @Description  Return coverage timeline data as virtual series for a tracker
 // @Tags         coverage
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Success      200  {object}  tracker.PreviewResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
@@ -293,10 +294,10 @@ func (s *CoverageHandler) HandleCoveragePreview(w http.ResponseWriter, r *http.R
 		render.InternalError(w, err)
 		return
 	}
-	previews := TimelineToPreviewSeries(tr.Id, timeline)
+	previews := TimelineToPreviewSeries(tr.Id, string(tr.ExternalId), timeline)
 
 	trackerResp := tracker.TrackerResponse{
-		Id:          tr.Id,
+		Id:          tr.ExternalId,
 		Name:        tr.Name,
 		Description: tr.Description,
 		Body:        tr.Body,
@@ -336,7 +337,7 @@ func makeFileListResponse(rm core.RepositoryClient, repo core.Repository, cov *C
 // @Summary      List files in a coverage entry
 // @Description  Return the file list and metadata for a coverage entry
 // @Tags         coverage
-// @Param        trackerId  path  int     true  "Tracker ID"
+// @Param        trackerId  path  string     true  "Tracker ID"
 // @Param        id         path  int     true  "Coverage index"
 // @Param        entry      path  string  true  "Entry name"
 // @Success      200  {object}  coverage.FileListResponse
@@ -371,7 +372,7 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 // @Summary      Get a source file
 // @Description  Return the source code and coverage blocks for a file in an entry
 // @Tags         coverage
-// @Param        trackerId  path  int     true  "Tracker ID"
+// @Param        trackerId  path  string     true  "Tracker ID"
 // @Param        id         path  int     true  "Coverage index"
 // @Param        entry      path  string  true  "Entry name"
 // @Param        filepath   path  string  true  "File path"
@@ -466,7 +467,7 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 // @Tags         coverage
 // @Accept       json
 // @Produce      json
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Param        body       body  coverage.CoverageUploadRequest  true  "Coverage data"
 // @Success      201  {object}  coverage.Coverage
 // @Failure      400  {object}  core.ErrorResponse
