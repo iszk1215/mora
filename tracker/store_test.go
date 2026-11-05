@@ -487,6 +487,8 @@ func TestStoreFindSeries(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, series.Id, got.Id)
 		require.Equal(t, series.TrackerId, got.TrackerId)
+		require.Equal(t, series.TrackerExternalId, got.TrackerExternalId)
+		require.NotEmpty(t, got.TrackerExternalId)
 		require.Equal(t, series.Name, got.Name)
 		require.Equal(t, series.DataType, got.DataType)
 		require.Equal(t, series.Config, got.Config)
@@ -502,6 +504,8 @@ func TestStoreFindSeries(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(items))
 		require.Equal(t, series.Id, items[0].Id)
+		require.Equal(t, series.TrackerExternalId, items[0].TrackerExternalId)
+		require.NotEmpty(t, items[0].TrackerExternalId)
 		require.Equal(t, series.Name, items[0].Name)
 	})
 

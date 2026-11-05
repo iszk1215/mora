@@ -76,9 +76,7 @@ func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 // trackerContextRouter mounts a coverage handler under /{trackerId} with a real
 // tracker injected into the request context, mirroring the production mount in
 // server/server.go.
-var testTrackerExtID string
-
-func trackerContextRouter(t *testing.T, s *CoverageHandler) http.Handler {
+func trackerContextRouter(t *testing.T, s *CoverageHandler) (http.Handler, string) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
 	db.MustExec("PRAGMA foreign_keys = OFF")
@@ -90,7 +88,6 @@ func trackerContextRouter(t *testing.T, s *CoverageHandler) http.Handler {
 	require.NoError(t, err)
 	tr, err := trackerService.CreateTracker("test coverage", "", "", "public", 1, tracker.TypeCoverage, `{"area":false}`)
 	require.NoError(t, err)
-	testTrackerExtID = string(tr.ExternalId)
 
 	r := chi.NewRouter()
 	r.Route("/{trackerId}", func(r chi.Router) {
@@ -99,10 +96,7 @@ func trackerContextRouter(t *testing.T, s *CoverageHandler) http.Handler {
 		r.Get("/public", s.HandleCoverageListPublic)
 		r.Post("/", s.HandleCoverageUpload)
 	})
-	// store for tests
-	t.Cleanup(func() {})
-	_ = tr
-	return r
+	return r, string(tr.ExternalId)
 }
 
 // Test Cases
@@ -229,9 +223,9 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 
 	store := setupCoverageStore(t, cov0, cov1)
 	s := newCoverageHandler(store)
-	r := trackerContextRouter(t, s)
+	r, trackerExtID := trackerContextRouter(t, s)
 
-	req := httptest.NewRequest(http.MethodGet, "/"+testTrackerExtID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/"+trackerExtID, nil)
 	req = req.WithContext(core.WithRepo(core.WithRepositoryClient(req.Context(), rm), repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -258,9 +252,9 @@ func Test_CoverageHandler_CoverageList_Empty(t *testing.T) {
 
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
-	r := trackerContextRouter(t, s)
+	r, trackerExtID := trackerContextRouter(t, s)
 
-	req := httptest.NewRequest(http.MethodGet, "/"+testTrackerExtID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/"+trackerExtID, nil)
 	req = req.WithContext(core.WithRepo(core.WithRepositoryClient(req.Context(), rm), repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -287,10 +281,10 @@ func Test_CoverageHandler_HandleCoverageListPublic(t *testing.T) {
 
 	store := setupCoverageStore(t, cov0, cov1)
 	s := newCoverageHandler(store)
-	r := trackerContextRouter(t, s)
+	r, trackerExtID := trackerContextRouter(t, s)
 
 	t.Run("with RepositoryClient", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/"+testTrackerExtID+"/public", nil)
+		req := httptest.NewRequest(http.MethodGet, "/"+trackerExtID+"/public", nil)
 		ctx := core.WithRepo(req.Context(), repo)
 		ctx = core.WithRepositoryClient(ctx, rm)
 		req = req.WithContext(ctx)
@@ -315,7 +309,7 @@ func Test_CoverageHandler_HandleCoverageListPublic(t *testing.T) {
 	})
 
 	t.Run("without RepositoryClient", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/"+testTrackerExtID+"/public", nil)
+		req := httptest.NewRequest(http.MethodGet, "/"+trackerExtID+"/public", nil)
 		ctx := core.WithRepo(req.Context(), repo)
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
@@ -687,7 +681,7 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
-	r := trackerContextRouter(t, s)
+	r, trackerExtID := trackerContextRouter(t, s)
 
 	makeUpload := func(revision string, entry *CoverageEntryUploadRequest) *httptest.ResponseRecorder {
 		req := &CoverageUploadRequest{
@@ -698,7 +692,7 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 		body, err := json.Marshal(req)
 		require.NoError(t, err)
 
-		request := httptest.NewRequest(http.MethodPost, "/"+testTrackerExtID, bytes.NewBuffer(body))
+		request := httptest.NewRequest(http.MethodPost, "/"+trackerExtID, bytes.NewBuffer(body))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, request)
 		return w
@@ -763,9 +757,9 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
-	r := trackerContextRouter(t, s)
+	r, trackerExtID := trackerContextRouter(t, s)
 
-	req := httptest.NewRequest(http.MethodPost, "/"+testTrackerExtID, bytes.NewBuffer(body))
+	req := httptest.NewRequest(http.MethodPost, "/"+trackerExtID, bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -814,7 +808,7 @@ func TestValidateCoverageUploadRequest(t *testing.T) {
 func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
-	r := trackerContextRouter(t, s)
+	r, trackerExtID := trackerContextRouter(t, s)
 
 	assertBadRequestMessage := func(t *testing.T, body []byte, expected string) {
 		var errResp core.ErrorResponse
@@ -823,7 +817,7 @@ func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 	}
 
 	t.Run("invalid JSON body returns sanitized message", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/"+testTrackerExtID, bytes.NewBufferString("{invalid}"))
+		request := httptest.NewRequest(http.MethodPost, "/"+trackerExtID, bytes.NewBufferString("{invalid}"))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, request)
 		res := w.Result()
@@ -840,7 +834,7 @@ func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 		}
 		body, err := json.Marshal(req)
 		require.NoError(t, err)
-		request := httptest.NewRequest(http.MethodPost, "/"+testTrackerExtID, bytes.NewBuffer(body))
+		request := httptest.NewRequest(http.MethodPost, "/"+trackerExtID, bytes.NewBuffer(body))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, request)
 		res := w.Result()

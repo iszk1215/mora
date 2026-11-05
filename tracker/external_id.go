@@ -30,10 +30,11 @@ func ParseExternalID(s string) (ExternalID, error) {
 		return "", fmt.Errorf("invalid tracker id")
 	}
 	raw := strings.TrimPrefix(s, externalIDPrefix)
-	if _, err := uuid.Parse(raw); err != nil {
+	id, err := uuid.Parse(raw)
+	if err != nil {
 		return "", fmt.Errorf("invalid tracker id")
 	}
-	return ExternalID(s), nil
+	return ExternalID(externalIDPrefix + id.String()), nil
 }
 
 func (e ExternalID) String() string {
@@ -66,10 +67,11 @@ func (e *ExternalID) Scan(src interface{}) error {
 		return nil
 	}
 	// stored as bare UUID in DB
-	if _, err := uuid.Parse(s); err != nil {
+	id, err := uuid.Parse(s)
+	if err != nil {
 		return err
 	}
-	*e = ExternalID(externalIDPrefix + s)
+	*e = ExternalID(externalIDPrefix + id.String())
 	return nil
 }
 
