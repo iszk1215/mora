@@ -18,7 +18,7 @@ export interface SeriesTableHandle {
 }
 
 interface SeriesTableProps {
-  trackerId: number
+  trackerId: string
   seriesList: SeriesModel[]
   yAxes: YAxisConfig[]
   onSelectSeries?: (seriesId: number) => void

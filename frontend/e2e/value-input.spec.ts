@@ -7,13 +7,13 @@ async function signIn(page: any): Promise<void> {
   await expect(page.locator('header .bg-blue-500')).toBeVisible({ timeout: 10_000 })
 }
 
-async function ownedTrackerId(page: any): Promise<number> {
+async function ownedTrackerId(page: any): Promise<string> {
   return page.evaluate(async () => {
     const res = await fetch('/api/trackers?page=1&per_page=100')
     const body: any = await res.json()
     const trackers = body.trackers ?? body.data ?? []
     const found = trackers.find((t: any) => t.type !== 'coverage' && t.role === 'owner')
-    return found ? found.id : 0
+    return found ? found.id : ''
   })
 }
 
@@ -34,7 +34,7 @@ test.describe('Quick value input layout', () => {
     await signIn(page)
 
     const trackerId = await ownedTrackerId(page)
-    expect(trackerId).toBeGreaterThan(0)
+    expect(trackerId).not.toBe('')
 
     await page.goto(`/trackers/${trackerId}`)
     const { date, series, value, add } = await valueRowBoxes(page)
@@ -50,7 +50,7 @@ test.describe('Quick value input layout', () => {
     await signIn(page)
 
     const trackerId = await ownedTrackerId(page)
-    expect(trackerId).toBeGreaterThan(0)
+    expect(trackerId).not.toBe('')
 
     await page.goto(`/trackers/${trackerId}`)
     const { row, date, series, value, add } = await valueRowBoxes(page)

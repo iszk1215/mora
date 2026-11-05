@@ -24,24 +24,26 @@ type (
 	}
 
 	TrackerModel struct {
-		Id            int64     `json:"id"         db:"id"`
-		Name          string    `json:"name"       db:"name"`
-		Description   string    `json:"description" db:"description"`
-		Body          string    `json:"body"       db:"body"`
-		Visibility    string    `json:"visibility" db:"visibility"`
-		Type          string    `json:"type"       db:"type"`
-		ChartConfig   string    `json:"chart_config" db:"chart_config"`
-		OwnerId       int64     `json:"owner_id"   db:"owner_id"`
-		CreatedAt     time.Time `json:"created_at" db:"created_at"`
-		LastUpdatedAt time.Time `json:"last_updated_at" db:"last_updated_at"`
+		Id            int64      `json:"-"           db:"id"`
+		ExternalId    ExternalID `json:"id"           db:"external_id"`
+		Name          string     `json:"name"         db:"name"`
+		Description   string     `json:"description"  db:"description"`
+		Body          string     `json:"body"         db:"body"`
+		Visibility    string     `json:"visibility"   db:"visibility"`
+		Type          string     `json:"type"         db:"type"`
+		ChartConfig   string     `json:"chart_config" db:"chart_config"`
+		OwnerId       int64      `json:"owner_id"     db:"owner_id"`
+		CreatedAt     time.Time  `json:"created_at"   db:"created_at"`
+		LastUpdatedAt time.Time  `json:"last_updated_at" db:"last_updated_at"`
 	}
 
 	SeriesModel struct {
-		Id        int64  `json:"id"         db:"id"`
-		TrackerId int64  `json:"tracker_id" db:"tracker_id"`
-		Name      string `json:"name"       db:"name"`
-		DataType  string `json:"data_type"  db:"data_type"`
-		Config    string `json:"config"     db:"config"`
+		Id                int64      `json:"id"          db:"id"`
+		TrackerId         int64      `json:"-"           db:"tracker_id"`
+		TrackerExternalId ExternalID `json:"tracker_id"  db:"external_id"`
+		Name              string     `json:"name"        db:"name"`
+		DataType          string     `json:"data_type"   db:"data_type"`
+		Config            string     `json:"config"      db:"config"`
 	}
 
 	ValueModel struct {
@@ -283,7 +285,7 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := TrackerResponse{
-		Id:            tracker.Id,
+		Id:            tracker.ExternalId,
 		Name:          tracker.Name,
 		Description:   tracker.Description,
 		Body:          tracker.Body,
@@ -306,7 +308,7 @@ func (h *trackerHandler) createTracker(w http.ResponseWriter, r *http.Request) {
 // @Summary      Delete a tracker
 // @Description  Delete the specified tracker. Child series and values are also cascade-deleted. Owner only.
 // @Tags         tracker
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -334,7 +336,7 @@ func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 // @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        trackerId  path  int                      true  "Tracker ID"
+// @Param        trackerId  path  string                      true  "Tracker ID"
 // @Param        body       body  tracker.PatchTrackerRequest  true  "Fields to update"
 // @Success      200  {object}  tracker.TrackerResponse
 // @Failure      400  {object}  core.ErrorResponse
@@ -347,7 +349,7 @@ func (h *trackerHandler) deleteTracker(w http.ResponseWriter, r *http.Request) {
 // @Summary      Get a tracker
 // @Description  Return a single tracker by ID
 // @Tags         tracker
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Success      200  {object}  tracker.TrackerResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
@@ -450,7 +452,7 @@ func (h *trackerHandler) patchTracker(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := TrackerResponse{
-		Id:            tracker.Id,
+		Id:            tracker.ExternalId,
 		Name:          tracker.Name,
 		Description:   tracker.Description,
 		Body:          tracker.Body,
@@ -505,7 +507,7 @@ func parallel(fns ...func() error) error {
 // @Summary      Preview tracker data
 // @Description  Return tracker info, all series, and latest values (up to 20 per series) for card previews
 // @Tags         tracker
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Success      200  {object}  tracker.PreviewResponse
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -554,7 +556,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	}
 
 	trackerResp := TrackerResponse{
-		Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type,
+		Id: tracker.ExternalId, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type,
 		ChartConfig: tracker.ChartConfig,
 		OwnerId:     tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt,
 		OwnerName: ownerName, Role: role, Liked: liked,
@@ -587,7 +589,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 // @Summary      List all series
 // @Description  Return all series belonging to the specified tracker
 // @Tags         tracker
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Success      200  {object}  tracker.ListSeriesResponse
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -631,7 +633,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trackerResp := TrackerResponse{Id: tracker.Id, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig, OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt, OwnerName: ownerName, Role: role, Liked: liked, LikeCount: likeCount}
+	trackerResp := TrackerResponse{Id: tracker.ExternalId, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig, OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt, OwnerName: ownerName, Role: role, Liked: liked, LikeCount: likeCount}
 
 	resp := ListSeriesResponse{
 		Tracker: trackerResp,
@@ -647,7 +649,7 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 // @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        trackerId  path  int                       true  "Tracker ID"
+// @Param        trackerId  path  string                       true  "Tracker ID"
 // @Param        body       body  tracker.CreateSeriesRequest  true  "Series information"
 // @Success      201  {object}  tracker.SeriesModel
 // @Failure      400  {object}  core.ErrorResponse
@@ -725,7 +727,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 // @Summary      Delete a series
 // @Description  Delete the specified series. Child values are also cascade-deleted.
 // @Tags         tracker
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Param        seriesId   path  int  true  "Series ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
@@ -758,7 +760,7 @@ func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 // @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        trackerId  path  int                      true  "Tracker ID"
+// @Param        trackerId  path  string                      true  "Tracker ID"
 // @Param        seriesId   path  int                      true  "Series ID"
 // @Param        body       body  tracker.PatchSeriesRequest  true  "Fields to update"
 // @Success      200  {object}  tracker.SeriesModel
@@ -859,7 +861,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 // @Summary      List all values
 // @Description  Return time-series data for the specified series. The limit parameter restricts the maximum number of results.
 // @Tags         tracker
-// @Param        trackerId  path  int     true   "Tracker ID"
+// @Param        trackerId  path  string     true   "Tracker ID"
 // @Param        seriesId   path  int     true   "Series ID"
 // @Param        limit      query int     false  "Maximum number of results"
 // @Success      200  {object}  tracker.ListValuesResponse
@@ -902,7 +904,7 @@ func (h *trackerHandler) listValues(w http.ResponseWriter, r *http.Request) {
 // @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        trackerId  path  int                     true  "Tracker ID"
+// @Param        trackerId  path  string                     true  "Tracker ID"
 // @Param        seriesId   path  int                     true  "Series ID"
 // @Param        body       body  tracker.CreateValueRequest  true  "Value data"
 // @Success      201  {object}  tracker.ValueModel
@@ -964,7 +966,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // @Summary      Delete all values
 // @Description  Delete all time-series data for the specified series
 // @Tags         tracker
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Param        seriesId   path  int  true  "Series ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
@@ -996,7 +998,7 @@ func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 // @Tags         tracker
 // @Accept       json
 // @Produce      json
-// @Param        trackerId  path  int                       true  "Tracker ID"
+// @Param        trackerId  path  string                       true  "Tracker ID"
 // @Param        seriesId   path  int                       true  "Series ID"
 // @Param        body       body  tracker.PatchValuesRequest  true  "Batch of value updates and deletions"
 // @Success      200  {object}  tracker.ListValuesResponse
@@ -1073,7 +1075,7 @@ func (h *trackerHandler) patchValues(w http.ResponseWriter, r *http.Request) {
 // @Summary      Like a tracker
 // @Description  Add a like to the specified tracker for the current user
 // @Tags         tracker
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Success      201
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -1099,7 +1101,7 @@ func (h *trackerHandler) likeTracker(w http.ResponseWriter, r *http.Request) {
 // @Summary      Unlike a tracker
 // @Description  Remove a like from the specified tracker for the current user
 // @Tags         tracker
-// @Param        trackerId  path  int  true  "Tracker ID"
+// @Param        trackerId  path  string  true  "Tracker ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse

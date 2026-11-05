@@ -6,8 +6,8 @@ import type { SeriesModel } from './core'
 import { ValueInput, shiftDate } from './value-input'
 
 const series: SeriesModel[] = [
-  { id: 1, tracker_id: 1, name: 's1', data_type: 'float', config: '' },
-  { id: 2, tracker_id: 1, name: 's2', data_type: 'float', config: '' },
+  { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '' },
+  { id: 2, tracker_id: "trk_1", name: 's2', data_type: 'float', config: '' },
 ]
 
 const renderInput = (props: Partial<React.ComponentProps<typeof ValueInput>> = {}) => {

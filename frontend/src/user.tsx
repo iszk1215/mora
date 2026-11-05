@@ -55,7 +55,7 @@ export const UserPage = (): React.JSX.Element => {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [perPage] = useState(12)
-  const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
+  const [previews, setPreviews] = useState<Map<string, PreviewData>>(new Map())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

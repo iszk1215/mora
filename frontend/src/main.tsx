@@ -43,7 +43,7 @@ export const TrackerSearchPage = (): React.JSX.Element => {
   const urlQuery = searchParams.get('q') ?? ''
   const [query, setQuery] = useState(urlQuery)
   const [trackers, setTrackers] = useState<TrackerResponse[]>([])
-  const [previews, setPreviews] = useState<Map<number, PreviewData>>(new Map())
+  const [previews, setPreviews] = useState<Map<string, PreviewData>>(new Map())
   const [searching, setSearching] = useState(false)
   const [initial, setInitial] = useState(true)
   const search = useSearch()
@@ -594,7 +594,7 @@ export const routes = [
             path: ':trackerId',
             handle: {
               crumb: (params: Params, data: any) => ({
-                label: data?.tracker?.name ?? `Tracker #${params.trackerId}`,
+                label: data?.tracker?.name ?? `Tracker ${params.trackerId}`,
               }),
             },
             async lazy() {
@@ -620,7 +620,7 @@ export const routes = [
         path: '/coverages/:trackerId',
         handle: {
           crumb: (params: Params, data: any) => ({
-            label: data?.trackerName ?? `Coverage #${params.trackerId}`,
+            label: data?.trackerName ?? `Coverage ${params.trackerId}`,
             link: `/coverages/${params.trackerId}`,
           })
         },

@@ -18,6 +18,9 @@ tracker
   └── tracker_like   (user_id, tracker_id)
 ```
 
+- `tracker.id`: internal integer primary key. It is never exposed through the API or URLs (`json:"-"`).
+- `tracker.external_id`: public identifier (UUIDv7, `trk_` prefix). All API paths and JSON `id` fields use this value. Invalid values return `400 Bad Request`; well-formed but unknown values return `404 Not Found`.
+- `tracker_series.id` / `tracker_value.id` remain numeric internal IDs and are still exposed as `seriesId` / value `id`.
 - `tracker.owner_id`: FK to `user.id`, `NOT NULL`, `ON DELETE CASCADE`. The owner is the sole authority for DELETE and PATCH on the tracker; `tracker_member` rows grant editor (edit-only) access.
 - `tracker.created_at` / `tracker.last_updated_at`: RFC3339 timestamps. `last_updated_at` is set at creation and bumped whenever a value is added, updated, or deleted (`POST`/`PATCH`/`DELETE values`) or coverage data is uploaded for a linked repository.
 
@@ -60,7 +63,7 @@ Hard limits on the number of series and values, applied regardless of user type 
 | POST | `/api/trackers/{trackerId}/like` | Like | authenticated |
 | DELETE | `/api/trackers/{trackerId}/like` | Unlike | authenticated |
 
-POST returns 201, DELETE returns 204.
+`{trackerId}` in every path is the tracker external ID (`trk_<uuidv7>`); `{seriesId}` is the numeric series ID. POST returns 201, DELETE returns 204.
 
 PATCH `/api/trackers/{trackerId}/series/{seriesId}` accepts optional `name`, `data_type`, and `config` fields; only provided fields are updated. A series `name` must be non-empty (after trim), at most 200 characters, and unique within the tracker. A rename to an already-used name returns `409 Conflict`.
 
@@ -188,7 +191,7 @@ All fields are optional. Only provided fields are updated.
 ### TrackerResponse
 
 ```json
-{ "id": 1, "name": "string", "description": "string", "body": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "owner_id": 1, "owner_name": "string", "created_at": "2024-01-01T00:00:00Z", "last_updated_at": "2024-01-01T00:00:00Z", "role": "owner", "liked": false }
+{ "id": "trk_00000000-0000-7000-8000-000000000001", "name": "string", "description": "string", "body": "string", "visibility": "public", "type": "tracker", "chart_config": "{}", "owner_id": 1, "owner_name": "string", "created_at": "2024-01-01T00:00:00Z", "last_updated_at": "2024-01-01T00:00:00Z", "role": "owner", "liked": false }
 ```
 
 | Field | Type | Description |
@@ -262,9 +265,9 @@ All fields are optional. Only provided fields are updated.
 
 ```json
 {
-  "tracker": { "id": 1, "name": "string", "type": "tracker", "chart_config": "{}", "owner_id": 1, "owner_name": "string", "created_at": "2024-01-01T00:00:00Z", "last_updated_at": "2024-01-01T00:00:00Z", "role": "owner", "liked": false },
+  "tracker": { "id": "trk_00000000-0000-7000-8000-000000000001", "name": "string", "type": "tracker", "chart_config": "{}", "owner_id": 1, "owner_name": "string", "created_at": "2024-01-01T00:00:00Z", "last_updated_at": "2024-01-01T00:00:00Z", "role": "owner", "liked": false },
   "series": [
-    { "series": { "id": 1, "name": "string", "data_type": "float", "config": "{}" },
+    { "series": { "id": 1, "name": "string", "data_type": "float", "config": "{}", "tracker_id": "trk_00000000-0000-7000-8000-000000000001" },
       "values": [{ "time": "2024-01-01T00:00:00Z", "value": 45.0 }] }
   ]
 }

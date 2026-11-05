@@ -167,7 +167,7 @@
                 "summary": "List coverages for a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -209,7 +209,7 @@
                 "summary": "Upload coverage data",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -262,7 +262,7 @@
                 "summary": "Preview coverage data",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -300,7 +300,7 @@
                 "summary": "List files in a coverage entry",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -352,7 +352,7 @@
                 "summary": "Get a source file",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1092,7 +1092,7 @@
                 "summary": "Get a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1128,7 +1128,7 @@
                 "summary": "Delete a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1179,7 +1179,7 @@
                 "summary": "Update a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1238,7 +1238,7 @@
                 "summary": "Like a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1277,7 +1277,7 @@
                 "summary": "Unlike a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1318,7 +1318,7 @@
                 "summary": "Preview tracker data",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1362,7 +1362,7 @@
                 "summary": "List all series",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1410,7 +1410,7 @@
                 "summary": "Create a series",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1469,7 +1469,7 @@
                 "summary": "Delete a series",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1527,7 +1527,7 @@
                 "summary": "Update a series",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1593,7 +1593,7 @@
                 "summary": "List all values",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1654,7 +1654,7 @@
                 "summary": "Add a value",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1718,7 +1718,7 @@
                 "summary": "Delete all values",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1776,7 +1776,7 @@
                 "summary": "Update and delete values in a batch",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -2693,7 +2693,7 @@
                     "type": "string"
                 },
                 "tracker_id": {
-                    "type": "integer"
+                    "type": "string"
                 }
             }
         },
@@ -2713,7 +2713,7 @@
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "last_updated_at": {
                     "type": "string"
@@ -2748,7 +2748,7 @@
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "last_updated_at": {
                     "type": "string"

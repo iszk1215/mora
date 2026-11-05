@@ -32,8 +32,8 @@ export interface PreviewData {
 // previewsFromTrackers builds the per-tracker preview map from a list response
 // that was requested with include=preview. Trackers without preview data map to
 // an empty series list so cards render their "No data" state.
-export function previewsFromTrackers(trackers: TrackerResponse[]): Map<number, PreviewData> {
-  const map = new Map<number, PreviewData>()
+export function previewsFromTrackers(trackers: TrackerResponse[]): Map<string, PreviewData> {
+  const map = new Map<string, PreviewData>()
   for (const t of trackers) {
     map.set(t.id, { tracker: t, series: t.series ?? [] })
   }
@@ -72,13 +72,13 @@ export async function createTracker(name: string, visibility: string, descriptio
   return resp.json()
 }
 
-async function listSeries(trackerId: number): Promise<TrackerDetailData> {
+async function listSeries(trackerId: string): Promise<TrackerDetailData> {
   const resp = await fetch(`/api/trackers/${trackerId}/series`)
   if (!resp.ok) throw resp
   return resp.json()
 }
 
-export async function createSeries(trackerId: number, name: string, dataType: string, config?: string): Promise<SeriesModel> {
+export async function createSeries(trackerId: string, name: string, dataType: string, config?: string): Promise<SeriesModel> {
   const body: Record<string, unknown> = { name, data_type: dataType }
   if (config) body.config = config
   const resp = await fetch(`/api/trackers/${trackerId}/series`, {
@@ -90,7 +90,7 @@ export async function createSeries(trackerId: number, name: string, dataType: st
   return resp.json()
 }
 
-export async function patchSeries(trackerId: number, seriesId: number, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
+export async function patchSeries(trackerId: string, seriesId: number, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -100,12 +100,12 @@ export async function patchSeries(trackerId: number, seriesId: number, opts: { n
   return resp.json()
 }
 
-export async function deleteSeries(trackerId: number, seriesId: number): Promise<void> {
+export async function deleteSeries(trackerId: string, seriesId: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-export async function createValue(trackerId: number, seriesId: number, time: string, value: number): Promise<void> {
+export async function createValue(trackerId: string, seriesId: number, time: string, value: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -114,12 +114,12 @@ export async function createValue(trackerId: number, seriesId: number, time: str
   if (!resp.ok) throw resp
 }
 
-export async function deleteValues(trackerId: number, seriesId: number): Promise<void> {
+export async function deleteValues(trackerId: string, seriesId: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-export async function patchValuesBatch(trackerId: number, seriesId: number, updates: ValueUpdate[], deletes: number[]): Promise<ValueModel[]> {
+export async function patchValuesBatch(trackerId: string, seriesId: number, updates: ValueUpdate[], deletes: number[]): Promise<ValueModel[]> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -130,17 +130,17 @@ export async function patchValuesBatch(trackerId: number, seriesId: number, upda
   return data.values ?? []
 }
 
-export async function likeTracker(trackerId: number): Promise<void> {
+export async function likeTracker(trackerId: string): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/like`, { method: 'POST' })
   if (!resp.ok) throw resp
 }
 
-export async function unlikeTracker(trackerId: number): Promise<void> {
+export async function unlikeTracker(trackerId: string): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/like`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-export async function patchTracker(trackerId: number, opts: { name?: string; visibility?: string; chart_config?: string; description?: string; body?: string }): Promise<TrackerResponse> {
+export async function patchTracker(trackerId: string, opts: { name?: string; visibility?: string; chart_config?: string; description?: string; body?: string }): Promise<TrackerResponse> {
   const resp = await fetch(`/api/trackers/${trackerId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -150,12 +150,12 @@ export async function patchTracker(trackerId: number, opts: { name?: string; vis
   return resp.json()
 }
 
-export async function deleteTracker(trackerId: number): Promise<void> {
+export async function deleteTracker(trackerId: string): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
 export async function loadTrackerDetail({ params }: LoaderFunctionArgs): Promise<TrackerDetailData> {
   if (!params.trackerId) throw new Error('trackerId is required')
-  return listSeries(parseInt(params.trackerId))
+  return listSeries(params.trackerId!)
 }

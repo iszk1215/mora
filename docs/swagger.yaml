@@ -390,7 +390,7 @@ definitions:
       name:
         type: string
       tracker_id:
-        type: integer
+        type: string
     type: object
   tracker.TrackerModel:
     properties:
@@ -403,7 +403,7 @@ definitions:
       description:
         type: string
       id:
-        type: integer
+        type: string
       last_updated_at:
         type: string
       name:
@@ -426,7 +426,7 @@ definitions:
       description:
         type: string
       id:
-        type: integer
+        type: string
       last_updated_at:
         type: string
       like_count:
@@ -647,7 +647,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       responses:
         "200":
           description: OK
@@ -673,7 +673,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Coverage data
         in: body
         name: body
@@ -710,7 +710,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Coverage index
         in: path
         name: id
@@ -745,7 +745,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Coverage index
         in: path
         name: id
@@ -785,7 +785,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       responses:
         "200":
           description: OK
@@ -1267,7 +1267,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       responses:
         "204":
           description: No Content
@@ -1297,7 +1297,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       responses:
         "200":
           description: OK
@@ -1323,7 +1323,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Fields to update
         in: body
         name: body
@@ -1364,7 +1364,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       responses:
         "204":
           description: No Content
@@ -1390,7 +1390,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       responses:
         "201":
           description: Created
@@ -1418,7 +1418,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       responses:
         "200":
           description: OK
@@ -1447,7 +1447,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       responses:
         "200":
           description: OK
@@ -1478,7 +1478,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Series information
         in: body
         name: body
@@ -1519,7 +1519,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Series ID
         in: path
         name: seriesId
@@ -1557,7 +1557,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Series ID
         in: path
         name: seriesId
@@ -1603,7 +1603,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Series ID
         in: path
         name: seriesId
@@ -1639,7 +1639,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Series ID
         in: path
         name: seriesId
@@ -1680,7 +1680,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Series ID
         in: path
         name: seriesId
@@ -1732,7 +1732,7 @@ paths:
         in: path
         name: trackerId
         required: true
-        type: integer
+        type: string
       - description: Series ID
         in: path
         name: seriesId

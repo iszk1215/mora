@@ -2,7 +2,7 @@
 
 ## Overview
 
-Coverage data is accessed via tracker-based URLs. Each coverage tracker links to a repository through the `tracker_coverage` table, which is owned and managed by the coverage package.
+Coverage data is accessed via tracker-based URLs. Each coverage tracker links to a repository through the `tracker_coverage` table, which is owned and managed by the coverage package. `:trackerId` in every URL is the tracker external ID (`trk_<uuidv7>`), not the internal integer primary key.
 
 ## URL Structure
 
@@ -28,10 +28,10 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 
 ## Middleware
 
-`injectTrackerCoverage` in `server/server.go`:
+`injectTrackerCoverage` in `server/server.go` (runs after `InjectTracker`, which resolves the external ID):
 
-1. Parse `trackerId` from URL
-2. Resolve `trackerId` -> repository via `coverage.FindRepoByTrackerID()`
+1. Parse `trackerId` from URL (external ID `trk_<uuidv7>`; invalid format -> 400)
+2. Resolve the internal tracker ID -> repository via `coverage.FindRepoByTrackerID()`
 3. Load repository and repository manager
 4. Verify access (session or API key)
 5. Inject `core.Repository` and `core.RepositoryClient` into context
@@ -77,7 +77,7 @@ Responses:
 
 ## Upload
 
-Upload command specifies tracker ID via `--tracker` flag and POSTs to `/api/coverages/:trackerId`.
+Upload command specifies the tracker external ID via `--tracker` flag and POSTs to `/api/coverages/:trackerId`.
 
 A successful upload (`CoverageStore.Put`) also bumps the `last_updated_at` of the linked coverage tracker, so the tracker list reflects the latest upload. It is a no-op if the `tracker`/`tracker_coverage` tables do not exist.
 

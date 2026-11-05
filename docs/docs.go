@@ -174,7 +174,7 @@ const docTemplate = `{
                 "summary": "List coverages for a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -216,7 +216,7 @@ const docTemplate = `{
                 "summary": "Upload coverage data",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -269,7 +269,7 @@ const docTemplate = `{
                 "summary": "Preview coverage data",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -307,7 +307,7 @@ const docTemplate = `{
                 "summary": "List files in a coverage entry",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -359,7 +359,7 @@ const docTemplate = `{
                 "summary": "Get a source file",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1099,7 +1099,7 @@ const docTemplate = `{
                 "summary": "Get a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1135,7 +1135,7 @@ const docTemplate = `{
                 "summary": "Delete a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1186,7 +1186,7 @@ const docTemplate = `{
                 "summary": "Update a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1245,7 +1245,7 @@ const docTemplate = `{
                 "summary": "Like a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1284,7 +1284,7 @@ const docTemplate = `{
                 "summary": "Unlike a tracker",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1325,7 +1325,7 @@ const docTemplate = `{
                 "summary": "Preview tracker data",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1369,7 +1369,7 @@ const docTemplate = `{
                 "summary": "List all series",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1417,7 +1417,7 @@ const docTemplate = `{
                 "summary": "Create a series",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1476,7 +1476,7 @@ const docTemplate = `{
                 "summary": "Delete a series",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1534,7 +1534,7 @@ const docTemplate = `{
                 "summary": "Update a series",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1600,7 +1600,7 @@ const docTemplate = `{
                 "summary": "List all values",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1661,7 +1661,7 @@ const docTemplate = `{
                 "summary": "Add a value",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1725,7 +1725,7 @@ const docTemplate = `{
                 "summary": "Delete all values",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -1783,7 +1783,7 @@ const docTemplate = `{
                 "summary": "Update and delete values in a batch",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Tracker ID",
                         "name": "trackerId",
                         "in": "path",
@@ -2700,7 +2700,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "tracker_id": {
-                    "type": "integer"
+                    "type": "string"
                 }
             }
         },
@@ -2720,7 +2720,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "last_updated_at": {
                     "type": "string"
@@ -2755,7 +2755,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "last_updated_at": {
                     "type": "string"

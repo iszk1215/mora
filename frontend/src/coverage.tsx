@@ -140,7 +140,7 @@ export async function loadCoverageListByTracker({ params }: { params: Params }):
   coverages: Coverage[],
   liked: boolean,
   likeCount: number,
-  trackerId: number,
+  trackerId: string,
   chartConfig: ChartConfig | null,
 }> {
   const url = `/api/coverages/${params.trackerId}`
@@ -194,7 +194,7 @@ export async function loadCoverageListByTracker({ params }: { params: Params }):
     coverages,
     liked,
     likeCount,
-    trackerId: parseInt(params.trackerId!, 10),
+    trackerId: params.trackerId!,
     chartConfig,
   }
 }
@@ -352,7 +352,7 @@ export const CoverageTrackerList = (): React.JSX.Element => {
     coverages: Coverage[],
     liked: boolean,
     likeCount: number,
-    trackerId: number,
+    trackerId: string,
     chartConfig: ChartConfig | null,
   }
   const params = useParams()

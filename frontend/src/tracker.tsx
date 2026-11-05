@@ -1147,7 +1147,7 @@ export const trackerRoute = [
     element: <TrackerDetailRouter />,
     handle: {
       crumb: (params: Params, data: any) => ({
-        label: data?.tracker?.name ?? `Tracker #${params.trackerId}`,
+        label: data?.tracker?.name ?? `Tracker ${params.trackerId}`,
       }),
     },
   },

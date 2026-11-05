@@ -17,8 +17,8 @@ import (
 	"github.com/drone/go-scm/scm"
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/core"
-	"github.com/iszk1215/mora/mockscm"
 	"github.com/iszk1215/mora/coverage/profile"
+	"github.com/iszk1215/mora/mockscm"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
@@ -58,7 +58,7 @@ func (m *MockRepositoryClient) RevisionURL(baseURL string, revision string) stri
 func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	store := NewCoverageStore(db)
 	err = store.Init()
@@ -76,18 +76,21 @@ func setupCoverageStore(t *testing.T, coverages ...*Coverage) CoverageStore {
 // trackerContextRouter mounts a coverage handler under /{trackerId} with a real
 // tracker injected into the request context, mirroring the production mount in
 // server/server.go.
+var testTrackerExtID string
+
 func trackerContextRouter(t *testing.T, s *CoverageHandler) http.Handler {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	db.MustExec(`CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, user_type TEXT NOT NULL DEFAULT 'free')`)
 	db.MustExec(`INSERT INTO user (id, username, user_type) VALUES (1, 'admin', 'admin')`)
 
 	trackerService, err := tracker.NewService(db)
 	require.NoError(t, err)
-	_, err = trackerService.CreateTracker("test coverage", "", "", "public", 1, tracker.TypeCoverage, `{"area":false}`)
+	tr, err := trackerService.CreateTracker("test coverage", "", "", "public", 1, tracker.TypeCoverage, `{"area":false}`)
 	require.NoError(t, err)
+	testTrackerExtID = string(tr.ExternalId)
 
 	r := chi.NewRouter()
 	r.Route("/{trackerId}", func(r chi.Router) {
@@ -96,6 +99,9 @@ func trackerContextRouter(t *testing.T, s *CoverageHandler) http.Handler {
 		r.Get("/public", s.HandleCoverageListPublic)
 		r.Post("/", s.HandleCoverageUpload)
 	})
+	// store for tests
+	t.Cleanup(func() {})
+	_ = tr
 	return r
 }
 
@@ -112,7 +118,7 @@ func Test_injectCoverage(t *testing.T) {
 
 	want := &Coverage{
 		Revision:  "revision",
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
 	}
@@ -136,7 +142,7 @@ func Test_injectCoverage(t *testing.T) {
 }
 
 func Test_injectCoverage_malformed_id(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/foo", nil)
+	req := httptest.NewRequest(http.MethodGet, "/trk_invalidfoo", nil)
 	req = req.WithContext(core.WithRepo(req.Context(), core.Repository{Url: "link"}))
 	w := httptest.NewRecorder()
 
@@ -156,7 +162,7 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	}
 
 	cov := &Coverage{
-		TrackerID:    repo.Id,
+		TrackerID: repo.Id,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -225,7 +231,7 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 	s := newCoverageHandler(store)
 	r := trackerContextRouter(t, s)
 
-	req := httptest.NewRequest(http.MethodGet, "/1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/"+testTrackerExtID, nil)
 	req = req.WithContext(core.WithRepo(core.WithRepositoryClient(req.Context(), rm), repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -254,7 +260,7 @@ func Test_CoverageHandler_CoverageList_Empty(t *testing.T) {
 	s := newCoverageHandler(store)
 	r := trackerContextRouter(t, s)
 
-	req := httptest.NewRequest(http.MethodGet, "/1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/"+testTrackerExtID, nil)
 	req = req.WithContext(core.WithRepo(core.WithRepositoryClient(req.Context(), rm), repo))
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -284,7 +290,7 @@ func Test_CoverageHandler_HandleCoverageListPublic(t *testing.T) {
 	r := trackerContextRouter(t, s)
 
 	t.Run("with RepositoryClient", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/1/public", nil)
+		req := httptest.NewRequest(http.MethodGet, "/"+testTrackerExtID+"/public", nil)
 		ctx := core.WithRepo(req.Context(), repo)
 		ctx = core.WithRepositoryClient(ctx, rm)
 		req = req.WithContext(ctx)
@@ -309,7 +315,7 @@ func Test_CoverageHandler_HandleCoverageListPublic(t *testing.T) {
 	})
 
 	t.Run("without RepositoryClient", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/1/public", nil)
+		req := httptest.NewRequest(http.MethodGet, "/"+testTrackerExtID+"/public", nil)
 		ctx := core.WithRepo(req.Context(), repo)
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
@@ -347,7 +353,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	cov := &Coverage{
 		ID:        -1,
-		TrackerID:    repo.Id,
+		TrackerID: repo.Id,
 		Revision:  revision,
 		Timestamp: timestamp,
 		Entries: []*CoverageEntry{
@@ -453,7 +459,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 	repo := core.Repository{Id: 1215, Namespace: orgName, Name: repoName, Url: repoURL}
 
 	cov := &Coverage{
-		TrackerID:    repo.Id,
+		TrackerID: repo.Id,
 		Revision:  revision,
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -536,7 +542,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 
 func TestCoverageHandler_AddCoverage(t *testing.T) {
 	cov := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "012345",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -569,7 +575,7 @@ func TestCoverageHandler_AddCoverage(t *testing.T) {
 
 func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	existing := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "012345",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -590,7 +596,7 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	}
 
 	added := Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "012345",
 		Timestamp: time.Now(),
 		Entries: []*CoverageEntry{
@@ -611,7 +617,7 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	}
 
 	want := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "012345",
 		Timestamp: added.Timestamp,
 		Entries: []*CoverageEntry{
@@ -692,7 +698,7 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 		body, err := json.Marshal(req)
 		require.NoError(t, err)
 
-		request := httptest.NewRequest(http.MethodPost, "/1", bytes.NewBuffer(body))
+		request := httptest.NewRequest(http.MethodPost, "/"+testTrackerExtID, bytes.NewBuffer(body))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, request)
 		return w
@@ -720,7 +726,7 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 
 func TestCoverageHandler_HandleUpload(t *testing.T) {
 	cov := &Coverage{
-		TrackerID:    1,
+		TrackerID: 1,
 		Revision:  "012345",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -759,7 +765,7 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 	s := newCoverageHandler(store)
 	r := trackerContextRouter(t, s)
 
-	req := httptest.NewRequest(http.MethodPost, "/1", bytes.NewBuffer(body))
+	req := httptest.NewRequest(http.MethodPost, "/"+testTrackerExtID, bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
@@ -773,10 +779,10 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 
 func TestValidateCoverageUploadRequest(t *testing.T) {
 	tests := []struct {
-		name    string
-		revision string
+		name      string
+		revision  string
 		timestamp time.Time
-		wantErr string
+		wantErr   string
 	}{
 		{name: "valid", revision: "abcdef1234", timestamp: time.Now()},
 		{name: "valid full SHA", revision: "a12345678901234567890123456789012345678", timestamp: time.Now()},
@@ -817,7 +823,7 @@ func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 	}
 
 	t.Run("invalid JSON body returns sanitized message", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/1", bytes.NewBufferString("{invalid}"))
+		request := httptest.NewRequest(http.MethodPost, "/"+testTrackerExtID, bytes.NewBufferString("{invalid}"))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, request)
 		res := w.Result()
@@ -834,7 +840,7 @@ func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 		}
 		body, err := json.Marshal(req)
 		require.NoError(t, err)
-		request := httptest.NewRequest(http.MethodPost, "/1", bytes.NewBuffer(body))
+		request := httptest.NewRequest(http.MethodPost, "/"+testTrackerExtID, bytes.NewBuffer(body))
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, request)
 		res := w.Result()
@@ -859,7 +865,7 @@ func TestInjectCoverageNotFound(t *testing.T) {
 
 func TestInjectCoverageEntryEntryNotFound(t *testing.T) {
 	cov := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "abcdef",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
@@ -918,7 +924,7 @@ func TestHandleFileProfileNotFound(t *testing.T) {
 	}
 
 	cov := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "abcdef",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{entry},

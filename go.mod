@@ -8,6 +8,7 @@ require (
 	github.com/elliotchance/pie/v2 v2.9.1
 	github.com/go-chi/chi/v5 v5.3.0
 	github.com/go-git/go-git/v5 v5.19.1
+	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/rs/zerolog v1.35.1

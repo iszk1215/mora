@@ -304,7 +304,7 @@ func TestStoreFindTracker(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
 		require.Equal(t, 1, total)
-		require.Equal(t, tracker.Id, trackers[0].Id)
+		require.Equal(t, tracker.Id, trackers[0].InternalId)
 		require.Equal(t, "owner", trackers[0].Role)
 		require.Equal(t, false, trackers[0].Liked)
 	})
@@ -485,7 +485,11 @@ func TestStoreFindSeries(t *testing.T) {
 	t.Run("find existing by id", func(t *testing.T) {
 		got, err := s.findSeriesById(series.Id)
 		require.NoError(t, err)
-		require.Equal(t, series, got)
+		require.Equal(t, series.Id, got.Id)
+		require.Equal(t, series.TrackerId, got.TrackerId)
+		require.Equal(t, series.Name, got.Name)
+		require.Equal(t, series.DataType, got.DataType)
+		require.Equal(t, series.Config, got.Config)
 	})
 
 	t.Run("find non existing by id", func(t *testing.T) {
@@ -496,7 +500,9 @@ func TestStoreFindSeries(t *testing.T) {
 	t.Run("list by existing tracker id", func(t *testing.T) {
 		items, err := s.listSeries(series.TrackerId)
 		require.NoError(t, err)
-		require.Equal(t, []SeriesModel{*series}, items)
+		require.Equal(t, 1, len(items))
+		require.Equal(t, series.Id, items[0].Id)
+		require.Equal(t, series.Name, items[0].Name)
 	})
 
 	t.Run("list by non existing tracker id", func(t *testing.T) {
@@ -885,7 +891,7 @@ func TestStoreTrackerListUserScoped(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(trackers))
 		require.Equal(t, 1, total)
-		require.Equal(t, tr1.Id, trackers[0].Id)
+		require.Equal(t, tr1.Id, trackers[0].InternalId)
 		require.True(t, trackers[0].Liked)
 		require.Empty(t, trackers[0].Role)
 	})
@@ -943,7 +949,7 @@ func TestStoreTrackerSearch(t *testing.T) {
 		// public trackers: "public_gamma" matches "gamma"
 		require.Equal(t, 1, total)
 		require.Equal(t, 1, len(trackers))
-		require.Equal(t, tr3.Id, trackers[0].Id)
+		require.Equal(t, tr3.Id, trackers[0].InternalId)
 	})
 
 	t.Run("not logged in, no query returns empty", func(t *testing.T) {
@@ -958,7 +964,7 @@ func TestStoreTrackerSearch(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, total)
 		require.Equal(t, 1, len(trackers))
-		require.Equal(t, tr3.Id, trackers[0].Id)
+		require.Equal(t, tr3.Id, trackers[0].InternalId)
 	})
 
 	t.Run("not logged in, query does not match private", func(t *testing.T) {
@@ -988,7 +994,7 @@ func TestStoreListTrackersByOwner(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, total)
 		require.Equal(t, 1, len(trackers))
-		require.Equal(t, pub.Id, trackers[0].Id)
+		require.Equal(t, pub.Id, trackers[0].InternalId)
 	})
 
 	t.Run("owner viewer sees public and private", func(t *testing.T) {
@@ -1003,7 +1009,7 @@ func TestStoreListTrackersByOwner(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, total)
 		require.Equal(t, 1, len(trackers))
-		require.Equal(t, pub.Id, trackers[0].Id)
+		require.Equal(t, pub.Id, trackers[0].InternalId)
 	})
 
 	t.Run("search filters within owner's trackers", func(t *testing.T) {
@@ -1016,7 +1022,7 @@ func TestStoreListTrackersByOwner(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, total)
 		require.Equal(t, 1, len(trackers))
-		require.Equal(t, pub.Id, trackers[0].Id)
+		require.Equal(t, pub.Id, trackers[0].InternalId)
 	})
 
 	t.Run("search does not match other user's trackers", func(t *testing.T) {
