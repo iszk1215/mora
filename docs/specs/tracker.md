@@ -196,7 +196,7 @@ All fields are optional. Only provided fields are updated.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | number | Tracker ID |
+| `id` | string | Tracker external ID (`trk_<uuidv7>`) |
 | `name` | string | Tracker name |
 | `description` | string | One-line description |
 | `body` | string | Free-form Markdown body shown below the chart |
@@ -278,7 +278,7 @@ All fields are optional. Only provided fields are updated.
 Coverage-type trackers (`type="coverage"`) are created exclusively through the coverage API (`POST /api/coverages`, see [coverage.md](coverage.md)). The tracker package has no coverage knowledge; it only stores the row.
 
 - A coverage tracker links to a repository via the `tracker_coverage` table, owned and managed by the coverage package.
-- Preview data is served by the coverage handler at `GET /api/coverages/{trackerId}/preview`, which fetches from `CoverageStore.Timeline(repoID, 20)` and maps coverage entries as series.
+- Preview data is served by the coverage handler at `GET /api/coverages/{trackerId}/preview`, which fetches from `CoverageStore.Timeline(trackerID, 20)` and maps coverage entries as series.
 - Series/values endpoints return empty or 400 for `coverage` types; `activity_grid` trackers serve series/values with integer-only validation (see [activity-grid.md](activity-grid.md))
 - Frontend routes to `/coverages/:trackerId` for coverage detail view
 
