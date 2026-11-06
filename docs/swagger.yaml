@@ -344,7 +344,7 @@ definitions:
   tracker.PatchValueItem:
     properties:
       id:
-        type: integer
+        type: string
       time:
         type: string
       value:
@@ -354,7 +354,7 @@ definitions:
     properties:
       deletes:
         items:
-          type: integer
+          type: string
         type: array
       updates:
         items:
@@ -386,7 +386,7 @@ definitions:
       data_type:
         type: string
       id:
-        type: integer
+        type: string
       name:
         type: string
       tracker_id:
@@ -458,9 +458,7 @@ definitions:
   tracker.ValueModel:
     properties:
       id:
-        type: integer
-      seriesId:
-        type: integer
+        type: string
       time:
         type: string
       value:
@@ -1520,11 +1518,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       responses:
         "204":
           description: No Content
@@ -1558,11 +1556,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       - description: Fields to update
         in: body
         name: body
@@ -1604,11 +1602,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       responses:
         "204":
           description: No Content
@@ -1640,11 +1638,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       - description: Maximum number of results
         in: query
         name: limit
@@ -1681,11 +1679,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       - description: Batch of value updates and deletions
         in: body
         name: body
@@ -1733,11 +1731,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       - description: Value data
         in: body
         name: body

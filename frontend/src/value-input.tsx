@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import type { SeriesModel } from './core'
 
 export type QuickAddValue = {
-  seriesId: number
+  seriesId: string
   time: string
   value: number
 }
@@ -34,7 +34,7 @@ export const shiftDate = (base: string, deltaDays: number, isDate: boolean): str
 
 export const ValueInput = ({ seriesList, isDate, defaultDate, onAdd, levels }: ValueInputProps): React.JSX.Element => {
   const [date, setDate] = useState(defaultDate)
-  const [selectedId, setSelectedId] = useState<number | null>(seriesList[0]?.id ?? null)
+  const [selectedId, setSelectedId] = useState<string | null>(seriesList[0]?.id ?? null)
   const [value, setValue] = useState('')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -119,7 +119,7 @@ export const ValueInput = ({ seriesList, isDate, defaultDate, onAdd, levels }: V
               <DropdownMenu.Content align="start" className="bg-popover text-popover-foreground rounded-md border shadow-md p-1 min-w-[12rem] z-50">
                 <DropdownMenu.RadioGroup
                   value={seriesId != null ? String(seriesId) : ''}
-                  onValueChange={(v) => setSelectedId(parseInt(v))}
+                  onValueChange={(v) => setSelectedId(v)}
                 >
                   {seriesList.map((s) => (
                     <DropdownMenu.RadioItem

@@ -111,7 +111,7 @@ func (s *Service) BatchPreview(trackerIDs []int64) (map[int64][]PreviewSeriesVal
 		}
 		previews := make([]PreviewSeriesValues, 0, len(series))
 		for _, se := range series {
-			vs := valuesMap[tid][se.Id]
+			vs := valuesMap[tid][se.InternalId]
 			if vs == nil {
 				vs = []ValueModel{}
 			}

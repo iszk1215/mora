@@ -259,7 +259,6 @@ func TimelineToPreviewSeries(trackerID int64, trackerExternalID string, timeline
 		}
 		previews = append(previews, tracker.PreviewSeriesValues{
 			Series: tracker.SeriesModel{
-				Id:                0,
 				TrackerId:         trackerID,
 				TrackerExternalId: tracker.ExternalID(trackerExternalID),
 				Name:              name,

@@ -183,7 +183,7 @@ func TestStoreAddSeriesLimit(t *testing.T) {
 		for i := 0; i < MaxSeriesPerTracker; i++ {
 			se := &SeriesModel{TrackerId: tr.Id, Name: fmt.Sprintf("delete_series_%d", i), DataType: "float"}
 			require.NoError(t, s.addSeries(se))
-			victimID = se.Id
+			victimID = se.InternalId
 		}
 		require.NoError(t, s.deleteSeries(victimID))
 		se := &SeriesModel{TrackerId: tr.Id, Name: "after_delete", DataType: "float"}
@@ -220,11 +220,13 @@ func TestStoreAddValueLimit(t *testing.T) {
 
 		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		for i := 0; i < MaxValuesPerSeries; i++ {
-			_, err := s.db.Exec("INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
-				se.Id, base.Add(time.Duration(i)*time.Second), float64(i))
+			ext, err := NewValueExternalID()
+			require.NoError(t, err)
+			_, err = s.db.Exec("INSERT INTO tracker_value (series_id, external_id, time, value) VALUES (?, ?, ?, ?)",
+				se.InternalId, ext.Bare(), base.Add(time.Duration(i)*time.Second), float64(i))
 			require.NoError(t, err)
 		}
-		err := s.addValue(&ValueModel{SeriesId: se.Id, Timestamp: base.Add(time.Hour * 8760), Value: 42})
+		err := s.addValue(&ValueModel{SeriesId: se.InternalId, Timestamp: base.Add(time.Hour * 8760), Value: 42})
 		require.ErrorIs(t, err, ErrValueLimitReached)
 	})
 
@@ -236,12 +238,14 @@ func TestStoreAddValueLimit(t *testing.T) {
 
 		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		for i := 0; i < MaxValuesPerSeries; i++ {
-			_, err := s.db.Exec("INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
-				se.Id, base.Add(time.Duration(i)*time.Second), float64(i))
+			ext, err := NewValueExternalID()
+			require.NoError(t, err)
+			_, err = s.db.Exec("INSERT INTO tracker_value (series_id, external_id, time, value) VALUES (?, ?, ?, ?)",
+				se.InternalId, ext.Bare(), base.Add(time.Duration(i)*time.Second), float64(i))
 			require.NoError(t, err)
 		}
-		require.NoError(t, s.deleteValues(se.Id))
-		require.NoError(t, s.addValue(&ValueModel{SeriesId: se.Id, Timestamp: time.Now().Round(0), Value: 10}))
+		require.NoError(t, s.deleteValues(se.InternalId))
+		require.NoError(t, s.addValue(&ValueModel{SeriesId: se.InternalId, Timestamp: time.Now().Round(0), Value: 10}))
 	})
 
 	t.Run("limit applies per series", func(t *testing.T) {
@@ -254,15 +258,17 @@ func TestStoreAddValueLimit(t *testing.T) {
 
 		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		for i := 0; i < MaxValuesPerSeries; i++ {
-			_, err := s.db.Exec("INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
-				se.Id, base.Add(time.Duration(i)*time.Second), float64(i))
+			ext, err := NewValueExternalID()
+			require.NoError(t, err)
+			_, err = s.db.Exec("INSERT INTO tracker_value (series_id, external_id, time, value) VALUES (?, ?, ?, ?)",
+				se.InternalId, ext.Bare(), base.Add(time.Duration(i)*time.Second), float64(i))
 			require.NoError(t, err)
 		}
-		err := s.addValue(&ValueModel{SeriesId: se.Id, Timestamp: base.Add(time.Hour * 8760), Value: 42})
+		err := s.addValue(&ValueModel{SeriesId: se.InternalId, Timestamp: base.Add(time.Hour * 8760), Value: 42})
 		require.ErrorIs(t, err, ErrValueLimitReached)
 
 		// second series is unaffected
-		require.NoError(t, s.addValue(&ValueModel{SeriesId: se2.Id, Timestamp: time.Now().Round(0), Value: 7}))
+		require.NoError(t, s.addValue(&ValueModel{SeriesId: se2.InternalId, Timestamp: time.Now().Round(0), Value: 7}))
 	})
 }
 
@@ -439,7 +445,7 @@ func TestStoreSeries(t *testing.T) {
 
 		err = s.addSeries(series)
 		require.NoError(t, err)
-		require.Equal(t, int64(1), series.Id)
+		require.Equal(t, int64(1), series.InternalId)
 	})
 
 	t.Run("add series with non existing tracker", func(t *testing.T) {
@@ -480,18 +486,29 @@ func TestStoreFindSeries(t *testing.T) {
 
 	err = s.addSeries(series)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), series.Id)
+	require.Equal(t, int64(1), series.InternalId)
 
 	t.Run("find existing by id", func(t *testing.T) {
-		got, err := s.findSeriesById(series.Id)
+		got, err := s.findSeriesById(series.InternalId)
 		require.NoError(t, err)
 		require.Equal(t, series.Id, got.Id)
+		require.Equal(t, series.InternalId, got.InternalId)
 		require.Equal(t, series.TrackerId, got.TrackerId)
 		require.Equal(t, series.TrackerExternalId, got.TrackerExternalId)
 		require.NotEmpty(t, got.TrackerExternalId)
 		require.Equal(t, series.Name, got.Name)
 		require.Equal(t, series.DataType, got.DataType)
 		require.Equal(t, series.Config, got.Config)
+	})
+
+	t.Run("find existing by external id", func(t *testing.T) {
+		got, err := s.findSeriesByExternalID(series.Id)
+		require.NoError(t, err)
+		require.Equal(t, series.Id, got.Id)
+		require.Equal(t, series.InternalId, got.InternalId)
+
+		_, err = s.findSeriesByExternalID(SeriesExternalID("ser_0195f3a6-5b8c-7e6a-8f43-123456789def"))
+		require.ErrorIs(t, err, errorSeriesNotFound)
 	})
 
 	t.Run("find non existing by id", func(t *testing.T) {
@@ -504,6 +521,7 @@ func TestStoreFindSeries(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(items))
 		require.Equal(t, series.Id, items[0].Id)
+		require.Equal(t, series.InternalId, items[0].InternalId)
 		require.Equal(t, series.TrackerExternalId, items[0].TrackerExternalId)
 		require.NotEmpty(t, items[0].TrackerExternalId)
 		require.Equal(t, series.Name, items[0].Name)
@@ -533,12 +551,12 @@ func TestStoreDeleteSeries(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("delete existing series", func(t *testing.T) {
-		err := s.deleteSeries(series.Id)
+		err := s.deleteSeries(series.InternalId)
 		require.NoError(t, err)
 	})
 
 	t.Run("delete non existing series", func(t *testing.T) {
-		err := s.deleteSeries(series.Id + 1)
+		err := s.deleteSeries(series.InternalId + 1)
 		require.NoError(t, err)
 	})
 }
@@ -560,14 +578,15 @@ func TestStoreValue(t *testing.T) {
 	require.NoError(t, err)
 
 	value := &ValueModel{
-		SeriesId:  series.Id,
+		SeriesId:  series.InternalId,
 		Timestamp: time.Now().Round(0),
 		Value:     1976.5,
 	}
 
 	err = s.addValue(value)
 	require.NoError(t, err)
-	require.Equal(t, int64(1), value.Id)
+	require.NotEmpty(t, value.Id)
+	require.Equal(t, int64(1), value.InternalId)
 
 	t.Run("list values by non existing series id", func(t *testing.T) {
 		values, err := s.listValues(130, 0)
@@ -576,7 +595,7 @@ func TestStoreValue(t *testing.T) {
 	})
 
 	t.Run("list values by existing series id", func(t *testing.T) {
-		values, err := s.listValues(series.Id, 0)
+		values, err := s.listValues(series.InternalId, 0)
 		require.NoError(t, err)
 		require.Len(t, values, 1)
 		require.Equal(t, value.Id, values[0].Id)
@@ -586,16 +605,16 @@ func TestStoreValue(t *testing.T) {
 	})
 
 	t.Run("list values with limit", func(t *testing.T) {
-		values, err := s.listValues(series.Id, 1)
+		values, err := s.listValues(series.InternalId, 1)
 		require.NoError(t, err)
 		require.Equal(t, 1, len(values))
 	})
 
 	t.Run("delete values", func(t *testing.T) {
-		err = s.deleteValues(series.Id)
+		err = s.deleteValues(series.InternalId)
 		require.NoError(t, err)
 
-		values, err := s.listValues(series.Id, 0)
+		values, err := s.listValues(series.InternalId, 0)
 		require.NoError(t, err)
 		require.Empty(t, values)
 	})
@@ -612,12 +631,12 @@ func TestStoreListLatestValues(t *testing.T) {
 
 	now := time.Now().Round(0)
 	for i := 0; i < 10; i++ {
-		v := &ValueModel{SeriesId: series.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i)}
+		v := &ValueModel{SeriesId: series.InternalId, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i)}
 		require.NoError(t, s.addValue(v))
 	}
 
 	t.Run("latest values returns most recent first in ASC order", func(t *testing.T) {
-		values, err := s.listLatestValues(series.Id, 3)
+		values, err := s.listLatestValues(series.InternalId, 3)
 		require.NoError(t, err)
 		require.Equal(t, 3, len(values))
 		require.Equal(t, 7.0, values[0].Value)
@@ -626,7 +645,7 @@ func TestStoreListLatestValues(t *testing.T) {
 	})
 
 	t.Run("no limit returns all in ASC order", func(t *testing.T) {
-		values, err := s.listLatestValues(series.Id, 0)
+		values, err := s.listLatestValues(series.InternalId, 0)
 		require.NoError(t, err)
 		require.Equal(t, 10, len(values))
 		require.Equal(t, 0.0, values[0].Value)
@@ -654,10 +673,10 @@ func TestStoreListLatestValuesByTracker(t *testing.T) {
 	now := time.Now().Round(0)
 	for i := 0; i < 25; i++ {
 		require.NoError(t, s.addValue(&ValueModel{
-			SeriesId: seriesA.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i),
+			SeriesId: seriesA.InternalId, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i),
 		}))
 		require.NoError(t, s.addValue(&ValueModel{
-			SeriesId: seriesB.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i + 100),
+			SeriesId: seriesB.InternalId, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i + 100),
 		}))
 	}
 
@@ -666,7 +685,7 @@ func TestStoreListLatestValuesByTracker(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, values, 2)
 
-		a := values[seriesA.Id]
+		a := values[seriesA.InternalId]
 		require.Len(t, a, 20)
 		// latest 20 out of 25 -> values 5..24, ordered by time ASC
 		require.Equal(t, 5.0, a[0].Value)
@@ -675,7 +694,7 @@ func TestStoreListLatestValuesByTracker(t *testing.T) {
 			require.True(t, a[i].Timestamp.After(a[i-1].Timestamp))
 		}
 
-		b := values[seriesB.Id]
+		b := values[seriesB.InternalId]
 		require.Len(t, b, 20)
 		require.Equal(t, 105.0, b[0].Value)
 		require.Equal(t, 124.0, b[19].Value)
@@ -688,7 +707,7 @@ func TestStoreListLatestValuesByTracker(t *testing.T) {
 		values, err := s.listLatestValuesByTracker(tr.Id, 20)
 		require.NoError(t, err)
 		require.Len(t, values, 2)
-		_, ok := values[sEmpty.Id]
+		_, ok := values[sEmpty.InternalId]
 		require.False(t, ok)
 	})
 
@@ -762,15 +781,15 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	err = s.addSeries(series)
 	require.NoError(t, err)
 
-	value := &ValueModel{SeriesId: series.Id, Timestamp: time.Now().Round(0), Value: 42}
+	value := &ValueModel{SeriesId: series.InternalId, Timestamp: time.Now().Round(0), Value: 42}
 	err = s.addValue(value)
 	require.NoError(t, err)
 
 	// Delete series should cascade delete value
-	err = s.deleteSeries(series.Id)
+	err = s.deleteSeries(series.InternalId)
 	require.NoError(t, err)
 
-	values, err := s.listValues(series.Id, 0)
+	values, err := s.listValues(series.InternalId, 0)
 	require.NoError(t, err)
 	require.Empty(t, values)
 
@@ -783,7 +802,7 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	err = s.addSeries(series2)
 	require.NoError(t, err)
 
-	value2 := &ValueModel{SeriesId: series2.Id, Timestamp: time.Now().Round(0), Value: 99}
+	value2 := &ValueModel{SeriesId: series2.InternalId, Timestamp: time.Now().Round(0), Value: 99}
 	err = s.addValue(value2)
 	require.NoError(t, err)
 
@@ -793,10 +812,10 @@ func TestStoreDeleteValueCascade(t *testing.T) {
 	_, err = s.findTrackerById(tr2.Id)
 	require.ErrorIs(t, err, errorTrackerNotFound)
 
-	_, err = s.findSeriesById(series2.Id)
+	_, err = s.findSeriesById(series2.InternalId)
 	require.ErrorIs(t, err, errorSeriesNotFound)
 
-	values2, err := s.listValues(series2.Id, 0)
+	values2, err := s.listValues(series2.InternalId, 0)
 	require.NoError(t, err)
 	require.Empty(t, values2)
 }
@@ -1098,7 +1117,7 @@ func TestStoreTrackerOwner(t *testing.T) {
 		require.NoError(t, s.addSeries(ser))
 
 		time.Sleep(5 * time.Millisecond)
-		v := &ValueModel{SeriesId: ser.Id, Timestamp: time.Now(), Value: 1.0}
+		v := &ValueModel{SeriesId: ser.InternalId, Timestamp: time.Now(), Value: 1.0}
 		require.NoError(t, s.addValue(v))
 
 		got, err := s.findTrackerById(tr.Id)
@@ -1132,23 +1151,23 @@ func TestStoreApplyValueChanges(t *testing.T) {
 	t2 := t1.Add(time.Hour)
 	t3 := t1.Add(2 * time.Hour)
 
-	v1 := &ValueModel{SeriesId: ser.Id, Timestamp: t1, Value: 10.0}
-	v2 := &ValueModel{SeriesId: ser.Id, Timestamp: t2, Value: 20.0}
-	v3 := &ValueModel{SeriesId: ser.Id, Timestamp: t3, Value: 30.0}
+	v1 := &ValueModel{SeriesId: ser.InternalId, Timestamp: t1, Value: 10.0}
+	v2 := &ValueModel{SeriesId: ser.InternalId, Timestamp: t2, Value: 20.0}
+	v3 := &ValueModel{SeriesId: ser.InternalId, Timestamp: t3, Value: 30.0}
 	require.NoError(t, s.addValue(v1))
 	require.NoError(t, s.addValue(v2))
 	require.NoError(t, s.addValue(v3))
 
 	t.Run("empty batch returns current values", func(t *testing.T) {
-		values, err := s.applyValueChanges(ser.Id, nil, nil)
+		values, err := s.applyValueChanges(ser.InternalId, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, values, 3)
 	})
 
 	t.Run("update and delete", func(t *testing.T) {
-		values, err := s.applyValueChanges(ser.Id,
+		values, err := s.applyValueChanges(ser.InternalId,
 			[]ValuePatch{{Id: v1.Id, Time: t1.Add(time.Hour * 24), Value: 99.0}},
-			[]int64{v2.Id})
+			[]ValueExternalID{v2.Id})
 		require.NoError(t, err)
 		require.Len(t, values, 2)
 		require.Equal(t, v3.Id, values[0].Id)
@@ -1161,25 +1180,25 @@ func TestStoreApplyValueChanges(t *testing.T) {
 	})
 
 	t.Run("delete unknown id is ignored", func(t *testing.T) {
-		values, err := s.applyValueChanges(ser.Id, nil, []int64{99999})
+		values, err := s.applyValueChanges(ser.InternalId, nil, []ValueExternalID{ValueExternalID("val_0195f3a6-5b8c-7e6a-8f43-123456789def")})
 		require.NoError(t, err)
 		require.Len(t, values, 2)
 	})
 
 	t.Run("update unknown id returns errorValueNotFound", func(t *testing.T) {
-		_, err := s.applyValueChanges(ser.Id, []ValuePatch{{Id: 99999, Time: t1, Value: 1}}, nil)
+		_, err := s.applyValueChanges(ser.InternalId, []ValuePatch{{Id: ValueExternalID("val_0195f3a6-5b8c-7e6a-8f43-123456789def"), Time: t1, Value: 1}}, nil)
 		require.ErrorIs(t, err, errorValueNotFound)
 	})
 
 	t.Run("duplicate time returns ErrValueExists", func(t *testing.T) {
-		v4 := &ValueModel{SeriesId: ser.Id, Timestamp: t1.Add(3 * time.Hour), Value: 40.0}
+		v4 := &ValueModel{SeriesId: ser.InternalId, Timestamp: t1.Add(3 * time.Hour), Value: 40.0}
 		require.NoError(t, s.addValue(v4))
 
-		_, err := s.applyValueChanges(ser.Id, []ValuePatch{{Id: v4.Id, Time: t1.Add(time.Hour * 24), Value: 41.0}}, nil)
+		_, err := s.applyValueChanges(ser.InternalId, []ValuePatch{{Id: v4.Id, Time: t1.Add(time.Hour * 24), Value: 41.0}}, nil)
 		require.ErrorIs(t, err, ErrValueExists)
 
 		// ensure the failed batch rolled back
-		values, err := s.listValues(ser.Id, 0)
+		values, err := s.listValues(ser.InternalId, 0)
 		require.NoError(t, err)
 		require.Len(t, values, 3)
 		for _, v := range values {

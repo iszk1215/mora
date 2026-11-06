@@ -38,7 +38,7 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 
 The `tracker_coverage` table is owned by the coverage package and stores the repository description (scm, namespace, name, url) directly, keyed by `tracker_id` with a foreign key to `tracker(id) ON DELETE CASCADE`. The `coverage` table is keyed by `tracker_id` (foreign key to `tracker(id) ON DELETE CASCADE`) instead of `repo_id`; on startup the coverage store migrates databases that still use the old `repo_id` schema (renaming the column, rebuilding the table, carrying over existing `tracker_coverage` links, and marking rows without a link with a negative repository id that is resolved to the tracker created for the repository at startup).
 
-`GET /api/coverages/{trackerId}/preview` uses only `requireTrackerAuth` + `InjectTracker` + `RequireReadPermission` (no SCM access needed).
+`GET /api/coverages/{trackerId}/preview` uses only `requireTrackerAuth` + `InjectTracker` + `RequireReadPermission` (no SCM access needed). Its series and values are virtual (not stored in `tracker_series` / `tracker_value`), so their `id` fields are omitted.
 
 ## Coverage Type Trackers
 

@@ -1483,8 +1483,8 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1541,8 +1541,8 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1607,8 +1607,8 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1668,8 +1668,8 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1732,8 +1732,8 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1790,8 +1790,8 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -2629,7 +2629,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "time": {
                     "type": "string"
@@ -2645,7 +2645,7 @@ const docTemplate = `{
                 "deletes": {
                     "type": "array",
                     "items": {
-                        "type": "integer"
+                        "type": "string"
                     }
                 },
                 "updates": {
@@ -2694,7 +2694,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -2799,10 +2799,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
-                },
-                "seriesId": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "time": {
                     "type": "string"

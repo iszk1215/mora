@@ -21,15 +21,15 @@ interface SeriesTableProps {
   trackerId: string
   seriesList: SeriesModel[]
   yAxes: YAxisConfig[]
-  onSelectSeries?: (seriesId: number) => void
-  onDeleteSeries?: (seriesId: number) => void
-  onRenameSeries?: (seriesId: number, name: string) => Promise<boolean>
+  onSelectSeries?: (seriesId: string) => void
+  onDeleteSeries?: (seriesId: string) => void
+  onRenameSeries?: (seriesId: string, name: string) => Promise<boolean>
   ref?: React.Ref<SeriesTableHandle>
 }
 
 export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDeleteSeries, onRenameSeries, ref }: SeriesTableProps): React.JSX.Element => {
-  const [seriesValueFormats, setSeriesValueFormats] = useState<Record<number, string>>(() => {
-    const map: Record<number, string> = {}
+  const [seriesValueFormats, setSeriesValueFormats] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {}
     for (const s of seriesList) {
       try {
         const cfg = JSON.parse(s.config) as SeriesConfig
@@ -39,8 +39,8 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     return map
   })
 
-  const [seriesTypes, setSeriesTypes] = useState<Record<number, 'line' | 'bar'>>(() => {
-    const map: Record<number, 'line' | 'bar'> = {}
+  const [seriesTypes, setSeriesTypes] = useState<Record<string, 'line' | 'bar'>>(() => {
+    const map: Record<string, 'line' | 'bar'> = {}
     for (const s of seriesList) {
       try {
         const cfg = JSON.parse(s.config) as SeriesConfig
@@ -50,8 +50,8 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     return map
   })
 
-  const [seriesYAxisIndices, setSeriesYAxisIndices] = useState<Record<number, number>>(() => {
-    const map: Record<number, number> = {}
+  const [seriesYAxisIndices, setSeriesYAxisIndices] = useState<Record<string, number>>(() => {
+    const map: Record<string, number> = {}
     for (const s of seriesList) {
       try {
         const cfg = JSON.parse(s.config) as SeriesConfig
@@ -63,7 +63,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
 
   useEffect(() => {
     setSeriesValueFormats((prev) => {
-      const next: Record<number, string> = {}
+      const next: Record<string, string> = {}
       for (const s of seriesList) {
         try {
           const cfg = JSON.parse(s.config) as SeriesConfig
@@ -71,12 +71,12 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
         } catch { /* ignore */ }
       }
       for (const id of Object.keys(prev)) {
-        if (!seriesList.some((s) => s.id === Number(id))) delete next[Number(id)]
+        if (!seriesList.some((s) => s.id === id)) delete next[id]
       }
       return { ...prev, ...next }
     })
     setSeriesTypes((prev) => {
-      const next: Record<number, 'line' | 'bar'> = {}
+      const next: Record<string, 'line' | 'bar'> = {}
       for (const s of seriesList) {
         try {
           const cfg = JSON.parse(s.config) as SeriesConfig
@@ -84,12 +84,12 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
         } catch { /* ignore */ }
       }
       for (const id of Object.keys(prev)) {
-        if (!seriesList.some((s) => s.id === Number(id))) delete next[Number(id)]
+        if (!seriesList.some((s) => s.id === id)) delete next[id]
       }
       return { ...prev, ...next }
     })
       setSeriesYAxisIndices((prev) => {
-        const next: Record<number, number> = {}
+        const next: Record<string, number> = {}
         for (const s of seriesList) {
           try {
             const cfg = JSON.parse(s.config) as SeriesConfig
@@ -97,7 +97,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
           } catch { /* ignore */ }
         }
         for (const id of Object.keys(prev)) {
-          if (!seriesList.some((s) => s.id === Number(id))) delete next[Number(id)]
+          if (!seriesList.some((s) => s.id === id)) delete next[id]
         }
         return { ...prev, ...next }
       })
@@ -110,7 +110,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     reassignYAxes: async (removedIndex: number) => {
       const current = seriesYAxisIndicesRef.current
       for (const [sidStr, yi] of Object.entries(current)) {
-        const sid = Number(sidStr)
+        const sid = sidStr
         if (yi === removedIndex) {
           await handleSeriesYAxisChange(sid, 0)
         } else if (yi > removedIndex) {
@@ -120,7 +120,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     },
   }))
 
-  const buildSeriesConfig = (seriesId: number): SeriesConfig => {
+  const buildSeriesConfig = (seriesId: string): SeriesConfig => {
     const config: SeriesConfig = {}
     const fmt = seriesValueFormats[seriesId]
     if (fmt) config.value_format = fmt
@@ -131,7 +131,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     return config
   }
 
-  const patchSeriesConfig = async (seriesId: number, config: SeriesConfig): Promise<SeriesModel | null> => {
+  const patchSeriesConfig = async (seriesId: string, config: SeriesConfig): Promise<SeriesModel | null> => {
     try {
       return await patchSeries(trackerId, seriesId, { config: JSON.stringify(config) })
     } catch {
@@ -139,7 +139,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     }
   }
 
-  const handleSaveValueFormat = async (seriesId: number, fmt: string) => {
+  const handleSaveValueFormat = async (seriesId: string, fmt: string) => {
     if (fmt) {
       setSeriesValueFormats((prev) => ({ ...prev, [seriesId]: fmt }))
     } else {
@@ -153,19 +153,19 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     await patchSeriesConfig(seriesId, config)
   }
 
-  const handleSeriesTypeChange = async (seriesId: number, type: 'line' | 'bar') => {
+  const handleSeriesTypeChange = async (seriesId: string, type: 'line' | 'bar') => {
     setSeriesTypes((prev) => ({ ...prev, [seriesId]: type }))
     const config: SeriesConfig = { ...buildSeriesConfig(seriesId), type }
     await patchSeriesConfig(seriesId, config)
   }
 
-  const handleSeriesYAxisChange = async (seriesId: number, yAxisIndex: number) => {
+  const handleSeriesYAxisChange = async (seriesId: string, yAxisIndex: number) => {
     setSeriesYAxisIndices((prev) => ({ ...prev, [seriesId]: yAxisIndex }))
     const config: SeriesConfig = { ...buildSeriesConfig(seriesId), y_axis_index: yAxisIndex }
     await patchSeriesConfig(seriesId, config)
   }
 
-  const handleDeleteSeries = async (seriesId: number) => {
+  const handleDeleteSeries = async (seriesId: string) => {
     try {
       await deleteSeries(trackerId, seriesId)
       if (onDeleteSeries) onDeleteSeries(seriesId)
@@ -273,7 +273,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
   )
 }
 
-function ValueFormatCell({ seriesId, initialFormat, onSave }: { seriesId: number; initialFormat: string; onSave: (seriesId: number, fmt: string) => void }): React.JSX.Element {
+function ValueFormatCell({ seriesId, initialFormat, onSave }: { seriesId: string; initialFormat: string; onSave: (seriesId: string, fmt: string) => void }): React.JSX.Element {
   const [value, setValue] = useState(initialFormat)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -305,7 +305,7 @@ function ValueFormatCell({ seriesId, initialFormat, onSave }: { seriesId: number
   )
 }
 
-function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId: number; initialName: string; existingNames: string[]; onRename?: (seriesId: number, name: string) => Promise<boolean> }): React.JSX.Element {
+function NameCell({ seriesId, initialName, existingNames, onRename }: { seriesId: string; initialName: string; existingNames: string[]; onRename?: (seriesId: string, name: string) => Promise<boolean> }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(initialName)
   const [saving, setSaving] = useState(false)

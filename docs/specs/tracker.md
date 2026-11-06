@@ -20,7 +20,9 @@ tracker
 
 - `tracker.id`: internal integer primary key. It is never exposed through the API or URLs (`json:"-"`).
 - `tracker.external_id`: public identifier (UUIDv7, `trk_` prefix). All API paths and JSON `id` fields use this value. Invalid values return `400 Bad Request`; well-formed but unknown values return `404 Not Found`.
-- `tracker_series.id` / `tracker_value.id` remain numeric internal IDs and are still exposed as `seriesId` / value `id`.
+- `tracker_series.id` / `tracker_value.id` are internal integer primary keys. They are never exposed through the API or URLs (`json:"-"`).
+- `tracker_series.external_id` / `tracker_value.external_id` are public identifiers (UUIDv7, `ser_` / `val_` prefixes, stored as bare UUID strings in the DB). All series/value URLs and JSON `id` fields use these values. Invalid values return `400 Bad Request`; well-formed but unknown values return `404 Not Found`. Numeric IDs are not accepted.
+- On startup, existing `tracker_series` / `tracker_value` rows without external IDs are backfilled (values in batches of 1000) and unique indexes are created. Existing external IDs are never changed.
 - `tracker.owner_id`: FK to `user.id`, `NOT NULL`, `ON DELETE CASCADE`. The owner is the sole authority for DELETE and PATCH on the tracker; `tracker_member` rows grant editor (edit-only) access.
 - `tracker.created_at` / `tracker.last_updated_at`: RFC3339 timestamps. `last_updated_at` is set at creation and bumped whenever a value is added, updated, or deleted (`POST`/`PATCH`/`DELETE values`) or coverage data is uploaded for a linked repository.
 
@@ -63,7 +65,7 @@ Hard limits on the number of series and values, applied regardless of user type 
 | POST | `/api/trackers/{trackerId}/like` | Like | authenticated |
 | DELETE | `/api/trackers/{trackerId}/like` | Unlike | authenticated |
 
-`{trackerId}` in every path is the tracker external ID (`trk_<uuidv7>`); `{seriesId}` is the numeric series ID. POST returns 201, DELETE returns 204.
+`{trackerId}` in every path is the tracker external ID (`trk_<uuidv7>`); `{seriesId}` is the series external ID (`ser_<uuidv7>`). Value `id` fields are value external IDs (`val_<uuidv7>`). POST returns 201, DELETE returns 204.
 
 PATCH `/api/trackers/{trackerId}/series/{seriesId}` accepts optional `name`, `data_type`, and `config` fields; only provided fields are updated. A series `name` must be non-empty (after trim), at most 200 characters, and unique within the tracker. A rename to an already-used name returns `409 Conflict`.
 
@@ -74,17 +76,17 @@ PATCH `/api/trackers/{trackerId}/series/{seriesId}/values` performs an atomic ba
 ```json
 {
   "updates": [
-    { "id": 3, "time": "2024-01-02T00:00:00Z", "value": 45.0 },
-    { "id": 5, "time": "2024-01-04T00:00:00Z", "value": 12 }
+    { "id": "val_0195f3a6-5b8c-7e6a-8f43-123456789abc", "time": "2024-01-02T00:00:00Z", "value": 45.0 },
+    { "id": "val_0195f3a6-5b8c-7e6a-8f43-123456789abd", "time": "2024-01-04T00:00:00Z", "value": 12 }
   ],
-  "deletes": [7, 9]
+  "deletes": ["val_0195f3a6-5b8c-7e6a-8f43-123456789abe", "val_0195f3a6-5b8c-7e6a-8f43-123456789abf"]
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `updates` | Array of `{id, time, value}` | Values to update. Each `id` must reference an existing value of the series, otherwise the batch fails with `404` |
-| `deletes` | Array of number | Value IDs to delete. Unknown IDs are silently ignored |
+| `deletes` | Array of string | Value external IDs (`val_<uuidv7>`) to delete. Unknown IDs are silently ignored |
 
 Error behavior: on a `409` conflict the batch fails with a message like `value already exists at time 2024-01-02T00:00:00Z` naming the first conflicting time, and no changes are applied (transaction rolled back). Coverage-type trackers have no value endpoints and return `400`; values with a time already present within the updates themselves (two updates for the same new time) also conflict.
 
@@ -93,8 +95,8 @@ On success the response body is the updated values list:
 ```json
 {
   "values": [
-    { "id": 3, "time": "2024-01-02T00:00:00Z", "value": 45.0 },
-    { "id": 5, "time": "2024-01-04T00:00:00Z", "value": 12 }
+    { "id": "val_0195f3a6-5b8c-7e6a-8f43-123456789abc", "time": "2024-01-02T00:00:00Z", "value": 45.0 },
+    { "id": "val_0195f3a6-5b8c-7e6a-8f43-123456789abd", "time": "2024-01-04T00:00:00Z", "value": 12 }
   ]
 }
 ```
@@ -104,7 +106,7 @@ On success the response body is the updated values list:
 Values carry an `id` in list (`GET values`, `PATCH values`) and preview responses:
 
 ```json
-{ "id": 3, "time": "2024-01-02T00:00:00Z", "value": 45.0 }
+{ "id": "val_0195f3a6-5b8c-7e6a-8f43-123456789abc", "time": "2024-01-02T00:00:00Z", "value": 45.0 }
 ```
 
 The `id` is needed by the batch PATCH endpoint and by the frontend edit card to track per-value edits and deletions.
@@ -267,11 +269,13 @@ All fields are optional. Only provided fields are updated.
 {
   "tracker": { "id": "trk_00000000-0000-7000-8000-000000000001", "name": "string", "type": "tracker", "chart_config": "{}", "owner_id": 1, "owner_name": "string", "created_at": "2024-01-01T00:00:00Z", "last_updated_at": "2024-01-01T00:00:00Z", "role": "owner", "liked": false },
   "series": [
-    { "series": { "id": 1, "name": "string", "data_type": "float", "config": "{}", "tracker_id": "trk_00000000-0000-7000-8000-000000000001" },
-      "values": [{ "time": "2024-01-01T00:00:00Z", "value": 45.0 }] }
+    { "series": { "id": "ser_0195f3a6-5b8c-7e6a-8f43-123456789abc", "name": "string", "data_type": "float", "config": "{}", "tracker_id": "trk_00000000-0000-7000-8000-000000000001" },
+      "values": [{ "id": "val_0195f3a6-5b8c-7e6a-8f43-123456789abd", "time": "2024-01-01T00:00:00Z", "value": 45.0 }] }
   ]
 }
 ```
+
+Coverage previews expose virtual series/values that are not persisted in `tracker_series` / `tracker_value`; their `id` fields are omitted.
 
 ## Coverage Type
 

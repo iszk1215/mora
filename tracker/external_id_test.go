@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -90,4 +91,80 @@ func TestExternalIDValue(t *testing.T) {
 	v, err = ExternalID("").Value()
 	require.NoError(t, err)
 	require.Equal(t, "", v)
+}
+
+func TestSeriesExternalID(t *testing.T) {
+	id, err := NewSeriesExternalID()
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(string(id), seriesExternalIDPrefix))
+
+	raw, err := uuid.Parse(id.Bare())
+	require.NoError(t, err)
+	require.Equal(t, uuid.Version(7), raw.Version())
+
+	parsed, err := ParseSeriesExternalID(strings.ToUpper(string(id)))
+	require.NoError(t, err)
+	require.Equal(t, id, parsed)
+
+	_, err = ParseSeriesExternalID("trk_" + uuid.NewString())
+	require.Error(t, err)
+	_, err = ParseSeriesExternalID("ser_not-a-uuid")
+	require.Error(t, err)
+}
+
+func TestSeriesExternalIDScanValue(t *testing.T) {
+	raw := uuid.New()
+	canonical := SeriesExternalID(seriesExternalIDPrefix + raw.String())
+
+	var got SeriesExternalID
+	require.NoError(t, got.Scan(raw.String()))
+	require.Equal(t, canonical, got)
+
+	v, err := canonical.Value()
+	require.NoError(t, err)
+	require.Equal(t, raw.String(), v)
+
+	var fromJSON SeriesExternalID
+	require.NoError(t, json.Unmarshal([]byte(`"`+canonical.String()+`"`), &fromJSON))
+	require.Equal(t, canonical, fromJSON)
+
+	err = json.Unmarshal([]byte(`"trk_`+raw.String()+`"`), &fromJSON)
+	require.Error(t, err)
+}
+
+func TestValueExternalID(t *testing.T) {
+	id, err := NewValueExternalID()
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(string(id), valueExternalIDPrefix))
+
+	raw, err := uuid.Parse(id.Bare())
+	require.NoError(t, err)
+	require.Equal(t, uuid.Version(7), raw.Version())
+
+	parsed, err := ParseValueExternalID(strings.ToUpper(string(id)))
+	require.NoError(t, err)
+	require.Equal(t, id, parsed)
+
+	_, err = ParseValueExternalID("ser_" + uuid.NewString())
+	require.Error(t, err)
+}
+
+func TestValueExternalIDScanValueUnmarshalJSON(t *testing.T) {
+	raw := uuid.New()
+	canonical := ValueExternalID(valueExternalIDPrefix + raw.String())
+
+	var got ValueExternalID
+	require.NoError(t, got.Scan(raw.String()))
+	require.Equal(t, canonical, got)
+
+	v, err := canonical.Value()
+	require.NoError(t, err)
+	require.Equal(t, raw.String(), v)
+
+	var fromJSON ValueExternalID
+	require.NoError(t, json.Unmarshal([]byte(`"`+canonical.String()+`"`), &fromJSON))
+	require.Equal(t, canonical, fromJSON)
+
+	err = json.Unmarshal([]byte(`"not-a-value-id"`), &fromJSON)
+	require.Error(t, err)
 }

@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS tracker (
 var schemaSeries = `
 CREATE TABLE IF NOT EXISTS tracker_series (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_id TEXT,
     tracker_id INTEGER NOT NULL REFERENCES tracker(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     data_type TEXT NOT NULL DEFAULT 'float',
@@ -84,6 +85,7 @@ CREATE TABLE IF NOT EXISTS tracker_series (
 var schemaValue = `
 CREATE TABLE IF NOT EXISTS tracker_value (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_id TEXT,
     series_id INTEGER NOT NULL REFERENCES tracker_series(id) ON DELETE CASCADE,
     time DATETIME NOT NULL,
     value REAL NOT NULL,
@@ -513,14 +515,20 @@ func (s *trackerStore) addSeries(series *SeriesModel) error {
 		series.Config = "{}"
 	}
 
-	query := "INSERT INTO tracker_series (tracker_id, name, data_type, config) VALUES (?, ?, ?, ?)"
+	eid, err := NewSeriesExternalID()
+	if err != nil {
+		return fmt.Errorf("addSeries new external id: %w", err)
+	}
+	series.Id = eid
 
-	res, err := s.db.Exec(query, series.TrackerId, series.Name, series.DataType, series.Config)
+	query := "INSERT INTO tracker_series (tracker_id, external_id, name, data_type, config) VALUES (?, ?, ?, ?, ?)"
+
+	res, err := s.db.Exec(query, series.TrackerId, eid.Bare(), series.Name, series.DataType, series.Config)
 	if err != nil {
 		return fmt.Errorf("addSeries insert: %w", err)
 	}
 
-	series.Id, err = res.LastInsertId()
+	series.InternalId, err = res.LastInsertId()
 	if err != nil {
 		return fmt.Errorf("addSeries LastInsertId: %w", err)
 	}
@@ -529,7 +537,9 @@ func (s *trackerStore) addSeries(series *SeriesModel) error {
 }
 
 func (s *trackerStore) findSeriesById(id int64) (*SeriesModel, error) {
-	query := `SELECT s.id, s.tracker_id, t.external_id, s.name, s.data_type, s.config
+	query := `SELECT s.external_id AS series_external_id, s.id AS internal_id,
+			s.tracker_id, t.external_id AS tracker_external_id,
+			s.name, s.data_type, s.config
 		FROM tracker_series s
 		JOIN tracker t ON t.id = s.tracker_id
 		WHERE s.id = ?`
@@ -547,9 +557,32 @@ func (s *trackerStore) findSeriesById(id int64) (*SeriesModel, error) {
 	return &rows[0], nil
 }
 
+func (s *trackerStore) findSeriesByExternalID(id SeriesExternalID) (*SeriesModel, error) {
+	query := `SELECT s.external_id AS series_external_id, s.id AS internal_id,
+			s.tracker_id, t.external_id AS tracker_external_id,
+			s.name, s.data_type, s.config
+		FROM tracker_series s
+		JOIN tracker t ON t.id = s.tracker_id
+		WHERE s.external_id = ?`
+
+	rows := []SeriesModel{}
+	err := s.db.Select(&rows, query, id.Bare())
+	if err != nil {
+		return nil, fmt.Errorf("findSeriesByExternalID select: %w", err)
+	}
+
+	if len(rows) == 0 {
+		return nil, errorSeriesNotFound
+	}
+
+	return &rows[0], nil
+}
+
 func (s *trackerStore) listSeries(trackerId int64) ([]SeriesModel, error) {
 	start := time.Now()
-	query := `SELECT s.id, s.tracker_id, t.external_id, s.name, s.data_type, s.config
+	query := `SELECT s.external_id AS series_external_id, s.id AS internal_id,
+			s.tracker_id, t.external_id AS tracker_external_id,
+			s.name, s.data_type, s.config
 		FROM tracker_series s
 		JOIN tracker t ON t.id = s.tracker_id
 		WHERE s.tracker_id = ?`
@@ -578,7 +611,9 @@ func (s *trackerStore) listSeriesByTrackerIDs(trackerIDs []int64) (map[int64][]S
 		return map[int64][]SeriesModel{}, nil
 	}
 	start := time.Now()
-	query := fmt.Sprintf(`SELECT s.id, s.tracker_id, t.external_id, s.name, s.data_type, s.config
+	query := fmt.Sprintf(`SELECT s.external_id AS series_external_id, s.id AS internal_id,
+			s.tracker_id, t.external_id AS tracker_external_id,
+			s.name, s.data_type, s.config
 		FROM tracker_series s
 		JOIN tracker t ON t.id = s.tracker_id
 		WHERE s.tracker_id IN (%s)
@@ -686,14 +721,20 @@ func (s *trackerStore) addValue(value *ValueModel) error {
 		return ErrValueLimitReached
 	}
 
-	query := "INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)"
+	eid, err := NewValueExternalID()
+	if err != nil {
+		return fmt.Errorf("addValue new external id: %w", err)
+	}
+	value.Id = eid
 
-	res, err := s.db.Exec(query, value.SeriesId, value.Timestamp, value.Value)
+	query := "INSERT INTO tracker_value (series_id, external_id, time, value) VALUES (?, ?, ?, ?)"
+
+	res, err := s.db.Exec(query, value.SeriesId, eid.Bare(), value.Timestamp, value.Value)
 	if err != nil {
 		return fmt.Errorf("addValue insert: %w", err)
 	}
 
-	value.Id, err = res.LastInsertId()
+	value.InternalId, err = res.LastInsertId()
 	if err != nil {
 		return fmt.Errorf("addValue LastInsertId: %w", err)
 	}
@@ -724,7 +765,7 @@ func (s *trackerStore) setLastUpdatedAt(trackerID int64, ts time.Time) error {
 }
 
 func (s *trackerStore) listValues(seriesId int64, limit int) ([]ValueModel, error) {
-	query := "SELECT id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time"
+	query := "SELECT external_id AS value_external_id, id AS internal_id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time"
 
 	var rows []ValueModel
 	var err error
@@ -745,7 +786,7 @@ func (s *trackerStore) listValues(seriesId int64, limit int) ([]ValueModel, erro
 
 func (s *trackerStore) listLatestValues(seriesId int64, limit int) ([]ValueModel, error) {
 	start := time.Now()
-	query := "SELECT id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time DESC"
+	query := "SELECT external_id AS value_external_id, id AS internal_id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time DESC"
 
 	rows := make([]ValueModel, 0)
 	var err error
@@ -777,9 +818,9 @@ func (s *trackerStore) listLatestValues(seriesId int64, limit int) ([]ValueModel
 func (s *trackerStore) listLatestValuesByTracker(trackerID int64, limit int) (map[int64][]ValueModel, error) {
 	start := time.Now()
 	query := `
-		SELECT series_id, id, time, value
+		SELECT series_id, external_id AS value_external_id, id AS internal_id, time, value
 		FROM (
-			SELECT id, series_id, time, value,
+			SELECT id, external_id, series_id, time, value,
 				ROW_NUMBER() OVER (PARTITION BY series_id ORDER BY time DESC) AS rn
 			FROM tracker_value
 			WHERE series_id IN (SELECT id FROM tracker_series WHERE tracker_id = ?)
@@ -813,9 +854,10 @@ func (s *trackerStore) listLatestValuesByTrackerIDs(trackerIDs []int64, limit in
 	}
 	start := time.Now()
 	query := fmt.Sprintf(`
-		SELECT v.tracker_id, v.series_id, v.id, v.time, v.value
+		SELECT v.tracker_id, v.series_id, v.value_external_id, v.internal_id, v.time, v.value
 		FROM (
-			SELECT ts.tracker_id, tv.id, tv.series_id, tv.time, tv.value,
+			SELECT ts.tracker_id, tv.external_id AS value_external_id, tv.id AS internal_id,
+				tv.series_id, tv.time, tv.value,
 				ROW_NUMBER() OVER (PARTITION BY tv.series_id ORDER BY tv.time DESC) AS rn
 			FROM tracker_value tv
 			JOIN tracker_series ts ON ts.id = tv.series_id
@@ -920,7 +962,7 @@ func (s *trackerStore) deleteValues(seriesId int64) error {
 
 // ValuePatch describes an update to a single value row.
 type ValuePatch struct {
-	Id    int64
+	Id    ValueExternalID
 	Time  time.Time
 	Value float64
 }
@@ -929,7 +971,7 @@ type ValuePatch struct {
 // single transaction and returns the resulting value list (ordered by time).
 // Updates are rejected (ErrValueExists) when the new timestamp collides with
 // another value of the same series. Deletions of unknown ids are ignored.
-func (s *trackerStore) applyValueChanges(seriesID int64, updates []ValuePatch, deletes []int64) ([]ValueModel, error) {
+func (s *trackerStore) applyValueChanges(seriesID int64, updates []ValuePatch, deletes []ValueExternalID) ([]ValueModel, error) {
 	tx, err := s.db.Beginx()
 	if err != nil {
 		return nil, fmt.Errorf("applyValueChanges begin: %w", err)
@@ -941,17 +983,17 @@ func (s *trackerStore) applyValueChanges(seriesID int64, updates []ValuePatch, d
 	for _, u := range updates {
 		var count int
 		err := tx.Get(&count,
-			"SELECT COUNT(*) FROM tracker_value WHERE series_id = ? AND time = ? AND id != ?",
-			seriesID, u.Time, u.Id)
+			"SELECT COUNT(*) FROM tracker_value WHERE series_id = ? AND time = ? AND external_id != ?",
+			seriesID, u.Time, u.Id.Bare())
 		if err != nil {
 			return nil, fmt.Errorf("applyValueChanges conflict check: %w", err)
 		}
 		if count > 0 {
-			return nil, fmt.Errorf("applyValueChanges update %d: %w", u.Id, ErrValueExists)
+			return nil, fmt.Errorf("applyValueChanges update %s: %w", u.Id, ErrValueExists)
 		}
 
-		res, err := tx.Exec("UPDATE tracker_value SET time = ?, value = ? WHERE id = ? AND series_id = ?",
-			u.Time, u.Value, u.Id, seriesID)
+		res, err := tx.Exec("UPDATE tracker_value SET time = ?, value = ? WHERE external_id = ? AND series_id = ?",
+			u.Time, u.Value, u.Id.Bare(), seriesID)
 		if err != nil {
 			return nil, fmt.Errorf("applyValueChanges update: %w", err)
 		}
@@ -960,12 +1002,12 @@ func (s *trackerStore) applyValueChanges(seriesID int64, updates []ValuePatch, d
 			return nil, fmt.Errorf("applyValueChanges rows affected: %w", err)
 		}
 		if n == 0 {
-			return nil, fmt.Errorf("applyValueChanges update %d: %w", u.Id, errorValueNotFound)
+			return nil, fmt.Errorf("applyValueChanges update %s: %w", u.Id, errorValueNotFound)
 		}
 	}
 
 	if len(deletes) > 0 {
-		query, args, err := sqlx.In("DELETE FROM tracker_value WHERE series_id = ? AND id IN (?)", seriesID, deletes)
+		query, args, err := sqlx.In("DELETE FROM tracker_value WHERE series_id = ? AND external_id IN (?)", seriesID, deletes)
 		if err != nil {
 			return nil, fmt.Errorf("applyValueChanges delete: %w", err)
 		}
@@ -987,7 +1029,7 @@ func (s *trackerStore) applyValueChanges(seriesID int64, updates []ValuePatch, d
 	}
 
 	var values []ValueModel
-	err = tx.Select(&values, "SELECT id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time", seriesID)
+	err = tx.Select(&values, "SELECT external_id AS value_external_id, id AS internal_id, series_id, time, value FROM tracker_value WHERE series_id = ? ORDER BY time", seriesID)
 	if err != nil {
 		return nil, fmt.Errorf("applyValueChanges select: %w", err)
 	}
@@ -1119,6 +1161,84 @@ func (s *trackerStore) migrate() error {
 	return nil
 }
 
+func (s *trackerStore) migrateSeriesValueExternalIDs() error {
+	if !s.hasColumn("tracker_series", "external_id") {
+		if _, err := s.db.Exec("ALTER TABLE tracker_series ADD COLUMN external_id TEXT"); err != nil {
+			return fmt.Errorf("migrate tracker_series external_id column: %w", err)
+		}
+	}
+	if !s.hasColumn("tracker_value", "external_id") {
+		if _, err := s.db.Exec("ALTER TABLE tracker_value ADD COLUMN external_id TEXT"); err != nil {
+			return fmt.Errorf("migrate tracker_value external_id column: %w", err)
+		}
+	}
+
+	if err := s.backfillSeriesExternalIDs(); err != nil {
+		return err
+	}
+	if err := s.backfillValueExternalIDs(); err != nil {
+		return err
+	}
+
+	if _, err := s.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tracker_series_external_id ON tracker_series(external_id)"); err != nil {
+		return fmt.Errorf("migrate idx_tracker_series_external_id: %w", err)
+	}
+	if _, err := s.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_tracker_value_external_id ON tracker_value(external_id)"); err != nil {
+		return fmt.Errorf("migrate idx_tracker_value_external_id: %w", err)
+	}
+	return nil
+}
+
+func (s *trackerStore) backfillSeriesExternalIDs() error {
+	var ids []int64
+	if err := s.db.Select(&ids, "SELECT id FROM tracker_series WHERE external_id IS NULL OR external_id = '' ORDER BY id"); err != nil {
+		return fmt.Errorf("migrate series external_id select: %w", err)
+	}
+	for _, id := range ids {
+		eid, err := NewSeriesExternalID()
+		if err != nil {
+			return err
+		}
+		if _, err := s.db.Exec("UPDATE tracker_series SET external_id = ? WHERE id = ?", eid.Bare(), id); err != nil {
+			return fmt.Errorf("migrate series external_id update: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *trackerStore) backfillValueExternalIDs() error {
+	const batchSize = 1000
+	for {
+		var ids []int64
+		if err := s.db.Select(&ids,
+			"SELECT id FROM tracker_value WHERE external_id IS NULL OR external_id = '' ORDER BY id LIMIT ?", batchSize); err != nil {
+			return fmt.Errorf("migrate value external_id select: %w", err)
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+
+		tx, err := s.db.Beginx()
+		if err != nil {
+			return fmt.Errorf("migrate value external_id begin: %w", err)
+		}
+		for _, id := range ids {
+			eid, err := NewValueExternalID()
+			if err != nil {
+				_ = tx.Rollback()
+				return err
+			}
+			if _, err := tx.Exec("UPDATE tracker_value SET external_id = ? WHERE id = ?", eid.Bare(), id); err != nil {
+				_ = tx.Rollback()
+				return fmt.Errorf("migrate value external_id update: %w", err)
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("migrate value external_id commit: %w", err)
+		}
+	}
+}
+
 func (s *trackerStore) hasColumn(table, column string) bool {
 	rows, err := s.db.Query("PRAGMA table_info(" + table + ")")
 	if err != nil {
@@ -1160,6 +1280,10 @@ func (s *trackerStore) initialize() error {
 	_, err = s.db.Exec(schemaValue)
 	if err != nil {
 		return fmt.Errorf("initialize schemaValue: %w", err)
+	}
+
+	if err := s.migrateSeriesValueExternalIDs(); err != nil {
+		return err
 	}
 
 	_, err = s.db.Exec(schemaMember)

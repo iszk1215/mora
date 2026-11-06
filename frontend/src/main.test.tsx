@@ -557,7 +557,7 @@ describe('TrackerSearchPage', () => {
     const withSeries = {
       ...tracker,
       chart_config: '{}',
-      series: [{ series: { id: 1, tracker_id: "trk_1", name: 'temp', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2026-01-01T00:00:00Z', value: 12.5 }] }],
+      series: [{ series: { id: '1', tracker_id: "trk_1", name: 'temp', data_type: 'float', config: '{}' }, values: [{ id: '1', time: '2026-01-01T00:00:00Z', value: 12.5 }] }],
     }
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify({ trackers: [withSeries], total: 1, page: 1, per_page: 12 }), { headers: { 'Content-Type': 'application/json' } }))

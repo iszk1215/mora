@@ -38,19 +38,21 @@ type (
 	}
 
 	SeriesModel struct {
-		Id                int64      `json:"id"          db:"id"`
-		TrackerId         int64      `json:"-"           db:"tracker_id"`
-		TrackerExternalId ExternalID `json:"tracker_id"  db:"external_id"`
-		Name              string     `json:"name"        db:"name"`
-		DataType          string     `json:"data_type"   db:"data_type"`
-		Config            string     `json:"config"      db:"config"`
+		Id                SeriesExternalID `json:"id,omitempty"  db:"series_external_id"`
+		InternalId        int64            `json:"-"             db:"internal_id"`
+		TrackerId         int64            `json:"-"             db:"tracker_id"`
+		TrackerExternalId ExternalID       `json:"tracker_id"    db:"tracker_external_id"`
+		Name              string           `json:"name"          db:"name"`
+		DataType          string           `json:"data_type"     db:"data_type"`
+		Config            string           `json:"config"        db:"config"`
 	}
 
 	ValueModel struct {
-		Id        int64     `json:"id"    db:"id"`
-		SeriesId  int64     `db:"series_id"`
-		Timestamp time.Time `json:"time"  db:"time"`
-		Value     float64   `json:"value" db:"value"`
+		Id         ValueExternalID `json:"id,omitempty" db:"value_external_id"`
+		InternalId int64           `json:"-"            db:"internal_id"`
+		SeriesId   int64           `json:"-"            db:"series_id"`
+		Timestamp  time.Time       `json:"time"         db:"time"`
+		Value      float64         `json:"value"        db:"value"`
 	}
 
 	CreateTrackerRequest struct {
@@ -116,14 +118,14 @@ type (
 
 	// PatchValueItem is a single value update in a batch patch request.
 	PatchValueItem struct {
-		Id    int64     `json:"id"`
-		Time  time.Time `json:"time"`
-		Value float64   `json:"value"`
+		Id    ValueExternalID `json:"id"`
+		Time  time.Time       `json:"time"`
+		Value float64         `json:"value"`
 	}
 
 	PatchValuesRequest struct {
-		Updates []PatchValueItem `json:"updates"`
-		Deletes []int64          `json:"deletes"`
+		Updates []PatchValueItem  `json:"updates"`
+		Deletes []ValueExternalID `json:"deletes"`
 	}
 )
 
@@ -565,7 +567,7 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 	totalValues := 0
 	previews := make([]PreviewSeriesValues, 0, len(series))
 	for _, s := range series {
-		vs := values[s.Id]
+		vs := values[s.InternalId]
 		if vs == nil {
 			vs = []ValueModel{}
 		}
@@ -728,7 +730,7 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 // @Description  Delete the specified series. Child values are also cascade-deleted.
 // @Tags         tracker
 // @Param        trackerId  path  string  true  "Tracker ID"
-// @Param        seriesId   path  int  true  "Series ID"
+// @Param        seriesId   path  string  true  "Series external ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -744,7 +746,7 @@ func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 
 	series, _ := seriesFrom(r.Context())
 
-	err := h.store.deleteSeries(series.Id)
+	err := h.store.deleteSeries(series.InternalId)
 	if err != nil {
 		log.Warn().Err(err).Msg("deleteSeries")
 		render.InternalError(w, err)
@@ -761,7 +763,7 @@ func (h *trackerHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        trackerId  path  string                      true  "Tracker ID"
-// @Param        seriesId   path  int                      true  "Series ID"
+// @Param        seriesId   path  string                      true  "Series external ID"
 // @Param        body       body  tracker.PatchSeriesRequest  true  "Fields to update"
 // @Success      200  {object}  tracker.SeriesModel
 // @Failure      400  {object}  core.ErrorResponse
@@ -805,7 +807,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 		}
 		*req.Name = n
 
-		exists, err := h.store.seriesNameExists(tracker.Id, n, series.Id)
+		exists, err := h.store.seriesNameExists(tracker.Id, n, series.InternalId)
 		if err != nil {
 			log.Error().Err(err).Msg("patchSeries seriesNameExists")
 			render.InternalError(w, err)
@@ -836,7 +838,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = h.store.updateSeries(series.Id, req.Name, req.DataType, req.Config)
+	err = h.store.updateSeries(series.InternalId, req.Name, req.DataType, req.Config)
 	if err != nil {
 		log.Error().Err(err).Msg("patchSeries updateSeries")
 		render.InternalError(w, err)
@@ -844,7 +846,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reload the updated series
-	updated, err := h.store.findSeriesById(series.Id)
+	updated, err := h.store.findSeriesById(series.InternalId)
 	if err != nil {
 		log.Error().Err(err).Msg("patchSeries findSeriesById")
 		render.InternalError(w, err)
@@ -862,7 +864,7 @@ func (h *trackerHandler) patchSeries(w http.ResponseWriter, r *http.Request) {
 // @Description  Return time-series data for the specified series. The limit parameter restricts the maximum number of results.
 // @Tags         tracker
 // @Param        trackerId  path  string     true   "Tracker ID"
-// @Param        seriesId   path  int     true   "Series ID"
+// @Param        seriesId   path  string     true   "Series external ID"
 // @Param        limit      query int     false  "Maximum number of results"
 // @Success      200  {object}  tracker.ListValuesResponse
 // @Failure      400  {object}  core.ErrorResponse
@@ -883,7 +885,7 @@ func (h *trackerHandler) listValues(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 
-	values, err := h.store.listValues(series.Id, limit)
+	values, err := h.store.listValues(series.InternalId, limit)
 	if err != nil {
 		log.Error().Err(err).Msg("tracker.handler.listValues")
 		render.InternalError(w, err)
@@ -905,7 +907,7 @@ func (h *trackerHandler) listValues(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        trackerId  path  string                     true  "Tracker ID"
-// @Param        seriesId   path  int                     true  "Series ID"
+// @Param        seriesId   path  string                     true  "Series external ID"
 // @Param        body       body  tracker.CreateValueRequest  true  "Value data"
 // @Success      201  {object}  tracker.ValueModel
 // @Failure      400  {object}  core.ErrorResponse
@@ -942,7 +944,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 
 	series, _ := seriesFrom(r.Context())
 	value := ValueModel{
-		SeriesId:  series.Id,
+		SeriesId:  series.InternalId,
 		Timestamp: req.Timestamp,
 		Value:     req.Value,
 	}
@@ -950,7 +952,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 	err = h.store.addValue(&value)
 	if err != nil {
 		if errors.Is(err, ErrValueLimitReached) {
-			log.Warn().Int64("series_id", series.Id).Msg("createValue: limit reached")
+			log.Warn().Stringer("series_id", series.Id).Msg("createValue: limit reached")
 			render.Forbidden(w, fmt.Errorf("value limit reached (max %d values per series)", MaxValuesPerSeries))
 			return
 		}
@@ -967,7 +969,7 @@ func (h *trackerHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // @Description  Delete all time-series data for the specified series
 // @Tags         tracker
 // @Param        trackerId  path  string  true  "Tracker ID"
-// @Param        seriesId   path  int  true  "Series ID"
+// @Param        seriesId   path  string  true  "Series external ID"
 // @Success      204
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
@@ -982,7 +984,7 @@ func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 	}
 
 	series, _ := seriesFrom(r.Context())
-	err := h.store.deleteValues(series.Id)
+	err := h.store.deleteValues(series.InternalId)
 	if err != nil {
 		log.Error().Err(err).Msg("deleteValues")
 		render.InternalError(w, err)
@@ -999,7 +1001,7 @@ func (h *trackerHandler) deleteValues(w http.ResponseWriter, r *http.Request) {
 // @Accept       json
 // @Produce      json
 // @Param        trackerId  path  string                       true  "Tracker ID"
-// @Param        seriesId   path  int                       true  "Series ID"
+// @Param        seriesId   path  string                       true  "Series external ID"
 // @Param        body       body  tracker.PatchValuesRequest  true  "Batch of value updates and deletions"
 // @Success      200  {object}  tracker.ListValuesResponse
 // @Failure      400  {object}  core.ErrorResponse
@@ -1046,7 +1048,7 @@ func (h *trackerHandler) patchValues(w http.ResponseWriter, r *http.Request) {
 		updates = append(updates, ValuePatch(u))
 	}
 
-	values, err := h.store.applyValueChanges(series.Id, updates, req.Deletes)
+	values, err := h.store.applyValueChanges(series.InternalId, updates, req.Deletes)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrValueExists):

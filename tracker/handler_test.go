@@ -825,7 +825,7 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNoContent, h, r)
@@ -837,10 +837,24 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		require.NoError(t, store.addTracker(tr, 1))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/99999", string(tr.ExternalId))
+		path := fmt.Sprintf("/%s/series/ser_0195f3a6-5b8c-7e6a-8f43-123456789def", string(tr.ExternalId))
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
+	})
+
+	t.Run("invalid external id", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		for _, id := range []string{"1", "ser_not-a-uuid"} {
+			path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), id)
+			r := httptest.NewRequest(http.MethodDelete, path, nil)
+			r = r.WithContext(superuserCtx())
+			getResponse(t, http.StatusBadRequest, h, r)
+		}
 	})
 
 	t.Run("series from different tracker", func(t *testing.T) {
@@ -854,7 +868,7 @@ func TestHandlerDeleteSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr1.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr1.ExternalId), s.Id)
 		r := httptest.NewRequest(http.MethodDelete, path, nil)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
@@ -871,7 +885,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.Equal(t, "{}", s.Config)
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 		cfg := `{"value_format":"%.2f"}`
 		body := PatchSeriesRequest{Config: strPtr(cfg)}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -891,7 +905,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 		body := PatchSeriesRequest{DataType: strPtr("int")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
@@ -910,7 +924,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 		body := PatchSeriesRequest{Name: strPtr("renamed")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
@@ -929,7 +943,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 		body := PatchSeriesRequest{Name: strPtr("   ")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
@@ -944,7 +958,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 		body := PatchSeriesRequest{Name: strPtr("  renamed  ")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
@@ -965,7 +979,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s2))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s2.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s2.Id)
 		body := PatchSeriesRequest{Name: strPtr("s1")}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(superuserCtx())
@@ -980,7 +994,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 		body := PatchSeriesRequest{Config: strPtr(`{"value_format":"%.1f"}`)}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
 		r = r.WithContext(ContextWithAuth(context.Background(), nil))
@@ -996,7 +1010,7 @@ func TestHandlerPatchSeries(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 		cfg := `{"y_axis_index":1}`
 		body := PatchSeriesRequest{Config: strPtr(cfg)}
 		r := newRequestWithJSON(t, http.MethodPatch, path, body)
@@ -1017,7 +1031,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
 		r = r.WithContext(superuserCtx())
@@ -1037,7 +1051,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 		now := time.Now().Round(0)
 		r1 := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
 		r1 = r1.WithContext(superuserCtx())
@@ -1056,7 +1070,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 		r := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString("{invalid}"))
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
@@ -1070,7 +1084,7 @@ func TestHandlerCreateValue(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 42.5})
 		// anonymous
@@ -1086,13 +1100,15 @@ func TestHandlerCreateValue(t *testing.T) {
 
 		base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		for i := 0; i < MaxValuesPerSeries; i++ {
-			_, err := store.db.Exec("INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
-				s.Id, base.Add(time.Duration(i)*time.Second), float64(i))
+			ext, err := NewValueExternalID()
+			require.NoError(t, err)
+			_, err = store.db.Exec("INSERT INTO tracker_value (series_id, external_id, time, value) VALUES (?, ?, ?, ?)",
+				s.InternalId, ext.Bare(), base.Add(time.Duration(i)*time.Second), float64(i))
 			require.NoError(t, err)
 		}
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: base.Add(time.Hour * 8760), Value: 1})
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusForbidden, h, r)
@@ -1112,7 +1128,7 @@ func TestHandlerListValues(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -1131,13 +1147,13 @@ func TestHandlerListValues(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		now := time.Now().Round(0)
-		v1 := &ValueModel{SeriesId: s.Id, Timestamp: now, Value: 10.0}
-		v2 := &ValueModel{SeriesId: s.Id, Timestamp: now.Add(time.Hour), Value: 20.0}
+		v1 := &ValueModel{SeriesId: s.InternalId, Timestamp: now, Value: 10.0}
+		v2 := &ValueModel{SeriesId: s.InternalId, Timestamp: now.Add(time.Hour), Value: 20.0}
 		require.NoError(t, store.addValue(v1))
 		require.NoError(t, store.addValue(v2))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -1156,12 +1172,12 @@ func TestHandlerListValues(t *testing.T) {
 
 		now := time.Now().Round(0)
 		for i := 0; i < 5; i++ {
-			v := &ValueModel{SeriesId: s.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i)}
+			v := &ValueModel{SeriesId: s.InternalId, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i)}
 			require.NoError(t, store.addValue(v))
 		}
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values?limit=3", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values?limit=3", string(tr.ExternalId), s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -1179,7 +1195,7 @@ func TestHandlerListValues(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values?limit=abc", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values?limit=abc", string(tr.ExternalId), s.Id)
 		r := httptest.NewRequest(http.MethodGet, path, nil)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
@@ -1194,20 +1210,20 @@ func TestHandlerDeleteValues(t *testing.T) {
 	require.NoError(t, store.addSeries(s))
 
 	now := time.Now().Round(0)
-	v1 := &ValueModel{SeriesId: s.Id, Timestamp: now, Value: 10.0}
-	v2 := &ValueModel{SeriesId: s.Id, Timestamp: now.Add(time.Hour), Value: 20.0}
+	v1 := &ValueModel{SeriesId: s.InternalId, Timestamp: now, Value: 10.0}
+	v2 := &ValueModel{SeriesId: s.InternalId, Timestamp: now.Add(time.Hour), Value: 20.0}
 	require.NoError(t, store.addValue(v1))
 	require.NoError(t, store.addValue(v2))
 
 	h := newHandler(store)
-	path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+	path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
 	r = r.WithContext(superuserCtx())
 	getResponse(t, http.StatusNoContent, h, r)
 }
 
 func TestHandlerPatchValues(t *testing.T) {
-	setup := func(t *testing.T) (*trackerStore, int64, int64, ValueModel, ValueModel) {
+	setup := func(t *testing.T) (*trackerStore, int64, SeriesExternalID, ValueModel, ValueModel) {
 		store := initTestStore(t)
 		tr := &TrackerModel{Name: "test", Type: TypeTracker}
 		require.NoError(t, store.addTracker(tr, 1))
@@ -1215,8 +1231,8 @@ func TestHandlerPatchValues(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		t1 := time.Now().Round(0)
-		v1 := &ValueModel{SeriesId: s.Id, Timestamp: t1, Value: 10.0}
-		v2 := &ValueModel{SeriesId: s.Id, Timestamp: t1.Add(time.Hour), Value: 20.0}
+		v1 := &ValueModel{SeriesId: s.InternalId, Timestamp: t1, Value: 10.0}
+		v2 := &ValueModel{SeriesId: s.InternalId, Timestamp: t1.Add(time.Hour), Value: 20.0}
 		require.NoError(t, store.addValue(v1))
 		require.NoError(t, store.addValue(v2))
 		return store, tr.Id, s.Id, *v1, *v2
@@ -1227,10 +1243,10 @@ func TestHandlerPatchValues(t *testing.T) {
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
 		trExt := string(tr.ExternalId)
-		path := fmt.Sprintf("/%s/series/%d/values", trExt, sId)
+		path := fmt.Sprintf("/%s/series/%s/values", trExt, sId)
 		req := PatchValuesRequest{
 			Updates: []PatchValueItem{{Id: v1.Id, Time: v2.Timestamp.Add(time.Hour), Value: 99.0}},
-			Deletes: []int64{v2.Id},
+			Deletes: []ValueExternalID{v2.Id},
 		}
 		r := newRequestWithJSON(t, http.MethodPatch, path, req)
 		r = r.WithContext(superuserCtx())
@@ -1248,7 +1264,7 @@ func TestHandlerPatchValues(t *testing.T) {
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
 		trExt := string(tr.ExternalId)
-		path := fmt.Sprintf("/%s/series/%d/values", trExt, sId)
+		path := fmt.Sprintf("/%s/series/%s/values", trExt, sId)
 		r := newRequestWithJSON(t, http.MethodPatch, path, PatchValuesRequest{})
 		r = r.WithContext(superuserCtx())
 		res := getResponse(t, http.StatusOK, h, r)
@@ -1263,7 +1279,7 @@ func TestHandlerPatchValues(t *testing.T) {
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
 		trExt := string(tr.ExternalId)
-		path := fmt.Sprintf("/%s/series/%d/values", trExt, sId)
+		path := fmt.Sprintf("/%s/series/%s/values", trExt, sId)
 		r := httptest.NewRequest(http.MethodPatch, path, bytes.NewBufferString("{invalid"))
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
@@ -1274,7 +1290,7 @@ func TestHandlerPatchValues(t *testing.T) {
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
 		trExt := string(tr.ExternalId)
-		path := fmt.Sprintf("/%s/series/%d/values", trExt, sId)
+		path := fmt.Sprintf("/%s/series/%s/values", trExt, sId)
 		// v1 time collides with v2's time
 		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: v1.Id, Time: v2.Timestamp, Value: 99.0}}}
 		r := newRequestWithJSON(t, http.MethodPatch, path, req)
@@ -1286,13 +1302,25 @@ func TestHandlerPatchValues(t *testing.T) {
 		require.Contains(t, got.Message, "timestamp already exists")
 	})
 
+	t.Run("invalid value id in request returns 400", func(t *testing.T) {
+		store, trId, sId, _, _ := setup(t)
+		h := newHandler(store)
+		tr, _ := store.findTrackerById(trId)
+		trExt := string(tr.ExternalId)
+		path := fmt.Sprintf("/%s/series/%s/values", trExt, sId)
+		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: ValueExternalID("1"), Time: time.Now(), Value: 1}}}
+		r := newRequestWithJSON(t, http.MethodPatch, path, req)
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
 	t.Run("update unknown id returns 404", func(t *testing.T) {
 		store, trId, sId, _, _ := setup(t)
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
 		trExt := string(tr.ExternalId)
-		path := fmt.Sprintf("/%s/series/%d/values", trExt, sId)
-		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: 99999, Time: time.Now(), Value: 1}}}
+		path := fmt.Sprintf("/%s/series/%s/values", trExt, sId)
+		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: ValueExternalID("val_0195f3a6-5b8c-7e6a-8f43-123456789def"), Time: time.Now(), Value: 1}}}
 		r := newRequestWithJSON(t, http.MethodPatch, path, req)
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusNotFound, h, r)
@@ -1303,7 +1331,7 @@ func TestHandlerPatchValues(t *testing.T) {
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
 		trExt := string(tr.ExternalId)
-		path := fmt.Sprintf("/%s/series/%d/values", trExt, sId)
+		path := fmt.Sprintf("/%s/series/%s/values", trExt, sId)
 		r := newRequestWithJSON(t, http.MethodPatch, path, PatchValuesRequest{})
 		getResponse(t, http.StatusNotFound, h, r)
 	})
@@ -1316,7 +1344,7 @@ func TestHandlerPatchValues(t *testing.T) {
 		require.NoError(t, store.addSeries(s))
 
 		h := newHandler(store)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 		r := newRequestWithJSON(t, http.MethodPatch, path, PatchValuesRequest{})
 		r = r.WithContext(superuserCtx())
 		getResponse(t, http.StatusBadRequest, h, r)
@@ -1419,7 +1447,7 @@ func TestHandlerPreviewTracker(t *testing.T) {
 
 		now := time.Now().Round(0)
 		for i := 0; i < 5; i++ {
-			v := &ValueModel{SeriesId: s1.Id, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i)}
+			v := &ValueModel{SeriesId: s1.InternalId, Timestamp: now.Add(time.Duration(i) * time.Hour), Value: float64(i)}
 			require.NoError(t, store.addValue(v))
 		}
 
@@ -1470,10 +1498,10 @@ func TestHandlerPreviewTracker(t *testing.T) {
 		now := time.Now().Round(0)
 		for i := 0; i < 25; i++ {
 			require.NoError(t, store.addValue(&ValueModel{
-				SeriesId: s1.Id, Timestamp: now.Add(time.Duration(i) * time.Minute), Value: float64(i),
+				SeriesId: s1.InternalId, Timestamp: now.Add(time.Duration(i) * time.Minute), Value: float64(i),
 			}))
 			require.NoError(t, store.addValue(&ValueModel{
-				SeriesId: s2.Id, Timestamp: now.Add(time.Duration(i) * time.Minute), Value: float64(i + 100),
+				SeriesId: s2.InternalId, Timestamp: now.Add(time.Duration(i) * time.Minute), Value: float64(i + 100),
 			}))
 		}
 
@@ -1514,7 +1542,7 @@ func TestHandlerPreviewTracker(t *testing.T) {
 		sEmpty := &SeriesModel{TrackerId: tr.Id, Name: "empty", DataType: "float"}
 		require.NoError(t, store.addSeries(sEmpty))
 		require.NoError(t, store.addValue(&ValueModel{
-			SeriesId: s1.Id, Timestamp: time.Now().Round(0), Value: 42,
+			SeriesId: s1.InternalId, Timestamp: time.Now().Round(0), Value: 42,
 		}))
 
 		h := newHandler(store)
@@ -1594,7 +1622,7 @@ func TestHandlerDeleteSeriesCoverageTracker(t *testing.T) {
 	require.NoError(t, store.addSeries(s))
 
 	h := newHandler(store)
-	path := fmt.Sprintf("/%s/series/%d", string(tr.ExternalId), s.Id)
+	path := fmt.Sprintf("/%s/series/%s", string(tr.ExternalId), s.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
 	r = r.WithContext(superuserCtx())
 	getResponse(t, http.StatusBadRequest, h, r)
@@ -1608,7 +1636,7 @@ func TestHandlerCreateValueCoverageTracker(t *testing.T) {
 	require.NoError(t, store.addSeries(s))
 
 	h := newHandler(store)
-	path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+	path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 	now := time.Now().Round(0)
 	r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 1.0})
 	r = r.WithContext(superuserCtx())
@@ -1623,7 +1651,7 @@ func TestHandlerDeleteValuesCoverageTracker(t *testing.T) {
 	require.NoError(t, store.addSeries(s))
 
 	h := newHandler(store)
-	path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), s.Id)
+	path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), s.Id)
 	r := httptest.NewRequest(http.MethodDelete, path, nil)
 	r = r.WithContext(superuserCtx())
 	getResponse(t, http.StatusBadRequest, h, r)
@@ -1664,7 +1692,7 @@ func TestHandlerSeriesActivityGridTracker(t *testing.T) {
 }
 
 func TestHandlerCreateValueActivityGridTracker(t *testing.T) {
-	newGridTracker := func(t *testing.T) (*trackerStore, int64, int64) {
+	newGridTracker := func(t *testing.T) (*trackerStore, int64, SeriesExternalID) {
 		store := initTestStore(t)
 		tr := &TrackerModel{Name: "grid", Type: TypeActivityGrid}
 		require.NoError(t, store.addTracker(tr, 1))
@@ -1677,7 +1705,7 @@ func TestHandlerCreateValueActivityGridTracker(t *testing.T) {
 		store, trId, sId := newGridTracker(t)
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), sId)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), sId)
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 2.0})
 		r = r.WithContext(superuserCtx())
@@ -1692,7 +1720,7 @@ func TestHandlerCreateValueActivityGridTracker(t *testing.T) {
 		store, trId, sId := newGridTracker(t)
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), sId)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), sId)
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: 2.5})
 		r = r.WithContext(superuserCtx())
@@ -1707,7 +1735,7 @@ func TestHandlerCreateValueActivityGridTracker(t *testing.T) {
 		store, trId, sId := newGridTracker(t)
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), sId)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), sId)
 		now := time.Now().Round(0)
 		r := newRequestWithJSON(t, http.MethodPost, path, CreateValueRequest{Timestamp: now, Value: -1.0})
 		r = r.WithContext(superuserCtx())
@@ -1716,13 +1744,13 @@ func TestHandlerCreateValueActivityGridTracker(t *testing.T) {
 }
 
 func TestHandlerPatchValuesActivityGridTracker(t *testing.T) {
-	setup := func(t *testing.T) (*trackerStore, int64, int64, ValueModel) {
+	setup := func(t *testing.T) (*trackerStore, int64, SeriesExternalID, ValueModel) {
 		store := initTestStore(t)
 		tr := &TrackerModel{Name: "grid", Type: TypeActivityGrid}
 		require.NoError(t, store.addTracker(tr, 1))
 		s := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "int"}
 		require.NoError(t, store.addSeries(s))
-		v := &ValueModel{SeriesId: s.Id, Timestamp: time.Now().Round(0), Value: 1.0}
+		v := &ValueModel{SeriesId: s.InternalId, Timestamp: time.Now().Round(0), Value: 1.0}
 		require.NoError(t, store.addValue(v))
 		return store, tr.Id, s.Id, *v
 	}
@@ -1731,7 +1759,7 @@ func TestHandlerPatchValuesActivityGridTracker(t *testing.T) {
 		store, trId, sId, v := setup(t)
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), sId)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), sId)
 		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: v.Id, Time: v.Timestamp, Value: 3.0}}}
 		r := newRequestWithJSON(t, http.MethodPatch, path, req)
 		r = r.WithContext(superuserCtx())
@@ -1747,7 +1775,7 @@ func TestHandlerPatchValuesActivityGridTracker(t *testing.T) {
 		store, trId, sId, v := setup(t)
 		h := newHandler(store)
 		tr, _ := store.findTrackerById(trId)
-		path := fmt.Sprintf("/%s/series/%d/values", string(tr.ExternalId), sId)
+		path := fmt.Sprintf("/%s/series/%s/values", string(tr.ExternalId), sId)
 		req := PatchValuesRequest{Updates: []PatchValueItem{{Id: v.Id, Time: v.Timestamp, Value: 2.5}}}
 		r := newRequestWithJSON(t, http.MethodPatch, path, req)
 		r = r.WithContext(superuserCtx())

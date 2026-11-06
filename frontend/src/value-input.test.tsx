@@ -6,8 +6,8 @@ import type { SeriesModel } from './core'
 import { ValueInput, shiftDate } from './value-input'
 
 const series: SeriesModel[] = [
-  { id: 1, tracker_id: "trk_1", name: 's1', data_type: 'float', config: '' },
-  { id: 2, tracker_id: "trk_1", name: 's2', data_type: 'float', config: '' },
+  { id: '1', tracker_id: "trk_1", name: 's1', data_type: 'float', config: '' },
+  { id: '2', tracker_id: "trk_1", name: 's2', data_type: 'float', config: '' },
 ]
 
 const renderInput = (props: Partial<React.ComponentProps<typeof ValueInput>> = {}) => {
@@ -79,7 +79,7 @@ describe('ValueInput', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
     await waitFor(() => {
-      expect(onAdd).toHaveBeenCalledWith({ seriesId: 2, time: '2024-02-15T00:00:00.000Z', value: 42 })
+      expect(onAdd).toHaveBeenCalledWith({ seriesId: '2', time: '2024-02-15T00:00:00.000Z', value: 42 })
     })
   })
 
@@ -169,7 +169,7 @@ describe('ValueInput with levels', () => {
 
     await user.click(screen.getByRole('button', { name: 'Set level 3' }))
     await waitFor(() => {
-      expect(onAdd).toHaveBeenCalledWith({ seriesId: 1, time: '2024-02-15T00:00:00.000Z', value: 2 })
+      expect(onAdd).toHaveBeenCalledWith({ seriesId: '1', time: '2024-02-15T00:00:00.000Z', value: 2 })
     })
   })
 })

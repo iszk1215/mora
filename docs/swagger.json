@@ -1476,8 +1476,8 @@
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1534,8 +1534,8 @@
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1600,8 +1600,8 @@
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1661,8 +1661,8 @@
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1725,8 +1725,8 @@
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -1783,8 +1783,8 @@
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Series ID",
+                        "type": "string",
+                        "description": "Series external ID",
                         "name": "seriesId",
                         "in": "path",
                         "required": true
@@ -2622,7 +2622,7 @@
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "time": {
                     "type": "string"
@@ -2638,7 +2638,7 @@
                 "deletes": {
                     "type": "array",
                     "items": {
-                        "type": "integer"
+                        "type": "string"
                     }
                 },
                 "updates": {
@@ -2687,7 +2687,7 @@
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -2792,10 +2792,7 @@
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
-                },
-                "seriesId": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "time": {
                     "type": "string"
