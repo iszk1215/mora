@@ -17,7 +17,7 @@ import (
 func initCoverageStore(t *testing.T) CoverageStore {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	s := NewCoverageStore(db)
@@ -32,10 +32,10 @@ func TestCoverageStore_New(t *testing.T) {
 	initCoverageStore(t)
 }
 
-func TestCoverageStore_Find(t *testing.T) {
+func TestCoverageStore_FindByExternalID(t *testing.T) {
 	s := initCoverageStore(t)
 	want := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "123abc",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -51,15 +51,15 @@ func TestCoverageStore_Find(t *testing.T) {
 	require.NoError(t, err)
 	want.ID = id
 
-	got, err := s.Find(id)
+	got, err := s.FindByExternalID(want.TrackerID, want.ExternalID)
 	require.NoError(t, err)
 	assertCoverageEqual(t, want, got)
 }
 
-func TestCoverageStore_Find_Nil(t *testing.T) {
+func TestCoverageStore_FindByExternalID_Nil(t *testing.T) {
 	s := initCoverageStore(t)
 
-	cov, err := s.Find(0)
+	cov, err := s.FindByExternalID(0, "")
 	require.NoError(t, err)
 	require.Nil(t, cov)
 }
@@ -83,7 +83,7 @@ func TestCoverageStore_List_Empty(t *testing.T) {
 func TestCoverageStore_Init_CreatesUniqueConstraint(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	s := NewCoverageStore(db)
@@ -113,7 +113,7 @@ func TestCoverageStore_Init_CreatesUniqueConstraint(t *testing.T) {
 
 func TestCoverageStore_Put_Insert(t *testing.T) {
 	want := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
@@ -126,14 +126,14 @@ func TestCoverageStore_Put_Insert(t *testing.T) {
 	require.Equal(t, int64(1), id)
 	want.ID = id
 
-	got, err := s.Find(id)
+	got, err := s.FindByExternalID(want.TrackerID, want.ExternalID)
 	require.NoError(t, err)
 	assertCoverageEqual(t, want, got)
 }
 
 func TestCoverageStore_Put_InsertWithEntry(t *testing.T) {
 	want := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -152,19 +152,14 @@ func TestCoverageStore_Put_InsertWithEntry(t *testing.T) {
 	require.Equal(t, int64(1), id)
 	want.ID = id
 
-	got, err := s.Find(id)
+	got, err := s.FindByExternalID(want.TrackerID, want.ExternalID)
 	require.NoError(t, err)
 	assertCoverageEqual(t, want, got)
 }
 
 func TestCoverageStore_Put_Concurrent(t *testing.T) {
 	s := initCoverageStore(t)
-	cov := &Coverage{
-		TrackerID:    1215,
-		Revision:  "same-revision",
-		Timestamp: time.Now().Round(0),
-		Entries:   []*CoverageEntry{},
-	}
+	timestamp := time.Now().Round(0)
 
 	var barrier sync.WaitGroup
 	barrier.Add(1)
@@ -179,7 +174,12 @@ func TestCoverageStore_Put_Concurrent(t *testing.T) {
 			defer wg.Done()
 			barrier.Wait()
 			runtime.Gosched()
-			_, err := s.Put(cov)
+			_, err := s.Put(&Coverage{
+				TrackerID: 1215,
+				Revision:  "same-revision",
+				Timestamp: timestamp,
+				Entries:   []*CoverageEntry{},
+			})
 			errs <- err
 		}()
 	}
@@ -195,14 +195,14 @@ func TestCoverageStore_Put_Concurrent(t *testing.T) {
 
 func TestCoverageStore_Put_Update(t *testing.T) {
 	cov := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
 	}
 
 	want := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "abcde",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
@@ -217,8 +217,10 @@ func TestCoverageStore_Put_Update(t *testing.T) {
 	id2, err := s.Put(want) // Update
 	require.NoError(t, err)
 	require.Equal(t, int64(1), id2)
+	require.Equal(t, cov.ExternalID, want.ExternalID,
+		"external ID should be stable across UPSERT conflict")
 
-	got, err := s.Find(id2)
+	got, err := s.FindByExternalID(want.TrackerID, want.ExternalID)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.Equal(t, want.Timestamp.Unix(), got.Timestamp.Unix(),
@@ -228,7 +230,7 @@ func TestCoverageStore_Put_Update(t *testing.T) {
 func TestCoverageStore_Put_TouchesLinkedTracker(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	db.MustExec(`CREATE TABLE user (id INTEGER PRIMARY KEY, username TEXT NOT NULL)`)
@@ -278,7 +280,7 @@ func TestCoverageStore_Timeline(t *testing.T) {
 
 	// Insert coverage at two different timestamps
 	id1, err := s.Put(&Coverage{
-		TrackerID:    1215, Revision: "abc", Timestamp: now.Add(-2 * time.Hour),
+		TrackerID: 1215, Revision: "abc", Timestamp: now.Add(-2 * time.Hour),
 		Entries: []*CoverageEntry{{Name: "go", Hits: 30, Lines: 100}},
 	})
 	require.NoError(t, err)
@@ -345,8 +347,8 @@ func TestCoverageStore_Timeline(t *testing.T) {
 	t.Run("zero lines produces zero percentage", func(t *testing.T) {
 		s2 := initCoverageStore(t)
 		_, err := s2.Put(&Coverage{
-			TrackerID:    1,
-			Revision: "abc",
+			TrackerID: 1,
+			Revision:  "abc",
 			Timestamp: now,
 			Entries:   []*CoverageEntry{{Name: "zero", Hits: 0, Lines: 0}},
 		})
@@ -370,7 +372,7 @@ func TestCoverageStore_Timeline_DBError(t *testing.T) {
 
 func TestCoverageStore_ReplaceEntries_BeginTxError(t *testing.T) {
 	cov := &Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "abc",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{{Name: "go", Hits: 10, Lines: 20}},
@@ -378,7 +380,7 @@ func TestCoverageStore_ReplaceEntries_BeginTxError(t *testing.T) {
 
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	s := NewCoverageStore(db)
 	err = s.Init()
@@ -398,7 +400,7 @@ func TestCoverageStore_ReplaceEntries_BeginTxError(t *testing.T) {
 func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	s := NewCoverageStore(db)
@@ -407,7 +409,7 @@ func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
 
 	// Put a coverage entry, then corrupt its block data directly
 	_, err = s.Put(&Coverage{
-		TrackerID:    1215,
+		TrackerID: 1215,
 		Revision:  "abc",
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -427,7 +429,7 @@ func TestCoverageStore_LoadCoverage_BlockUnmarshalError(t *testing.T) {
 	db.MustExec("UPDATE coverage_block SET blocks = 'not-json' WHERE entry_id = (SELECT id FROM coverage_entry LIMIT 1)")
 
 	// Find should fail when trying to unmarshal corrupt blocks
-	_, err = s.Find(1)
+	_, err = s.(*coverageStoreImpl).findByID(1)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "loadCoverage unmarshal blocks")
 }
@@ -456,7 +458,7 @@ CREATE TABLE tracker_coverage (
 func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 
 	db.MustExec(`CREATE TABLE repository (
@@ -494,21 +496,21 @@ func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, repo)
 	require.Equal(t, &core.Repository{
-		Id:                10,
 		RepositoryManager: 2,
 		Namespace:         "acme",
 		Name:              "alpha",
 		Url:               "http://example.com/acme/alpha",
 	}, repo)
 
-	cov, err := s.Find(1)
+	cov, err := impl.findByID(1)
 	require.NoError(t, err)
 	require.NotNil(t, cov)
 	require.Equal(t, int64(10), cov.TrackerID)
+	require.NotEmpty(t, cov.ExternalID)
 
 	// A row whose repository has no link is marked with a negative
 	// repository id and resolved by MigrateCoverageTrackers at startup.
-	unlinked, err := s.Find(2)
+	unlinked, err := impl.findByID(2)
 	require.NoError(t, err)
 	require.NotNil(t, unlinked)
 	require.Equal(t, int64(-2), unlinked.TrackerID)
@@ -520,7 +522,7 @@ func TestCoverageStore_MigrateFromOldSchema(t *testing.T) {
 func TestCoverageStore_DeleteTrackerCascadesCoverage(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 	db.MustExec("PRAGMA foreign_keys = ON")
 
@@ -559,7 +561,7 @@ func TestCoverageStore_DeleteTrackerCascadesCoverage(t *testing.T) {
 func TestCoverageStore_Put_FailsForMissingTrackerWithForeignKeys(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.SetMaxOpenConns(1)
 	db.MustExec("PRAGMA foreign_keys = ON")
 

@@ -7,14 +7,14 @@ import (
 	"github.com/iszk1215/mora/core"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
+	_ "github.com/tursodatabase/go-libsql"
 )
 
 func initTestCoverageService(t *testing.T) *CoverageService {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	svc, err := NewCoverageService(db)
 	require.NoError(t, err)
@@ -63,7 +63,6 @@ func TestCoverageServiceLinkAndFindRepoByTrackerID(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	require.Equal(t, &core.Repository{
-		Id:                7, // the returned repo mirrors the tracker id
 		RepositoryManager: 1,
 		Namespace:         "acme",
 		Name:              "alpha",
@@ -97,7 +96,7 @@ func (f *fakeTrackerCreator) CreateTracker(name, description, body, visibility s
 func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 	db.MustExec(`
 		CREATE TABLE IF NOT EXISTS repository (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,7 +131,6 @@ func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	require.Equal(t, &core.Repository{
-		Id:                1, // the new tracker id
 		RepositoryManager: 1,
 		Namespace:         "acme",
 		Name:              "beta",
@@ -152,7 +150,7 @@ func TestCoverageServiceMigrateCoverageTrackers(t *testing.T) {
 func TestCoverageServiceMigrateCoverageTrackersFromOldSchemaNoLinks(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	db.MustExec(`CREATE TABLE repository (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,7 +230,6 @@ func TestCoverageServiceCreateCoverageTracker(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	require.Equal(t, &core.Repository{
-		Id:                1,
 		RepositoryManager: 1,
 		Namespace:         "acme",
 		Name:              "alpha",

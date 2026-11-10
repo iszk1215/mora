@@ -236,7 +236,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/coverage.Coverage"
+                            "$ref": "#/definitions/coverage.CoverageUploadResponse"
                         }
                     },
                     "400": {
@@ -298,7 +298,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/coverages/{trackerId}/{id}/{entry}/files": {
+        "/api/coverages/{trackerId}/{coverageId}/{entry}/files": {
             "get": {
                 "description": "Return the file list and metadata for a coverage entry",
                 "tags": [
@@ -314,9 +314,9 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Coverage index",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Coverage ID (cov_\u003cuuidv7\u003e)",
+                        "name": "coverageId",
                         "in": "path",
                         "required": true
                     },
@@ -350,7 +350,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/coverages/{trackerId}/{id}/{entry}/files/{filepath}": {
+        "/api/coverages/{trackerId}/{coverageId}/{entry}/files/{filepath}": {
             "get": {
                 "description": "Return the source code and coverage blocks for a file in an entry",
                 "tags": [
@@ -366,9 +366,9 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "integer",
-                        "description": "Coverage index",
-                        "name": "id",
+                        "type": "string",
+                        "description": "Coverage ID (cov_\u003cuuidv7\u003e)",
+                        "name": "coverageId",
                         "in": "path",
                         "required": true
                     },
@@ -2147,32 +2147,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "repo": {
-                    "$ref": "#/definitions/core.Repository"
-                }
-            }
-        },
-        "coverage.Coverage": {
-            "type": "object",
-            "properties": {
-                "entries": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/coverage.CoverageEntry"
-                    }
-                },
-                "id": {
-                    "type": "integer",
-                    "format": "int64"
-                },
-                "revision": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                },
-                "trackerID": {
-                    "type": "integer",
-                    "format": "int64"
+                    "$ref": "#/definitions/coverage.coverageRepository"
                 }
             }
         },
@@ -2226,7 +2201,7 @@ const docTemplate = `{
                     }
                 },
                 "repo": {
-                    "$ref": "#/definitions/core.Repository"
+                    "$ref": "#/definitions/coverage.coverageRepository"
                 }
             }
         },
@@ -2239,8 +2214,8 @@ const docTemplate = `{
                         "$ref": "#/definitions/coverage.CoverageEntry"
                     }
                 },
-                "index": {
-                    "type": "integer"
+                "id": {
+                    "type": "string"
                 },
                 "revision": {
                     "type": "string"
@@ -2270,6 +2245,26 @@ const docTemplate = `{
                 }
             }
         },
+        "coverage.CoverageUploadResponse": {
+            "type": "object",
+            "properties": {
+                "entries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/coverage.CoverageEntry"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "revision": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
         "coverage.FileListResponse": {
             "type": "object",
             "properties": {
@@ -2283,7 +2278,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/coverage.MetaResponse"
                 },
                 "repo": {
-                    "$ref": "#/definitions/core.Repository"
+                    "$ref": "#/definitions/coverage.coverageRepository"
                 }
             }
         },
@@ -2317,6 +2312,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "coverage.coverageRepository": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }

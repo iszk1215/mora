@@ -382,7 +382,7 @@ func (s *MoraServer) injectTrackerCoverage(next http.Handler) http.Handler {
 				render.Forbidden(w, render.ErrForbidden)
 				return
 			}
-			err = checkRepoAccess(sess, rm, *repo)
+			err = checkRepoAccessByRepositoryManager(sess, rm, repo.Namespace, repo.Name)
 			if errors.Is(err, errorTokenNotFound) {
 				render.Forbidden(w, render.ErrForbidden)
 				return
@@ -435,7 +435,7 @@ func (s *MoraServer) handleCoverageListPublic(w http.ResponseWriter, r *http.Req
 	if rm != nil {
 		sess, ok := MoraSessionFrom(r.Context())
 		if ok {
-			if err := checkRepoAccess(sess, rm, *repo); err == nil {
+			if err := checkRepoAccessByRepositoryManager(sess, rm, repo.Namespace, repo.Name); err == nil {
 				ctx, _ = sess.WithToken(ctx, rm.ID())
 				ctx = core.WithRepositoryClient(ctx, rm)
 			}

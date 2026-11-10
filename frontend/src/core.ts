@@ -12,13 +12,19 @@ export interface CoverageEntry {
 }
 
 export interface Coverage {
-  index: number
+  id: string
   hits: number
   lines: number
   entries: CoverageEntry[]
   revision: string
   revision_url: string
   time: string
+}
+
+export interface CoverageRepo {
+  url: string
+  namespace: string
+  name: string
 }
 
 export type CoverageBlock = [number, number, number]
