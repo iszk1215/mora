@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/iszk1215/mora/tracker"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/tursodatabase/go-libsql"
 	"github.com/stretchr/testify/require"
+	_ "github.com/tursodatabase/go-libsql"
 )
 
 type migratedTrackerRow struct {
@@ -24,24 +25,26 @@ type migratedTrackerRow struct {
 }
 
 type migratedSeriesRow struct {
-	Id        int64  `db:"id"`
-	TrackerId int64  `db:"tracker_id"`
-	Name      string `db:"name"`
-	DataType  string `db:"data_type"`
-	Config    string `db:"config"`
+	Id         int64  `db:"id"`
+	TrackerId  int64  `db:"tracker_id"`
+	ExternalId string `db:"external_id"`
+	Name       string `db:"name"`
+	DataType   string `db:"data_type"`
+	Config     string `db:"config"`
 }
 
 type migratedValueRow struct {
-	Id       int64     `db:"id"`
-	SeriesId int64     `db:"series_id"`
-	Time     time.Time `db:"time"`
-	Value    float64   `db:"value"`
+	Id         int64     `db:"id"`
+	SeriesId   int64     `db:"series_id"`
+	ExternalId string    `db:"external_id"`
+	Time       time.Time `db:"time"`
+	Value      float64   `db:"value"`
 }
 
 func initMigrateTestStore(t *testing.T) *sqlx.DB {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	db.MustExec("PRAGMA foreign_keys = ON")
 
@@ -119,7 +122,7 @@ func TestMigrateUDMToTracker(t *testing.T) {
 	require.True(t, trk.LastUpdatedAt.Equal(t3), "last_updated_at should be max value time")
 
 	var series []migratedSeriesRow
-	err = db.Select(&series, "SELECT id, tracker_id, name, data_type, config FROM tracker_series ORDER BY id")
+	err = db.Select(&series, "SELECT id, tracker_id, external_id, name, data_type, config FROM tracker_series ORDER BY id")
 	require.NoError(t, err)
 	require.Len(t, series, 2)
 	require.Equal(t, "user", series[0].Name)
@@ -127,9 +130,17 @@ func TestMigrateUDMToTracker(t *testing.T) {
 	require.Equal(t, "{}", series[0].Config)
 	require.Equal(t, "system", series[1].Name)
 	require.Equal(t, "int", series[1].DataType)
+	seenSeriesExt := map[string]bool{}
+	for _, se := range series {
+		require.NotEmpty(t, se.ExternalId)
+		_, err := uuid.Parse(se.ExternalId)
+		require.NoError(t, err)
+		require.False(t, seenSeriesExt[se.ExternalId])
+		seenSeriesExt[se.ExternalId] = true
+	}
 
 	var values []migratedValueRow
-	err = db.Select(&values, "SELECT id, series_id, time, value FROM tracker_value ORDER BY time")
+	err = db.Select(&values, "SELECT id, series_id, external_id, time, value FROM tracker_value ORDER BY time")
 	require.NoError(t, err)
 	require.Len(t, values, 3)
 	require.Equal(t, 10.0, values[0].Value)
@@ -137,6 +148,14 @@ func TestMigrateUDMToTracker(t *testing.T) {
 	require.Equal(t, 30.0, values[2].Value)
 	require.True(t, values[0].Time.Equal(t1))
 	require.True(t, values[2].Time.Equal(t3))
+	seenValueExt := map[string]bool{}
+	for _, v := range values {
+		require.NotEmpty(t, v.ExternalId)
+		_, err := uuid.Parse(v.ExternalId)
+		require.NoError(t, err)
+		require.False(t, seenValueExt[v.ExternalId])
+		seenValueExt[v.ExternalId] = true
+	}
 
 	// UDM tables must be left intact.
 	var metricCount, itemCount, valueCount int
@@ -274,7 +293,7 @@ func TestMigrateUDMToTrackerNoUdmTables(t *testing.T) {
 func TestMigrateUDMToTrackerNoTrackerTables(t *testing.T) {
 	db, err := sqlx.Connect("libsql", ":memory:")
 	require.NoError(t, err)
-	 db.MustExec("PRAGMA foreign_keys = OFF")
+	db.MustExec("PRAGMA foreign_keys = OFF")
 
 	udmStore := newUdmStore(db)
 	require.NoError(t, udmStore.initialize())

@@ -245,9 +245,9 @@ func (s *MoraServer) seedDemoData() error {
 				if err != nil {
 					return fmt.Errorf("create demo series %s: %w", sd.name, err)
 				}
-				log.Debug().Int64("series_id", series.Id).Str("name", sd.name).Msg("Created demo series")
+				log.Debug().Stringer("series_id", series.Id).Str("name", sd.name).Msg("Created demo series")
 
-				seriesSeed := int(series.Id*7 + tracker.Id*13)
+				seriesSeed := int(series.InternalId*7 + tracker.Id*13)
 				valueCount := 10 + rng.Intn(11) // 10-20 values per series
 				times, err := demoValueTimes(rng, xAxisType, valueCount, now)
 				if err != nil {
@@ -286,7 +286,7 @@ func (s *MoraServer) seedDemoData() error {
 							(rng.Float64()-0.5)*2 + 51
 					}
 
-					if _, err := s.tracker.CreateValue(series.Id, ts, val); err != nil {
+					if _, err := s.tracker.CreateValue(series.InternalId, ts, val); err != nil {
 						return fmt.Errorf("create demo value: %w", err)
 					}
 				}

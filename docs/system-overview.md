@@ -112,7 +112,7 @@ out of `frontend/public/`, is served with `no-cache` plus a strong `ETag` and
 1. `InjectTracker` parses the external ID (`trk_<uuidv7>`) and loads the tracker (invalid format -> 400, unknown -> 404)
 2. Resolve the internal tracker ID to the linked repository via the `tracker_coverage` table (managed by coverage: `coverage.FindRepoByTrackerID()`), which stores the scm/namespace/name/url directly
 3. Load repository and repository manager
-4. Verify access
+4. Verify access directly (`checkRepoAccessByRepositoryManager`; avoids the `repo.Id` access cache because coverage uses tracker IDs)
 5. Inject into context
 
 Coverage-type trackers are created via `POST /api/coverages` (the tracker package has no coverage knowledge). `coverage.CreateCoverageTracker` creates a `tracker` row through the `TrackerCreator` interface and links it via `coverage.Link`, returning 409 when the repository already has a coverage tracker.

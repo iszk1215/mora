@@ -153,9 +153,13 @@ func MigrateUDMToTracker(db *sqlx.DB) error {
 						Err(err).Msg("MigrateUDMToTracker: skipping unparsable value")
 					continue
 				}
+				ext, err := tracker.NewValueExternalID()
+				if err != nil {
+					return fmt.Errorf("MigrateUDMToTracker new value external id: %w", err)
+				}
 				if _, err := tx.Exec(
-					"INSERT INTO tracker_value (series_id, time, value) VALUES (?, ?, ?)",
-					seriesID, value.Time, f); err != nil {
+					"INSERT INTO tracker_value (series_id, external_id, time, value) VALUES (?, ?, ?, ?)",
+					seriesID, ext.Bare(), value.Time, f); err != nil {
 					return fmt.Errorf("MigrateUDMToTracker insert tracker_value: %w", err)
 				}
 				valueCount++
@@ -216,10 +220,14 @@ func insertMigratedTracker(tx *sqlx.Tx, metricID int64, name string) (int64, tim
 // insertMigratedSeries creates a tracker_series for a udm_item row and returns
 // the series id.
 func insertMigratedSeries(tx *sqlx.Tx, trackerID int64, name string) (int64, error) {
+	ext, err := tracker.NewSeriesExternalID()
+	if err != nil {
+		return 0, fmt.Errorf("insertMigratedSeries new external id: %w", err)
+	}
 	res, err := tx.Exec(`
-		INSERT INTO tracker_series (tracker_id, name, data_type, config)
-		VALUES (?, ?, 'int', '{}')`,
-		trackerID, name)
+		INSERT INTO tracker_series (tracker_id, external_id, name, data_type, config)
+		VALUES (?, ?, ?, 'int', '{}')`,
+		trackerID, ext.Bare(), name)
 	if err != nil {
 		return 0, fmt.Errorf("insertMigratedSeries insert: %w", err)
 	}

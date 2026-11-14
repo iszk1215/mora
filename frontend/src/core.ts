@@ -12,13 +12,19 @@ export interface CoverageEntry {
 }
 
 export interface Coverage {
-  index: number
+  id: string
   hits: number
   lines: number
   entries: CoverageEntry[]
   revision: string
   revision_url: string
   time: string
+}
+
+export interface CoverageRepo {
+  url: string
+  namespace: string
+  name: string
 }
 
 export type CoverageBlock = [number, number, number]
@@ -69,7 +75,15 @@ export interface SeriesConfig {
 }
 
 export interface SeriesModel {
-  id: number
+  id: string
+  tracker_id: string
+  name: string
+  data_type: string
+  config: string
+}
+
+export interface PreviewSeriesModel {
+  id?: string
   tracker_id: string
   name: string
   data_type: string
@@ -77,8 +91,8 @@ export interface SeriesModel {
 }
 
 export interface PreviewSeriesValues {
-  series: SeriesModel
-  values: Array<{ id: number; time: string; value: number }>
+  series: PreviewSeriesModel
+  values: Array<{ id?: string; time: string; value: number }>
 }
 
 export interface TrackerResponse {

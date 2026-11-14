@@ -80,16 +80,16 @@ export const TrackerDetailView = (): React.JSX.Element => {
   const [addSeriesError, setAddSeriesError] = useState<string | null>(null)
 
   const [showAddValue, setShowAddValue] = useState(false)
-  const [addingValues, setAddingValues] = useState<Record<number, boolean>>({})
+  const [addingValues, setAddingValues] = useState<Record<string, boolean>>({})
   const [addValueError, setAddValueError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState('')
-  const [addValues, setAddValues] = useState<Record<number, string>>({})
+  const [addValues, setAddValues] = useState<Record<string, string>>({})
 
-  const [editSeriesId, setEditSeriesId] = useState<number | null>(null)
+  const [editSeriesId, setEditSeriesId] = useState<string | null>(null)
   const [editPage, setEditPage] = useState(1)
   const [editPerPage, setEditPerPage] = useState(20)
-  const [pendingEdits, setPendingEdits] = useState<Record<number, { time: string; value: string }>>({})
-  const [pendingDeletes, setPendingDeletes] = useState<Set<number>>(new Set())
+  const [pendingEdits, setPendingEdits] = useState<Record<string, { time: string; value: string }>>({})
+  const [pendingDeletes, setPendingDeletes] = useState<Set<string>>(new Set())
   const [savingValues, setSavingValues] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -103,9 +103,9 @@ export const TrackerDetailView = (): React.JSX.Element => {
 
   const seriesValuesRef = useRef(seriesValues)
   useEffect(() => { seriesValuesRef.current = seriesValues }, [seriesValues])
-  const pendingEditsRef = useRef<Record<number, { time: string; value: string }>>({})
+  const pendingEditsRef = useRef<Record<string, { time: string; value: string }>>({})
   useEffect(() => { pendingEditsRef.current = pendingEdits }, [pendingEdits])
-  const pendingDeletesRef = useRef<Set<number>>(new Set())
+  const pendingDeletesRef = useRef<Set<string>>(new Set())
   useEffect(() => { pendingDeletesRef.current = pendingDeletes }, [pendingDeletes])
 
   useEffect(() => {
@@ -122,7 +122,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     ).then(setSeriesValues).catch(() => {}).finally(() => setValuesLoaded(true))
   }, [seriesList, tracker.id])
 
-  const mergePendingValues = (seriesId: number, fetched: ValueModel[]): ValueModel[] => {
+  const mergePendingValues = (seriesId: string, fetched: ValueModel[]): ValueModel[] => {
     const deletes = pendingDeletesRef.current
     const edits = pendingEditsRef.current
     const existing = seriesValuesRef.current.find((x) => x.series.id === seriesId)?.values ?? []
@@ -334,11 +334,11 @@ export const TrackerDetailView = (): React.JSX.Element => {
     setShowAddValue(false)
   }
 
-  const setAddValue = (seriesId: number, val: string) => {
+  const setAddValue = (seriesId: string, val: string) => {
     setAddValues((prev) => ({ ...prev, [seriesId]: val }))
   }
 
-  const handleAddValue = async (seriesId: number, level?: number) => {
+  const handleAddValue = async (seriesId: string, level?: number) => {
     if (!selectedDate) return
     const numberValue = level !== undefined ? level : parseFloat(addValues[seriesId] ?? '')
     if (Number.isNaN(numberValue)) return
@@ -366,7 +366,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     await refetchSeriesValues(seriesId)
   }
 
-  const openEditSeries = (seriesId: number) => {
+  const openEditSeries = (seriesId: string) => {
     setEditSeriesId(seriesId)
     setEditPage(1)
     setPendingEdits({})
@@ -374,10 +374,10 @@ export const TrackerDetailView = (): React.JSX.Element => {
     setEditError(null)
   }
 
-  const currentValue = (seriesId: number, valueId: number): ValueModel | undefined =>
+  const currentValue = (seriesId: string, valueId: string): ValueModel | undefined =>
     seriesValues.find((x) => x.series.id === seriesId)?.values.find((v) => v.id === valueId)
 
-  const handleEditDataPoint = (seriesId: number, valueId: number, which: 'time' | 'value', raw: string) => {
+  const handleEditDataPoint = (seriesId: string, valueId: string, which: 'time' | 'value', raw: string) => {
     const cur = currentValue(seriesId, valueId)
     if (!cur) return
     const isDate = xAxisType === 'date'
@@ -419,7 +419,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
-  const handleDeleteDataPoint = (seriesId: number, valueId: number) => {
+  const handleDeleteDataPoint = (seriesId: string, valueId: string) => {
     setSeriesValues((prev) =>
       prev.map((sv) => (sv.series.id !== seriesId ? sv : {
         ...sv,
@@ -445,7 +445,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     try {
       const updates: ValueUpdate[] = []
       for (const [idStr, draft] of Object.entries(pendingEdits)) {
-        const id = Number(idStr)
+        const id = idStr
         if (pendingDeletes.has(id) || !currentValue(editSeriesId, id)) continue
         const time = new Date(draft.time).toISOString()
         const value = Number(draft.value)
@@ -466,7 +466,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
-  const refetchSeriesValues = async (seriesId: number) => {
+  const refetchSeriesValues = async (seriesId: string) => {
     try {
       const resp = await fetch(`/api/trackers/${tracker.id}/series/${seriesId}/values`)
       const data = await resp.json()
@@ -498,7 +498,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
-  const handleSeriesDeleted = (seriesId: number) => {
+  const handleSeriesDeleted = (seriesId: string) => {
     setSeriesList((prev) => prev.filter((s) => s.id !== seriesId))
     setSeriesValues((prev) => prev.filter((sv) => sv.series.id !== seriesId))
     if (editSeriesId === seriesId) {
@@ -508,7 +508,7 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
-  const handleSeriesRename = async (seriesId: number, name: string): Promise<boolean> => {
+  const handleSeriesRename = async (seriesId: string, name: string): Promise<boolean> => {
     try {
       const updated = await patchSeries(tracker.id, seriesId, { name })
       setSeriesList((prev) => prev.map((s) => (s.id === seriesId ? updated : s)))

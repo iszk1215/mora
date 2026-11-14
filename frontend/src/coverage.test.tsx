@@ -95,7 +95,7 @@ describe('CoverageEntryPage', () => {
 interface Point {
   x: string
   y: number
-  index: number
+  id: string
 }
 
 function makeCoverageSeries(coverages: Coverage[]) {
@@ -115,12 +115,12 @@ function makeCoverageSeries(coverages: Coverage[]) {
         map[e.name] = []
       }
       map[e.name].push(
-        { x: cov.time, y: e.lines === 0 ? 0 : e.hits * 100.0 / e.lines, index: cov.index }
+        { x: cov.time, y: e.lines === 0 ? 0 : e.hits * 100.0 / e.lines, id: cov.id }
       )
     }
     if (hasMultiEntries) {
       map.total.push(
-        { x: cov.time, y: cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines, index: cov.index }
+        { x: cov.time, y: cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines, id: cov.id }
       )
     }
   }
@@ -131,7 +131,7 @@ function makeCoverageSeries(coverages: Coverage[]) {
     series.push({
       name,
       type: 'line' as const,
-      data: map[k].map(p => ({ value: [p.x, p.y], index: p.index })),
+      data: map[k].map(p => ({ value: [p.x, p.y], id: p.id })),
     })
   }
 
@@ -141,7 +141,7 @@ function makeCoverageSeries(coverages: Coverage[]) {
 describe('makeCoverageSeries', () => {
   it('returns 0 instead of Infinity when lines is 0', () => {
     const coverages: Coverage[] = [{
-      index: 1,
+      id: 'cov_1',
       time: '2024-01-01T00:00:00Z',
       hits: 0,
       lines: 0,
@@ -158,25 +158,25 @@ describe('coverageToDatasets', () => {
   it('includes index in extra for each data point', () => {
     const coverages: Coverage[] = [
       {
-        index: 5, hits: 90, lines: 100, revision: 'abc', revision_url: '',
+        id: 'cov_5', hits: 90, lines: 100, revision: 'abc', revision_url: '',
         time: '2024-01-15T10:00:00Z',
         entries: [{ name: 'go', hits: 90, lines: 100 }],
       },
       {
-        index: 8, hits: 80, lines: 100, revision: 'def', revision_url: '',
+        id: 'cov_8', hits: 80, lines: 100, revision: 'def', revision_url: '',
         time: '2024-06-15T10:00:00Z',
         entries: [{ name: 'go', hits: 80, lines: 100 }],
       },
     ]
     const datasets = coverageToDatasets(coverages)
-    expect(datasets[0].data[0].extra).toEqual({ index: 5, entryName: 'go' })
-    expect(datasets[0].data[1].extra).toEqual({ index: 8, entryName: 'go' })
+    expect(datasets[0].data[0].extra).toEqual({ id: 'cov_5', entryName: 'go' })
+    expect(datasets[0].data[1].extra).toEqual({ id: 'cov_8', entryName: 'go' })
   })
 
-  it('includes total series with extra.index when multiple entries exist', () => {
+  it('includes total series with extra.id when multiple entries exist', () => {
     const coverages: Coverage[] = [
       {
-        index: 1, hits: 150, lines: 200, revision: 'abc', revision_url: '',
+        id: 'cov_1', hits: 150, lines: 200, revision: 'abc', revision_url: '',
         time: '2024-01-15T10:00:00Z',
         entries: [
           { name: 'go', hits: 90, lines: 100 },
@@ -187,12 +187,12 @@ describe('coverageToDatasets', () => {
     const datasets = coverageToDatasets(coverages)
     const totalDataset = datasets.find(d => d.label === 'total')
     expect(totalDataset).toBeDefined()
-    expect(totalDataset!.data[0].extra).toEqual({ index: 1, entryName: 'total' })
+    expect(totalDataset!.data[0].extra).toEqual({ id: 'cov_1', entryName: 'total' })
   })
 
   it('returns 0 instead of Infinity when lines is 0', () => {
     const coverages: Coverage[] = [{
-      index: 1,
+      id: 'cov_1',
       time: '2024-01-01T00:00:00Z',
       hits: 0,
       lines: 0,
@@ -206,18 +206,18 @@ describe('coverageToDatasets', () => {
 })
 
 describe('buildCoverageClickUrl', () => {
-  it('builds url from trackerId', () => {
-    expect(buildCoverageClickUrl('5', 3, 'go'))
-      .toBe('/coverages/5/3/go')
+  it('builds url from trackerId and coverage external ID', () => {
+    expect(buildCoverageClickUrl('trk_5', 'cov_3', 'go'))
+      .toBe('/coverages/trk_5/cov_3/go')
   })
 
-  it('handles numeric index', () => {
-    expect(buildCoverageClickUrl('10', 10, 'py'))
-      .toBe('/coverages/10/10/py')
+  it('handles arbitrary external coverage IDs', () => {
+    expect(buildCoverageClickUrl('trk_10', 'cov_10', 'py'))
+      .toBe('/coverages/trk_10/cov_10/py')
   })
 })
 
-const mockRepo = { id: 1, url: 'https://example.com/repo', namespace: 'test', name: 'test-repo' }
+const mockRepo = { url: 'https://example.com/repo', namespace: 'test', name: 'test-repo' }
 
 describe('CoverageTrackerList', () => {
   beforeEach(() => {

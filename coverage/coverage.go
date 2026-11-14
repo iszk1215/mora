@@ -24,22 +24,23 @@ type (
 	}
 
 	Coverage struct {
-		ID        int64
-		TrackerID int64
-		Revision  string
-		Timestamp time.Time
-		Entries   []*CoverageEntry
+		ID         int64
+		ExternalID CoverageExternalID
+		TrackerID  int64
+		Revision   string
+		Timestamp  time.Time
+		Entries    []*CoverageEntry
 	}
 
 	CoverageStore interface {
 		Init() error
-		Find(id int64) (*Coverage, error)
+		FindByExternalID(trackerID int64, id CoverageExternalID) (*Coverage, error)
 		FindRevision(id int64, revision string) (*Coverage, error)
 		List(id int64) ([]*Coverage, error)
 		Put(*Coverage) (int64, error)
-Timeline(trackerID int64, limit int) (map[string][]CoverageTimelinePoint, error)
-	TimelineByTrackerIDs(trackerIDs []int64, limit int) (map[int64]map[string][]CoverageTimelinePoint, error)
-	FindRepoByTrackerID(trackerID int64) (*core.Repository, error)
+		Timeline(trackerID int64, limit int) (map[string][]CoverageTimelinePoint, error)
+		TimelineByTrackerIDs(trackerIDs []int64, limit int) (map[int64]map[string][]CoverageTimelinePoint, error)
+		FindRepoByTrackerID(trackerID int64) (*core.Repository, error)
 	}
 )
 
@@ -80,10 +81,11 @@ func mergeCoverage(a, b *Coverage) (*Coverage, error) {
 	})
 
 	merged := &Coverage{
-		TrackerID: a.TrackerID,
-		Revision:  a.Revision,
-		Timestamp: b.Timestamp,
-		Entries:   tmp,
+		ExternalID: a.ExternalID,
+		TrackerID:  a.TrackerID,
+		Revision:   a.Revision,
+		Timestamp:  b.Timestamp,
+		Entries:    tmp,
 	}
 
 	return merged, nil

@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -62,6 +63,85 @@ func TestMigrateBackfillsExternalIDs(t *testing.T) {
 	var idsAgain []string
 	require.NoError(t, db.Select(&idsAgain, "SELECT external_id FROM tracker ORDER BY id"))
 	require.Equal(t, ids, idsAgain)
+}
+
+func openOldSeriesValueDB(t *testing.T) *sqlx.DB {
+	t.Helper()
+	db := openOldTrackerDB(t)
+	db.MustExec(`CREATE TABLE tracker_series (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		tracker_id INTEGER NOT NULL,
+		name TEXT NOT NULL,
+		data_type TEXT NOT NULL,
+		config TEXT NOT NULL DEFAULT '{}'
+	)`)
+	db.MustExec(`INSERT INTO tracker_series (tracker_id, name, data_type, config)
+		VALUES (1, 'first', 'float', '{}'),
+		       (1, 'second', 'float', '{}')`)
+	db.MustExec(`CREATE TABLE tracker_value (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		series_id INTEGER NOT NULL,
+		time DATETIME NOT NULL,
+		value REAL NOT NULL
+	)`)
+	db.MustExec(`INSERT INTO tracker_value (series_id, time, value)
+		VALUES (1, datetime('now'), 1.0),
+		       (1, datetime('now', '+1 hour'), 2.0),
+		       (2, datetime('now'), 3.0)`)
+	return db
+}
+
+func TestMigrateBackfillsSeriesValueExternalIDs(t *testing.T) {
+	db := openOldSeriesValueDB(t)
+	s := newTrackerStore(db)
+	require.NoError(t, s.initialize())
+
+	for _, table := range []string{"tracker_series", "tracker_value"} {
+		var ids []string
+		require.NoError(t, db.Select(&ids, "SELECT external_id FROM "+table+" ORDER BY id"))
+		require.NotEmpty(t, ids)
+
+		seen := make(map[string]bool, len(ids))
+		for _, id := range ids {
+			require.NotEmpty(t, id)
+			parsed, err := uuid.Parse(id)
+			require.NoError(t, err)
+			require.False(t, seen[parsed.String()], "duplicate external id %q in %s", id, table)
+			seen[parsed.String()] = true
+		}
+	}
+
+	for _, name := range []string{"idx_tracker_series_external_id", "idx_tracker_value_external_id"} {
+		var count int
+		require.NoError(t, db.Get(&count,
+			"SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?", name))
+		require.Equal(t, 1, count, name)
+	}
+
+	var beforeSeries []string
+	require.NoError(t, db.Select(&beforeSeries, "SELECT external_id FROM tracker_series ORDER BY id"))
+	var beforeValues []string
+	require.NoError(t, db.Select(&beforeValues, "SELECT external_id FROM tracker_value ORDER BY id"))
+
+	require.NoError(t, s.initialize())
+
+	var afterSeries []string
+	require.NoError(t, db.Select(&afterSeries, "SELECT external_id FROM tracker_series ORDER BY id"))
+	require.Equal(t, beforeSeries, afterSeries)
+	var afterValues []string
+	require.NoError(t, db.Select(&afterValues, "SELECT external_id FROM tracker_value ORDER BY id"))
+	require.Equal(t, beforeValues, afterValues)
+
+	series, err := s.findSeriesById(1)
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(string(series.Id), seriesExternalIDPrefix))
+
+	values, err := s.listValues(1, 0)
+	require.NoError(t, err)
+	require.NotEmpty(t, values)
+	for _, v := range values {
+		require.True(t, strings.HasPrefix(string(v.Id), valueExternalIDPrefix))
+	}
 }
 
 func TestStoreExternalIDRoundTrip(t *testing.T) {

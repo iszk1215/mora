@@ -111,7 +111,7 @@ describe('UserPage', () => {
       role: '',
       liked: false,
       like_count: 0,
-      series: [{ series: { id: 1, tracker_id: "trk_1", name: 'temp', data_type: 'float', config: '{}' }, values: [{ id: 1, time: '2026-01-01T00:00:00Z', value: 12.5 }] }],
+      series: [{ series: { id: '1', tracker_id: "trk_1", name: 'temp', data_type: 'float', config: '{}' }, values: [{ id: '1', time: '2026-01-01T00:00:00Z', value: 12.5 }] }],
     }
     vi.mocked(globalThis.fetch)
       .mockResolvedValueOnce({

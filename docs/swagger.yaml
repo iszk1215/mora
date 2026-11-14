@@ -31,24 +31,7 @@ definitions:
       filename:
         type: string
       repo:
-        $ref: '#/definitions/core.Repository'
-    type: object
-  coverage.Coverage:
-    properties:
-      entries:
-        items:
-          $ref: '#/definitions/coverage.CoverageEntry'
-        type: array
-      id:
-        format: int64
-        type: integer
-      revision:
-        type: string
-      timestamp:
-        type: string
-      trackerID:
-        format: int64
-        type: integer
+        $ref: '#/definitions/coverage.coverageRepository'
     type: object
   coverage.CoverageEntry:
     properties:
@@ -83,7 +66,7 @@ definitions:
           $ref: '#/definitions/coverage.CoverageResponse'
         type: array
       repo:
-        $ref: '#/definitions/core.Repository'
+        $ref: '#/definitions/coverage.coverageRepository'
     type: object
   coverage.CoverageResponse:
     properties:
@@ -91,8 +74,8 @@ definitions:
         items:
           $ref: '#/definitions/coverage.CoverageEntry'
         type: array
-      index:
-        type: integer
+      id:
+        type: string
       revision:
         type: string
       revision_url:
@@ -111,6 +94,19 @@ definitions:
       time:
         type: string
     type: object
+  coverage.CoverageUploadResponse:
+    properties:
+      entries:
+        items:
+          $ref: '#/definitions/coverage.CoverageEntry'
+        type: array
+      id:
+        type: string
+      revision:
+        type: string
+      time:
+        type: string
+    type: object
   coverage.FileListResponse:
     properties:
       files:
@@ -120,7 +116,7 @@ definitions:
       meta:
         $ref: '#/definitions/coverage.MetaResponse'
       repo:
-        $ref: '#/definitions/core.Repository'
+        $ref: '#/definitions/coverage.coverageRepository'
     type: object
   coverage.FileResponse:
     properties:
@@ -142,6 +138,15 @@ definitions:
       revision_url:
         type: string
       time:
+        type: string
+    type: object
+  coverage.coverageRepository:
+    properties:
+      name:
+        type: string
+      namespace:
+        type: string
+      url:
         type: string
     type: object
   profile.Profile:
@@ -344,7 +349,7 @@ definitions:
   tracker.PatchValueItem:
     properties:
       id:
-        type: integer
+        type: string
       time:
         type: string
       value:
@@ -354,7 +359,7 @@ definitions:
     properties:
       deletes:
         items:
-          type: integer
+          type: string
         type: array
       updates:
         items:
@@ -386,7 +391,7 @@ definitions:
       data_type:
         type: string
       id:
-        type: integer
+        type: string
       name:
         type: string
       tracker_id:
@@ -458,9 +463,7 @@ definitions:
   tracker.ValueModel:
     properties:
       id:
-        type: integer
-      seriesId:
-        type: integer
+        type: string
       time:
         type: string
       value:
@@ -686,7 +689,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/coverage.Coverage'
+            $ref: '#/definitions/coverage.CoverageUploadResponse'
         "400":
           description: Bad Request
           schema:
@@ -702,7 +705,7 @@ paths:
       summary: Upload coverage data
       tags:
       - coverage
-  /api/coverages/{trackerId}/{id}/{entry}/files:
+  /api/coverages/{trackerId}/{coverageId}/{entry}/files:
     get:
       description: Return the file list and metadata for a coverage entry
       parameters:
@@ -711,11 +714,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Coverage index
+      - description: Coverage ID (cov_<uuidv7>)
         in: path
-        name: id
+        name: coverageId
         required: true
-        type: integer
+        type: string
       - description: Entry name
         in: path
         name: entry
@@ -737,7 +740,7 @@ paths:
       summary: List files in a coverage entry
       tags:
       - coverage
-  /api/coverages/{trackerId}/{id}/{entry}/files/{filepath}:
+  /api/coverages/{trackerId}/{coverageId}/{entry}/files/{filepath}:
     get:
       description: Return the source code and coverage blocks for a file in an entry
       parameters:
@@ -746,11 +749,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Coverage index
+      - description: Coverage ID (cov_<uuidv7>)
         in: path
-        name: id
+        name: coverageId
         required: true
-        type: integer
+        type: string
       - description: Entry name
         in: path
         name: entry
@@ -1520,11 +1523,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       responses:
         "204":
           description: No Content
@@ -1558,11 +1561,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       - description: Fields to update
         in: body
         name: body
@@ -1604,11 +1607,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       responses:
         "204":
           description: No Content
@@ -1640,11 +1643,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       - description: Maximum number of results
         in: query
         name: limit
@@ -1681,11 +1684,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       - description: Batch of value updates and deletions
         in: body
         name: body
@@ -1733,11 +1736,11 @@ paths:
         name: trackerId
         required: true
         type: string
-      - description: Series ID
+      - description: Series external ID
         in: path
         name: seriesId
         required: true
-        type: integer
+        type: string
       - description: Value data
         in: body
         name: body

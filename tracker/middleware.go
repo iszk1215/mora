@@ -3,7 +3,6 @@ package tracker
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/render"
@@ -125,14 +124,14 @@ func RequireOwnerPermission(store *trackerStore, next http.Handler) http.Handler
 
 func InjectSeries(store *trackerStore, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seriesId, err := strconv.ParseInt(chi.URLParam(r, "seriesId"), 10, 64)
+		seriesId, err := ParseSeriesExternalID(chi.URLParam(r, "seriesId"))
 		if err != nil {
 			log.Warn().Err(err).Msg("invalid seriesId in URL")
 			render.BadRequest(w, errors.New("invalid series id"))
 			return
 		}
 
-		series, err := store.findSeriesById(seriesId)
+		series, err := store.findSeriesByExternalID(seriesId)
 		if err == errorSeriesNotFound {
 			render.NotFound(w, errors.New("series not found"))
 			return

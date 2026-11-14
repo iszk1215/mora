@@ -92,9 +92,8 @@ func trackerContextRouter(t *testing.T, s *CoverageHandler) (http.Handler, strin
 	r := chi.NewRouter()
 	r.Route("/{trackerId}", func(r chi.Router) {
 		r.Use(trackerService.InjectTracker)
-		r.Get("/", s.handleCoverageList)
 		r.Get("/public", s.HandleCoverageListPublic)
-		r.Post("/", s.HandleCoverageUpload)
+		r.Mount("/", s.Handler())
 	})
 	return r, string(tr.ExternalId)
 }
@@ -110,9 +109,21 @@ func Test_injectCoverage(t *testing.T) {
 		got = cov
 	}
 
+	db, err := sqlx.Connect("libsql", ":memory:")
+	require.NoError(t, err)
+	db.MustExec("PRAGMA foreign_keys = OFF")
+	db.SetMaxOpenConns(1)
+	db.MustExec(`CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, user_type TEXT NOT NULL DEFAULT 'free')`)
+	db.MustExec(`INSERT INTO user (id, username, user_type) VALUES (1, 'admin', 'admin')`)
+
+	trackerService, err := tracker.NewService(db)
+	require.NoError(t, err)
+	tr, err := trackerService.CreateTracker("test coverage", "", "", "public", 1, tracker.TypeCoverage, `{}`)
+	require.NoError(t, err)
+
 	want := &Coverage{
 		Revision:  "revision",
-		TrackerID: 1215,
+		TrackerID: tr.Id,
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
 	}
@@ -121,18 +132,34 @@ func Test_injectCoverage(t *testing.T) {
 	s := newCoverageHandler(store)
 
 	r := chi.NewRouter()
-	r.Route("/{id}", func(r chi.Router) {
-		r.Use(s.injectCoverage)
-		r.Get("/", handler)
+	r.Route("/{trackerId}", func(r chi.Router) {
+		r.Use(trackerService.InjectTracker)
+		r.Route("/{coverageId}", func(r chi.Router) {
+			r.Use(s.injectCoverage)
+			r.Get("/", handler)
+		})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d", want.ID), nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%s/%s", tr.ExternalId, want.ExternalID), nil)
 	w := httptest.NewRecorder()
 
 	r.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Result().StatusCode)
 	assertCoverageEqual(t, want, got)
+
+	other, err := trackerService.CreateTracker("other coverage", "", "", "public", 1, tracker.TypeCoverage, `{}`)
+	require.NoError(t, err)
+
+	req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%s/%s", other.ExternalId, want.ExternalID), nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+
+	req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%s/not-a-coverage-id", tr.ExternalId), nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
 }
 
 func Test_injectCoverage_malformed_id(t *testing.T) {
@@ -156,9 +183,10 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	}
 
 	cov := &Coverage{
-		TrackerID: repo.Id,
-		Revision:  "abcde",
-		Timestamp: time.Now().Round(0),
+		ExternalID: "cov_0190f0f0-0000-7000-8000-000000000001",
+		TrackerID:  repo.Id,
+		Revision:   "abcde",
+		Timestamp:  time.Now().Round(0),
 		Entries: []*CoverageEntry{
 			{
 				Name:  "cc",
@@ -183,10 +211,10 @@ func TestMakeCoverageResponseList(t *testing.T) {
 	}
 
 	want := CoverageListResponse{
-		Repo: repo,
+		Repo: makeCoverageRepository(repo),
 		Coverages: []CoverageResponse{
 			{
-				ID:          cov.ID,
+				ID:          cov.ExternalID,
 				Timestamp:   cov.Timestamp,
 				Revision:    cov.Revision,
 				RevisionURL: rm.RevisionURL(repo.Url, cov.Revision),
@@ -244,6 +272,9 @@ func Test_CoverageHandler_CoverageList(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, want, data)
+	require.NotContains(t, string(body), `"index"`)
+	require.NotContains(t, string(body), `"scm_id"`)
+	require.NotContains(t, string(body), `"tracker_id"`)
 }
 
 func Test_CoverageHandler_CoverageList_Empty(t *testing.T) {
@@ -347,7 +378,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	cov := &Coverage{
 		ID:        -1,
-		TrackerID: repo.Id,
+		TrackerID: 1,
 		Revision:  revision,
 		Timestamp: timestamp,
 		Entries: []*CoverageEntry{
@@ -369,16 +400,17 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	store := setupCoverageStore(t, cov)
 	s := newCoverageHandler(store)
+	r, trackerExtID := trackerContextRouter(t, s)
 
 	req := httptest.NewRequest(
-		http.MethodGet, fmt.Sprintf("/%d/go/files", cov.ID), nil)
+		http.MethodGet, fmt.Sprintf("/%s/%s/go/files", trackerExtID, cov.ExternalID), nil)
 	ctx := req.Context()
 	ctx = core.WithRepositoryClient(ctx, rm)
 	ctx = core.WithRepo(ctx, repo)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
 
-	s.Handler().ServeHTTP(w, req)
+	r.ServeHTTP(w, req)
 
 	result := w.Result()
 	require.Equal(t, http.StatusOK, result.StatusCode)
@@ -406,7 +438,7 @@ func Test_CoverageHandler_FileList(t *testing.T) {
 
 	want := FileListResponse{
 		Files:    []*FileResponse{&fileRes},
-		Repo:     repo,
+		Repo:     makeCoverageRepository(repo),
 		Metadata: metaRes,
 	}
 
@@ -453,7 +485,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 	repo := core.Repository{Id: 1215, Namespace: orgName, Name: repoName, Url: repoURL}
 
 	cov := &Coverage{
-		TrackerID: repo.Id,
+		TrackerID: 1,
 		Revision:  revision,
 		Timestamp: time.Now().Round(0),
 		Entries: []*CoverageEntry{
@@ -470,8 +502,9 @@ func Test_CoverageHandler_File(t *testing.T) {
 
 	store := setupCoverageStore(t, cov)
 	s := newCoverageHandler(store)
+	r, trackerExtID := trackerContextRouter(t, s)
 
-	path := fmt.Sprintf("/%d/%s/files/%s", cov.ID, entryName, filename)
+	path := fmt.Sprintf("/%s/%s/%s/files/%s", trackerExtID, cov.ExternalID, entryName, filename)
 
 	t.Run("with valid token", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -482,7 +515,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 
-		s.Handler().ServeHTTP(w, req)
+		r.ServeHTTP(w, req)
 
 		result := w.Result()
 		require.Equal(t, http.StatusOK, result.StatusCode)
@@ -495,7 +528,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 		require.NoError(t, err)
 
 		want := CodeResponse{
-			Repo:     repo,
+			Repo:     makeCoverageRepository(repo),
 			FileName: prof.FileName,
 			Code:     code,
 			Blocks:   prof.Blocks,
@@ -513,7 +546,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 
-		s.Handler().ServeHTTP(w, req)
+		r.ServeHTTP(w, req)
 
 		result := w.Result()
 		require.Equal(t, http.StatusNotFound, result.StatusCode)
@@ -527,7 +560,7 @@ func Test_CoverageHandler_File(t *testing.T) {
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 
-		s.Handler().ServeHTTP(w, req)
+		r.ServeHTTP(w, req)
 
 		result := w.Result()
 		require.Equal(t, http.StatusNotFound, result.StatusCode)
@@ -561,10 +594,9 @@ func TestCoverageHandler_AddCoverage(t *testing.T) {
 	got, err := handler.AddCoverage(cov)
 
 	require.NoError(t, err)
-	cov.ID = got.ID
-	saved, err := store.Find(cov.ID)
+	saved, err := store.FindByExternalID(got.TrackerID, got.ExternalID)
 	require.NoError(t, err)
-	assertCoverageEqual(t, cov, saved)
+	assertCoverageEqual(t, got, saved)
 }
 
 func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
@@ -653,7 +685,8 @@ func TestCoverageHandler_AddCoverageMerge(t *testing.T) {
 	require.NoError(t, err)
 
 	want.ID = got.ID
-	saved, err := store.Find(want.ID)
+	want.ExternalID = got.ExternalID
+	saved, err := store.FindByExternalID(want.TrackerID, want.ExternalID)
 	require.NoError(t, err)
 	assert.Equal(t, want.TrackerID, saved.TrackerID)
 	assert.Equal(t, want.Revision, saved.Revision)
@@ -708,9 +741,10 @@ func TestCoverageHandler_HandleUploadMergeResponseBody(t *testing.T) {
 	defer func() { _ = res2.Body.Close() }()
 	require.Equal(t, http.StatusCreated, res2.StatusCode)
 
-	var resp Coverage
+	var resp CoverageUploadResponse
 	err := json.NewDecoder(res2.Body).Decode(&resp)
 	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(string(resp.ID), "cov_"))
 
 	// Assert response contains both entries (merged)
 	assert.Len(t, resp.Entries, 2)
@@ -765,9 +799,13 @@ func TestCoverageHandler_HandleUpload(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusCreated, w.Result().StatusCode)
-	cov.ID = 1 // 1 will be assigned by the server
-	got, err := store.Find(cov.ID)
+
+	var resp CoverageUploadResponse
+	require.NoError(t, json.NewDecoder(w.Result().Body).Decode(&resp))
+	cov.ExternalID = resp.ID
+	got, err := store.FindByExternalID(cov.TrackerID, cov.ExternalID)
 	require.NoError(t, err)
+	cov.ID = got.ID
 	assertCoverageEqual(t, cov, got)
 }
 
@@ -847,19 +885,21 @@ func TestCoverageHandler_HandleUpload_SanitizedErrorMessages(t *testing.T) {
 func TestInjectCoverageNotFound(t *testing.T) {
 	store := setupCoverageStore(t)
 	s := newCoverageHandler(store)
+	router, trackerExtID := trackerContextRouter(t, s)
 
-	r := httptest.NewRequest(http.MethodGet, "/99999/go/files", nil)
+	r := httptest.NewRequest(http.MethodGet,
+		fmt.Sprintf("/%s/cov_00000000-0000-7000-8000-000000000000/go/files", trackerExtID), nil)
 	r = r.WithContext(core.WithRepo(r.Context(), core.Repository{Url: "link"}))
 	w := httptest.NewRecorder()
 
-	s.Handler().ServeHTTP(w, r)
+	router.ServeHTTP(w, r)
 
 	require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 }
 
 func TestInjectCoverageEntryEntryNotFound(t *testing.T) {
 	cov := &Coverage{
-		TrackerID: 1215,
+		TrackerID: 1,
 		Revision:  "abcdef",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{},
@@ -867,12 +907,14 @@ func TestInjectCoverageEntryEntryNotFound(t *testing.T) {
 
 	store := setupCoverageStore(t, cov)
 	s := newCoverageHandler(store)
+	router, trackerExtID := trackerContextRouter(t, s)
 
-	r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d/nonexistent/files", cov.ID), nil)
+	r := httptest.NewRequest(http.MethodGet,
+		fmt.Sprintf("/%s/%s/nonexistent/files", trackerExtID, cov.ExternalID), nil)
 	r = r.WithContext(core.WithRepo(r.Context(), core.Repository{Url: "link"}))
 	w := httptest.NewRecorder()
 
-	s.Handler().ServeHTTP(w, r)
+	router.ServeHTTP(w, r)
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
 
@@ -918,7 +960,7 @@ func TestHandleFileProfileNotFound(t *testing.T) {
 	}
 
 	cov := &Coverage{
-		TrackerID: 1215,
+		TrackerID: 1,
 		Revision:  "abcdef",
 		Timestamp: time.Now().Round(0),
 		Entries:   []*CoverageEntry{entry},
@@ -926,12 +968,14 @@ func TestHandleFileProfileNotFound(t *testing.T) {
 
 	store := setupCoverageStore(t, cov)
 	s := newCoverageHandler(store)
+	router, trackerExtID := trackerContextRouter(t, s)
 
-	r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d/go/files/missing_file.go", cov.ID), nil)
+	r := httptest.NewRequest(http.MethodGet,
+		fmt.Sprintf("/%s/%s/go/files/missing_file.go", trackerExtID, cov.ExternalID), nil)
 	r = r.WithContext(core.WithRepo(r.Context(), core.Repository{Url: "link"}))
 	w := httptest.NewRecorder()
 
-	s.Handler().ServeHTTP(w, r)
+	router.ServeHTTP(w, r)
 	res := w.Result()
 	defer func() { _ = res.Body.Close() }()
 	require.Equal(t, http.StatusNotFound, res.StatusCode)

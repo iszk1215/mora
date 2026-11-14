@@ -1284,6 +1284,27 @@ func TestHandleCoverageListPublic(t *testing.T) {
 		defer func() { _ = res.Body.Close() }()
 		require.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
+
+	t.Run("private tracker - repo id cache collision does not bypass access", func(t *testing.T) {
+		userStore := NewUserStore(db)
+		require.NoError(t, userStore.Init())
+		user3, err := userStore.CreateUser("nonmember-cache", "")
+		require.NoError(t, err)
+
+		sess := NewMoraSessionWithTokenFor(rm)
+		sess.SetUserID(user3.ID)
+		sess.setReposCache(rm.ID(), map[int64]bool{privateTrk.Id: true})
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/coverages/%s", string(privateTrk.ExternalId)), nil)
+		r.AddCookie(&http.Cookie{Name: "morasessionid", Value: "test-sess-cache-collision"})
+		require.NoError(t, server.sessionManager.store.Put("test-sess-cache-collision", sess))
+		handler.ServeHTTP(w, r)
+
+		res := w.Result()
+		defer func() { _ = res.Body.Close() }()
+		require.Equal(t, http.StatusNotFound, res.StatusCode)
+	})
 }
 
 // ----------------------------------------------------------------------

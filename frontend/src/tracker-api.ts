@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs } from 'react-router'
 import type { PreviewSeriesValues, SeriesModel, TrackerResponse } from './core'
 
 export interface ValueModel {
-  id: number
+  id: string
   time: string
   value: number
 }
@@ -41,7 +41,7 @@ export function previewsFromTrackers(trackers: TrackerResponse[]): Map<string, P
 }
 
 export interface ValueUpdate {
-  id: number
+  id: string
   time: string
   value: number
 }
@@ -90,7 +90,7 @@ export async function createSeries(trackerId: string, name: string, dataType: st
   return resp.json()
 }
 
-export async function patchSeries(trackerId: string, seriesId: number, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
+export async function patchSeries(trackerId: string, seriesId: string, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -100,12 +100,12 @@ export async function patchSeries(trackerId: string, seriesId: number, opts: { n
   return resp.json()
 }
 
-export async function deleteSeries(trackerId: string, seriesId: number): Promise<void> {
+export async function deleteSeries(trackerId: string, seriesId: string): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-export async function createValue(trackerId: string, seriesId: number, time: string, value: number): Promise<void> {
+export async function createValue(trackerId: string, seriesId: string, time: string, value: number): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -114,12 +114,12 @@ export async function createValue(trackerId: string, seriesId: number, time: str
   if (!resp.ok) throw resp
 }
 
-export async function deleteValues(trackerId: string, seriesId: number): Promise<void> {
+export async function deleteValues(trackerId: string, seriesId: string): Promise<void> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, { method: 'DELETE' })
   if (!resp.ok) throw resp
 }
 
-export async function patchValuesBatch(trackerId: string, seriesId: number, updates: ValueUpdate[], deletes: number[]): Promise<ValueModel[]> {
+export async function patchValuesBatch(trackerId: string, seriesId: string, updates: ValueUpdate[], deletes: string[]): Promise<ValueModel[]> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}/values`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

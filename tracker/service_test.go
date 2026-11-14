@@ -101,9 +101,9 @@ func TestServiceCreateValue(t *testing.T) {
 
 	t.Run("valid value", func(t *testing.T) {
 		now := time.Now().Round(0)
-		v, err := svc.CreateValue(s.Id, now, 42.5)
+		v, err := svc.CreateValue(s.InternalId, now, 42.5)
 		require.NoError(t, err)
-		require.Equal(t, s.Id, v.SeriesId)
+		require.Equal(t, s.InternalId, v.SeriesId)
 		require.Equal(t, now, v.Timestamp)
 		require.Equal(t, 42.5, v.Value)
 	})

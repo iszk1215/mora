@@ -633,10 +633,10 @@ export const routes = [
             },
           },
           {
-            path: ':index',
+            path: ':coverageId',
             handle: {
               crumb: (params: Params) => {
-                return { label: `#${params.index}` }
+                return { label: `#${(params.coverageId ?? '').replace(/^cov_/, '').slice(0, 8)}` }
               }
             },
             children: [
@@ -645,7 +645,7 @@ export const routes = [
                 handle: {
                   crumb: (params: Params) => ({
                     label: params.entry,
-                    link: `/coverages/${params.trackerId}/${params.index}/${params.entry}`
+                    link: `/coverages/${params.trackerId}/${params.coverageId}/${params.entry}`
                   }),
                 },
                 children: [

@@ -54,6 +54,9 @@ table. Requires the database path from the server config.`,
 			if err := udm.MigrateUDMToTracker(db); err != nil {
 				return fmt.Errorf("migrate UDM to tracker: %w", err)
 			}
+			if _, err := tracker.NewService(db); err != nil {
+				return fmt.Errorf("backfill tracker external IDs: %w", err)
+			}
 			log.Info().Stringer("elapsed", time.Since(start)).Msg("migration finished")
 			return nil
 		},

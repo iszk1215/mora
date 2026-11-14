@@ -9,7 +9,7 @@ import {
 } from 'react-router'
 import { Star } from 'lucide-react'
 
-import { ChartConfig, Coverage, CoverageEntry, FileData, Repo } from './core'
+import { ChartConfig, Coverage, CoverageEntry, CoverageRepo, FileData } from './core'
 import { TrackerChart } from './chart'
 import { Dataset } from './chart'
 import { Browser } from './browser'
@@ -41,7 +41,7 @@ interface CoverageEntryData {
 import type { CoverageBlock } from './core'
 
 interface CodeData {
-  repo: Repo
+  repo: CoverageRepo
   filename: string
   code: string
   blocks: CoverageBlock[]
@@ -52,11 +52,11 @@ export function makeCoverageTrackerPath(params: Params) {
 }
 
 export function makeCoverageTrackerEntryPath(params: Params) {
-  return `${makeCoverageTrackerPath(params)}/${params.index}/${params.entry}`
+  return `${makeCoverageTrackerPath(params)}/${params.coverageId}/${params.entry}`
 }
 
 export function buildEntryUrl(params: Params, cov: Coverage, entryName: string): string {
-  return `/coverages/${params.trackerId}/${cov.index}/${entryName}`
+  return `/coverages/${params.trackerId}/${cov.id}/${entryName}`
 }
 
 // formatters
@@ -74,8 +74,8 @@ export function formatRatio(hits: number, lines: number) {
   return (hits * 100.0 / lines).toFixed(1)
 }
 
-export function buildCoverageClickUrl(trackerId: string | undefined, index: number, seriesName: string): string {
-  return `/coverages/${trackerId}/${index}/${seriesName}`
+export function buildCoverageClickUrl(trackerId: string | undefined, coverageId: string, seriesName: string): string {
+  return `/coverages/${trackerId}/${coverageId}/${seriesName}`
 }
 
 export const FilePage = (): React.JSX.Element => {
@@ -89,7 +89,7 @@ export const FilePage = (): React.JSX.Element => {
 // CoverageEntryPage
 
 export async function loadCoverageEntryByTracker({ params }: LoaderFunctionArgs): Promise<Response> {
-  const url = `/api/coverages/${params.trackerId}/${params.index}/${params.entry}/files`
+  const url = `/api/coverages/${params.trackerId}/${params.coverageId}/${params.entry}/files`
   const resp = await fetch(url)
   if (resp.status == 403) {
     return redirect("/auth")
@@ -100,7 +100,7 @@ export async function loadCoverageEntryByTracker({ params }: LoaderFunctionArgs)
 }
 
 export async function loadFileByTracker({ params }: LoaderFunctionArgs): Promise<Response> {
-  const url = `/api/coverages/${params.trackerId}/${params.index}/${params.entry}/files/${params["*"]}`
+  const url = `/api/coverages/${params.trackerId}/${params.coverageId}/${params.entry}/files/${params["*"]}`
   const resp = await fetch(url)
   if (!resp.ok)
     throw resp
@@ -136,7 +136,7 @@ export const CoverageEntryPage = (): React.JSX.Element => {
 
 export async function loadCoverageListByTracker({ params }: { params: Params }): Promise<Response | {
   trackerName: string,
-  repo: Repo,
+  repo: CoverageRepo,
   coverages: Coverage[],
   liked: boolean,
   likeCount: number,
@@ -157,7 +157,7 @@ export async function loadCoverageListByTracker({ params }: { params: Params }):
 
   // preprocess
   coverages.sort((a: Coverage, b: Coverage) => {
-    return b.index - a.index
+    return b.time.localeCompare(a.time)
   })
 
   for (const cov of coverages) {
@@ -203,6 +203,7 @@ interface CoverageSegmentProperty {
   cov: Coverage,
   params: Params,
   entryNames: string[]
+  displayIndex: number
 }
 
 
@@ -217,7 +218,7 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
   return (
     <TableRow>
       <TableCell>
-        <Badge variant="outline">#{cov.index}</Badge>
+        <Badge variant="outline">#{props.displayIndex}</Badge>
       </TableCell>
       <TableCell>
         {(() => {
@@ -257,7 +258,7 @@ export const CoverageSegment = (props: CoverageSegmentProperty): React.JSX.Eleme
 const COVERAGE_PER_PAGE = 20
 
 export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSelector, chartConfig }: {
-  repo: Repo
+  repo: CoverageRepo
   coverages: Coverage[]
   params: Params
   min?: Date | null
@@ -280,7 +281,9 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
 
   const items: React.JSX.Element[] = []
   pageCoverages.forEach((cov: Coverage, i: number) => {
-    items.push(<CoverageSegment key={i} cov={cov} params={params} entryNames={entryNames} />)
+    items.push(
+      <CoverageSegment key={cov.id} cov={cov} params={params} entryNames={entryNames} displayIndex={start + i + 1} />
+    )
   })
 
   const datasets = useMemo(() => coverageToDatasets(coverages), [coverages])
@@ -288,8 +291,8 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
   const onChartClick = useCallback((rawParams: any) => {
     if (rawParams.seriesName !== 'total') {
       const d = rawParams.data
-      if (d?.index !== undefined) {
-        const url = buildCoverageClickUrl(params.trackerId, d.index, d.entryName)
+      if (d?.id !== undefined) {
+        const url = buildCoverageClickUrl(params.trackerId, d.id, d.entryName)
         window.location.assign(url)
       }
     }
@@ -348,7 +351,7 @@ export const CoverageListContent = ({ repo, coverages, params, min, max, rangeSe
 export const CoverageTrackerList = (): React.JSX.Element => {
   const data = useLoaderData() as {
     trackerName: string,
-    repo: Repo,
+    repo: CoverageRepo,
     coverages: Coverage[],
     liked: boolean,
     likeCount: number,
@@ -419,10 +422,10 @@ export const coverageTrackerRoute = [
     loader: loadCoverageListByTracker,
   },
   {
-    path: ':index',
+    path: ':coverageId',
     handle: {
       crumb: (params: Params) => {
-        return { label: `#${params.index}` }
+        return { label: `#${(params.coverageId ?? '').replace(/^cov_/, '').slice(0, 8)}` }
       }
     },
     children: [
@@ -431,7 +434,7 @@ export const coverageTrackerRoute = [
         handle: {
           crumb: (params: Params) => ({
             label: params.entry,
-            link: `/coverages/${params.trackerId}/${params.index}/${params.entry}`
+            link: `/coverages/${params.trackerId}/${params.coverageId}/${params.entry}`
           }),
         },
         children: [
@@ -471,11 +474,11 @@ export function coverageToDatasets(coverages: Coverage[]): Dataset[] {
         map[e.name] = []
       }
       const y = e.lines === 0 ? 0 : e.hits * 100.0 / e.lines
-      map[e.name].push({ x: cov.time, y: y.toFixed(1), extra: { index: cov.index, entryName: e.name } })
+      map[e.name].push({ x: cov.time, y: y.toFixed(1), extra: { id: cov.id, entryName: e.name } })
     }
     if (hasMultiEntries) {
       const y = cov.lines === 0 ? 0 : cov.hits * 100.0 / cov.lines
-      map.total.push({ x: cov.time, y: y.toFixed(1), extra: { index: cov.index, entryName: 'total' } })
+      map.total.push({ x: cov.time, y: y.toFixed(1), extra: { id: cov.id, entryName: 'total' } })
     }
   }
 

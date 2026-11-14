@@ -16,6 +16,7 @@ var schema = `
 CREATE TABLE IF NOT EXISTS coverage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tracker_id INTEGER NOT NULL REFERENCES tracker(id) ON DELETE CASCADE,
+    external_id TEXT,
     revision TEXT NOT NULL,
     time DATETIME NOT NULL,
     contents TEXT NOT NULL,
@@ -71,6 +72,7 @@ const schemaCoverage = `
 CREATE TABLE IF NOT EXISTS coverage (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tracker_id INTEGER NOT NULL REFERENCES tracker(id) ON DELETE CASCADE,
+    external_id TEXT,
     revision TEXT NOT NULL,
     time DATETIME NOT NULL,
     contents TEXT NOT NULL,
@@ -79,10 +81,11 @@ CREATE TABLE IF NOT EXISTS coverage (
 
 type (
 	storableCoverage struct {
-		ID        int64     `db:"id"`
-		TrackerID int64     `db:"tracker_id"`
-		Revision  string    `db:"revision"`
-		Time      time.Time `db:"time"`
+		ID         int64              `db:"id"`
+		TrackerID  int64              `db:"tracker_id"`
+		ExternalID CoverageExternalID `db:"external_id"`
+		Revision   string             `db:"revision"`
+		Time       time.Time          `db:"time"`
 	}
 
 	trackerCoverageRow struct {
@@ -118,7 +121,7 @@ type (
 )
 
 func newCoverageStoreImpl(db *sqlx.DB) *coverageStoreImpl {
-	query := "SELECT id, tracker_id, revision, time FROM coverage"
+	query := "SELECT id, tracker_id, external_id, revision, time FROM coverage"
 	return &coverageStoreImpl{db: db, selectQuery: query}
 }
 
@@ -152,7 +155,49 @@ func (s *coverageStoreImpl) migrate() error {
 	if err := s.migrateCoverage(); err != nil {
 		return err
 	}
-	return s.migrateTrackerCoverage()
+	if err := s.migrateTrackerCoverage(); err != nil {
+		return err
+	}
+	return s.migrateCoverageExternalID()
+}
+
+// migrateCoverageExternalID adds external IDs to coverage rows created by
+// older versions and enforces their uniqueness. It is idempotent.
+func (s *coverageStoreImpl) migrateCoverageExternalID() error {
+	if !s.hasColumn("coverage", "external_id") {
+		if _, err := s.db.Exec("ALTER TABLE coverage ADD COLUMN external_id TEXT"); err != nil {
+			return fmt.Errorf("migrate coverage external_id column: %w", err)
+		}
+	}
+
+	for {
+		var ids []int64
+		if err := s.db.Select(&ids,
+			"SELECT id FROM coverage WHERE external_id IS NULL OR external_id = '' LIMIT 500"); err != nil {
+			return fmt.Errorf("migrate coverage external_id select: %w", err)
+		}
+		if len(ids) == 0 {
+			break
+		}
+
+		for _, id := range ids {
+			eid, err := NewCoverageExternalID()
+			if err != nil {
+				return fmt.Errorf("migrate coverage external_id generate: %w", err)
+			}
+			if _, err := s.db.Exec(
+				"UPDATE coverage SET external_id = ? WHERE id = ?", eid.Bare(), id); err != nil {
+				return fmt.Errorf("migrate coverage external_id update: %w", err)
+			}
+		}
+	}
+
+	if _, err := s.db.Exec(
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_coverage_external_id ON coverage(external_id)"); err != nil {
+		return fmt.Errorf("migrate idx_coverage_external_id: %w", err)
+	}
+
+	return nil
 }
 
 // migrateCoverage rebuilds the coverage table when it still has a repo_id
@@ -342,7 +387,6 @@ func (s *coverageStoreImpl) FindRepoByTrackerID(trackerID int64) (*core.Reposito
 		return nil, fmt.Errorf("FindRepoByTrackerID select: %w", err)
 	}
 	return &core.Repository{
-		Id:                row.TrackerID,
 		RepositoryManager: row.Scm,
 		Namespace:         row.Namespace,
 		Name:              row.Name,
@@ -424,11 +468,12 @@ func (s *coverageStoreImpl) loadCoverage(row storableCoverage) (*Coverage, error
 	}
 
 	return &Coverage{
-		ID:        row.ID,
-		TrackerID: row.TrackerID,
-		Revision:  row.Revision,
-		Timestamp: row.Time,
-		Entries:   entries,
+		ID:         row.ID,
+		ExternalID: row.ExternalID,
+		TrackerID:  row.TrackerID,
+		Revision:   row.Revision,
+		Timestamp:  row.Time,
+		Entries:    entries,
 	}, nil
 }
 
@@ -452,19 +497,20 @@ func (s *coverageStoreImpl) scanFull(query string, params ...interface{}) ([]*Co
 
 func (s *coverageStoreImpl) scanLite(trackerID int64) ([]*Coverage, error) {
 	type row struct {
-		ID         int64     `db:"id"`
-		TrackerID  int64     `db:"tracker_id"`
-		Revision   string    `db:"revision"`
-		Time       time.Time `db:"time"`
-		EntryID    *int64    `db:"entry_id"`
-		EntryName  *string   `db:"entry_name"`
-		EntryHits  *int      `db:"entry_hits"`
-		EntryLines *int      `db:"entry_lines"`
+		ID         int64              `db:"id"`
+		TrackerID  int64              `db:"tracker_id"`
+		ExternalID CoverageExternalID `db:"external_id"`
+		Revision   string             `db:"revision"`
+		Time       time.Time          `db:"time"`
+		EntryID    *int64             `db:"entry_id"`
+		EntryName  *string            `db:"entry_name"`
+		EntryHits  *int               `db:"entry_hits"`
+		EntryLines *int               `db:"entry_lines"`
 	}
 
 	rows := []row{}
 	if err := s.db.Select(&rows, `
-		SELECT c.id, c.tracker_id, c.revision, c.time,
+		SELECT c.id, c.tracker_id, c.external_id, c.revision, c.time,
 		       e.id        AS entry_id,
 		       e.name      AS entry_name,
 		       e.hits      AS entry_hits,
@@ -481,10 +527,11 @@ func (s *coverageStoreImpl) scanLite(trackerID int64) ([]*Coverage, error) {
 	for _, r := range rows {
 		if current == nil || current.ID != r.ID {
 			current = &Coverage{
-				ID:        r.ID,
-				TrackerID: r.TrackerID,
-				Revision:  r.Revision,
-				Timestamp: r.Time,
+				ID:         r.ID,
+				ExternalID: r.ExternalID,
+				TrackerID:  r.TrackerID,
+				Revision:   r.Revision,
+				Timestamp:  r.Time,
 			}
 			coverages = append(coverages, current)
 		}
@@ -513,8 +560,13 @@ func (s *coverageStoreImpl) findOne(query string, params ...interface{}) (*Cover
 	return coverages[0], nil
 }
 
-func (s *coverageStoreImpl) Find(id int64) (*Coverage, error) {
+func (s *coverageStoreImpl) findByID(id int64) (*Coverage, error) {
 	return s.findOne(s.selectQuery+" WHERE id = ?", id)
+}
+
+func (s *coverageStoreImpl) FindByExternalID(trackerID int64, id CoverageExternalID) (*Coverage, error) {
+	return s.findOne(
+		s.selectQuery+" WHERE tracker_id = ? AND external_id = ?", trackerID, id.Bare())
 }
 
 func (s *coverageStoreImpl) FindRevision(trackerID int64, revision string) (*Coverage, error) {
@@ -532,22 +584,35 @@ func (s *coverageStoreImpl) Put(cov *Coverage) (int64, error) {
 		return 0, fmt.Errorf("Put marshal entries: %w", err)
 	}
 
+	if cov.ExternalID == "" {
+		cov.ExternalID, err = NewCoverageExternalID()
+		if err != nil {
+			return 0, fmt.Errorf("Put generate external id: %w", err)
+		}
+	}
+
 	_, err = s.db.Exec(
-		`INSERT INTO coverage (tracker_id, revision, time, contents)
-		 VALUES (?, ?, ?, ?)
+		`INSERT INTO coverage (tracker_id, external_id, revision, time, contents)
+		 VALUES (?, ?, ?, ?, ?)
 		 ON CONFLICT(tracker_id, revision) DO UPDATE SET contents = ?, time = ?`,
-		cov.TrackerID, cov.Revision, cov.Timestamp, contents, contents, cov.Timestamp)
+		cov.TrackerID, cov.ExternalID.Bare(), cov.Revision, cov.Timestamp, contents,
+		contents, cov.Timestamp)
 	if err != nil {
 		return 0, fmt.Errorf("Put insert coverage: %w", err)
 	}
 
-	var id int64
-	err = s.db.Get(&id,
-		"SELECT id FROM coverage WHERE tracker_id = ? AND revision = ?",
+	var row struct {
+		ID         int64              `db:"id"`
+		ExternalID CoverageExternalID `db:"external_id"`
+	}
+	err = s.db.Get(&row,
+		"SELECT id, external_id FROM coverage WHERE tracker_id = ? AND revision = ?",
 		cov.TrackerID, cov.Revision)
 	if err != nil {
 		return 0, fmt.Errorf("Put select coverage id: %w", err)
 	}
+	id := row.ID
+	cov.ExternalID = row.ExternalID
 
 	if err := s.replaceEntries(id, cov.Entries); err != nil {
 		return 0, err

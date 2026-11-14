@@ -2,7 +2,7 @@
 
 ## Overview
 
-Coverage data is accessed via tracker-based URLs. Each coverage tracker links to a repository through the `tracker_coverage` table, which is owned and managed by the coverage package. `:trackerId` in every URL is the tracker external ID (`trk_<uuidv7>`), not the internal integer primary key.
+Coverage data is accessed via tracker-based URLs. Each coverage tracker links to a repository through the `tracker_coverage` table, which is owned and managed by the coverage package. `:trackerId` in every URL is the tracker external ID (`trk_<uuidv7>`), and `:coverageId` is the coverage external ID (`cov_<uuidv7>`). Neither is the internal integer primary key.
 
 ## URL Structure
 
@@ -11,9 +11,11 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 | Pattern | Description |
 |---------|-------------|
 | `/coverages/:trackerId` | Coverage list view |
-| `/coverages/:trackerId/:index` | Coverage at index |
-| `/coverages/:trackerId/:index/:entry` | Entry detail |
-| `/coverages/:trackerId/:index/:entry/*` | File view |
+| `/coverages/:trackerId/:coverageId` | Coverage detail |
+| `/coverages/:trackerId/:coverageId/:entry` | Entry detail |
+| `/coverages/:trackerId/:coverageId/:entry/*` | File view |
+
+The coverage list displays a per-tracker ordinal (`#1`, `#2`, ...) for readability; the ordinal is not part of the URL or API. Old numeric URLs are not accepted.
 
 ### API
 
@@ -22,9 +24,11 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 | `POST /api/coverages` | Create a coverage tracker for a repository |
 | `/api/coverages/:trackerId` | Coverage list |
 | `/api/coverages/:trackerId/preview` | Preview (timeline as virtual series) |
-| `/api/coverages/:trackerId/:index` | Coverage at index |
-| `/api/coverages/:trackerId/:index/:entry/files` | File list |
-| `/api/coverages/:trackerId/:index/:entry/files/*` | File view |
+| `/api/coverages/:trackerId/:coverageId` | Coverage detail |
+| `/api/coverages/:trackerId/:coverageId/:entry/files` | File list |
+| `/api/coverages/:trackerId/:coverageId/:entry/files/*` | File view |
+
+Coverage list responses use `coverages[].id` (`cov_<uuidv7>`). List, file-list, and code responses return only the repository `{url, namespace, name}`; internal coverage IDs, tracker IDs, and repository IDs are not exposed. Upload responses return the coverage external ID, revision, time, and entries.
 
 ## Middleware
 
@@ -36,9 +40,11 @@ Coverage data is accessed via tracker-based URLs. Each coverage tracker links to
 4. Verify access (session or API key)
 5. Inject `core.Repository` and `core.RepositoryClient` into context
 
-The `tracker_coverage` table is owned by the coverage package and stores the repository description (scm, namespace, name, url) directly, keyed by `tracker_id` with a foreign key to `tracker(id) ON DELETE CASCADE`. The `coverage` table is keyed by `tracker_id` (foreign key to `tracker(id) ON DELETE CASCADE`) instead of `repo_id`; on startup the coverage store migrates databases that still use the old `repo_id` schema (renaming the column, rebuilding the table, carrying over existing `tracker_coverage` links, and marking rows without a link with a negative repository id that is resolved to the tracker created for the repository at startup).
+Access is verified directly with `checkRepoAccessByRepositoryManager(session, manager, namespace, name)`. Coverage paths do not use the per-request `core.Repository.Id` access cache because that ID is not the tracker ID.
 
-`GET /api/coverages/{trackerId}/preview` uses only `requireTrackerAuth` + `InjectTracker` + `RequireReadPermission` (no SCM access needed).
+The `tracker_coverage` table is owned by the coverage package and stores the repository description (scm, namespace, name, url) directly, keyed by `tracker_id` with a foreign key to `tracker(id) ON DELETE CASCADE`. The `coverage` table is keyed by `tracker_id` (foreign key to `tracker(id) ON DELETE CASCADE`) instead of `repo_id`; on startup the coverage store migrates databases that still use the old `repo_id` schema (renaming the column, rebuilding the table, carrying over existing `tracker_coverage` links, and marking rows without a link with a negative repository id that is resolved to the tracker created for the repository at startup). It also adds `coverage.external_id` (bare UUIDv7 in the DB) to existing rows and creates a unique index on it.
+
+`GET /api/coverages/{trackerId}/preview` uses only `requireTrackerAuth` + `InjectTracker` + `RequireReadPermission` (no SCM access needed). Its series and values are virtual (not stored in `tracker_series` / `tracker_value`), so their `id` fields are omitted.
 
 ## Coverage Type Trackers
 
@@ -79,12 +85,13 @@ Responses:
 
 Upload command specifies the tracker external ID via `--tracker` flag and POSTs to `/api/coverages/:trackerId`.
 
-A successful upload (`CoverageStore.Put`) also bumps the `last_updated_at` of the linked coverage tracker, so the tracker list reflects the latest upload. It is a no-op if the `tracker`/`tracker_coverage` tables do not exist.
+A successful upload (`CoverageStore.Put`) returns the coverage external ID (`cov_<uuidv7>`), which is stable across re-uploads of the same revision. It also bumps the `last_updated_at` of the linked coverage tracker, so the tracker list reflects the latest upload. It is a no-op if the `tracker`/`tracker_coverage` tables do not exist.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
+| `coverage/external_id.go` | Coverage external ID (`cov_<uuidv7>`) type and helpers |
 | `coverage/coverage_store.go` | SQLite store for coverage/coverage_entry/coverage_block |
 | `coverage/coverage_handler.go` | HTTP handlers |
 | `coverage/upload.go` | Coverage upload logic |

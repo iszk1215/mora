@@ -27,9 +27,9 @@ export interface DataPointEditCardProps {
   dirty: boolean
   saving: boolean
   error: string | null
-  pendingEdits: Record<number, EditDraft>
-  onEdit: (valueId: number, which: 'time' | 'value', raw: string) => void
-  onDelete: (valueId: number) => void
+  pendingEdits: Record<string, EditDraft>
+  onEdit: (valueId: string, which: 'time' | 'value', raw: string) => void
+  onDelete: (valueId: string) => void
   onPerPageChange: (n: number) => void
   onPageChange: (n: number) => void
   onSave: () => void
@@ -50,10 +50,10 @@ export function isoToInputValue(iso: string, isDate: boolean): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-const displayTime = (v: ValueModel, isDate: boolean, pendingEdits: Record<number, EditDraft>): string =>
+const displayTime = (v: ValueModel, isDate: boolean, pendingEdits: Record<string, EditDraft>): string =>
   pendingEdits[v.id]?.time ?? isoToInputValue(v.time, isDate)
 
-const displayValue = (v: ValueModel, pendingEdits: Record<number, EditDraft>): string =>
+const displayValue = (v: ValueModel, pendingEdits: Record<string, EditDraft>): string =>
   pendingEdits[v.id]?.value ?? String(v.value)
 
 export const DataPointEditCard = ({

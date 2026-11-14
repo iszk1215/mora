@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
-	"strconv"
 	"time"
 	"unicode"
 
@@ -21,18 +20,24 @@ import (
 )
 
 type (
+	coverageRepository struct {
+		URL       string `json:"url"`
+		Namespace string `json:"namespace"`
+		Name      string `json:"name"`
+	}
+
 	// handleCoverageList
 	CoverageResponse struct {
-		ID          int64            `json:"index"`
-		RevisionURL string           `json:"revision_url"`
-		Revision    string           `json:"revision"`
-		Timestamp   time.Time        `json:"time"`
-		Entries     []*CoverageEntry `json:"entries"`
+		ID          CoverageExternalID `json:"id"`
+		RevisionURL string             `json:"revision_url"`
+		Revision    string             `json:"revision"`
+		Timestamp   time.Time          `json:"time"`
+		Entries     []*CoverageEntry   `json:"entries"`
 		// Profiles in entry is emptry
 	}
 
 	CoverageListResponse struct {
-		Repo      core.Repository    `json:"repo"`
+		Repo      coverageRepository `json:"repo"`
 		Coverages []CoverageResponse `json:"coverages"`
 	}
 
@@ -52,17 +57,24 @@ type (
 	}
 
 	FileListResponse struct {
-		Metadata MetaResponse    `json:"meta"`
-		Repo     core.Repository `json:"repo"`
-		Files    []*FileResponse `json:"files"`
+		Metadata MetaResponse       `json:"meta"`
+		Repo     coverageRepository `json:"repo"`
+		Files    []*FileResponse    `json:"files"`
 	}
 
 	// handleFile
 	CodeResponse struct {
-		Repo     core.Repository `json:"repo"`
-		FileName string          `json:"filename"`
-		Code     string          `json:"code"`
-		Blocks   [][]int         `json:"blocks"`
+		Repo     coverageRepository `json:"repo"`
+		FileName string             `json:"filename"`
+		Code     string             `json:"code"`
+		Blocks   [][]int            `json:"blocks"`
+	}
+
+	CoverageUploadResponse struct {
+		ID        CoverageExternalID `json:"id"`
+		Revision  string             `json:"revision"`
+		Timestamp time.Time          `json:"time"`
+		Entries   []*CoverageEntry   `json:"entries"`
 	}
 
 	// Upload
@@ -133,14 +145,21 @@ func injectCoverageEntry(next http.Handler) http.Handler {
 
 func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+		tr, ok := tracker.TrackerFromContext(r.Context())
+		if !ok {
+			log.Warn().Msg("injectCoverage: tracker not found in context")
+			render.BadRequest(w, errors.New("invalid tracker"))
+			return
+		}
+
+		id, err := ParseCoverageExternalID(chi.URLParam(r, "coverageId"))
 		if err != nil {
 			log.Warn().Err(err).Msg("invalid coverage id in URL")
 			render.BadRequest(w, errors.New("invalid coverage id"))
 			return
 		}
 
-		cov, err := s.coverages.Find(id)
+		cov, err := s.coverages.FindByExternalID(tr.Id, id)
 		if err != nil {
 			log.Warn().Err(err).Msg("failed to find coverage")
 			render.NotFound(w, render.ErrNotFound)
@@ -156,9 +175,17 @@ func (s *CoverageHandler) injectCoverage(next http.Handler) http.Handler {
 	})
 }
 
+func makeCoverageRepository(repo core.Repository) coverageRepository {
+	return coverageRepository{
+		URL:       repo.Url,
+		Namespace: repo.Namespace,
+		Name:      repo.Name,
+	}
+}
+
 func makeCoverageResponse(revisionURL string, cov *Coverage) CoverageResponse {
 	resp := CoverageResponse{
-		ID:          cov.ID,
+		ID:          cov.ExternalID,
 		Timestamp:   cov.Timestamp,
 		Revision:    cov.Revision,
 		RevisionURL: revisionURL,
@@ -190,7 +217,7 @@ func makeCoverageListResponse(
 	}
 
 	resp := CoverageListResponse{
-		Repo:      repo,
+		Repo:      makeCoverageRepository(repo),
 		Coverages: covs,
 	}
 
@@ -259,7 +286,6 @@ func TimelineToPreviewSeries(trackerID int64, trackerExternalID string, timeline
 		}
 		previews = append(previews, tracker.PreviewSeriesValues{
 			Series: tracker.SeriesModel{
-				Id:                0,
 				TrackerId:         trackerID,
 				TrackerExternalId: tracker.ExternalID(trackerExternalID),
 				Name:              name,
@@ -322,7 +348,7 @@ func makeFileListResponse(rm core.RepositoryClient, repo core.Repository, cov *C
 
 	return FileListResponse{
 		Files: files,
-		Repo:  repo,
+		Repo:  makeCoverageRepository(repo),
 		Metadata: MetaResponse{
 			Revision:    cov.Revision,
 			RevisionURL: rm.RevisionURL(repo.Url, cov.Revision),
@@ -338,12 +364,12 @@ func makeFileListResponse(rm core.RepositoryClient, repo core.Repository, cov *C
 // @Description  Return the file list and metadata for a coverage entry
 // @Tags         coverage
 // @Param        trackerId  path  string     true  "Tracker ID"
-// @Param        id         path  int     true  "Coverage index"
-// @Param        entry      path  string  true  "Entry name"
+// @Param        coverageId path  string     true  "Coverage ID (cov_<uuidv7>)"
+// @Param        entry      path  string     true  "Entry name"
 // @Success      200  {object}  coverage.FileListResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/coverages/{trackerId}/{id}/{entry}/files [get]
+// @Router       /api/coverages/{trackerId}/{coverageId}/{entry}/files [get]
 func handleFileList(w http.ResponseWriter, r *http.Request) {
 	rm, _ := core.RepositoryClientFrom(r.Context())
 	repo, _ := core.RepoFrom(r.Context())
@@ -373,13 +399,13 @@ func getSourceCode(ctx context.Context, revision, path string) ([]byte, error) {
 // @Description  Return the source code and coverage blocks for a file in an entry
 // @Tags         coverage
 // @Param        trackerId  path  string     true  "Tracker ID"
-// @Param        id         path  int     true  "Coverage index"
-// @Param        entry      path  string  true  "Entry name"
-// @Param        filepath   path  string  true  "File path"
+// @Param        coverageId path  string     true  "Coverage ID (cov_<uuidv7>)"
+// @Param        entry      path  string     true  "Entry name"
+// @Param        filepath   path  string     true  "File path"
 // @Success      200  {object}  coverage.CodeResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
-// @Router       /api/coverages/{trackerId}/{id}/{entry}/files/{filepath} [get]
+// @Router       /api/coverages/{trackerId}/{coverageId}/{entry}/files/{filepath} [get]
 func handleFile(w http.ResponseWriter, r *http.Request) {
 	repo, _ := core.RepoFrom(r.Context())
 	cov, _ := CoverageFrom(r.Context())
@@ -402,7 +428,7 @@ func handleFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := CodeResponse{
-		Repo:     repo,
+		Repo:     makeCoverageRepository(repo),
 		FileName: profile.FileName,
 		Code:     string(code),
 		Blocks:   profile.Blocks,
@@ -469,7 +495,7 @@ func parseCoverageEntryUploadRequests(req []*CoverageEntryUploadRequest) ([]*Cov
 // @Produce      json
 // @Param        trackerId  path  string  true  "Tracker ID"
 // @Param        body       body  coverage.CoverageUploadRequest  true  "Coverage data"
-// @Success      201  {object}  coverage.Coverage
+// @Success      201  {object}  coverage.CoverageUploadResponse
 // @Failure      400  {object}  core.ErrorResponse
 // @Failure      401  {object}  core.ErrorResponse
 // @Failure      404  {object}  core.ErrorResponse
@@ -518,7 +544,12 @@ func (s *CoverageHandler) HandleCoverageUpload(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	render.JSON(w, cov, http.StatusCreated)
+	render.JSON(w, CoverageUploadResponse{
+		ID:        cov.ExternalID,
+		Revision:  cov.Revision,
+		Timestamp: cov.Timestamp,
+		Entries:   cov.Entries,
+	}, http.StatusCreated)
 }
 
 func (s *CoverageHandler) Handler() http.Handler {
@@ -526,7 +557,7 @@ func (s *CoverageHandler) Handler() http.Handler {
 	r.Get("/", s.handleCoverageList)
 	r.Post("/", s.HandleCoverageUpload)
 
-	r.Route("/{id}", func(r chi.Router) {
+	r.Route("/{coverageId}", func(r chi.Router) {
 		r.Use(s.injectCoverage)
 		r.Route("/{entry}", func(r chi.Router) {
 			r.Use(injectCoverageEntry)
