@@ -15,7 +15,8 @@ User page (`/users/:userName`) shows the trackers owned by a user. Anyone can vi
 
 `GET /api/users/:userName`
 
-- Returns the public user profile (`server.User`)
+- Returns the public user profile (`server.User`): `username`, `avatar_url`, and `user_type`
+- The internal `user.id` is never exposed; clients identify users by `username`
 
 `GET /api/users/:userName/trackers?q=<query>&page=N&per_page=N&include=preview`
 

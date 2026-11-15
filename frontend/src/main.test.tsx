@@ -72,7 +72,7 @@ describe('Header', () => {
     )
   }
 
-  const mockUser = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
+  const mockUser = { provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: 'https://example.com/avatar.jpg' }
 
   it('renders Login link for anonymous user', async () => {
     mockConfig()

@@ -36,7 +36,6 @@ export interface FileData {
 }
 
 export interface UserData {
-  id: number
   provider: string
   provider_user_id: string
   username: string
@@ -103,7 +102,6 @@ export interface TrackerResponse {
   visibility: string
   type: string
   chart_config: string
-  owner_id?: number
   owner_name?: string
   created_at?: string
   last_updated_at?: string

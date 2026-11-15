@@ -21,7 +21,7 @@ import (
 )
 
 type User struct {
-	ID        int64     `db:"id" json:"id"`
+	ID        int64     `db:"id" json:"-"`
 	Username  string    `db:"username" json:"username"`
 	AvatarURL string    `db:"avatar_url" json:"avatar_url"`
 	Type      string    `db:"user_type" json:"user_type"`
@@ -31,7 +31,7 @@ type User struct {
 
 type UserAuth struct {
 	ID             int64  `db:"id" json:"-"`
-	UserID         int64  `db:"user_id" json:"user_id"`
+	UserID         int64  `db:"user_id" json:"-"`
 	Provider       string `db:"provider" json:"provider"`
 	ProviderUserID string `db:"provider_user_id" json:"provider_user_id"`
 }

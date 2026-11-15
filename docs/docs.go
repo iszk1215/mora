@@ -2452,9 +2452,6 @@ const docTemplate = `{
                 "avatar_url": {
                     "type": "string"
                 },
-                "id": {
-                    "type": "integer"
-                },
                 "user_type": {
                     "type": "string"
                 },
@@ -2737,9 +2734,6 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "owner_id": {
-                    "type": "integer"
-                },
                 "type": {
                     "type": "string"
                 },
@@ -2777,9 +2771,6 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
-                },
-                "owner_id": {
-                    "type": "integer"
                 },
                 "owner_name": {
                     "type": "string"

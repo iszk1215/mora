@@ -196,8 +196,8 @@ how to control them from the browser.
   returns `409` with a `suggested_username` alternative.
 - Usernames are currently immutable. The validation/suggestion logic lives in
   `server/username.go` as pure functions so a future rename feature can reuse
-  it; `user.id` remains the stable identifier (usernames are not yet used in
-  URLs).
+  it. `user.id` is the stable internal identifier and is never exposed through
+  the API; the public identifier is `username`.
 
 ## User Types
 

@@ -138,7 +138,7 @@ describe('trackerRoute index', () => {
 
 
 describe('TrackerCreate', () => {
-  const mockUser = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
+  const mockUser = { provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
 
   beforeEach(() => {
     mockNavigate.mockReset()
@@ -258,7 +258,7 @@ describe('TrackerDetailView', () => {
     vi.restoreAllMocks()
   })
 
-  const mockUser = { id: 1, provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
+  const mockUser = { provider: 'github', provider_user_id: '42', username: 'testuser', avatar_url: '' }
 
   it('renders tracker name', () => {
     vi.mocked(useLoaderData).mockReturnValue({

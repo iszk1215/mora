@@ -228,8 +228,6 @@ definitions:
     properties:
       avatar_url:
         type: string
-      id:
-        type: integer
       user_type:
         type: string
       username:
@@ -413,8 +411,6 @@ definitions:
         type: string
       name:
         type: string
-      owner_id:
-        type: integer
       type:
         type: string
       visibility:
@@ -440,8 +436,6 @@ definitions:
         type: boolean
       name:
         type: string
-      owner_id:
-        type: integer
       owner_name:
         type: string
       role:

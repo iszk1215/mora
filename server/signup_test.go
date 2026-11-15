@@ -83,8 +83,8 @@ func TestSignupHandler_GetPending(t *testing.T) {
 	h := SignupHandler(nil)
 	sess := NewMoraSession()
 	sess.SetPendingSignup(&pendingSignup{
-		provider: "gitea",
-		username: "newuser",
+		provider:  "gitea",
+		username:  "newuser",
 		avatarURL: "https://example.com/avatar.jpg",
 	})
 
@@ -214,6 +214,11 @@ func TestSignupHandler_Confirm_Success(t *testing.T) {
 	defer func() { _ = res.Body.Close() }()
 
 	require.Equal(t, http.StatusCreated, res.StatusCode)
+
+	var got map[string]any
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&got))
+	require.NotContains(t, got, "id")
+	require.Equal(t, "confirmeduser", got["username"])
 
 	user, err := store.FindByUsername("confirmeduser")
 	require.NoError(t, err)
