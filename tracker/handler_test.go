@@ -386,14 +386,14 @@ func TestHandlerPatchTracker(t *testing.T) {
 		r = r.WithContext(ContextWithAuth(context.Background(), &uid))
 		res := getResponse(t, http.StatusOK, h, r)
 
-		var got TrackerResponse
+		var got map[string]any
 		unmarshalResponse(t, res, &got)
-		require.Equal(t, "public", got.Visibility)
-		require.Equal(t, int64(2), got.OwnerId)
-		require.Equal(t, "user2", got.OwnerName)
-		require.Equal(t, "owner", got.Role)
-		require.False(t, got.CreatedAt.IsZero())
-		require.False(t, got.LastUpdatedAt.IsZero())
+		require.Equal(t, "public", got["visibility"])
+		require.NotContains(t, got, "owner_id")
+		require.Equal(t, "user2", got["owner_name"])
+		require.Equal(t, "owner", got["role"])
+		require.NotEmpty(t, got["created_at"])
+		require.NotEmpty(t, got["last_updated_at"])
 	})
 
 	t.Run("editor member cannot patch", func(t *testing.T) {

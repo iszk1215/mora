@@ -221,7 +221,7 @@ const mockRepo = { url: 'https://example.com/repo', namespace: 'test', name: 'te
 
 describe('CoverageTrackerList', () => {
   beforeEach(() => {
-    vi.mocked(useUser).mockReturnValue({ id: 1, provider: 'local', provider_user_id: 'user1', username: 'testuser', avatar_url: '' })
+    vi.mocked(useUser).mockReturnValue({ provider: 'local', provider_user_id: 'user1', username: 'testuser', avatar_url: '' })
     vi.mocked(useParams).mockReturnValue({ trackerId: '42' })
     vi.mocked(useLoaderData).mockReturnValue({
       trackerName: 'Test Coverage',

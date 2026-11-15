@@ -57,10 +57,10 @@ func TestHandleUserSetType(t *testing.T) {
 		defer func() { _ = res.Body.Close() }()
 		require.Equal(t, http.StatusOK, res.StatusCode)
 
-		var got User
+		var got map[string]any
 		require.NoError(t, json.NewDecoder(res.Body).Decode(&got))
-		require.Equal(t, target.ID, got.ID)
-		require.Equal(t, core.UserTypePro, got.Type)
+		require.NotContains(t, got, "id")
+		require.Equal(t, core.UserTypePro, got["user_type"])
 
 		found, err := server.userStore.FindByID(target.ID)
 		require.NoError(t, err)

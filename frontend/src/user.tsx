@@ -8,7 +8,6 @@ import type { PreviewData } from './tracker-api'
 import { TrackerResponse } from './core'
 
 interface UserData {
-  id: number
   username: string
   avatar_url: string
 }

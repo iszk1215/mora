@@ -32,7 +32,7 @@ type (
 		Visibility    string     `json:"visibility"   db:"visibility"`
 		Type          string     `json:"type"         db:"type"`
 		ChartConfig   string     `json:"chart_config" db:"chart_config"`
-		OwnerId       int64      `json:"owner_id"     db:"owner_id"`
+		OwnerId       int64      `json:"-"            db:"owner_id"`
 		CreatedAt     time.Time  `json:"created_at"   db:"created_at"`
 		LastUpdatedAt time.Time  `json:"last_updated_at" db:"last_updated_at"`
 	}

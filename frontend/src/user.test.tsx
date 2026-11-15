@@ -13,7 +13,7 @@ vi.mock('echarts-for-react/esm/core', () => ({
   default: ({ option }: any) => <div data-testid="echart" data-option={JSON.stringify(option)} />,
 }))
 
-const mockUser = { id: 2, username: 'alice', avatar_url: '' }
+const mockUser = { username: 'alice', avatar_url: '' }
 
 const mockTrackers = (names: string[]) => ({
   trackers: names.map((name, i) => ({

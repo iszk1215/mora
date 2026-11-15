@@ -31,7 +31,7 @@ func setupUserPageServer(t *testing.T) (*MoraServer, http.Handler) {
 func TestHandleUserGet(t *testing.T) {
 	server, handler := setupUserPageServer(t)
 
-	owner, err := server.userStore.CreateUser("alice", "https://example.com/avatar.png")
+	_, err := server.userStore.CreateUser("alice", "https://example.com/avatar.png")
 	require.NoError(t, err)
 
 	t.Run("returns user profile", func(t *testing.T) {
@@ -43,11 +43,11 @@ func TestHandleUserGet(t *testing.T) {
 		defer func() { _ = res.Body.Close() }()
 		require.Equal(t, http.StatusOK, res.StatusCode)
 
-		var got User
+		var got map[string]any
 		require.NoError(t, json.NewDecoder(res.Body).Decode(&got))
-		require.Equal(t, owner.ID, got.ID)
-		require.Equal(t, "alice", got.Username)
-		require.Equal(t, "https://example.com/avatar.png", got.AvatarURL)
+		require.NotContains(t, got, "id")
+		require.Equal(t, "alice", got["username"])
+		require.Equal(t, "https://example.com/avatar.png", got["avatar_url"])
 	})
 
 	t.Run("username lookup is case-insensitive", func(t *testing.T) {

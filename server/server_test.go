@@ -963,12 +963,12 @@ func TestHandleMe_LoggedIn(t *testing.T) {
 	defer func() { _ = res.Body.Close() }()
 	require.Equal(t, http.StatusOK, res.StatusCode)
 
-	var got User
+	var got map[string]any
 	err = json.NewDecoder(res.Body).Decode(&got)
 	require.NoError(t, err)
-	require.Equal(t, user.ID, got.ID)
-	require.Equal(t, "testuser", got.Username)
-	require.Equal(t, "https://example.com/avatar.jpg", got.AvatarURL)
+	require.NotContains(t, got, "id")
+	require.Equal(t, "testuser", got["username"])
+	require.Equal(t, "https://example.com/avatar.jpg", got["avatar_url"])
 }
 
 func TestTrackerEndpointIsMounted(t *testing.T) {
@@ -1406,6 +1406,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 
 		raw, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
+		require.NotContains(t, string(raw), `"owner_id"`)
 		var trk tracker.TrackerModel
 		require.NoError(t, json.Unmarshal(raw, &trk))
 		require.Equal(t, "my cov tracker", trk.Name)

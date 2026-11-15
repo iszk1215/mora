@@ -200,11 +200,11 @@ func TestPasswordLogin_Success(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var user User
+	var user map[string]any
 	err = json.NewDecoder(resp.Body).Decode(&user)
 	require.NoError(t, err)
-	require.Equal(t, "logintest", user.Username)
-	require.NotZero(t, user.ID)
+	require.NotContains(t, user, "id")
+	require.Equal(t, "logintest", user["username"])
 }
 
 func TestPasswordLogin_WrongPassword(t *testing.T) {
