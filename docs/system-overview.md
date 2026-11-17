@@ -98,10 +98,12 @@ out of `frontend/public/`, is served with `no-cache` plus a strong `ETag` and
 ## Middleware Chain
 
 ### injectRepo (`/api/repos/{repo_id}/*`)
-1. Parse `repo_id` from URL
-2. Load repository and repository manager
+1. Parse `repo_id` from URL as a repository external ID (`repo_<uuidv7>`; invalid format -> 400)
+2. Load repository by external ID and repository manager (unknown -> 404)
 3. Verify access (session token or API key)
 4. Inject `core.Repository` and `core.RepositoryClient` into context
+
+Repository, SCM, and API key external IDs are UUIDv7 values with `repo_`, `scm_`, and `key_` prefixes in HTTP URLs and JSON. Internal numeric IDs remain DB-only.
 
 ### requireTrackerAuth (`/api/trackers/*`)
 1. Session cookie -> extract user ID

@@ -493,7 +493,7 @@ const docTemplate = `{
                 "summary": "List metrics",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -523,7 +523,7 @@ const docTemplate = `{
                 "summary": "Create a metric",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -564,7 +564,7 @@ const docTemplate = `{
                 "summary": "Delete a metric",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -603,7 +603,7 @@ const docTemplate = `{
                 "summary": "List items",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -646,7 +646,7 @@ const docTemplate = `{
                 "summary": "Create an item",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -700,7 +700,7 @@ const docTemplate = `{
                 "summary": "Delete an item",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -752,7 +752,7 @@ const docTemplate = `{
                 "summary": "List values",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -796,7 +796,7 @@ const docTemplate = `{
                 "summary": "Add a value",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -849,7 +849,7 @@ const docTemplate = `{
                 "summary": "Delete all values",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -1925,7 +1925,7 @@ const docTemplate = `{
                 "summary": "Revoke an API key",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "API key ID",
                         "name": "keyId",
                         "in": "path",
@@ -2112,16 +2112,13 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
                 },
                 "namespace": {
                     "type": "string"
-                },
-                "scm_id": {
-                    "type": "integer"
                 },
                 "url": {
                     "type": "string"
@@ -2380,7 +2377,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "key": {
                     "type": "string"
@@ -2422,7 +2419,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "logined": {
                     "type": "boolean"
@@ -2467,7 +2464,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "key_prefix": {
                     "type": "string"
@@ -2484,7 +2481,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "repo_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "visibility": {
                     "type": "string"

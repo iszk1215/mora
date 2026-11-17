@@ -37,12 +37,13 @@ type UserAuth struct {
 }
 
 type UserAPIKey struct {
-	ID        int64     `db:"id" json:"id"`
-	UserID    int64     `db:"user_id" json:"-"`
-	Name      string    `db:"name" json:"name"`
-	KeyHash   string    `db:"key_hash" json:"-"`
-	KeyPrefix string    `db:"key_prefix" json:"key_prefix"`
-	CreatedAt time.Time `db:"created_at" json:"created_at"`
+	ID         int64     `db:"id" json:"-"`
+	ExternalID string    `db:"external_id" json:"id"`
+	UserID     int64     `db:"user_id" json:"-"`
+	Name       string    `db:"name" json:"name"`
+	KeyHash    string    `db:"key_hash" json:"-"`
+	KeyPrefix  string    `db:"key_prefix" json:"key_prefix"`
+	CreatedAt  time.Time `db:"created_at" json:"created_at"`
 }
 
 type UserStore interface {
@@ -55,9 +56,9 @@ type UserStore interface {
 	GetPasswordHash(userID int64) (*string, error)
 	LinkAuth(userID int64, provider, providerUserID string) error
 	FindByID(id int64) (*User, error)
-	CreateAPIKey(userID int64, name string) (string, error)
+	CreateAPIKey(userID int64, name string) (UserAPIKey, string, error)
 	ListAPIKeys(userID int64) ([]UserAPIKey, error)
-	RevokeAPIKey(userID, keyID int64) error
+	RevokeAPIKey(userID int64, keyID string) error
 	FindUserByAPIKey(plaintext string) (*User, error)
 	UpdateUserType(userID int64, userType string) error
 }
@@ -100,15 +101,19 @@ func (s *userStore) Init() error {
 
 	_, err = s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS user_api_key (
-			id         INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id    INTEGER NOT NULL REFERENCES user(id),
-			name       TEXT    NOT NULL,
-			key_hash   TEXT    NOT NULL,
-			key_prefix TEXT    NOT NULL,
-			created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			external_id TEXT,
+			user_id     INTEGER NOT NULL REFERENCES user(id),
+			name        TEXT    NOT NULL,
+			key_hash    TEXT    NOT NULL,
+			key_prefix  TEXT    NOT NULL,
+			created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 		)
 	`)
 	if err != nil {
+		return err
+	}
+	if err := s.migrateAPIKeyExternalID(); err != nil {
 		return err
 	}
 
@@ -308,36 +313,61 @@ func generateAPIKey() (string, string, error) {
 	return plaintext, hex.EncodeToString(hash[:]), nil
 }
 
-func (s *userStore) CreateAPIKey(userID int64, name string) (string, error) {
+func (s *userStore) CreateAPIKey(userID int64, name string) (UserAPIKey, string, error) {
 	plaintext, keyHash, err := generateAPIKey()
 	if err != nil {
-		return "", fmt.Errorf("CreateAPIKey generate: %w", err)
+		return UserAPIKey{}, "", fmt.Errorf("CreateAPIKey generate: %w", err)
+	}
+	externalID, err := newAPIKeyExternalID()
+	if err != nil {
+		return UserAPIKey{}, "", fmt.Errorf("CreateAPIKey external id: %w", err)
 	}
 	prefix := plaintext[:12]
-	_, err = s.db.Exec(
-		"INSERT INTO user_api_key (user_id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?)",
-		userID, name, keyHash, prefix)
+	res, err := s.db.Exec(
+		"INSERT INTO user_api_key (external_id, user_id, name, key_hash, key_prefix) VALUES (?, ?, ?, ?, ?)",
+		bareAPIKeyExternalID(externalID), userID, name, keyHash, prefix)
 	if err != nil {
-		return "", fmt.Errorf("CreateAPIKey insert: %w", err)
+		return UserAPIKey{}, "", fmt.Errorf("CreateAPIKey insert: %w", err)
 	}
-	return plaintext, nil
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return UserAPIKey{}, "", fmt.Errorf("CreateAPIKey LastInsertId: %w", err)
+	}
+
+	var key UserAPIKey
+	err = s.db.Get(&key,
+		"SELECT id, external_id, user_id, name, key_prefix, created_at FROM user_api_key WHERE id = ?",
+		id)
+	if err != nil {
+		return UserAPIKey{}, "", fmt.Errorf("CreateAPIKey select: %w", err)
+	}
+	key.ExternalID = apiKeyExternalIDFromBare(key.ExternalID)
+	return key, plaintext, nil
 }
 
 func (s *userStore) ListAPIKeys(userID int64) ([]UserAPIKey, error) {
 	var keys []UserAPIKey
 	err := s.db.Select(&keys,
-		"SELECT id, user_id, name, key_prefix, created_at FROM user_api_key WHERE user_id = ? ORDER BY created_at DESC",
+		"SELECT id, external_id, user_id, name, key_prefix, created_at FROM user_api_key WHERE user_id = ? ORDER BY created_at DESC",
 		userID)
 	if err != nil {
 		return nil, fmt.Errorf("ListAPIKeys: %w", err)
 	}
+	for i := range keys {
+		keys[i].ExternalID = apiKeyExternalIDFromBare(keys[i].ExternalID)
+	}
 	return keys, nil
 }
 
-func (s *userStore) RevokeAPIKey(userID, keyID int64) error {
+func (s *userStore) RevokeAPIKey(userID int64, keyID string) error {
+	parsed, err := parseAPIKeyExternalID(keyID)
+	if err != nil {
+		return fmt.Errorf("RevokeAPIKey: %w", err)
+	}
 	result, err := s.db.Exec(
-		"DELETE FROM user_api_key WHERE id = ? AND user_id = ?",
-		keyID, userID)
+		"DELETE FROM user_api_key WHERE external_id = ? AND user_id = ?",
+		bareAPIKeyExternalID(parsed), userID)
 	if err != nil {
 		return fmt.Errorf("RevokeAPIKey: %w", err)
 	}
@@ -347,6 +377,37 @@ func (s *userStore) RevokeAPIKey(userID, keyID int64) error {
 	}
 	if n == 0 {
 		return fmt.Errorf("api key not found")
+	}
+	return nil
+}
+
+func (s *userStore) migrateAPIKeyExternalID() error {
+	if !hasColumn(s.db, "user_api_key", "external_id") {
+		if _, err := s.db.Exec("ALTER TABLE user_api_key ADD COLUMN external_id TEXT"); err != nil {
+			return fmt.Errorf("migrate user_api_key external_id column: %w", err)
+		}
+	}
+
+	var ids []int64
+	if err := s.db.Select(&ids,
+		"SELECT id FROM user_api_key WHERE external_id IS NULL OR external_id = '' ORDER BY id"); err != nil {
+		return fmt.Errorf("migrate user_api_key external_id select: %w", err)
+	}
+
+	for _, id := range ids {
+		eid, err := newAPIKeyExternalID()
+		if err != nil {
+			return fmt.Errorf("migrate user_api_key external_id generate: %w", err)
+		}
+		if _, err := s.db.Exec("UPDATE user_api_key SET external_id = ? WHERE id = ?",
+			bareAPIKeyExternalID(eid), id); err != nil {
+			return fmt.Errorf("migrate user_api_key external_id update: %w", err)
+		}
+	}
+
+	if _, err := s.db.Exec(
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_user_api_key_external_id ON user_api_key(external_id)"); err != nil {
+		return fmt.Errorf("migrate idx_user_api_key_external_id: %w", err)
 	}
 	return nil
 }

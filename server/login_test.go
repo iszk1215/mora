@@ -1,10 +1,8 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -47,7 +45,7 @@ func NewGetRequestWithMoraSession(path string, sess *MoraSession) *http.Request 
 
 func TestLoginSuccess(t *testing.T) {
 	rm := NewMockRepositoryManager(12)
-	path := "/" + strconv.FormatInt(rm.ID(), 10)
+	path := "/" + rm.ExternalID()
 	rm.loginHandler = MockLoginMiddleware{"/"}.Handler
 	handler := createTestLoginHandler(rm)
 
@@ -92,7 +90,7 @@ func TestLoginSetsCSRFCookieSecure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rm := NewMockRepositoryManager(12)
-			path := "/" + strconv.FormatInt(rm.ID(), 10)
+			path := "/" + rm.ExternalID()
 			rm.loginHandler = MockLoginMiddleware{"/"}.Handler
 			handler := LoginHandler([]RepositoryManager{rm}, nil, tt.insecureCookie,
 				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
@@ -128,7 +126,7 @@ func TestLoginError(t *testing.T) {
 	rm := NewMockRepositoryManager(1)
 	r := createTestLoginHandler(rm)
 
-	req := NewGetRequestWithMoraSession(fmt.Sprintf("/%d", rm.ID()), NewMoraSession())
+	req := NewGetRequestWithMoraSession("/"+rm.ExternalID(), NewMoraSession())
 	got := httptest.NewRecorder()
 	r.ServeHTTP(got, req)
 	res := got.Result()
@@ -148,13 +146,25 @@ func TestLoginErrorOnUnknownRepositoryManager(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, res.StatusCode)
 }
 
+func TestLoginErrorOnLegacyNumericSCMID(t *testing.T) {
+	rm := NewMockRepositoryManager(1)
+	r := createTestLoginHandler(rm)
+
+	req := NewGetRequestWithMoraSession("/1", NewMoraSession())
+	got := httptest.NewRecorder()
+	r.ServeHTTP(got, req)
+	res := got.Result()
+
+	require.Equal(t, http.StatusNotFound, res.StatusCode)
+}
+
 func testLogout(t *testing.T, logoutAll bool) {
 	rm0 := NewMockRepositoryManager(0)
 	rm1 := NewMockRepositoryManager(1)
 
 	path := "/"
 	if !logoutAll {
-		path = "/" + strconv.FormatInt(rm0.ID(), 10)
+		path = "/" + rm0.ExternalID()
 	}
 	w := httptest.NewRecorder()
 

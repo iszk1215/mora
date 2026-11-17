@@ -8,14 +8,14 @@ import (
 )
 
 func TestGoogle_RevisionURL(t *testing.T) {
-	g, err := NewGoogle(1, "https://accounts.google.com", "clientID", "clientSecret", "https://mora.example.com/login")
+	g, err := NewGoogle(1, "scm_test", "https://accounts.google.com", "clientID", "clientSecret", "https://mora.example.com/login")
 	require.NoError(t, err)
 
 	assert.Equal(t, "", g.RevisionURL("https://mora.example.com", "abc123"))
 }
 
 func TestNewGoogle_DefaultEndpoints(t *testing.T) {
-	g, err := NewGoogle(1, "https://accounts.google.com", "clientID", "clientSecret", "https://mora.example.com/login")
+	g, err := NewGoogle(1, "scm_test", "https://accounts.google.com", "clientID", "clientSecret", "https://mora.example.com/login")
 	require.NoError(t, err)
 
 	require.NotNil(t, g.oauthHandler)
@@ -29,7 +29,7 @@ func TestNewGoogle_DefaultEndpoints(t *testing.T) {
 }
 
 func TestNewGoogle_CustomServerEndpoints(t *testing.T) {
-	g, err := NewGoogle(1, "http://localhost:4102", "clientID", "clientSecret", "https://mora.example.com/login")
+	g, err := NewGoogle(1, "scm_test", "http://localhost:4102", "clientID", "clientSecret", "https://mora.example.com/login")
 	require.NoError(t, err)
 
 	assert.Equal(t, "http://localhost:4102/o/oauth2/v2/auth", g.oauthHandler.config.Endpoint.AuthURL)

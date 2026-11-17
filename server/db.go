@@ -171,3 +171,25 @@ func localDSN(filename string) string {
 func isMemoryDSN(dsn string) bool {
 	return strings.HasPrefix(dsn, ":memory:") || strings.HasPrefix(dsn, "file::memory:")
 }
+
+func hasColumn(db *sqlx.DB, table, column string) bool {
+	rows, err := db.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return false
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var defaultValue *string
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return false
+		}
+		if name == column {
+			return true
+		}
+	}
+	return false
+}

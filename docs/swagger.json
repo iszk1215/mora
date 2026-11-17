@@ -486,7 +486,7 @@
                 "summary": "List metrics",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -516,7 +516,7 @@
                 "summary": "Create a metric",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -557,7 +557,7 @@
                 "summary": "Delete a metric",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -596,7 +596,7 @@
                 "summary": "List items",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -639,7 +639,7 @@
                 "summary": "Create an item",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -693,7 +693,7 @@
                 "summary": "Delete an item",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -745,7 +745,7 @@
                 "summary": "List values",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -789,7 +789,7 @@
                 "summary": "Add a value",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -842,7 +842,7 @@
                 "summary": "Delete all values",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "Repository ID",
                         "name": "repo_id",
                         "in": "path",
@@ -1918,7 +1918,7 @@
                 "summary": "Revoke an API key",
                 "parameters": [
                     {
-                        "type": "integer",
+                        "type": "string",
                         "description": "API key ID",
                         "name": "keyId",
                         "in": "path",
@@ -2105,16 +2105,13 @@
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
                 },
                 "namespace": {
                     "type": "string"
-                },
-                "scm_id": {
-                    "type": "integer"
                 },
                 "url": {
                     "type": "string"
@@ -2373,7 +2370,7 @@
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "key": {
                     "type": "string"
@@ -2415,7 +2412,7 @@
             "type": "object",
             "properties": {
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "logined": {
                     "type": "boolean"
@@ -2460,7 +2457,7 @@
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "key_prefix": {
                     "type": "string"
@@ -2477,7 +2474,7 @@
                     "type": "string"
                 },
                 "repo_id": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "visibility": {
                     "type": "string"

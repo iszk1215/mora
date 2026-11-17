@@ -54,7 +54,7 @@ func (c *mockListMetricsCall) Return(metrics ...MetricModel) *gomock.Call {
 }
 
 func newMockHelper(ctrl *gomock.Controller, repo core.Repository) *mockHelper {
-	base := fmt.Sprintf("/api/repos/%d/udm", repo.Id)
+	base := fmt.Sprintf("/api/repos/%s/udm", repo.ExternalID)
 	return &mockHelper{mock: NewMockAPIClient(ctrl), repo: repo, base: base}
 }
 
@@ -144,7 +144,7 @@ func (h *mockHelper) expectDeleteValues(metricId, itemId int64) *gomock.Call {
 // tests
 
 func TestCmdCreateMetric(t *testing.T) {
-	repo := core.Repository{Id: 1215, Url: "repo_url"}
+	repo := core.Repository{Id: 1215, ExternalID: "repo_00000000-0000-0000-0000-000000000121", Url: "repo_url"}
 
 	t.Run("new", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -204,7 +204,7 @@ func TestCmdCreateMetric(t *testing.T) {
 }
 
 func TestCmdListMetrics(t *testing.T) {
-	repo := core.Repository{Id: 1215, Url: "repo_url"}
+	repo := core.Repository{Id: 1215, ExternalID: "repo_00000000-0000-0000-0000-000000000121", Url: "repo_url"}
 
 	t.Run("list", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -245,7 +245,7 @@ func TestCmdListMetrics(t *testing.T) {
 }
 
 func TestCmdDeleteMetric(t *testing.T) {
-	repo := core.Repository{Id: 1215, Url: "repo_url"}
+	repo := core.Repository{Id: 1215, ExternalID: "repo_00000000-0000-0000-0000-000000000121", Url: "repo_url"}
 
 	t.Run("delete", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -267,7 +267,7 @@ func TestCmdDeleteMetric(t *testing.T) {
 }
 
 func TestCmdAddValue(t *testing.T) {
-	repo := core.Repository{Id: 1215, Url: "repo_url"}
+	repo := core.Repository{Id: 1215, ExternalID: "repo_00000000-0000-0000-0000-000000000121", Url: "repo_url"}
 
 	t.Run("add_value", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -343,7 +343,7 @@ func TestCmdAddValue(t *testing.T) {
 }
 
 func TestCmdListValues(t *testing.T) {
-	repo := core.Repository{Id: 1215, Url: "repo_url"}
+	repo := core.Repository{Id: 1215, ExternalID: "repo_00000000-0000-0000-0000-000000000121", Url: "repo_url"}
 
 	t.Run("list", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -424,7 +424,7 @@ func TestCmdListValues(t *testing.T) {
 }
 
 func TestCmdClearValues2(t *testing.T) {
-	repo := core.Repository{Id: 1215, Url: "repo_url"}
+	repo := core.Repository{Id: 1215, ExternalID: "repo_00000000-0000-0000-0000-000000000121", Url: "repo_url"}
 
 	t.Run("clear", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

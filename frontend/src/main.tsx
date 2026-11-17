@@ -137,7 +137,7 @@ export const TrackerSearchPage = (): React.JSX.Element => {
 // SCM List
 
 interface SCMData {
-  id: number
+  id: string
   url: string
   name: string
   logined: boolean

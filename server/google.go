@@ -32,7 +32,7 @@ func (g *Google) RevisionURL(baseURL string, revision string) string {
 	return ""
 }
 
-func NewGoogle(id int64, serverURL, clientID, clientSecret, redirectURL string) (*Google, error) {
+func NewGoogle(id int64, externalID, serverURL, clientID, clientSecret, redirectURL string) (*Google, error) {
 	u, err := url.Parse(serverURL)
 	if err != nil {
 		return nil, fmt.Errorf("NewGoogle: invalid URL %q: %w", serverURL, err)
@@ -50,16 +50,16 @@ func NewGoogle(id int64, serverURL, clientID, clientSecret, redirectURL string) 
 	}
 
 	google := new(Google)
-	google.Init(id, u, nil, NewOAuthHandler(oauthCfg), "google")
+	google.Init(id, externalID, u, nil, NewOAuthHandler(oauthCfg), "google")
 
 	return google, nil
 }
 
-func NewGoogleFromFile(id int64, url, filename, redirectURL string) (*Google, error) {
+func NewGoogleFromFile(id int64, externalID, url, filename, redirectURL string) (*Google, error) {
 	secret, err := readSecret(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewGoogle(id, url, secret.ClientID, secret.ClientSecret, redirectURL)
+	return NewGoogle(id, externalID, url, secret.ClientID, secret.ClientSecret, redirectURL)
 }

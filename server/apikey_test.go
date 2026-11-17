@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -136,7 +135,7 @@ func TestAPIKeyHandlerRevoke(t *testing.T) {
 	user, err := userStore.CreateUser("revokekey", "")
 	require.NoError(t, err)
 
-	plaintext, err := userStore.CreateAPIKey(user.ID, "torevoke")
+	_, plaintext, err := userStore.CreateAPIKey(user.ID, "torevoke")
 	require.NoError(t, err)
 	require.NotEmpty(t, plaintext)
 
@@ -146,7 +145,7 @@ func TestAPIKeyHandlerRevoke(t *testing.T) {
 
 	cookies := loggedInSession(t, sm, user.ID)
 
-	r := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/%d", keys[0].ID), nil)
+	r := httptest.NewRequest(http.MethodDelete, "/"+keys[0].ExternalID, nil)
 	for _, c := range cookies {
 		r.AddCookie(c)
 	}
@@ -169,7 +168,8 @@ func TestAPIKeyHandlerRevokeNotFound(t *testing.T) {
 
 	cookies := loggedInSession(t, sm, user.ID)
 
-	r := httptest.NewRequest(http.MethodDelete, "/999", nil)
+	r := httptest.NewRequest(http.MethodDelete,
+		"/key_00000000-0000-0000-0000-000000000000", nil)
 	for _, c := range cookies {
 		r.AddCookie(c)
 	}
@@ -180,10 +180,29 @@ func TestAPIKeyHandlerRevokeNotFound(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, w.Code)
 }
 
+func TestAPIKeyHandlerRevokeRejectsLegacyNumericID(t *testing.T) {
+	handler, sm, userStore := newTestAPIKeyHandler(t)
+
+	user, err := userStore.CreateUser("revokelegacy", "")
+	require.NoError(t, err)
+
+	cookies := loggedInSession(t, sm, user.ID)
+
+	r := httptest.NewRequest(http.MethodDelete, "/1", nil)
+	for _, c := range cookies {
+		r.AddCookie(c)
+	}
+	r.Header.Set("X-CSRF-Token", testCSRFToken)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	require.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestAPIKeyHandlerRevokeRequiresAuth(t *testing.T) {
 	handler, _, _ := newTestAPIKeyHandler(t)
 
-	r := httptest.NewRequest(http.MethodDelete, "/1", nil)
+	r := httptest.NewRequest(http.MethodDelete, "/key_00000000-0000-0000-0000-000000000000", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 	require.Equal(t, http.StatusForbidden, w.Code)

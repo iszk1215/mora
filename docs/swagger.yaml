@@ -8,13 +8,11 @@ definitions:
   core.Repository:
     properties:
       id:
-        type: integer
+        type: string
       name:
         type: string
       namespace:
         type: string
-      scm_id:
-        type: integer
       url:
         type: string
     type: object
@@ -182,7 +180,7 @@ definitions:
       created_at:
         type: string
       id:
-        type: integer
+        type: string
       key:
         type: string
       key_prefix:
@@ -209,7 +207,7 @@ definitions:
   server.RepositoryManagerResponse:
     properties:
       id:
-        type: integer
+        type: string
       logined:
         type: boolean
       name:
@@ -238,7 +236,7 @@ definitions:
       created_at:
         type: string
       id:
-        type: integer
+        type: string
       key_prefix:
         type: string
       name:
@@ -249,7 +247,7 @@ definitions:
       name:
         type: string
       repo_id:
-        type: integer
+        type: string
       visibility:
         type: string
     type: object
@@ -854,7 +852,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -874,7 +872,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       - description: Metric information
         in: body
         name: body
@@ -903,7 +901,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       - description: Metric ID
         in: path
         name: metricId
@@ -927,7 +925,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       - description: Metric ID
         in: path
         name: metricId
@@ -956,7 +954,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       - description: Metric ID
         in: path
         name: metricId
@@ -994,7 +992,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       - description: Metric ID
         in: path
         name: metricId
@@ -1027,7 +1025,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       - description: Metric ID
         in: path
         name: metricId
@@ -1055,7 +1053,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       - description: Metric ID
         in: path
         name: metricId
@@ -1085,7 +1083,7 @@ paths:
         in: path
         name: repo_id
         required: true
-        type: integer
+        type: string
       - description: Metric ID
         in: path
         name: metricId
@@ -1821,7 +1819,7 @@ paths:
         in: path
         name: keyId
         required: true
-        type: integer
+        type: string
       responses:
         "204":
           description: No Content

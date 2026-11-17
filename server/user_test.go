@@ -196,13 +196,39 @@ func TestUserStore_CreateUser_EmptyAvatar(t *testing.T) {
 	require.Equal(t, "", user.AvatarURL)
 }
 
+func TestUserStore_Init_MigratesAPIKeyExternalID(t *testing.T) {
+	db := openTestDB(t)
+	db.MustExec(`CREATE TABLE user_api_key (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		name TEXT NOT NULL,
+		key_hash TEXT NOT NULL,
+		key_prefix TEXT NOT NULL,
+		created_at TEXT NOT NULL DEFAULT (datetime('now'))
+	)`)
+	db.MustExec(`INSERT INTO user_api_key (user_id, name, key_hash, key_prefix)
+		VALUES (1, 'legacy', 'hash', 'mora_legacy')`)
+
+	store := NewUserStore(db)
+	require.NoError(t, store.Init())
+
+	keys, err := store.ListAPIKeys(1)
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	require.True(t, strings.HasPrefix(keys[0].ExternalID, apiKeyExternalIDPrefix))
+	_, err = parseAPIKeyExternalID(keys[0].ExternalID)
+	require.NoError(t, err)
+
+	require.NoError(t, store.Init())
+}
+
 func TestUserStore_CreateAPIKey(t *testing.T) {
 	store := newTestUserStore(t)
 
 	user, err := store.CreateUser("apikeyuser", "")
 	require.NoError(t, err)
 
-	plaintext, err := store.CreateAPIKey(user.ID, "test key")
+	_, plaintext, err := store.CreateAPIKey(user.ID, "test key")
 	require.NoError(t, err)
 	require.Contains(t, plaintext, "mora_")
 	require.Len(t, plaintext, 69) // "mora_" (5) + 64 hex chars
@@ -214,7 +240,7 @@ func TestUserStore_CreateAPIKey_InvalidName(t *testing.T) {
 	user, err := store.CreateUser("apikeyuser2", "")
 	require.NoError(t, err)
 
-	_, err = store.CreateAPIKey(user.ID, "")
+	_, _, err = store.CreateAPIKey(user.ID, "")
 	require.NoError(t, err) // empty name is allowed at DB level
 }
 
@@ -228,9 +254,9 @@ func TestUserStore_ListAPIKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, keys)
 
-	_, err = store.CreateAPIKey(user.ID, "key1")
+	_, _, err = store.CreateAPIKey(user.ID, "key1")
 	require.NoError(t, err)
-	_, err = store.CreateAPIKey(user.ID, "key2")
+	_, _, err = store.CreateAPIKey(user.ID, "key2")
 	require.NoError(t, err)
 
 	keys, err = store.ListAPIKeys(user.ID)
@@ -252,7 +278,7 @@ func TestUserStore_ListAPIKeys_OtherUser(t *testing.T) {
 	user2, err := store.CreateUser("user2", "")
 	require.NoError(t, err)
 
-	_, err = store.CreateAPIKey(user1.ID, "user1key")
+	_, _, err = store.CreateAPIKey(user1.ID, "user1key")
 	require.NoError(t, err)
 
 	keys, err := store.ListAPIKeys(user2.ID)
@@ -266,14 +292,14 @@ func TestUserStore_RevokeAPIKey(t *testing.T) {
 	user, err := store.CreateUser("revokekeyuser", "")
 	require.NoError(t, err)
 
-	_, err = store.CreateAPIKey(user.ID, "torevoke")
+	_, _, err = store.CreateAPIKey(user.ID, "torevoke")
 	require.NoError(t, err)
 
 	keys, err := store.ListAPIKeys(user.ID)
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 
-	err = store.RevokeAPIKey(user.ID, keys[0].ID)
+	err = store.RevokeAPIKey(user.ID, keys[0].ExternalID)
 	require.NoError(t, err)
 
 	keys, err = store.ListAPIKeys(user.ID)
@@ -287,7 +313,7 @@ func TestUserStore_RevokeAPIKey_NotFound(t *testing.T) {
 	user, err := store.CreateUser("revokenotfound", "")
 	require.NoError(t, err)
 
-	err = store.RevokeAPIKey(user.ID, 999)
+	err = store.RevokeAPIKey(user.ID, "key_00000000-0000-0000-0000-000000000000")
 	require.Error(t, err)
 }
 
@@ -299,14 +325,14 @@ func TestUserStore_RevokeAPIKey_WrongUser(t *testing.T) {
 	user2, err := store.CreateUser("user2", "")
 	require.NoError(t, err)
 
-	_, err = store.CreateAPIKey(user1.ID, "key1")
+	_, _, err = store.CreateAPIKey(user1.ID, "key1")
 	require.NoError(t, err)
 
 	keys, err := store.ListAPIKeys(user1.ID)
 	require.NoError(t, err)
 	require.Len(t, keys, 1)
 
-	err = store.RevokeAPIKey(user2.ID, keys[0].ID)
+	err = store.RevokeAPIKey(user2.ID, keys[0].ExternalID)
 	require.Error(t, err)
 }
 
@@ -316,7 +342,7 @@ func TestUserStore_FindUserByAPIKey(t *testing.T) {
 	user, err := store.CreateUser("findkeyuser", "")
 	require.NoError(t, err)
 
-	plaintext, err := store.CreateAPIKey(user.ID, "findme")
+	_, plaintext, err := store.CreateAPIKey(user.ID, "findme")
 	require.NoError(t, err)
 
 	found, err := store.FindUserByAPIKey(plaintext)
@@ -347,7 +373,7 @@ func TestUserStore_FindUserByAPIKey_WrongUserKey(t *testing.T) {
 	_, err = store.CreateUser("user2", "")
 	require.NoError(t, err)
 
-	pk, err := store.CreateAPIKey(user1.ID, "key1")
+	_, pk, err := store.CreateAPIKey(user1.ID, "key1")
 	require.NoError(t, err)
 
 	found, err := store.FindUserByAPIKey(pk)

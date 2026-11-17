@@ -36,9 +36,9 @@ describe('loadUdmMetrics', () => {
       json: () => Promise.resolve({ repo: {}, metrics: mockMetrics }),
     } as Response)
 
-    const result = await loadUdmMetrics(1)
+    const result = await loadUdmMetrics('repo_1')
     expect(result).toEqual(mockMetrics)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/repos/1/udm/metrics')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/repos/repo_1/udm/metrics')
   })
 
   it('throws on non-ok response', async () => {
@@ -47,7 +47,7 @@ describe('loadUdmMetrics', () => {
       status: 500,
     } as Response)
 
-    await expect(loadUdmMetrics(1)).rejects.toBeDefined()
+    await expect(loadUdmMetrics('repo_1')).rejects.toBeDefined()
   })
 })
 
@@ -119,9 +119,9 @@ describe('loadMetricValues', () => {
       json: () => Promise.resolve({ item: {}, values: mockValues }),
     } as Response)
 
-    const result = await loadMetricValues(1, 2, 3)
+    const result = await loadMetricValues('repo_1', 2, 3)
     expect(result.values).toEqual(mockValues)
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/repos/1/udm/metrics/2/items/3/values')
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/repos/repo_1/udm/metrics/2/items/3/values')
   })
 
   it('throws on non-ok response', async () => {
@@ -130,7 +130,7 @@ describe('loadMetricValues', () => {
       status: 500,
     } as Response)
 
-    await expect(loadMetricValues(1, 2, 3)).rejects.toBeDefined()
+    await expect(loadMetricValues('repo_1', 2, 3)).rejects.toBeDefined()
   })
 })
 
