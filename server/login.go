@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/iszk1215/mora/render"
@@ -100,9 +99,11 @@ func LoginHandler(repositoryManagers []RepositoryManager, userStore UserStore, i
 	r := chi.NewRouter()
 
 	handlers := map[int64]http.Handler{}
+	externalIDs := map[string]int64{}
 
 	for _, rm := range repositoryManagers {
 		handlers[rm.ID()] = createLoginHandler(rm, userStore, insecureCookie, next)
+		externalIDs[rm.ExternalID()] = rm.ID()
 	}
 
 	// redirect from scm
@@ -132,23 +133,25 @@ func LoginHandler(repositoryManagers []RepositoryManager, userStore UserStore, i
 	})
 
 	r.Get("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
-		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
+		externalID, err := parseSCMExternalID(chi.URLParam(r, "scm_id"))
 		if err != nil {
 			log.Err(err).Msg("invalid scm_id in login URL")
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
 
-		sess, _ := MoraSessionFrom(r.Context())
-		if sess != nil {
-			sess.setLoggingInto(rm_id)
-		}
-
-		handler, ok := handlers[rm_id]
+		rmID, ok := externalIDs[externalID]
 		if !ok {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
+
+		sess, _ := MoraSessionFrom(r.Context())
+		if sess != nil {
+			sess.setLoggingInto(rmID)
+		}
+
+		handler := handlers[rmID]
 		handler.ServeHTTP(w, r)
 	})
 
@@ -157,6 +160,11 @@ func LoginHandler(repositoryManagers []RepositoryManager, userStore UserStore, i
 
 func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) http.Handler {
 	r := chi.NewRouter()
+
+	externalIDs := map[string]int64{}
+	for _, rm := range repositoryManagers {
+		externalIDs[rm.ExternalID()] = rm.ID()
+	}
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		defer func() { _ = r.Body.Close() }()
@@ -180,9 +188,14 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 
 	r.Post("/{scm_id}", func(w http.ResponseWriter, r *http.Request) {
 		defer func() { _ = r.Body.Close() }()
-		rm_id, err := strconv.ParseInt(chi.URLParam(r, "scm_id"), 10, 64)
+		externalID, err := parseSCMExternalID(chi.URLParam(r, "scm_id"))
 		if err != nil {
 			log.Err(err).Msg("invalid scm_id in logout URL")
+			render.NotFound(w, render.ErrNotFound)
+			return
+		}
+		rmID, ok := externalIDs[externalID]
+		if !ok {
 			render.NotFound(w, render.ErrNotFound)
 			return
 		}
@@ -197,7 +210,7 @@ func LogoutHandler(repositoryManagers []RepositoryManager, next http.Handler) ht
 			render.Forbidden(w, render.ErrForbidden)
 			return
 		}
-		s.Remove(rm_id)
+		s.Remove(rmID)
 		s.ClearUserID()
 		next.ServeHTTP(w, r)
 	})

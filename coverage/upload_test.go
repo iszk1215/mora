@@ -151,7 +151,8 @@ func TestFindRepositoryByURL(t *testing.T) {
 		assert.Equal(t, "/api/repos", r.URL.Path)
 		assert.Equal(t, "Bearer mytoken", r.Header.Get("Authorization"))
 		repos := []core.Repository{
-			{Id: 1, Url: "http://example.com/repo", Namespace: "owner", Name: "repo"},
+			{Id: 1, ExternalID: "repo_00000000-0000-0000-0000-000000000001",
+				Url: "http://example.com/repo", Namespace: "owner", Name: "repo"},
 		}
 		require.NoError(t, json.NewEncoder(w).Encode(repos))
 	}))
@@ -163,7 +164,7 @@ func TestFindRepositoryByURL(t *testing.T) {
 	repo, err := findRepositoryByURL(srv.URL, "http://example.com/repo", httpClient)
 	require.NoError(t, err)
 	require.NotNil(t, repo)
-	assert.Equal(t, int64(1), repo.Id)
+	assert.Equal(t, "repo_00000000-0000-0000-0000-000000000001", repo.ExternalID)
 }
 
 func TestFindRepositoryByURL_NotFound(t *testing.T) {

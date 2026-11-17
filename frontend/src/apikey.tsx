@@ -11,14 +11,14 @@ import {
 } from '@/components/ui/table'
 
 interface APIKeyData {
-  id: number
+  id: string
   name: string
   key_prefix: string
   created_at: string
 }
 
 interface APIKeyCreateResponse {
-  id: number
+  id: string
   name: string
   key: string
   key_prefix: string
@@ -49,7 +49,7 @@ async function createAPIKey(name: string): Promise<APIKeyCreateResponse> {
   return resp.json()
 }
 
-async function revokeAPIKey(id: number): Promise<void> {
+async function revokeAPIKey(id: string): Promise<void> {
   const resp = await fetch(`/api/user/me/api-keys/${id}`, {
     method: 'DELETE',
     headers: {
@@ -68,7 +68,7 @@ export const APIKeyPage = (): React.JSX.Element => {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [createdKey, setCreatedKey] = useState<string | null>(null)
-  const [revokingId, setRevokingId] = useState<number | null>(null)
+  const [revokingId, setRevokingId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false;
@@ -103,7 +103,7 @@ export const APIKeyPage = (): React.JSX.Element => {
     }
   }
 
-  const handleRevoke = async (id: number) => {
+  const handleRevoke = async (id: string) => {
     setRevokingId(id)
     try {
       await revokeAPIKey(id)

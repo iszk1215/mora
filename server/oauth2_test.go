@@ -165,7 +165,7 @@ func TestBaseRepositoryManager_LoginHandler(t *testing.T) {
 		AuthURL: "https://example.com/auth", TokenURL: "https://example.com/token",
 	})
 	var b BaseRepositoryManager
-	b.Init(1, nil, nil, h, "test")
+	b.Init(1, "scm_test", nil, nil, h, "test")
 
 	handler := b.LoginHandler(next)
 

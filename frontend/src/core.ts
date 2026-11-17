@@ -1,5 +1,5 @@
 export interface Repo {
-  id: number
+  id: string
   url: string
   namespace: string
   name: string

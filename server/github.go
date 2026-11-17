@@ -17,7 +17,7 @@ func (g *Github) RevisionURL(baseURL string, revision string) string {
 	return baseURL + "/tree/" + revision
 }
 
-func NewGithub(id int64, urlstr string, clientID, clientSecret, redirectURL string) (*Github, error) {
+func NewGithub(id int64, externalID, urlstr string, clientID, clientSecret, redirectURL string) (*Github, error) {
 	u, err := url.Parse(urlstr)
 	if err != nil {
 		return nil, fmt.Errorf("NewGithub: invalid URL %q: %w", urlstr, err)
@@ -33,7 +33,7 @@ func NewGithub(id int64, urlstr string, clientID, clientSecret, redirectURL stri
 	}
 
 	github := new(Github)
-	github.Init(id, u, driver.NewDefault(), NewOAuthHandler(oauthCfg), "github")
+	github.Init(id, externalID, u, driver.NewDefault(), NewOAuthHandler(oauthCfg), "github")
 
 	github.SetupTransport(
 		&oauth2.Refresher{
@@ -49,11 +49,11 @@ func NewGithub(id int64, urlstr string, clientID, clientSecret, redirectURL stri
 	return github, nil
 }
 
-func NewGithubFromFile(id int64, url, filename, redirectURL string) (*Github, error) {
+func NewGithubFromFile(id int64, externalID, url, filename, redirectURL string) (*Github, error) {
 	secret, err := readSecret(filename)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewGithub(id, url, secret.ClientID, secret.ClientSecret, redirectURL)
+	return NewGithub(id, externalID, url, secret.ClientID, secret.ClientSecret, redirectURL)
 }

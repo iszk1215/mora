@@ -32,7 +32,7 @@ func unpackMetricName(name string) (string, string, error) {
 // ----------------------------------------------------------------------
 // udmCommand: utils
 
-func (c *udmCommand) resolveMetricByName(repoId int64, name string) (*MetricModel, error) {
+func (c *udmCommand) resolveMetricByName(repoId string, name string) (*MetricModel, error) {
 	metrics, err := c.client.listMetrics(repoId)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (c *udmCommand) resolveMetricByName(repoId int64, name string) (*MetricMode
 	return nil, errorMetricNotFound
 }
 
-func (c *udmCommand) resolveItemByName(repoId int64, metricId int64, name string) (*ItemModel, error) {
+func (c *udmCommand) resolveItemByName(repoId string, metricId int64, name string) (*ItemModel, error) {
 	items, err := c.client.listItems(repoId, metricId)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (c *udmCommand) resolveItemByName(repoId int64, metricId int64, name string
 	return nil, errorItemNotFound
 }
 
-func (c *udmCommand) resolveMetric(repoId int64, name string) (*MetricModel, *ItemModel, error) {
+func (c *udmCommand) resolveMetric(repoId string, name string) (*MetricModel, *ItemModel, error) {
 	metricName, itemName, err := unpackMetricName(name)
 	if err != nil {
 		return nil, nil, err
@@ -78,7 +78,7 @@ func (c *udmCommand) resolveMetric(repoId int64, name string) (*MetricModel, *It
 	return metric, item, err
 }
 
-func (c *udmCommand) resolveMetricAndItemByName(repoId int64, metricName, itemName string) (*MetricModel, *ItemModel, error) {
+func (c *udmCommand) resolveMetricAndItemByName(repoId string, metricName, itemName string) (*MetricModel, *ItemModel, error) {
 	metric, err := c.resolveMetricByName(repoId, metricName)
 	if err != nil {
 		return nil, nil, err
@@ -89,23 +89,23 @@ func (c *udmCommand) resolveMetricAndItemByName(repoId int64, metricName, itemNa
 	return metric, item, err
 }
 
-func (c *udmCommand) getRepoId(repoUrl string) (int64, error) {
+func (c *udmCommand) getRepoExternalID(repoUrl string) (string, error) {
 	repos, err := c.client.listRepositories()
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	for _, repo := range repos {
 		// log.Print("url=", repo.Url)
 		if repo.Url == repoUrl {
-			return repo.Id, nil
+			return repo.ExternalID, nil
 		}
 	}
 
-	return 0, errorRepositoryNotFound
+	return "", errorRepositoryNotFound
 }
 
-func (c *udmCommand) createMetric(repoId int64, metricName, itemName string, typ ValueType) error {
+func (c *udmCommand) createMetric(repoId string, metricName, itemName string, typ ValueType) error {
 	metric, err := c.resolveMetricByName(repoId, metricName)
 	if err == errorMetricNotFound {
 		log.Print("udmCommand.createMetric: creating metric: ", metricName)
@@ -128,7 +128,7 @@ func (c *udmCommand) createMetric(repoId int64, metricName, itemName string, typ
 	return c.client.addItem(repoId, &item)
 }
 
-func (c *udmCommand) deleteMetric(repoId int64, name string) error {
+func (c *udmCommand) deleteMetric(repoId string, name string) error {
 	log.Print("udmCommand.deleteMetric: name=", name)
 	metric, item, err := c.resolveMetric(repoId, name)
 	if err != nil {
@@ -138,7 +138,7 @@ func (c *udmCommand) deleteMetric(repoId int64, name string) error {
 	return c.client.deleteItem(repoId, metric.Id, item.Id)
 }
 
-func (c *udmCommand) listMetrics(repoId int64) error {
+func (c *udmCommand) listMetrics(repoId string) error {
 	metrics, err := c.client.listMetrics(repoId)
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func (c *udmCommand) listMetrics(repoId int64) error {
 // Value
 
 func (c *udmCommand) addValue(
-	repoId int64, name string, timestamp time.Time, value string) error {
+	repoId string, name string, timestamp time.Time, value string) error {
 
 	metric, item, err := c.resolveMetric(repoId, name)
 	if err != nil {
@@ -186,7 +186,7 @@ func (c *udmCommand) addValue(
 	return c.client.addValue(repoId, metric.Id, val)
 }
 
-func (c *udmCommand) listValues(repoId int64, metricName, itemName string) error {
+func (c *udmCommand) listValues(repoId string, metricName, itemName string) error {
 	metric, item, err := c.resolveMetricAndItemByName(repoId, metricName, itemName)
 	if err != nil {
 		return err
@@ -204,7 +204,7 @@ func (c *udmCommand) listValues(repoId int64, metricName, itemName string) error
 	return nil
 }
 
-func (c *udmCommand) deleteValues(repoId int64, name string) error {
+func (c *udmCommand) deleteValues(repoId string, name string) error {
 	metric, item, err := c.resolveMetric(repoId, name)
 	if err != nil {
 		return err
@@ -309,7 +309,7 @@ func (c *udmCommand) runMetricCommand(cmd *cobra.Command, args []string) error {
 
 		cmd.SilenceUsage = true
 
-		repoId, err := c.getRepoId(c.config.RepositoryURL)
+		repoId, err := c.getRepoExternalID(c.config.RepositoryURL)
 		if err != nil {
 			return err
 		}
@@ -319,7 +319,7 @@ func (c *udmCommand) runMetricCommand(cmd *cobra.Command, args []string) error {
 			return errors.New("no metric name given")
 		}
 		cmd.SilenceUsage = true
-		repoId, err := c.getRepoId(c.config.RepositoryURL)
+		repoId, err := c.getRepoExternalID(c.config.RepositoryURL)
 		if err != nil {
 			return err
 		}
@@ -330,7 +330,7 @@ func (c *udmCommand) runMetricCommand(cmd *cobra.Command, args []string) error {
 		}
 
 		cmd.SilenceUsage = true
-		repoId, err := c.getRepoId(c.config.RepositoryURL)
+		repoId, err := c.getRepoExternalID(c.config.RepositoryURL)
 		if err != nil {
 			return err
 		}
@@ -363,7 +363,7 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
 			return errors.New("no metric name given")
 		}
-		repoId, err := c.getRepoId(c.config.RepositoryURL)
+		repoId, err := c.getRepoExternalID(c.config.RepositoryURL)
 		if err != nil {
 			return err
 		}
@@ -388,7 +388,7 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		repoId, err := c.getRepoId(c.config.RepositoryURL)
+		repoId, err := c.getRepoExternalID(c.config.RepositoryURL)
 		if err != nil {
 			return err
 		}
@@ -405,7 +405,7 @@ func (c *udmCommand) runValueCommand(cmd *cobra.Command, args []string) error {
 
 		cmd.SilenceUsage = true
 
-		repoId, err := c.getRepoId(c.config.RepositoryURL)
+		repoId, err := c.getRepoExternalID(c.config.RepositoryURL)
 		if err != nil {
 			return err
 		}

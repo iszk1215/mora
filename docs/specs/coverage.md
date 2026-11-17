@@ -57,14 +57,14 @@ Creates a coverage-type tracker and links it to a repository. Requires authentic
 Request:
 
 ```json
-{ "name": "string", "visibility": "public|private", "repo_id": 1 }
+{ "name": "string", "visibility": "public|private", "repo_id": "repo_<uuidv7>" }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | yes | Tracker name (user-supplied) |
 | `visibility` | "public" \| "private" | yes | Access control |
-| `repo_id` | number | yes | Repository ID to link |
+| `repo_id` | string | yes | Repository external ID to link (`repo_<uuidv7>`; invalid format -> 400, unknown -> 404) |
 
 Responses:
 

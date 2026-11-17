@@ -26,9 +26,9 @@ type (
 	}
 
 	ItemModel struct {
-		Id        int64    `json:"id"        db:"id"`
-		MetricId  int64    `json:"metric_id" db:"metric_id"`
-		Name      string   `json:"name"      db:"name"`
+		Id        int64     `json:"id"        db:"id"`
+		MetricId  int64     `json:"metric_id" db:"metric_id"`
+		Name      string    `json:"name"      db:"name"`
 		ValueType ValueType `json:"type"      db:"type"`
 	}
 
@@ -95,7 +95,7 @@ func renderNoContent(w http.ResponseWriter) {
 // @Tags         udm
 // @Accept       json
 // @Produce      json
-// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        repo_id  path  string  true  "Repository ID"
 // @Param        body     body  udm.MetricModel  true  "Metric information"
 // @Success      201  {object}  udm.MetricModel
 // @Failure      400  {object}  core.ErrorResponse
@@ -139,7 +139,7 @@ func (h *udmHandler) createMetric(w http.ResponseWriter, r *http.Request) {
 // @Description  Return all UDM metrics for the repository
 // @Tags         udm
 // @Produce      json
-// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        repo_id  path  string  true  "Repository ID"
 // @Success      200  {object}  udm.ListMetricsResponse
 // @Router       /api/repos/{repo_id}/udm/metrics [get]
 func (h *udmHandler) listMetrics(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +163,7 @@ func (h *udmHandler) listMetrics(w http.ResponseWriter, r *http.Request) {
 // @Summary      Delete a metric
 // @Description  Delete a UDM metric and its items
 // @Tags         udm
-// @Param        repo_id   path  int  true  "Repository ID"
+// @Param        repo_id   path  string  true  "Repository ID"
 // @Param        metricId  path  int  true  "Metric ID"
 // @Success      204
 // @Failure      404  {object}  core.ErrorResponse
@@ -189,7 +189,7 @@ func (h *udmHandler) deleteMetric(w http.ResponseWriter, r *http.Request) {
 // @Tags         udm
 // @Accept       json
 // @Produce      json
-// @Param        repo_id   path  int  true  "Repository ID"
+// @Param        repo_id   path  string  true  "Repository ID"
 // @Param        metricId  path  int  true  "Metric ID"
 // @Param        body      body  udm.ItemModel  true  "Item information"
 // @Success      201  {object}  udm.ItemModel
@@ -239,7 +239,7 @@ func (h *udmHandler) createItem(w http.ResponseWriter, r *http.Request) {
 // @Description  Return all UDM items for a metric
 // @Tags         udm
 // @Produce      json
-// @Param        repo_id   path  int  true  "Repository ID"
+// @Param        repo_id   path  string  true  "Repository ID"
 // @Param        metricId  path  int  true  "Metric ID"
 // @Success      200  {object}  udm.ListItemsResponse
 // @Failure      404  {object}  core.ErrorResponse
@@ -270,7 +270,7 @@ func (h *udmHandler) listItems(w http.ResponseWriter, r *http.Request) {
 // @Summary      Delete an item
 // @Description  Delete a UDM item and its values
 // @Tags         udm
-// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        repo_id  path  string  true  "Repository ID"
 // @Param        metricId  path  int  true  "Metric ID"
 // @Param        itemId    path  int  true  "Item ID"
 // @Success      204
@@ -302,7 +302,7 @@ func (h *udmHandler) deleteItem(w http.ResponseWriter, r *http.Request) {
 // @Tags         udm
 // @Accept       json
 // @Produce      json
-// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        repo_id  path  string  true  "Repository ID"
 // @Param        metricId  path  int  true  "Metric ID"
 // @Param        itemId    path  int  true  "Item ID"
 // @Param        body      body  udm.ValueModel  true  "Value information"
@@ -346,7 +346,7 @@ func (h *udmHandler) createValue(w http.ResponseWriter, r *http.Request) {
 // @Description  Return all values for a UDM item
 // @Tags         udm
 // @Produce      json
-// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        repo_id  path  string  true  "Repository ID"
 // @Param        metricId  path  int  true  "Metric ID"
 // @Param        itemId    path  int  true  "Item ID"
 // @Success      200  {object}  udm.ListValuesResponse
@@ -375,7 +375,7 @@ func (h *udmHandler) listValues(w http.ResponseWriter, r *http.Request) {
 // @Summary      Delete all values
 // @Description  Delete all values for a UDM item
 // @Tags         udm
-// @Param        repo_id  path  int  true  "Repository ID"
+// @Param        repo_id  path  string  true  "Repository ID"
 // @Param        metricId  path  int  true  "Metric ID"
 // @Param        itemId    path  int  true  "Item ID"
 // @Success      204

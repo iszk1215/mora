@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -32,6 +33,9 @@ func TestRepoStore_Put(t *testing.T) {
 	err := s.Put(repo)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), repo.Id)
+	require.NotEmpty(t, repo.ExternalID)
+	_, err = parseRepositoryExternalID(repo.ExternalID)
+	require.NoError(t, err)
 }
 
 func TestRepoStore_Put_DuplicateURL(t *testing.T) {
@@ -104,6 +108,31 @@ func TestRepoStore_FindURL_NotFound(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestRepoStore_FindByExternalID(t *testing.T) {
+	s := setupRepoStore(t)
+
+	repo := &Repository{
+		RepositoryManager: 1,
+		Namespace:         "owner",
+		Name:              "repo",
+		Url:               "https://scm.com/owner/repo",
+	}
+	err := s.Put(repo)
+	require.NoError(t, err)
+
+	got, err := s.FindByExternalID(repo.ExternalID)
+	require.NoError(t, err)
+	require.Equal(t, *repo, got)
+}
+
+func TestRepoStore_FindByExternalID_NotFound(t *testing.T) {
+	s := setupRepoStore(t)
+
+	_, err := s.FindByExternalID(
+		"repo_00000000-0000-0000-0000-000000000000")
+	require.Error(t, err)
+}
+
 func TestRepoStore_ListAll(t *testing.T) {
 	s := setupRepoStore(t)
 
@@ -135,6 +164,31 @@ func TestRepoStore_ListAll_Empty(t *testing.T) {
 	got, err := s.ListAll()
 	require.NoError(t, err)
 	require.Empty(t, got)
+}
+
+func TestRepoStore_Init_MigratesExternalID(t *testing.T) {
+	db := openTestDB(t)
+	db.MustExec(`CREATE TABLE repository (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		scm INTEGER NOT NULL,
+		namespace TEXT NOT NULL,
+		name TEXT NOT NULL,
+		url TEXT NOT NULL UNIQUE,
+		UNIQUE(scm, namespace, name)
+	)`)
+	db.MustExec(`INSERT INTO repository (scm, namespace, name, url)
+		VALUES (1, 'owner', 'repo', 'https://scm.com/owner/repo')`)
+
+	s := NewRepositoryStore(db)
+	require.NoError(t, s.Init())
+
+	repo, err := s.Find(1)
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(repo.ExternalID, repositoryExternalIDPrefix))
+	_, err = parseRepositoryExternalID(repo.ExternalID)
+	require.NoError(t, err)
+
+	require.NoError(t, s.Init())
 }
 
 func TestRepoStore_Init_DBError(t *testing.T) {

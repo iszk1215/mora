@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -17,7 +16,7 @@ type CreateAPIKeyRequest struct {
 }
 
 type CreateAPIKeyResponse struct {
-	ID        int64     `json:"id"`
+	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	Key       string    `json:"key"`
 	KeyPrefix string    `json:"key_prefix"`
@@ -93,24 +92,15 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 			return
 		}
 
-		plaintext, err := userStore.CreateAPIKey(*sess.UserID(), req.Name)
+		created, plaintext, err := userStore.CreateAPIKey(*sess.UserID(), req.Name)
 		if err != nil {
 			log.Error().Err(err).Msg("APIKeyHandler create")
 			render.InternalError(w, err)
 			return
 		}
 
-		// Fetch the created key to get ID and timestamps
-		keys, err := userStore.ListAPIKeys(*sess.UserID())
-		if err != nil || len(keys) == 0 {
-			log.Error().Err(err).Msg("APIKeyHandler list after create")
-			render.InternalError(w, err)
-			return
-		}
-
-		created := keys[0]
 		resp := CreateAPIKeyResponse{
-			ID:        created.ID,
+			ID:        created.ExternalID,
 			Name:      created.Name,
 			Key:       plaintext,
 			KeyPrefix: created.KeyPrefix,
@@ -124,7 +114,7 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 		// @Summary      Revoke an API key
 		// @Description  Revoke an API key by ID
 		// @Tags         user
-		// @Param        keyId  path  int  true  "API key ID"
+		// @Param        keyId  path  string  true  "API key ID"
 		// @Success      204
 		// @Failure      400  {object}  core.ErrorResponse
 		// @Failure      401  {object}  core.ErrorResponse
@@ -142,7 +132,7 @@ func APIKeyHandler(userStore UserStore) http.Handler {
 			return
 		}
 
-		keyID, err := strconv.ParseInt(chi.URLParam(r, "keyId"), 10, 64)
+		keyID, err := parseAPIKeyExternalID(chi.URLParam(r, "keyId"))
 		if err != nil {
 			render.BadRequest(w, errors.New("invalid key id"))
 			return

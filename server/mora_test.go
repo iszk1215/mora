@@ -16,6 +16,7 @@ import (
 
 type MockRepositoryManager struct {
 	id           int64
+	externalID   string
 	url          *url.URL
 	loginHandler func(http.Handler) http.Handler
 	client       *scm.Client
@@ -24,6 +25,10 @@ type MockRepositoryManager struct {
 
 func (m *MockRepositoryManager) ID() int64 {
 	return m.id
+}
+
+func (m *MockRepositoryManager) ExternalID() string {
+	return m.externalID
 }
 
 func (m *MockRepositoryManager) Client() *scm.Client {
@@ -48,7 +53,11 @@ func (m *MockRepositoryManager) Driver() string {
 }
 
 func NewMockRepositoryManager(id int64) *MockRepositoryManager {
-	m := &MockRepositoryManager{id: id, driver: "mock"}
+	externalID, err := newSCMExternalID()
+	if err != nil {
+		panic(err)
+	}
+	m := &MockRepositoryManager{id: id, externalID: externalID, driver: "mock"}
 	m.url, _ = url.Parse(strings.Join([]string{"https://mock.scm"}, ""))
 
 	m.client = &scm.Client{}

@@ -94,7 +94,14 @@ func requireEqualRepoList(t *testing.T, want []Repository, res *http.Response) {
 	var got []Repository
 	err = json.Unmarshal(body, &got)
 	require.NoError(t, err)
-	require.Equal(t, want, got)
+
+	public := make([]Repository, len(want))
+	copy(public, want)
+	for i := range public {
+		public[i].Id = 0
+		public[i].RepositoryManager = 0
+	}
+	require.Equal(t, public, got)
 }
 
 // seedTestUserTable creates a minimal user table with the admin user for
@@ -245,7 +252,7 @@ func Test_injectRepo(t *testing.T) {
 
 	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithRepo(&repo).Finish()
 
-	valid_path := fmt.Sprintf("/%d", repo.Id)
+	valid_path := "/" + repo.ExternalID
 
 	callInjectRepo := func(req *http.Request) (int, Repository) {
 		var repo Repository
@@ -275,7 +282,7 @@ func Test_injectRepo(t *testing.T) {
 	})
 
 	t.Run("invalid repo id", func(t *testing.T) {
-		path := fmt.Sprintf("/%d", repo.Id+1)
+		path := "/repo_00000000-0000-0000-0000-000000000000"
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		sess := NewMoraSessionWithTokenFor(rm)
 		req = req.WithContext(WithMoraSession(req.Context(), sess))
@@ -295,6 +302,15 @@ func Test_injectRepo(t *testing.T) {
 
 	t.Run("invalid path", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/abc", nil)
+		sess := NewMoraSessionWithTokenFor(rm)
+		req = req.WithContext(WithMoraSession(req.Context(), sess))
+
+		status, _ := callInjectRepo(req)
+		require.Equal(t, http.StatusBadRequest, status)
+	})
+
+	t.Run("legacy numeric repo id", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/1", nil)
 		sess := NewMoraSessionWithTokenFor(rm)
 		req = req.WithContext(WithMoraSession(req.Context(), sess))
 
@@ -337,7 +353,7 @@ func Test_injectRepo(t *testing.T) {
 		err := server2.repos.Put(&strayRepo)
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/%d", strayRepo.Id), nil)
+		req := httptest.NewRequest(http.MethodGet, "/"+strayRepo.ExternalID, nil)
 		sess := NewMoraSessionWithTokenFor(rm)
 		req = req.WithContext(WithMoraSession(req.Context(), sess))
 
@@ -393,9 +409,9 @@ func Test_initRepositoryManager_UnknownDriver(t *testing.T) {
 
 // API Test with ServerHandler
 
-func requireLogin(t *testing.T, handler http.Handler, scmID int64) *http.Cookie {
+func requireLogin(t *testing.T, handler http.Handler, scmID string) *http.Cookie {
 	// 1st request to get code
-	path := fmt.Sprintf("/login/%d", scmID)
+	path := "/login/" + scmID
 	req := httptest.NewRequest(http.MethodGet, path, strings.NewReader(""))
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
@@ -428,7 +444,7 @@ func TestServerRepositoryManagerList(t *testing.T) {
 	server := NewMoraServerBuilder(t).WithRepositoryManager(rm).WithSessionManager().Finish()
 	handler := server.Handler()
 
-	cookie := requireLogin(t, handler, rm.ID())
+	cookie := requireLogin(t, handler, rm.ExternalID())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/providers", strings.NewReader(""))
 	req.AddCookie(cookie)
@@ -446,7 +462,7 @@ func TestServerRepositoryManagerList(t *testing.T) {
 
 	expected := []RepositoryManagerResponse{
 		{
-			ID:       rm.ID(),
+			ID:       rm.ExternalID(),
 			URL:      rm.URL().String(),
 			Name:     "mock",
 			LoggedIn: true,
@@ -596,7 +612,7 @@ func TestServerRepoList(t *testing.T) {
 
 	t.Run("repo list after login", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, url, nil)
-		cookie := requireLogin(t, handler, rm.ID())
+		cookie := requireLogin(t, handler, rm.ExternalID())
 		req.AddCookie(cookie)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -660,7 +676,7 @@ func TestServerRepoList_RMNotFound(t *testing.T) {
 		WithSessionManager().Finish()
 	handler := server.Handler()
 
-	cookie := requireLogin(t, handler, rm.ID())
+	cookie := requireLogin(t, handler, rm.ExternalID())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/repos", nil)
 	req.AddCookie(cookie)
@@ -696,7 +712,7 @@ func TestServerRepoList2(t *testing.T) {
 		WithSessionManager().Finish()
 	handler := server.Handler()
 
-	cookie := requireLogin(t, handler, rm.ID())
+	cookie := requireLogin(t, handler, rm.ExternalID())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/repos", nil)
 	req.AddCookie(cookie)
@@ -779,7 +795,7 @@ func Test_NewMoraServerFromConfig_Gitea(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = NewGiteaFromFile(
-		1, tmp.Name(), cfg.RepositoryManagers[0].URL, cfg.Server.URL+"/login", false)
+		1, "scm_test", tmp.Name(), cfg.RepositoryManagers[0].URL, cfg.Server.URL+"/login", false)
 	require.NoError(t, err)
 	got := server.repositoryManagers[0]
 	assert.Equal(t, int64(1), got.ID())
@@ -797,7 +813,7 @@ func TestNewGitea_InsecureSkipVerify(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gitea, err := NewGitea(1, "https://gitea.example.com", "id", "secret",
+			gitea, err := NewGitea(1, "scm_test", "https://gitea.example.com", "id", "secret",
 				"http://localhost:4000/login", tt.skip)
 			require.NoError(t, err)
 
@@ -1058,7 +1074,7 @@ func TestRequireTrackerAuth_APIKey(t *testing.T) {
 	_, err := userStore.CreateUser("apiuser", "")
 	require.NoError(t, err)
 
-	key, err := userStore.CreateAPIKey(1, "test-key")
+	_, key, err := userStore.CreateAPIKey(1, "test-key")
 	require.NoError(t, err)
 
 	trackerService, err := tracker.NewService(db)
@@ -1343,6 +1359,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 		Finish()
 
 	handler := server.Handler()
+	repoID := repo.ExternalID
 
 	authedRequest := func(body string) *http.Request {
 		r := httptest.NewRequest(http.MethodPost, "/api/coverages", strings.NewReader(body))
@@ -1355,7 +1372,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 	}
 
 	t.Run("requires auth", func(t *testing.T) {
-		body := `{"name":"cov","visibility":"public","repo_id":1}`
+		body := fmt.Sprintf(`{"name":"cov","visibility":"public","repo_id":%q}`, repoID)
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPost, "/api/coverages", strings.NewReader(body))
 		r.Header.Set("Content-Type", "application/json")
@@ -1371,9 +1388,9 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 			name string
 			body string
 		}{
-			{name: "missing name", body: `{"visibility":"public","repo_id":1}`},
+			{name: "missing name", body: fmt.Sprintf(`{"visibility":"public","repo_id":%q}`, repoID)},
 			{name: "missing repo_id", body: `{"name":"cov","visibility":"public"}`},
-			{name: "invalid visibility", body: `{"name":"cov","visibility":"secret","repo_id":1}`},
+			{name: "invalid visibility", body: fmt.Sprintf(`{"name":"cov","visibility":"secret","repo_id":%q}`, repoID)},
 			{name: "malformed body", body: `not-json`},
 		}
 		for _, tc := range cases {
@@ -1388,7 +1405,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 	})
 
 	t.Run("repository not found", func(t *testing.T) {
-		body := `{"name":"cov","visibility":"public","repo_id":999}`
+		body := `{"name":"cov","visibility":"public","repo_id":"repo_00000000-0000-0000-0000-000000000000"}`
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, authedRequest(body))
 		res := w.Result()
@@ -1397,7 +1414,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 	})
 
 	t.Run("creates and links coverage tracker", func(t *testing.T) {
-		body := `{"name":"my cov tracker","visibility":"public","repo_id":1}`
+		body := fmt.Sprintf(`{"name":"my cov tracker","visibility":"public","repo_id":%q}`, repoID)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, authedRequest(body))
 		res := w.Result()
@@ -1423,7 +1440,7 @@ func TestHandleCreateCoverageTracker(t *testing.T) {
 	})
 
 	t.Run("already linked returns conflict", func(t *testing.T) {
-		body := `{"name":"duplicate","visibility":"public","repo_id":1}`
+		body := fmt.Sprintf(`{"name":"duplicate","visibility":"public","repo_id":%q}`, repoID)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, authedRequest(body))
 		res := w.Result()

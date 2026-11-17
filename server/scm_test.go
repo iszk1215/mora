@@ -8,6 +8,6 @@ import (
 
 func TestBaseRepositoryManager_Driver(t *testing.T) {
 	var b BaseRepositoryManager
-	b.Init(1, nil, nil, nil, "gitea")
+	b.Init(1, "scm_test", nil, nil, nil, "gitea")
 	require.Equal(t, "gitea", b.Driver())
 }

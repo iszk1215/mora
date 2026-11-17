@@ -124,11 +124,12 @@ func TestUdmClientAddMetric(t *testing.T) {
 	api := newMockAPIClient(t)
 	c := &udmClient{client: api}
 
+	repoID := "repo_00000000-0000-0000-0000-000000000001"
 	metric := MetricModel{RepoId: 1215, Name: "metric_name"}
 
 	api.handleDo(func(method, path string, in any, out any) error {
 		require.Equal(t, method, http.MethodPost)
-		require.Equal(t, path, "/api/repos/1215/udm/metrics")
+		require.Equal(t, path, "/api/repos/"+repoID+"/udm/metrics")
 		require.NotNil(t, in)
 		require.NotNil(t, out)
 		require.IsType(t, &MetricModel{}, in)
@@ -141,7 +142,7 @@ func TestUdmClientAddMetric(t *testing.T) {
 		return nil
 	})
 
-	err := c.addMetric(metric.RepoId, &metric)
+	err := c.addMetric(repoID, &metric)
 	require.NoError(t, err)
 	require.True(t, api.ok())
 }
@@ -150,11 +151,11 @@ func TestUdmClientListMetrics(t *testing.T) {
 	api := newMockAPIClient(t)
 	c := &udmClient{client: api}
 
-	repoId := int64(1215)
+	repoId := "repo_00000000-0000-0000-0000-000000000001"
 
 	api.handleDo(func(method, path string, in any, out any) error {
 		require.Equal(t, method, http.MethodGet)
-		require.Equal(t, path, "/api/repos/1215/udm/metrics")
+		require.Equal(t, path, "/api/repos/"+repoId+"/udm/metrics")
 		require.Nil(t, in)
 		require.NotNil(t, out)
 
@@ -175,11 +176,12 @@ func TestUdmClientAddItem(t *testing.T) {
 	api := newMockAPIClient(t)
 	c := &udmClient{client: api}
 
+	repoID := "repo_00000000-0000-0000-0000-000000000001"
 	item := ItemModel{MetricId: 1976, Name: "item_name", ValueType: ValueTypeInt}
 
 	api.handleDo(func(method, path string, in any, out any) error {
 		require.Equal(t, method, http.MethodPost)
-		require.Equal(t, path, "/api/repos/1215/udm/metrics/1976/items")
+		require.Equal(t, path, "/api/repos/"+repoID+"/udm/metrics/1976/items")
 		require.NotNil(t, in)
 		require.NotNil(t, out)
 		require.IsType(t, &ItemModel{}, out)
@@ -191,7 +193,7 @@ func TestUdmClientAddItem(t *testing.T) {
 		return nil
 	})
 
-	err := c.addItem(1215, &item)
+	err := c.addItem(repoID, &item)
 	require.NoError(t, err)
 	require.True(t, api.ok())
 }

@@ -54,7 +54,7 @@ interface ValuesResponse {
   values: UdmValue[],
 }
 
-async function _loadUdmMetrics(repo_id: number): Promise<MetricsResponse> {
+async function _loadUdmMetrics(repo_id: string): Promise<MetricsResponse> {
   const url = `/api/repos/${repo_id}/udm/metrics`
   const resp = await fetch(url)
   if (!resp.ok)
@@ -63,14 +63,14 @@ async function _loadUdmMetrics(repo_id: number): Promise<MetricsResponse> {
   return resp.json()
 }
 
-export async function loadUdmMetrics(repo_id: number): Promise<UdmMetric[]> {
+export async function loadUdmMetrics(repo_id: string): Promise<UdmMetric[]> {
   const resp = await _loadUdmMetrics(repo_id)
   return resp.metrics
 }
 
 export async function loadUdmMetricsFromParam({ params }: LoaderFunctionArgs): Promise<MetricsResponse> {
   if (params.repo_id)
-    return _loadUdmMetrics(parseInt(params.repo_id))
+    return _loadUdmMetrics(params.repo_id)
 
   throw new Error("repo_id is undefined")
 }
@@ -90,7 +90,7 @@ export async function loadMetricItems({ params }: LoaderFunctionArgs): Promise<R
 
 
 export async function loadMetricValues(
-  repo_id: number, metric_id: number, item_id: number): Promise<ValuesResponse> {
+  repo_id: string, metric_id: number, item_id: number): Promise<ValuesResponse> {
   const url = `/api/repos/${repo_id}/udm/metrics/${metric_id}/items/${item_id}/values`
   const resp = await fetch(url)
   if (!resp.ok)

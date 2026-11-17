@@ -13,8 +13,9 @@ type (
 	}
 
 	Repository struct {
-		Id                int64  `json:"id"`
-		RepositoryManager int64  `json:"scm_id"`
+		Id                int64  `json:"-"`
+		ExternalID        string `json:"id"`
+		RepositoryManager int64  `json:"-"`
 		Namespace         string `json:"namespace"`
 		Name              string `json:"name"`
 		Url               string `json:"url"`
@@ -26,8 +27,8 @@ type (
 )
 
 const (
-	contextRepoKey              contextKey = iota
-	contextRepositoryClientKey  contextKey = iota
+	contextRepoKey             contextKey = iota
+	contextRepositoryClientKey contextKey = iota
 )
 
 func WithRepositoryClient(ctx context.Context, client RepositoryClient) context.Context {

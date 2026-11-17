@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +43,7 @@ type (
 	// Source Code Management System
 	RepositoryManager interface {
 		ID() int64
+		ExternalID() string
 		URL() *url.URL
 		Client() *scm.Client
 		RevisionURL(baseURL string, revision string) string
@@ -54,7 +54,7 @@ type (
 	// Protocols
 
 	RepositoryManagerResponse struct {
-		ID       int64  `json:"id"`
+		ID       string `json:"id"`
 		URL      string `json:"url"`
 		Name     string `json:"name"`
 		LoggedIn bool   `json:"logined"`
@@ -62,13 +62,14 @@ type (
 
 	RepositoryManagerStore interface {
 		Init() error
-		FindURL(string) (int64, string, error)
-		Insert(driver string, url string) (int64, error)
+		FindURL(string) (int64, string, string, error)
+		Insert(driver string, url string) (int64, string, error)
 	}
 
 	RepositoryStore interface {
 		Init() error
 		Find(id int64) (core.Repository, error)
+		FindByExternalID(externalID string) (core.Repository, error)
 		FindURL(url string) (Repository, error)
 		ListAll() ([]Repository, error)
 		Put(repo *Repository) error
@@ -174,7 +175,7 @@ func (s *MoraServer) handleRepositoryManagerList(w http.ResponseWriter, r *http.
 	for _, rm := range s.repositoryManagers {
 		_, ok := sess.getToken(rm.ID())
 		resp = append(resp, RepositoryManagerResponse{
-			ID:       rm.ID(),
+			ID:       rm.ExternalID(),
 			URL:      rm.URL().String(),
 			Name:     rm.Driver(),
 			LoggedIn: ok,
@@ -274,14 +275,14 @@ func checkRepoAccess(sess *MoraSession, rm RepositoryManager, repo Repository) e
 
 func (s *MoraServer) injectRepo(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		repo_id, err := strconv.ParseInt(chi.URLParam(r, "repo_id"), 10, 64)
-		if err != nil {
+		repoID := chi.URLParam(r, "repo_id")
+		if _, err := parseRepositoryExternalID(repoID); err != nil {
 			log.Err(err).Msg("invalid repo_id in URL")
 			render.BadRequest(w, errors.New("invalid repository id"))
 			return
 		}
 
-		repo, err := s.repos.Find(repo_id)
+		repo, err := s.repos.FindByExternalID(repoID)
 		if err != nil {
 			log.Err(err).Msg("failed to find repository")
 			render.NotFound(w, errors.New("repository not found"))
@@ -448,7 +449,7 @@ func (s *MoraServer) handleCoverageListPublic(w http.ResponseWriter, r *http.Req
 type createCoverageTrackerRequest struct {
 	Name       string `json:"name"`
 	Visibility string `json:"visibility"`
-	RepoID     int64  `json:"repo_id"`
+	RepoID     string `json:"repo_id"`
 }
 
 // handleCreateCoverageTracker godoc
@@ -488,12 +489,16 @@ func (s *MoraServer) handleCreateCoverageTracker(w http.ResponseWriter, r *http.
 		render.BadRequest(w, errors.New("visibility must be one of: public, private"))
 		return
 	}
-	if req.RepoID == 0 {
+	if req.RepoID == "" {
 		render.BadRequest(w, errors.New("repo_id is required"))
 		return
 	}
+	if _, err := parseRepositoryExternalID(req.RepoID); err != nil {
+		render.BadRequest(w, errors.New("invalid repo_id"))
+		return
+	}
 
-	repo, err := s.repos.Find(req.RepoID)
+	repo, err := s.repos.FindByExternalID(req.RepoID)
 	if err != nil {
 		render.NotFound(w, errors.New("repository not found"))
 		return
@@ -637,35 +642,36 @@ func initRepositoryManager(cfg config.RepositoryManagerConfig, baseURL string, s
 		return nil, fmt.Errorf("ConfigError: rm.secret_file is empty")
 	}
 
-	id, _, err := store.FindURL(cfg.URL)
+	id, externalID, _, err := store.FindURL(cfg.URL)
 	if err != nil {
 		return nil, err
 	}
 
 	if id < 0 {
-		id, err = store.Insert(cfg.Driver, cfg.URL)
+		id, externalID, err = store.Insert(cfg.Driver, cfg.URL)
 		if err != nil {
 			return nil, err
 		}
-		log.Info().Msgf("New repository manager is configured. ID=%d Driver=%s URL=%s",
-			id, cfg.Driver, cfg.URL)
+		log.Info().Msgf("New repository manager is configured. ID=%s Driver=%s URL=%s",
+			externalID, cfg.Driver, cfg.URL)
 	} else {
-		log.Info().Msgf("repository manager enabled. ID=%d Driver=%s URL=%s",
-			id, cfg.Driver, cfg.URL)
+		log.Info().Msgf("repository manager enabled. ID=%s Driver=%s URL=%s",
+			externalID, cfg.Driver, cfg.URL)
 	}
 
 	switch cfg.Driver {
 	case "gitea":
 		return NewGiteaFromFile(
 			id,
+			externalID,
 			cfg.SecretFilename,
 			cfg.URL,
 			baseURL+"/login",
 			cfg.InsecureSkipVerify)
 	case "github":
-		return NewGithubFromFile(id, cfg.URL, cfg.SecretFilename, baseURL+"/login")
+		return NewGithubFromFile(id, externalID, cfg.URL, cfg.SecretFilename, baseURL+"/login")
 	case "google":
-		return NewGoogleFromFile(id, cfg.URL, cfg.SecretFilename, baseURL+"/login")
+		return NewGoogleFromFile(id, externalID, cfg.URL, cfg.SecretFilename, baseURL+"/login")
 	default:
 		return nil, fmt.Errorf("ConfigError: unknown repository manager: %s", cfg.Driver)
 	}
