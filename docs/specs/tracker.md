@@ -23,6 +23,7 @@ tracker
 - `tracker_series.id` / `tracker_value.id` are internal integer primary keys. They are never exposed through the API or URLs (`json:"-"`).
 - `tracker_series.external_id` / `tracker_value.external_id` are public identifiers (UUIDv7, `ser_` / `val_` prefixes, stored as bare UUID strings in the DB). All series/value URLs and JSON `id` fields use these values. Invalid values return `400 Bad Request`; well-formed but unknown values return `404 Not Found`. Numeric IDs are not accepted.
 - On startup, existing `tracker_series` / `tracker_value` rows without external IDs are backfilled (values in batches of 1000) and unique indexes are created. Existing external IDs are never changed.
+- `tracker_series.position`: zero-based display order within a tracker. New series are appended, deleting a series renumbers the remaining ones, and list/preview responses return series ordered by `position`, then internal `id`. Legacy rows are backfilled from internal `id` on startup.
 - `tracker.owner_id`: FK to `user.id`, `NOT NULL`, `ON DELETE CASCADE`. The owner is the sole authority for DELETE and PATCH on the tracker; `tracker_member` rows grant editor (edit-only) access. This internal user ID is never exposed through the API (`json:"-"`); responses identify the owner by `owner_name`.
 - `tracker.created_at` / `tracker.last_updated_at`: RFC3339 timestamps. `last_updated_at` is set at creation and bumped whenever a value is added, updated, or deleted (`POST`/`PATCH`/`DELETE values`) or coverage data is uploaded for a linked repository.
 
@@ -56,6 +57,7 @@ Hard limits on the number of series and values, applied regardless of user type 
 | GET | `/api/trackers/{trackerId}/preview` | Preview data (latest 20 values per series) | read perm |
 | GET | `/api/trackers/{trackerId}/series` | List series | read perm |
 | POST | `/api/trackers/{trackerId}/series` | Create series | edit perm |
+| PUT | `/api/trackers/{trackerId}/series/order` | Reorder all series | edit perm |
 | PATCH | `/api/trackers/{trackerId}/series/{seriesId}` | Update series (rename via `name`, data_type, config) | edit perm |
 | DELETE | `/api/trackers/{trackerId}/series/{seriesId}` | Delete series | edit perm |
 | GET | `/api/trackers/{trackerId}/series/{seriesId}/values` | List values (`?limit=N`) | read perm |
@@ -68,6 +70,8 @@ Hard limits on the number of series and values, applied regardless of user type 
 `{trackerId}` in every path is the tracker external ID (`trk_<uuidv7>`); `{seriesId}` is the series external ID (`ser_<uuidv7>`). Value `id` fields are value external IDs (`val_<uuidv7>`). POST returns 201, DELETE returns 204.
 
 PATCH `/api/trackers/{trackerId}/series/{seriesId}` accepts optional `name`, `data_type`, and `config` fields; only provided fields are updated. A series `name` must be non-empty (after trim), at most 200 characters, and unique within the tracker. A rename to an already-used name returns `409 Conflict`.
+
+PUT `/api/trackers/{trackerId}/series/order` accepts `{ "series_ids": ["ser_<uuidv7>", ...] }`. The array must contain every series external ID of the tracker exactly once; unknown, foreign, duplicated, or missing IDs return `400 Bad Request`. The update is atomic and the response is the updated `ListSeriesResponse` with series in the new order. The body includes a `position` field on each series. This endpoint also applies to `activity_grid` trackers and returns `400` for coverage trackers.
 
 PATCH `/api/trackers/{trackerId}/series/{seriesId}/values` performs an atomic batch update: all value updates are applied and all requested deletions are executed in a single transaction (`applyValueChanges` in `tracker/store.go`), so the batch either succeeds completely or not at all. The whole batch is subject to the values-per-series limit (5000).
 

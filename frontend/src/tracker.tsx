@@ -197,6 +197,10 @@ export const TrackerDetailView = (): React.JSX.Element => {
     }
   }
 
+  const handleSeriesReorder = (reordered: SeriesModel[]) => {
+    setSeriesList(reordered.map((s, index) => ({ ...s, position: index })))
+  }
+
   const handleSaveTitle = async () => {
     const trimmed = draftName.trim()
     if (!trimmed || trimmed === trackerName) {
@@ -723,6 +727,7 @@ className="p-1 sm:p-1.5 rounded hover:bg-accent text-muted-foreground hover:text
             yAxes={yAxes}
             onDeleteSeries={handleSeriesDeleted}
             onRenameSeries={handleSeriesRename}
+            onReorderSeries={handleSeriesReorder}
           />
         </div>
       )}

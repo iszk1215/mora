@@ -90,6 +90,16 @@ export async function createSeries(trackerId: string, name: string, dataType: st
   return resp.json()
 }
 
+export async function reorderSeries(trackerId: string, seriesIds: string[]): Promise<TrackerDetailData> {
+  const resp = await fetch(`/api/trackers/${trackerId}/series/order`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ series_ids: seriesIds }),
+  })
+  if (!resp.ok) throw resp
+  return resp.json()
+}
+
 export async function patchSeries(trackerId: string, seriesId: string, opts: { name?: string; data_type?: string; config?: string }): Promise<SeriesModel> {
   const resp = await fetch(`/api/trackers/${trackerId}/series/${seriesId}`, {
     method: 'PATCH',

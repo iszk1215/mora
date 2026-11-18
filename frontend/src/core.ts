@@ -79,6 +79,7 @@ export interface SeriesModel {
   name: string
   data_type: string
   config: string
+  position?: number
 }
 
 export interface PreviewSeriesModel {

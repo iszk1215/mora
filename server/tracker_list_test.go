@@ -156,7 +156,7 @@ func TestServerHandleTrackersListPreview(t *testing.T) {
 	covTr, err := server.tracker.CreateTracker("coverage", "", "", "private", alice.ID, tracker.TypeCoverage, "{}")
 	require.NoError(t, err)
 
-	db.MustExec("INSERT INTO tracker_series (tracker_id, name, data_type, config) VALUES (?, 'temp', 'float', '{}')", trackerTr.Id)
+	db.MustExec("INSERT INTO tracker_series (tracker_id, name, data_type, config, position) VALUES (?, 'temp', 'float', '{}', 0)", trackerTr.Id)
 	var seriesID int64
 	require.NoError(t, db.Get(&seriesID, "SELECT id FROM tracker_series WHERE tracker_id = ?", trackerTr.Id))
 	now := time.Now().Round(0)

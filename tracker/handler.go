@@ -45,6 +45,7 @@ type (
 		Name              string           `json:"name"          db:"name"`
 		DataType          string           `json:"data_type"     db:"data_type"`
 		Config            string           `json:"config"        db:"config"`
+		Position          int              `json:"position"      db:"position"`
 	}
 
 	ValueModel struct {
@@ -79,6 +80,10 @@ type (
 		Name     *string `json:"name"`
 		DataType *string `json:"data_type"`
 		Config   *string `json:"config"`
+	}
+
+	ReorderSeriesRequest struct {
+		SeriesIds []SeriesExternalID `json:"series_ids"`
 	}
 
 	PatchTrackerRequest struct {
@@ -600,12 +605,23 @@ func (h *trackerHandler) previewTracker(w http.ResponseWriter, r *http.Request) 
 func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 	tracker, _ := trackerFrom(r.Context())
 
+	resp, err := h.buildListSeriesResponse(r.Context(), tracker)
+	if err != nil {
+		log.Error().Err(err).Msg("tracker.handler.listSeries")
+		render.InternalError(w, err)
+		return
+	}
+
+	render.JSON(w, resp, http.StatusOK)
+}
+
+func (h *trackerHandler) buildListSeriesResponse(ctx context.Context, tracker TrackerModel) (ListSeriesResponse, error) {
 	var series []SeriesModel
 	var ownerName string
 	var role string
 	var liked bool
 	var likeCount int
-	uid, hasUser := UserIDFromContext(r.Context())
+	uid, hasUser := UserIDFromContext(ctx)
 	if !hasUser {
 		uid = 0
 	}
@@ -630,19 +646,15 @@ func (h *trackerHandler) listSeries(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err := parallel(fns...); err != nil {
-		log.Error().Err(err).Msg("tracker.handler.listSeries")
-		render.InternalError(w, err)
-		return
+		return ListSeriesResponse{}, err
 	}
 
 	trackerResp := TrackerResponse{Id: tracker.ExternalId, Name: tracker.Name, Description: tracker.Description, Body: tracker.Body, Visibility: tracker.Visibility, Type: tracker.Type, ChartConfig: tracker.ChartConfig, OwnerId: tracker.OwnerId, CreatedAt: tracker.CreatedAt, LastUpdatedAt: tracker.LastUpdatedAt, OwnerName: ownerName, Role: role, Liked: liked, LikeCount: likeCount}
 
-	resp := ListSeriesResponse{
+	return ListSeriesResponse{
 		Tracker: trackerResp,
 		Series:  series,
-	}
-
-	render.JSON(w, resp, http.StatusOK)
+	}, nil
 }
 
 // CreateSeries godoc
@@ -723,6 +735,65 @@ func (h *trackerHandler) createSeries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.JSON(w, series, http.StatusCreated)
+}
+
+// ReorderSeries godoc
+// @Summary      Reorder series
+// @Description  Set the display order of all series in a tracker. series_ids must contain every series external ID exactly once.
+// @Tags         tracker
+// @Accept       json
+// @Produce      json
+// @Param        trackerId  path  string                       true  "Tracker ID"
+// @Param        body       body  tracker.ReorderSeriesRequest  true  "Ordered series external IDs"
+// @Success      200  {object}  tracker.ListSeriesResponse
+// @Failure      400  {object}  core.ErrorResponse
+// @Failure      401  {object}  core.ErrorResponse
+// @Failure      403  {object}  core.ErrorResponse
+// @Failure      404  {object}  core.ErrorResponse
+// @Router       /api/trackers/{trackerId}/series/order [put]
+func (h *trackerHandler) reorderSeries(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	defer func() {
+		if err := r.Body.Close(); err != nil {
+			log.Error().Err(err).Msg("Body.Close")
+		}
+	}()
+
+	tracker, _ := trackerFrom(r.Context())
+	if !supportsSeries(tracker.Type) {
+		render.BadRequest(w, errors.New("cannot modify series for this tracker type"))
+		return
+	}
+
+	var req ReorderSeriesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn().Err(err).Msg("tracker.handler.reorderSeries")
+		render.BadRequest(w, errors.New("invalid request body"))
+		return
+	}
+	if len(req.SeriesIds) == 0 {
+		render.BadRequest(w, errors.New("series_ids must not be empty"))
+		return
+	}
+
+	if err := h.store.reorderSeries(tracker.Id, req.SeriesIds); err != nil {
+		if errors.Is(err, ErrInvalidSeriesOrder) {
+			render.BadRequest(w, err)
+			return
+		}
+		log.Error().Err(err).Msg("reorderSeries")
+		render.InternalError(w, err)
+		return
+	}
+
+	resp, err := h.buildListSeriesResponse(r.Context(), tracker)
+	if err != nil {
+		log.Error().Err(err).Msg("reorderSeries buildListSeriesResponse")
+		render.InternalError(w, err)
+		return
+	}
+
+	render.JSON(w, resp, http.StatusOK)
 }
 
 // DeleteSeries godoc
@@ -1147,6 +1218,7 @@ func newHandler(store *trackerStore) http.Handler {
 			r.Route("/series", func(r chi.Router) {
 				r.Get("/", h.listSeries)
 				r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Post("/", h.createSeries)
+				r.With(func(next http.Handler) http.Handler { return RequireEditPermission(h.store, next) }).Put("/order", h.reorderSeries)
 
 				r.Route("/{seriesId}", func(r chi.Router) {
 					r.Use(func(next http.Handler) http.Handler { return InjectSeries(h.store, next) })

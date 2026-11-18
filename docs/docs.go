@@ -1467,6 +1467,71 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/trackers/{trackerId}/series/order": {
+            "put": {
+                "description": "Set the display order of all series in a tracker. series_ids must contain every series external ID exactly once.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tracker"
+                ],
+                "summary": "Reorder series",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tracker ID",
+                        "name": "trackerId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Ordered series external IDs",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/tracker.ReorderSeriesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/tracker.ListSeriesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/trackers/{trackerId}/series/{seriesId}": {
             "delete": {
                 "description": "Delete the specified series. Child values are also cascade-deleted.",
@@ -2687,6 +2752,17 @@ const docTemplate = `{
                 }
             }
         },
+        "tracker.ReorderSeriesRequest": {
+            "type": "object",
+            "properties": {
+                "series_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "tracker.SeriesModel": {
             "type": "object",
             "properties": {
@@ -2701,6 +2777,9 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "position": {
+                    "type": "integer"
                 },
                 "tracker_id": {
                     "type": "string"

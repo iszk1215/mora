@@ -1,7 +1,7 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react'
 
-import { Pencil } from 'lucide-react'
-import { patchSeries, deleteSeries } from './tracker-api'
+import { ArrowDown, ArrowUp, Pencil } from 'lucide-react'
+import { patchSeries, deleteSeries, reorderSeries } from './tracker-api'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -24,10 +24,11 @@ interface SeriesTableProps {
   onSelectSeries?: (seriesId: string) => void
   onDeleteSeries?: (seriesId: string) => void
   onRenameSeries?: (seriesId: string, name: string) => Promise<boolean>
+  onReorderSeries?: (seriesList: SeriesModel[]) => void
   ref?: React.Ref<SeriesTableHandle>
 }
 
-export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDeleteSeries, onRenameSeries, ref }: SeriesTableProps): React.JSX.Element => {
+export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDeleteSeries, onRenameSeries, onReorderSeries, ref }: SeriesTableProps): React.JSX.Element => {
   const [seriesValueFormats, setSeriesValueFormats] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {}
     for (const s of seriesList) {
@@ -174,6 +175,28 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     }
   }
 
+  const [reordering, setReordering] = useState(false)
+
+  const handleReorder = async (index: number, direction: -1 | 1) => {
+    if (!onReorderSeries || reordering) return
+    const target = index + direction
+    if (target < 0 || target >= seriesList.length) return
+
+    const reordered = [...seriesList]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(target, 0, moved)
+    onReorderSeries(reordered)
+
+    setReordering(true)
+    try {
+      await reorderSeries(trackerId, reordered.map((s) => s.id))
+    } catch {
+      onReorderSeries(seriesList)
+    } finally {
+      setReordering(false)
+    }
+  }
+
   return (
     <Table>
       <TableHeader className="hidden sm:table-header-group">
@@ -194,7 +217,7 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
             </TableCell>
           </TableRow>
         ) : (
-          seriesList.map((s) => (
+          seriesList.map((s, index) => (
             <TableRow key={s.id} className="block py-2 sm:table-row sm:py-0">
               <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
                 <span className="text-sm font-medium text-muted-foreground sm:hidden">Name</span>
@@ -261,6 +284,28 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
               </TableCell>
               <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
                 <span className="text-sm font-medium text-muted-foreground sm:hidden">Actions</span>
+                {onReorderSeries && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Move ${s.name} up`}
+                      disabled={index === 0 || reordering}
+                      onClick={() => handleReorder(index, -1)}
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Move ${s.name} down`}
+                      disabled={index === seriesList.length - 1 || reordering}
+                      onClick={() => handleReorder(index, 1)}
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                    </Button>
+                  </>
+                )}
                 <Button variant="destructive" size="sm" onClick={() => handleDeleteSeries(s.id)}>
                   Delete
                 </Button>
