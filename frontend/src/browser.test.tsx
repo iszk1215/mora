@@ -146,4 +146,27 @@ describe('Browser', () => {
     expect(screen.getByText('a.go')).toBeDefined()
     expect(screen.getByText('b.go')).toBeDefined()
   })
+
+  it('keeps indented file names in an inline row', () => {
+    const files: FileData[] = [makeFile('src/nested/a.go')]
+    render(
+      <MemoryRouter>
+        <Browser files={files} />
+      </MemoryRouter>
+    )
+
+    const link = screen.getByText('a.go')
+    const cell = link.closest('td')
+    expect(cell).not.toBeNull()
+
+    const wrapper = cell!.firstElementChild
+    expect(wrapper?.tagName).toBe('SPAN')
+    expect(wrapper?.className).toContain('inline-flex')
+    expect(wrapper?.className).toContain('items-center')
+
+    const placeholders = wrapper?.querySelectorAll('svg.opacity-0')
+    expect(placeholders).toHaveLength(2)
+    expect(wrapper?.firstElementChild).toBe(placeholders?.[0])
+    expect(wrapper?.lastElementChild).toBe(link)
+  })
 })

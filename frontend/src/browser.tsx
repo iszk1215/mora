@@ -158,7 +158,9 @@ const FileBrowserTable = (props: TableProp): React.JSX.Element => {
     }
 
     const elem = (<TableRow key={i} className={getClass(item)}>
-      <TableCell>{elems}</TableCell>
+      <TableCell>
+        <span className="inline-flex items-center">{elems}</span>
+      </TableCell>
       <TableCell>{item.hits}</TableCell>
       <TableCell>{item.lines - item.hits}</TableCell>
       <TableCell>{item.lines}</TableCell>
