@@ -246,6 +246,18 @@ describe('TrackerCreate', () => {
 })
 
 describe('TrackerDetailView', () => {
+  const dragSeries = (source: HTMLElement, target: HTMLElement) => {
+    fireEvent.dragStart(source)
+    fireEvent.dragOver(target)
+    fireEvent.drop(target)
+    fireEvent.dragEnd(source)
+  }
+
+  const getSeriesRow = (name: string): HTMLElement => {
+    const cell = within(screen.getByRole('table')).getByText(name)
+    return cell.closest('tr') as HTMLElement
+  }
+
   beforeEach(() => {
     vi.mocked(useLoaderData).mockReset()
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -425,7 +437,10 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
 
-    await user.click(screen.getByRole('button', { name: 'Move series-a down' }))
+    expect(screen.getByLabelText('Drag series-a to reorder')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Move series-a down' })).not.toBeInTheDocument()
+
+    dragSeries(getSeriesRow('series-a'), getSeriesRow('series-b'))
 
     await vi.waitFor(() => {
       const call = vi.mocked(globalThis.fetch).mock.calls.find(
@@ -463,7 +478,7 @@ describe('TrackerDetailView', () => {
     await user.click(screen.getByRole('button', { name: /tracker menu/i }))
     await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
 
-    await user.click(screen.getByRole('button', { name: 'Move series-a down' }))
+    dragSeries(getSeriesRow('series-a'), getSeriesRow('series-b'))
 
     await vi.waitFor(() => {
       const rows = within(screen.getByRole('table')).getAllByRole('row')

@@ -1,6 +1,6 @@
 import React, { useEffect, useImperativeHandle, useRef, useState } from 'react'
 
-import { ArrowDown, ArrowUp, Pencil } from 'lucide-react'
+import { GripVertical, Pencil } from 'lucide-react'
 import { patchSeries, deleteSeries, reorderSeries } from './tracker-api'
 import { Button } from '@/components/ui/button'
 import {
@@ -176,25 +176,84 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
   }
 
   const [reordering, setReordering] = useState(false)
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const orderRef = useRef(seriesList)
+  const initialOrderRef = useRef<SeriesModel[] | null>(null)
+  const dropCommittedRef = useRef(false)
 
-  const handleReorder = async (index: number, direction: -1 | 1) => {
-    if (!onReorderSeries || reordering) return
-    const target = index + direction
-    if (target < 0 || target >= seriesList.length) return
+  useEffect(() => { orderRef.current = seriesList }, [seriesList])
 
-    const reordered = [...seriesList]
-    const [moved] = reordered.splice(index, 1)
-    reordered.splice(target, 0, moved)
-    onReorderSeries(reordered)
+  const commitReorder = async () => {
+    const initialOrder = initialOrderRef.current
+    setDraggedId(null)
+    setDragOverId(null)
+    if (!initialOrder) return
 
-    setReordering(true)
-    try {
-      await reorderSeries(trackerId, reordered.map((s) => s.id))
-    } catch {
-      onReorderSeries(seriesList)
-    } finally {
-      setReordering(false)
+    const finalOrder = orderRef.current
+    const changed = finalOrder.map((s) => s.id).join(',') !== initialOrder.map((s) => s.id).join(',')
+    if (changed) {
+      setReordering(true)
+      try {
+        await reorderSeries(trackerId, finalOrder.map((s) => s.id))
+      } catch {
+        onReorderSeries?.(initialOrder)
+        orderRef.current = initialOrder
+      } finally {
+        setReordering(false)
+      }
     }
+    initialOrderRef.current = null
+  }
+
+  const handleDragStart = (event: React.DragEvent<HTMLTableRowElement>, seriesId: string) => {
+    if (!onReorderSeries || reordering) {
+      event.preventDefault()
+      return
+    }
+    initialOrderRef.current = seriesList
+    orderRef.current = seriesList
+    dropCommittedRef.current = false
+    setDraggedId(seriesId)
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', seriesId)
+    }
+  }
+
+  const handleDragOver = (event: React.DragEvent<HTMLTableRowElement>, seriesId: string, targetIndex: number) => {
+    if (!draggedId || !onReorderSeries || reordering) return
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+    setDragOverId(seriesId)
+
+    const current = orderRef.current
+    const from = current.findIndex((s) => s.id === draggedId)
+    if (from < 0 || from === targetIndex) return
+
+    const reordered = [...current]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(targetIndex, 0, moved)
+    orderRef.current = reordered
+    onReorderSeries(reordered)
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLTableRowElement>) => {
+    if (!draggedId) return
+    event.preventDefault()
+    if (dropCommittedRef.current) return
+    dropCommittedRef.current = true
+    void commitReorder()
+  }
+
+  const handleDragEnd = () => {
+    if (!dropCommittedRef.current && initialOrderRef.current) {
+      onReorderSeries?.(initialOrderRef.current)
+      orderRef.current = initialOrderRef.current
+      initialOrderRef.current = null
+    }
+    setDraggedId(null)
+    setDragOverId(null)
   }
 
   return (
@@ -218,7 +277,16 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
           </TableRow>
         ) : (
           seriesList.map((s, index) => (
-            <TableRow key={s.id} className="block py-2 sm:table-row sm:py-0">
+            <TableRow
+              key={s.id}
+              className={`block py-2 sm:table-row sm:py-0 ${draggedId === s.id ? 'opacity-50' : ''} ${dragOverId === s.id && draggedId !== s.id ? 'bg-muted/50' : ''}`}
+              draggable={!!onReorderSeries && !reordering}
+              onDragStart={(event) => handleDragStart(event, s.id)}
+              onDragOver={(event) => handleDragOver(event, s.id, index)}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
+              onDragLeave={() => setDragOverId((current) => (current === s.id ? null : current))}
+            >
               <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
                 <span className="text-sm font-medium text-muted-foreground sm:hidden">Name</span>
                 {onSelectSeries ? (
@@ -285,26 +353,13 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
               <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
                 <span className="text-sm font-medium text-muted-foreground sm:hidden">Actions</span>
                 {onReorderSeries && (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      aria-label={`Move ${s.name} up`}
-                      disabled={index === 0 || reordering}
-                      onClick={() => handleReorder(index, -1)}
-                    >
-                      <ArrowUp className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      aria-label={`Move ${s.name} down`}
-                      disabled={index === seriesList.length - 1 || reordering}
-                      onClick={() => handleReorder(index, 1)}
-                    >
-                      <ArrowDown className="w-4 h-4" />
-                    </Button>
-                  </>
+                  <span
+                    aria-label={`Drag ${s.name} to reorder`}
+                    title="Drag to reorder"
+                    className="cursor-grab text-muted-foreground"
+                  >
+                    <GripVertical className="w-4 h-4" />
+                  </span>
                 )}
                 <Button variant="destructive" size="sm" onClick={() => handleDeleteSeries(s.id)}>
                   Delete

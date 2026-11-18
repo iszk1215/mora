@@ -6,7 +6,7 @@ Activity grid ("contribution graph") tracker type for tracking coarse-grained da
 
 - A tracker with `type = "activity_grid"`.
 - Series are created through `POST /api/trackers/{trackerId}/series` like normal trackers, but the **data type is forced to `int`** server-side surface area: the frontend hides the Data Type / Chart Type selects in the Add Series dialog and sends `data_type: "int"` with no series `config`.
-- Series order is controlled by `PUT /api/trackers/{trackerId}/series/order`; each series is one rendered row, so reordering changes the row order in both the settings table and the chart.
+- Series order is controlled by `PUT /api/trackers/{trackerId}/series/order`; each series is one rendered row, so dragging a row by its handle changes the row order in both the settings table and the chart.
 - Values are **non-negative integers** (`0 <= value`, integer only). The level count is defined by the chart config, not by the stored value, so any non-negative integer is accepted (clamping is a display concern).
 - `chart_config` validation for activity grid accepts only:
   - `palette` (string) — named palette, same values as `tracker` type
