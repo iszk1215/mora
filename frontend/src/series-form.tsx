@@ -176,18 +176,35 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
   }
 
   const [reordering, setReordering] = useState(false)
-  const [draggedId, setDraggedId] = useState<string | null>(null)
-  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null)
   const orderRef = useRef(seriesList)
   const initialOrderRef = useRef<SeriesModel[] | null>(null)
+  const draggingIdRef = useRef<string | null>(null)
+  const pointerIdRef = useRef<number | null>(null)
   const dropCommittedRef = useRef(false)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
 
   useEffect(() => { orderRef.current = seriesList }, [seriesList])
+  useEffect(() => () => dragCleanupRef.current?.(), [])
+
+  const moveSeries = (draggedSeriesId: string, targetSeriesId: string) => {
+    const current = orderRef.current
+    const from = current.findIndex((s) => s.id === draggedSeriesId)
+    const to = current.findIndex((s) => s.id === targetSeriesId)
+    if (from < 0 || to < 0 || from === to) return
+
+    const reordered = [...current]
+    const [moved] = reordered.splice(from, 1)
+    reordered.splice(to, 0, moved)
+    orderRef.current = reordered
+    onReorderSeries?.(reordered)
+  }
 
   const commitReorder = async () => {
     const initialOrder = initialOrderRef.current
-    setDraggedId(null)
-    setDragOverId(null)
+    setDraggingId(null)
+    setDropTargetId(null)
     if (!initialOrder) return
 
     const finalOrder = orderRef.current
@@ -206,72 +223,111 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
     initialOrderRef.current = null
   }
 
-  const handleDragStart = (event: React.DragEvent<HTMLTableRowElement>, seriesId: string) => {
-    if (!onReorderSeries || reordering) {
-      event.preventDefault()
-      return
-    }
-    initialOrderRef.current = seriesList
-    orderRef.current = seriesList
-    dropCommittedRef.current = false
-    setDraggedId(seriesId)
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move'
-      event.dataTransfer.setData('text/plain', seriesId)
-    }
-  }
-
-  const handleDragOver = (event: React.DragEvent<HTMLTableRowElement>, seriesId: string, targetIndex: number) => {
-    if (!draggedId || !onReorderSeries || reordering) return
-    event.preventDefault()
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-    setDragOverId(seriesId)
-
-    const current = orderRef.current
-    const from = current.findIndex((s) => s.id === draggedId)
-    if (from < 0 || from === targetIndex) return
-
-    const reordered = [...current]
-    const [moved] = reordered.splice(from, 1)
-    reordered.splice(targetIndex, 0, moved)
-    orderRef.current = reordered
-    onReorderSeries(reordered)
-  }
-
-  const handleDrop = (event: React.DragEvent<HTMLTableRowElement>) => {
-    if (!draggedId) return
-    event.preventDefault()
-    if (dropCommittedRef.current) return
-    dropCommittedRef.current = true
-    void commitReorder()
-  }
-
-  const handleDragEnd = () => {
+  const cancelDrag = () => {
     if (!dropCommittedRef.current && initialOrderRef.current) {
       onReorderSeries?.(initialOrderRef.current)
       orderRef.current = initialOrderRef.current
       initialOrderRef.current = null
     }
-    setDraggedId(null)
-    setDragOverId(null)
+    dropCommittedRef.current = false
+    draggingIdRef.current = null
+    pointerIdRef.current = null
+    setDraggingId(null)
+    setDropTargetId(null)
+  }
+
+  const autoScroll = (clientY: number) => {
+    const edge = 72
+    const delta = clientY < edge ? -12 : clientY > window.innerHeight - edge ? 12 : 0
+    if (delta === 0 || typeof window.scrollBy !== 'function') return
+    try {
+      window.scrollBy(0, delta)
+    } catch {
+      return
+    }
+  }
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLSpanElement>, seriesId: string) => {
+    if (!onReorderSeries || reordering) return
+    event.preventDefault()
+    initialOrderRef.current = seriesList
+    orderRef.current = seriesList
+    dropCommittedRef.current = false
+    draggingIdRef.current = seriesId
+    pointerIdRef.current = event.pointerId
+    setDraggingId(seriesId)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+
+    const clearListeners = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+      dragCleanupRef.current = null
+    }
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const dragged = draggingIdRef.current
+      if (!dragged || pointerIdRef.current !== moveEvent.pointerId) return
+      autoScroll(moveEvent.clientY)
+
+      const row = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest<HTMLTableRowElement>('tr[data-series-id]')
+      const targetId = row?.dataset.seriesId ?? null
+      setDropTargetId(targetId)
+      if (targetId && targetId !== dragged) moveSeries(dragged, targetId)
+    }
+
+    const onUp = (upEvent: PointerEvent) => {
+      if (pointerIdRef.current !== upEvent.pointerId) return
+      dropCommittedRef.current = true
+      pointerIdRef.current = null
+      draggingIdRef.current = null
+      clearListeners()
+      void commitReorder()
+    }
+
+    const onCancel = (cancelEvent: PointerEvent) => {
+      if (pointerIdRef.current !== cancelEvent.pointerId) return
+      clearListeners()
+      cancelDrag()
+    }
+
+    dragCleanupRef.current = clearListeners
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+  }
+
+  const handleHandleKeyDown = (event: React.KeyboardEvent<HTMLSpanElement>, seriesId: string, index: number) => {
+    if (!onReorderSeries || reordering) return
+    const direction = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+    if (direction === 0) return
+    const target = orderRef.current[index + direction]
+    if (!target) return
+    event.preventDefault()
+    initialOrderRef.current = orderRef.current
+    dropCommittedRef.current = false
+    moveSeries(seriesId, target.id)
+    dropCommittedRef.current = true
+    void commitReorder()
   }
 
   return (
     <Table>
       <TableHeader className="hidden sm:table-header-group">
         <TableRow>
+          <TableHead className="w-14"><span className="sr-only">Order</span></TableHead>
           <TableHead>Name</TableHead>
           <TableHead>Data Type</TableHead>
           <TableHead>Chart Type</TableHead>
           <TableHead>Y-Axis</TableHead>
           <TableHead>Value Format</TableHead>
-          <TableHead className="w-48">Actions</TableHead>
+          <TableHead className="w-24">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {seriesList.length === 0 ? (
           <TableRow className="block sm:table-row">
-            <TableCell colSpan={6} className="block text-center text-muted-foreground sm:table-cell">
+            <TableCell colSpan={7} className="block text-center text-muted-foreground sm:table-cell">
               No series yet
             </TableCell>
           </TableRow>
@@ -279,14 +335,24 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
           seriesList.map((s, index) => (
             <TableRow
               key={s.id}
-              className={`block py-2 sm:table-row sm:py-0 ${draggedId === s.id ? 'opacity-50' : ''} ${dragOverId === s.id && draggedId !== s.id ? 'bg-muted/50' : ''}`}
-              draggable={!!onReorderSeries && !reordering}
-              onDragStart={(event) => handleDragStart(event, s.id)}
-              onDragOver={(event) => handleDragOver(event, s.id, index)}
-              onDrop={handleDrop}
-              onDragEnd={handleDragEnd}
-              onDragLeave={() => setDragOverId((current) => (current === s.id ? null : current))}
+              data-series-id={s.id}
+              className={`block py-2 sm:table-row sm:py-0 ${draggingId === s.id ? 'opacity-50' : ''} ${dropTargetId === s.id && draggingId !== s.id ? 'bg-muted/50' : ''}`}
             >
+              <TableCell className="mb-2 flex items-center sm:mb-0 sm:table-cell">
+                {onReorderSeries && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Drag ${s.name} to reorder`}
+                    title="Drag to reorder"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md touch-none cursor-grab select-none text-muted-foreground hover:bg-muted active:cursor-grabbing sm:h-8 sm:w-8"
+                    onPointerDown={(event) => handlePointerDown(event, s.id)}
+                    onKeyDown={(event) => handleHandleKeyDown(event, s.id, index)}
+                  >
+                    <GripVertical className="w-4 h-4" />
+                  </span>
+                )}
+              </TableCell>
               <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
                 <span className="text-sm font-medium text-muted-foreground sm:hidden">Name</span>
                 {onSelectSeries ? (
@@ -352,15 +418,6 @@ export const SeriesTable = ({ trackerId, seriesList, yAxes, onSelectSeries, onDe
               </TableCell>
               <TableCell className="flex flex-wrap items-center gap-2 whitespace-normal sm:table-cell sm:whitespace-nowrap">
                 <span className="text-sm font-medium text-muted-foreground sm:hidden">Actions</span>
-                {onReorderSeries && (
-                  <span
-                    aria-label={`Drag ${s.name} to reorder`}
-                    title="Drag to reorder"
-                    className="cursor-grab text-muted-foreground"
-                  >
-                    <GripVertical className="w-4 h-4" />
-                  </span>
-                )}
                 <Button variant="destructive" size="sm" onClick={() => handleDeleteSeries(s.id)}>
                   Delete
                 </Button>
