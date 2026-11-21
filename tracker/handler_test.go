@@ -815,6 +815,99 @@ func TestHandlerListSeries(t *testing.T) {
 	})
 }
 
+func TestHandlerReorderSeries(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		s1 := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		s2 := &SeriesModel{TrackerId: tr.Id, Name: "s2", DataType: "float"}
+		s3 := &SeriesModel{TrackerId: tr.Id, Name: "s3", DataType: "float"}
+		for _, s := range []*SeriesModel{s1, s2, s3} {
+			require.NoError(t, store.addSeries(s))
+		}
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%s/series/order", string(tr.ExternalId))
+		body := ReorderSeriesRequest{SeriesIds: []SeriesExternalID{s3.Id, s1.Id, s2.Id}}
+		r := newRequestWithJSON(t, http.MethodPut, path, body)
+		r = r.WithContext(superuserCtx())
+		res := getResponse(t, http.StatusOK, h, r)
+
+		var got ListSeriesResponse
+		unmarshalResponse(t, res, &got)
+		require.Len(t, got.Series, 3)
+		require.Equal(t, s3.Id, got.Series[0].Id)
+		require.Equal(t, s1.Id, got.Series[1].Id)
+		require.Equal(t, s2.Id, got.Series[2].Id)
+		for i, s := range got.Series {
+			require.Equal(t, i, s.Position)
+		}
+	})
+
+	t.Run("rejects invalid series ids", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+		other := &TrackerModel{Name: "other"}
+		require.NoError(t, store.addTracker(other, 1))
+
+		s1 := &SeriesModel{TrackerId: tr.Id, Name: "s1", DataType: "float"}
+		s2 := &SeriesModel{TrackerId: tr.Id, Name: "s2", DataType: "float"}
+		require.NoError(t, store.addSeries(s1))
+		require.NoError(t, store.addSeries(s2))
+		foreign := &SeriesModel{TrackerId: other.Id, Name: "foreign", DataType: "float"}
+		require.NoError(t, store.addSeries(foreign))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%s/series/order", string(tr.ExternalId))
+		cases := []map[string]any{
+			{"series_ids": []any{"1", string(s1.Id)}},
+			{"series_ids": []string{string(s1.Id), string(s1.Id)}},
+			{"series_ids": []string{string(s1.Id)}},
+			{"series_ids": []string{string(s1.Id), string(foreign.Id)}},
+		}
+		for _, body := range cases {
+			r := newRequestWithJSON(t, http.MethodPut, path, body)
+			r = r.WithContext(superuserCtx())
+			getResponse(t, http.StatusBadRequest, h, r)
+		}
+
+		listed, err := store.listSeries(tr.Id)
+		require.NoError(t, err)
+		require.Len(t, listed, 2)
+		require.Equal(t, "s1", listed[0].Name)
+		require.Equal(t, "s2", listed[1].Name)
+	})
+
+	t.Run("rejects empty series_ids", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "test"}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%s/series/order", string(tr.ExternalId))
+		r := newRequestWithJSON(t, http.MethodPut, path, ReorderSeriesRequest{})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+
+	t.Run("rejects coverage tracker", func(t *testing.T) {
+		store := initTestStore(t)
+		tr := &TrackerModel{Name: "coverage", Type: TypeCoverage}
+		require.NoError(t, store.addTracker(tr, 1))
+
+		h := newHandler(store)
+		path := fmt.Sprintf("/%s/series/order", string(tr.ExternalId))
+		r := newRequestWithJSON(t, http.MethodPut, path, ReorderSeriesRequest{
+			SeriesIds: []SeriesExternalID{SeriesExternalID("ser_0195f3a6-5b8c-7e6a-8f43-123456789def")},
+		})
+		r = r.WithContext(superuserCtx())
+		getResponse(t, http.StatusBadRequest, h, r)
+	})
+}
+
 func TestHandlerDeleteSeries(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		store := initTestStore(t)

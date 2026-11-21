@@ -225,9 +225,10 @@ func insertMigratedSeries(tx *sqlx.Tx, trackerID int64, name string) (int64, err
 		return 0, fmt.Errorf("insertMigratedSeries new external id: %w", err)
 	}
 	res, err := tx.Exec(`
-		INSERT INTO tracker_series (tracker_id, external_id, name, data_type, config)
-		VALUES (?, ?, ?, 'int', '{}')`,
-		trackerID, ext.Bare(), name)
+		INSERT INTO tracker_series (tracker_id, external_id, name, data_type, config, position)
+		VALUES (?, ?, ?, 'int', '{}',
+			(SELECT COALESCE(MAX(position), -1) + 1 FROM tracker_series WHERE tracker_id = ?))`,
+		trackerID, ext.Bare(), name, trackerID)
 	if err != nil {
 		return 0, fmt.Errorf("insertMigratedSeries insert: %w", err)
 	}

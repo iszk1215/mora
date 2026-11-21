@@ -144,6 +144,31 @@ func TestMigrateBackfillsSeriesValueExternalIDs(t *testing.T) {
 	}
 }
 
+func TestMigrateBackfillsSeriesPositions(t *testing.T) {
+	db := openOldSeriesValueDB(t)
+	s := newTrackerStore(db)
+	require.NoError(t, s.initialize())
+
+	series, err := s.listSeries(1)
+	require.NoError(t, err)
+	require.Len(t, series, 2)
+	require.Equal(t, "first", series[0].Name)
+	require.Equal(t, 1, series[0].Position)
+	require.Equal(t, "second", series[1].Name)
+	require.Equal(t, 2, series[1].Position)
+
+	require.NoError(t, s.reorderSeries(1, []SeriesExternalID{series[1].Id, series[0].Id}))
+	require.NoError(t, s.initialize())
+
+	series, err = s.listSeries(1)
+	require.NoError(t, err)
+	require.Len(t, series, 2)
+	require.Equal(t, "second", series[0].Name)
+	require.Equal(t, 0, series[0].Position)
+	require.Equal(t, "first", series[1].Name)
+	require.Equal(t, 1, series[1].Position)
+}
+
 func TestStoreExternalIDRoundTrip(t *testing.T) {
 	s := initTestStore(t)
 

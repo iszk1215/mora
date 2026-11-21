@@ -471,6 +471,77 @@ func TestStoreSeries(t *testing.T) {
 	})
 }
 
+func TestStoreSeriesOrdering(t *testing.T) {
+	s := initTestStore(t)
+	tr := &TrackerModel{Name: "test_tracker"}
+	require.NoError(t, s.addTracker(tr, 1))
+	other := &TrackerModel{Name: "other_tracker"}
+	require.NoError(t, s.addTracker(other, 1))
+
+	seriesNames := func(items []SeriesModel) []string {
+		names := make([]string, 0, len(items))
+		for _, item := range items {
+			names = append(names, item.Name)
+		}
+		return names
+	}
+
+	series := make([]*SeriesModel, 0, 3)
+	for _, name := range []string{"a", "b", "c"} {
+		item := &SeriesModel{TrackerId: tr.Id, Name: name, DataType: "float"}
+		require.NoError(t, s.addSeries(item))
+		series = append(series, item)
+	}
+	for i, item := range series {
+		require.Equal(t, i, item.Position)
+	}
+
+	listed, err := s.listSeries(tr.Id)
+	require.NoError(t, err)
+	require.Equal(t, []string{"a", "b", "c"}, seriesNames(listed))
+
+	grouped, err := s.listSeriesByTrackerIDs([]int64{tr.Id})
+	require.NoError(t, err)
+	require.Equal(t, []string{"a", "b", "c"}, seriesNames(grouped[tr.Id]))
+
+	order := []SeriesExternalID{series[2].Id, series[0].Id, series[1].Id}
+	require.NoError(t, s.reorderSeries(tr.Id, order))
+
+	listed, err = s.listSeries(tr.Id)
+	require.NoError(t, err)
+	require.Equal(t, []string{"c", "a", "b"}, seriesNames(listed))
+	for i, item := range listed {
+		require.Equal(t, i, item.Position)
+	}
+
+	added := &SeriesModel{TrackerId: tr.Id, Name: "d", DataType: "float"}
+	require.NoError(t, s.addSeries(added))
+	require.Equal(t, 3, added.Position)
+
+	require.NoError(t, s.deleteSeries(series[0].InternalId))
+	listed, err = s.listSeries(tr.Id)
+	require.NoError(t, err)
+	require.Equal(t, []string{"c", "b", "d"}, seriesNames(listed))
+	for i, item := range listed {
+		require.Equal(t, i, item.Position)
+	}
+
+	foreign := &SeriesModel{TrackerId: other.Id, Name: "foreign", DataType: "float"}
+	require.NoError(t, s.addSeries(foreign))
+
+	invalidOrders := [][]SeriesExternalID{
+		{series[2].Id, series[1].Id},
+		{series[2].Id, series[2].Id, series[1].Id},
+		{series[2].Id, series[1].Id, foreign.Id},
+	}
+	for _, invalid := range invalidOrders {
+		require.ErrorIs(t, s.reorderSeries(tr.Id, invalid), ErrInvalidSeriesOrder)
+		listed, err = s.listSeries(tr.Id)
+		require.NoError(t, err)
+		require.Equal(t, []string{"c", "b", "d"}, seriesNames(listed))
+	}
+}
+
 func TestStoreFindSeries(t *testing.T) {
 	tracker := &TrackerModel{Name: "test_tracker"}
 

@@ -246,6 +246,23 @@ describe('TrackerCreate', () => {
 })
 
 describe('TrackerDetailView', () => {
+  const originalElementFromPoint = document.elementFromPoint
+
+  const getSeriesRow = (name: string): HTMLElement => {
+    const cell = within(screen.getByRole('table')).getByText(name)
+    return cell.closest('tr') as HTMLElement
+  }
+
+  const dragSeries = (sourceName: string, targetName: string) => {
+    const sourceRow = getSeriesRow(sourceName)
+    const targetRow = getSeriesRow(targetName)
+    const handle = within(sourceRow).getByLabelText(`Drag ${sourceName} to reorder`)
+    document.elementFromPoint = vi.fn((x: number, y: number) => (x === 1 && y === 100 ? targetRow : sourceRow))
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 0, clientY: 100 })
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 1, clientY: 100 })
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 1, clientY: 100 })
+  }
+
   beforeEach(() => {
     vi.mocked(useLoaderData).mockReset()
     globalThis.fetch = vi.fn().mockResolvedValue({
@@ -255,6 +272,7 @@ describe('TrackerDetailView', () => {
   })
 
   afterEach(() => {
+    document.elementFromPoint = originalElementFromPoint
     vi.restoreAllMocks()
   })
 
@@ -409,6 +427,97 @@ describe('TrackerDetailView', () => {
     expect(table.getByText('series-a')).toBeInTheDocument()
     expect(table.getByText('series-b')).toBeInTheDocument()
     expect(screen.getAllByText('Delete')).toHaveLength(2)
+  })
+
+  it('reorders series from the series settings panel', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: '1', tracker_id: "trk_1", name: 'series-a', data_type: 'float', config: '{}', position: 0 },
+        { id: '2', tracker_id: "trk_1", name: 'series-b', data_type: 'int', config: '{}', position: 1 },
+      ],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    const handle = screen.getByLabelText('Drag series-a to reorder')
+    expect(handle).toHaveClass('touch-none')
+    expect(getSeriesRow('series-a').firstElementChild).toContainElement(handle)
+    expect(screen.queryByRole('button', { name: 'Move series-a down' })).not.toBeInTheDocument()
+
+    dragSeries('series-a', 'series-b')
+
+    await vi.waitFor(() => {
+      const call = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) => url === '/api/trackers/trk_1/series/order' && (init as RequestInit)?.method === 'PUT'
+      )
+      expect(call).toBeDefined()
+      expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ series_ids: ['2', '1'] })
+    })
+
+    const rows = within(screen.getByRole('table')).getAllByRole('row')
+    expect(rows[1]).toHaveTextContent('series-b')
+    expect(rows[2]).toHaveTextContent('series-a')
+  })
+
+  it('reorders series with the keyboard from the drag handle', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: '1', tracker_id: "trk_1", name: 'series-a', data_type: 'float', config: '{}', position: 0 },
+        { id: '2', tracker_id: "trk_1", name: 'series-b', data_type: 'int', config: '{}', position: 1 },
+      ],
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    fireEvent.keyDown(screen.getByLabelText('Drag series-a to reorder'), { key: 'ArrowDown' })
+
+    await vi.waitFor(() => {
+      const call = vi.mocked(globalThis.fetch).mock.calls.find(
+        ([url, init]) => url === '/api/trackers/trk_1/series/order' && (init as RequestInit)?.method === 'PUT'
+      )
+      expect(call).toBeDefined()
+      expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ series_ids: ['2', '1'] })
+    })
+  })
+
+  it('restores series order when reorder fails', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useLoaderData).mockReturnValue({
+      tracker: { id: "trk_1", name: 'test', visibility: 'private', type: 'tracker', chart_config: '{}', role: 'owner', liked: false },
+      series: [
+        { id: '1', tracker_id: "trk_1", name: 'series-a', data_type: 'float', config: '{}', position: 0 },
+        { id: '2', tracker_id: "trk_1", name: 'series-b', data_type: 'int', config: '{}', position: 1 },
+      ],
+    })
+    vi.mocked(globalThis.fetch).mockImplementation((_url, init) => {
+      if ((init as RequestInit)?.method === 'PUT') {
+        return Promise.resolve({ ok: false, status: 400 } as Response)
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ values: [] }),
+      } as Response)
+    })
+    render(<MemoryRouter><UserProvider value={mockUser}><TrackerDetailView /></UserProvider></MemoryRouter>)
+
+    await user.click(screen.getByRole('button', { name: /tracker menu/i }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Series' }))
+
+    dragSeries('series-a', 'series-b')
+
+    await vi.waitFor(() => {
+      const rows = within(screen.getByRole('table')).getAllByRole('row')
+      expect(rows[1]).toHaveTextContent('series-a')
+      expect(rows[2]).toHaveTextContent('series-b')
+    })
   })
 
   it('renames a series from the series settings panel', async () => {
